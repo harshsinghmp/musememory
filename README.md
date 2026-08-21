@@ -6,7 +6,7 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-69%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-70%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
@@ -22,7 +22,7 @@
 
 - **Brand Name**: **Muse Memory**
 - **Infrastructure / Package / Directory**: `musememory` / `.musememory/`
-- **Primary Fast CLI Command**: **`memory`** (e.g. `memory search`, `memory context`, `memory briefing`)
+- **Primary Fast CLI Command**: **`memory`** (e.g. `memory search`, `memory context`, `memory ui`, `memory briefing`)
 - **Conflict-Safe Command Alias**: **`musememory`** (available if any conflicting tool claims `memory`)
 
 ---
@@ -35,8 +35,8 @@ Here is the 3-step setup:
 
 ```
 ┌───────────────────────────┐      ┌───────────────────────────┐      ┌───────────────────────────┐
-│ 1. Install (npm/bun/docker)│ ───► │ 2. Add MCP Config         │ ───► │ 3. AI Agent Auto-Remembers│
-│ npm, bun, curl, or docker │      │ Paste 5 lines of JSON     │      │ Works in ANY folder!      │
+│ 1. Install (curl/npm/bun) │ ───► │ 2. Add MCP Config         │ ───► │ 3. AI Agent Auto-Remembers│
+│ curl, npm, bun, or docker │      │ Paste 5 lines of JSON     │      │ Auto-starts on agent open!│
 └───────────────────────────┘      └───────────────────────────┘      └───────────────────────────┘
 ```
 
@@ -45,14 +45,14 @@ Here is the 3-step setup:
 Choose **any one** of these installation methods:
 
 ```bash
-# Option A: via npm (Node.js)
+# Option A: via one-line curl installer (Recommended)
+curl -fsSL https://raw.githubusercontent.com/name/musememory/main/scripts/install.sh | bash
+
+# Option B: via npm (Node.js)
 npm install -g musememory
 
-# Option B: via Bun (Lightning fast)
+# Option C: via Bun (Lightning fast)
 bun add -g musememory
-
-# Option C: via one-line curl installer
-curl -fsSL https://raw.githubusercontent.com/name/musememory/main/scripts/install.sh | bash
 
 # Option D: via Docker
 git clone https://github.com/name/musememory.git && cd musememory
@@ -63,9 +63,9 @@ docker build -t musememory .
 
 ### Step 2: Connect it to your AI Agent / Editor
 
-Open your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings) and paste the configuration matching your install method:
+Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings):
 
-#### 🔹 Native Install (npm, Bun, or curl):
+#### 🔹 Native Install (curl, npm, or Bun):
 ```json
 {
   "mcpServers": {
@@ -77,9 +77,7 @@ Open your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Sett
 }
 ```
 
-#### 🐳 Docker Install (How Docker connects to AI Agents):
-Because MCP operates over standard input/output (`stdio`), your AI agent simply launches the Docker container with `-i --rm` (interactive stdin attached) and mounts your workspace folder:
-
+#### 🐳 Docker Install:
 ```json
 {
   "mcpServers": {
@@ -99,23 +97,39 @@ Because MCP operates over standard input/output (`stdio`), your AI agent simply 
 }
 ```
 
-> **How it works with Docker**: The AI Agent launches the container on-demand, streams JSON-RPC over `stdio`, and all persistent memories are saved directly into your local project's `.musememory/` folder via the volume mount. No open network ports or background daemons required.
-
 ---
 
-### Step 3: Use it in ANY Workspace
+### Step 3: Zero-Setup Universal Workspace Memory
 
-**That's it!** Whenever your AI Agent starts in *any* project folder:
+**Do I need to start Muse Memory manually?**
+> **No!** When configured in your MCP settings, your AI IDE / Agent **automatically launches Muse Memory as a background subprocess on agent launch** and stops it when closed. You do not need to run any manual background server.
+
+Whenever your AI Agent starts in *any* project folder:
 1. `memory` automatically detects or creates a `.musememory/` folder in your project.
 2. The AI agent automatically retrieves relevant past fixes and constraints (`get_context`, `memory_recall`).
 3. When the AI solves a bug or makes an architectural decision, it distills it into an atomic memory entry (`memory_harvest`, `memory_capture`).
-4. You can check what your agents know anytime from your terminal using the short command:
+4. You can check what your agents know anytime from your terminal:
    ```bash
    memory briefing
    memory search "authentication redirect"
    ```
 
-*(For Docker users, you can run CLI commands with `docker run --rm -v $(pwd)/.musememory:/app/.musememory musememory search "auth"` or set an alias `alias memory='docker run -i --rm -v $(pwd)/.musememory:/app/.musememory musememory'`).*
+---
+
+## 🌐 Built-In Visual Dashboard (`memory ui`)
+
+Muse Memory includes a **100% self-contained, zero-dependency visual graph inspector**:
+
+```bash
+memory ui
+# or specify a custom port
+memory ui --port 3000
+```
+
+Open `http://localhost:3000` in your browser to:
+- 🕸️ Explore the **interactive 2D knowledge graph** connecting decisions, failures, fixes, and dependencies.
+- 🔍 Live search and filter memory units by type (`fix`, `decision`, `constraint`, `failure`) and verification level.
+- 🚦 Inspect staleness heatmaps and confirm candidate memories with a single click.
 
 ---
 
@@ -171,6 +185,7 @@ flowchart TD
 | Component | Status | Description |
 | :--- | :---: | :--- |
 | **Short Command Interface** | ✅ Complete | Concise `memory <command>` CLI alongside conflict-safe `musememory <command>`. |
+| **Embedded Web Dashboard** | ✅ Complete | Zero-dependency single-page visual graph inspector (`memory ui`). |
 | **Atomic File Engine** | ✅ Complete | Atomic tmp-rename file storage with zero database locks in `.musememory/`. |
 | **Lifecycle State Machine** | ✅ Complete | Formal transitions: `candidate`, `active`, `confirmed`, `superseded`, `stale`, `disputed`, `rejected`. |
 | **Outcome/Fix Harvester** | ✅ Complete | Distills root causes, fixes, decisions, constraints from conversations (`harvest`). |
@@ -180,15 +195,16 @@ flowchart TD
 | **Graph AST Integration** | ✅ Complete | Provider-neutral CodeGraph detector awarding symbol relevance bonuses. |
 | **Agency Network Sync** | ✅ Complete | Portable JSON snapshot `export` / `import` for team-wide cross-node sync. |
 | **Auto Root & Workspace Init** | ✅ Complete | `memory init` and auto `.musememory/` bootstrapping in any workspace. |
-| **Dual Tool Surface** | ✅ Complete | 18 CLI commands + 13 MCP tools (JSON-RPC stdio). |
+| **Dual Tool Surface** | ✅ Complete | 19 CLI commands + 13 MCP tools (JSON-RPC stdio). |
 | **Multi-Platform Distribution** | ✅ Complete | Standalone NPM package, Bun native, curl installer, and Docker container. |
-| **Automated Test Suite** | ✅ Complete | 69 tests passing across 10 suites with clean TypeScript static checks. |
+| **Automated Test Suite** | ✅ Complete | 70 tests passing across 11 suites with clean TypeScript static checks. |
 
 ### 🔮 Scope of Work & Roadmap (Next Milestones)
 
-- [ ] **Real-Time Agency WebSocket Hub**: Optional peer-to-peer sync daemon for multi-developer agency teams.
-- [ ] **Multi-Model Embeddings Plugin**: Optional pluggable semantic vector indexing for repositories with $> 10,000$ memories.
-- [ ] **Web Inspection UI**: Minimalist local web dashboard (`localhost:31337`) for browsing visual memory graph connections.
+- [ ] **Scene-Based Consolidation Engine**: Automated 1-paragraph summary rollups of related memory cells.
+- [ ] **Autonomous Verification Oracle**: Automatically executes test commands to verify code fixes.
+- [ ] **Dynamic Token Budgeter**: Packs top memories into exact token budgets for 95% token savings.
+- [ ] **Real-Time Agency WebSocket Hub**: Multi-developer live sync daemon.
 
 ---
 
@@ -201,6 +217,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
 | `init` | `[path]` | Initialize `.musememory/` directory and `CURRENT.md` in workspace. |
+| `ui` | `[--port N]` | Launch zero-dependency visual knowledge graph dashboard. |
 | `context` | `[query] [--limit N] [--project P] [--type T] [--status S] [--verified]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--include-superseded] [--type T] [--status S]` | Ranked token search with scores and status indicators. |
 | `harvest` | `<text\|file> --project P [--confirmed]` | Distill raw text/transcripts into structured outcome/fix memory units. |
@@ -251,7 +268,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 69 tests passing across 10 test suites
+bun test          # 70 tests passing across 11 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

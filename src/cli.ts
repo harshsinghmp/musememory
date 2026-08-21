@@ -20,6 +20,7 @@ Usage: memory <command> [args] (alias: musememory)
 
 Commands:
   init [path]                                   initialize .musememory/ folder in workspace
+  ui [--port N]                                 launch zero-dependency visual graph dashboard
   context [query] [--limit N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context (default limit 5)
   search <query> [--limit N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
   propose <text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]  create candidate entry (confirmed with --confirmed)
@@ -117,6 +118,23 @@ export async function main(argv: string[]): Promise<number> {
         writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
       }
       console.log(`Initialized musememory in ${memoryDir}`);
+      return 0;
+    }
+
+    case "ui":
+    case "dashboard": {
+      const ctx = requireRoot();
+      if (!ctx) return 1;
+      const port = flags["port"] ? parseInt(flags["port"], 10) : 3000;
+      const { startUiServer } = await import("./ui.ts");
+      const srv = await startUiServer({
+        port,
+        memoryDir: ctx.memoryDir,
+        store: ctx.store,
+      });
+      console.log(`🧠 Muse Memory Visual Dashboard running at: http://localhost:${srv.port}`);
+      console.log(`Press Ctrl+C to stop.`);
+      await new Promise<void>(() => {});
       return 0;
     }
 
