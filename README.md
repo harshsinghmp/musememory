@@ -178,24 +178,10 @@ flowchart TD
 
 ---
 
-## 📋 Comprehensive Scope of Work & Implementation Checklist
+## 🔮 Scope of Work & Roadmap
 
-### 🚀 Implementation Status (Strikethrough = Implemented & Verified)
+For full historical details of completed v1.0.0 features, see [`CHANGELOG.md`](CHANGELOG.md).
 
-- [x] ~~**Short Command Interface**: Fast, concise `memory <command>` CLI alongside conflict-safe `musememory <command>` alias.~~
-- [x] ~~**Embedded Web Dashboard (`memory ui`)**: 100% zero-dependency Canvas 2D visual knowledge graph inspector and search UI.~~
-- [x] ~~**Atomic File Storage Engine**: Safe temp-file + rename atomic YAML storage in `.musememory/` with zero external DB locks.~~
-- [x] ~~**Formal Lifecycle State Machine**: Full lifecycle transitions (`candidate` ➔ `confirmed` ➔ `superseded` / `stale` / `disputed` / `rejected`).~~
-- [x] ~~**Outcome & Fix Distillation Harvester (`memory harvest`)**: Distills root causes, fixes, decisions, and constraints from chat threads.~~
-- [x] ~~**Mathematical Salience & Relevance Ranker**: Bounded scoring: $\text{Applicability} + \text{Status} + \text{Verification} + \text{Graph} + \text{Salience} + \text{Decay}$.~~
-- [x] ~~**Vibeguard Zero-Leakage Secret Defense**: Pure TypeScript pre-write scanner blocking 8 credential classes before disk write.~~
-- [x] ~~**Deep Referential Store Validator (`memory validate`)**: Audits JSON schemas, broken relation links, supersession pointers, and secrets.~~
-- [x] ~~**Provider-Neutral Graph AST Integration**: Detects CodeGraph index and awards capped relevance bonuses for matching symbols.~~
-- [x] ~~**Agency Network Snapshot Synchronizer**: Portable JSON snapshot `export` and `import` for cross-machine team synchronization.~~
-- [x] ~~**Universal Project Discovery & Auto-Init**: Dynamic upward scan and automatic `.musememory/` workspace bootstrapping.~~
-- [x] ~~**Dual Interface Tool Surface**: 19 CLI commands + 13 Model Context Protocol (MCP stdio) tool handlers.~~
-- [x] ~~**Multi-Platform Packaging & Distribution**: Verified on one-line curl installer, global npm, Bun native, and Docker containers.~~
-- [x] ~~**Automated Test Harness**: 70 tests passing across 11 test suites with 0 TypeScript static type errors.~~
 - [ ] **Scene-Based Hierarchical Consolidation (`mem_scenes`)**: Automated background 1-paragraph summary rollups of related memory cells (`memory consolidate`).
 - [ ] **Autonomous Verification Oracle (`memory verify <id>`)**: Auto-executes `test_command` in an isolated sandbox, automatically confirming verified code fixes.
 - [ ] **Dynamic Prompt Token Budgeter (`--token-budget N`)**: Knapsack packing algorithm delivering 95% token reduction under hard token ceilings.
