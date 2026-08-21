@@ -178,33 +178,32 @@ flowchart TD
 
 ---
 
-## 📋 Implementation Checklist & Project Scope
+## 📋 Comprehensive Scope of Work & Implementation Checklist
 
-### ✅ What Has Been Implemented (100% Verified)
+### 🚀 Implementation Status (Strikethrough = Implemented & Verified)
 
-| Component | Status | Description |
-| :--- | :---: | :--- |
-| **Short Command Interface** | ✅ Complete | Concise `memory <command>` CLI alongside conflict-safe `musememory <command>`. |
-| **Embedded Web Dashboard** | ✅ Complete | Zero-dependency single-page visual graph inspector (`memory ui`). |
-| **Atomic File Engine** | ✅ Complete | Atomic tmp-rename file storage with zero database locks in `.musememory/`. |
-| **Lifecycle State Machine** | ✅ Complete | Formal transitions: `candidate`, `active`, `confirmed`, `superseded`, `stale`, `disputed`, `rejected`. |
-| **Outcome/Fix Harvester** | ✅ Complete | Distills root causes, fixes, decisions, constraints from conversations (`harvest`). |
-| **Salience & Multi-Factor Ranking** | ✅ Complete | Formula: $\text{Applicability} + \text{Status} + \text{Verification} + \text{Graph} + \text{Salience} + \text{Decay}$. |
-| **Vibeguard Secret Scanner** | ✅ Complete | Built-in regex engine intercepting 8 credential classes. |
-| **Deep Referential Validator** | ✅ Complete | Checks schema, broken links, superseded pointers, and credential leaks. |
-| **Graph AST Integration** | ✅ Complete | Provider-neutral CodeGraph detector awarding symbol relevance bonuses. |
-| **Agency Network Sync** | ✅ Complete | Portable JSON snapshot `export` / `import` for team-wide cross-node sync. |
-| **Auto Root & Workspace Init** | ✅ Complete | `memory init` and auto `.musememory/` bootstrapping in any workspace. |
-| **Dual Tool Surface** | ✅ Complete | 19 CLI commands + 13 MCP tools (JSON-RPC stdio). |
-| **Multi-Platform Distribution** | ✅ Complete | Standalone NPM package, Bun native, curl installer, and Docker container. |
-| **Automated Test Suite** | ✅ Complete | 70 tests passing across 11 suites with clean TypeScript static checks. |
-
-### 🔮 Scope of Work & Roadmap (Next Milestones)
-
-- [ ] **Scene-Based Consolidation Engine**: Automated 1-paragraph summary rollups of related memory cells.
-- [ ] **Autonomous Verification Oracle**: Automatically executes test commands to verify code fixes.
-- [ ] **Dynamic Token Budgeter**: Packs top memories into exact token budgets for 95% token savings.
-- [ ] **Real-Time Agency WebSocket Hub**: Multi-developer live sync daemon.
+- [x] ~~**Short Command Interface**: Fast, concise `memory <command>` CLI alongside conflict-safe `musememory <command>` alias.~~
+- [x] ~~**Embedded Web Dashboard (`memory ui`)**: 100% zero-dependency Canvas 2D visual knowledge graph inspector and search UI.~~
+- [x] ~~**Atomic File Storage Engine**: Safe temp-file + rename atomic YAML storage in `.musememory/` with zero external DB locks.~~
+- [x] ~~**Formal Lifecycle State Machine**: Full lifecycle transitions (`candidate` ➔ `confirmed` ➔ `superseded` / `stale` / `disputed` / `rejected`).~~
+- [x] ~~**Outcome & Fix Distillation Harvester (`memory harvest`)**: Distills root causes, fixes, decisions, and constraints from chat threads.~~
+- [x] ~~**Mathematical Salience & Relevance Ranker**: Bounded scoring: $\text{Applicability} + \text{Status} + \text{Verification} + \text{Graph} + \text{Salience} + \text{Decay}$.~~
+- [x] ~~**Vibeguard Zero-Leakage Secret Defense**: Pure TypeScript pre-write scanner blocking 8 credential classes before disk write.~~
+- [x] ~~**Deep Referential Store Validator (`memory validate`)**: Audits JSON schemas, broken relation links, supersession pointers, and secrets.~~
+- [x] ~~**Provider-Neutral Graph AST Integration**: Detects CodeGraph index and awards capped relevance bonuses for matching symbols.~~
+- [x] ~~**Agency Network Snapshot Synchronizer**: Portable JSON snapshot `export` and `import` for cross-machine team synchronization.~~
+- [x] ~~**Universal Project Discovery & Auto-Init**: Dynamic upward scan and automatic `.musememory/` workspace bootstrapping.~~
+- [x] ~~**Dual Interface Tool Surface**: 19 CLI commands + 13 Model Context Protocol (MCP stdio) tool handlers.~~
+- [x] ~~**Multi-Platform Packaging & Distribution**: Verified on one-line curl installer, global npm, Bun native, and Docker containers.~~
+- [x] ~~**Automated Test Harness**: 70 tests passing across 11 test suites with 0 TypeScript static type errors.~~
+- [ ] **Scene-Based Hierarchical Consolidation (`mem_scenes`)**: Automated background 1-paragraph summary rollups of related memory cells (`memory consolidate`).
+- [ ] **Autonomous Verification Oracle (`memory verify <id>`)**: Auto-executes `test_command` in an isolated sandbox, automatically confirming verified code fixes.
+- [ ] **Dynamic Prompt Token Budgeter (`--token-budget N`)**: Knapsack packing algorithm delivering 95% token reduction under hard token ceilings.
+- [ ] **Multi-Hop Causality Graph Tracer (`memory trace <id>`)**: Recursive graph traversal walking full `decision` ➔ `failure` ➔ `fix` ➔ `superseded` causal pathways.
+- [ ] **In-Place Core Memory Partitioning (`memory core`)**: Letta/MemGPT 4-tier model supporting in-place runtime editing of permanent operating guidelines.
+- [ ] **Automated Post-Turn Transcript Harvester Hook**: Zero-prompt Git pre-commit and IDE session-end hook that automatically harvests memories.
+- [ ] **Real-Time Agency WebSocket Hub (`memory daemon`)**: Live peer-to-peer event notification daemon for multi-developer agency teams.
+- [ ] **Local Offline Hybrid Vector Engine**: Zero-cloud local ONNX/WASM embedding model for hybrid semantic + BM25 search at $> 10,000$ memory scale.
 
 ---
 
