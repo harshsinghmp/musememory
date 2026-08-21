@@ -35,14 +35,14 @@ Here is the 3-step setup:
 
 ```
 ┌───────────────────────────┐      ┌───────────────────────────┐      ┌───────────────────────────┐
-│ 1. Install Globally       │ ───► │ 2. Add MCP Config         │ ───► │ 3. AI Agent Auto-Remembers│
-│ npm install -g musememory │      │ Paste 5 lines of JSON     │      │ Works in ANY folder!      │
+│ 1. Install (npm/bun/docker)│ ───► │ 2. Add MCP Config         │ ───► │ 3. AI Agent Auto-Remembers│
+│ npm, bun, curl, or docker │      │ Paste 5 lines of JSON     │      │ Works in ANY folder!      │
 └───────────────────────────┘      └───────────────────────────┘      └───────────────────────────┘
 ```
 
 ### Step 1: Install `musememory` on your machine
 
-Open your terminal and run **one** of these:
+Choose **any one** of these installation methods:
 
 ```bash
 # Option A: via npm (Node.js)
@@ -53,12 +53,19 @@ bun add -g musememory
 
 # Option C: via one-line curl installer
 curl -fsSL https://raw.githubusercontent.com/name/musememory/main/scripts/install.sh | bash
+
+# Option D: via Docker
+git clone https://github.com/name/musememory.git && cd musememory
+docker build -t musememory .
 ```
+
+---
 
 ### Step 2: Connect it to your AI Agent / Editor
 
-Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings):
+Open your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings) and paste the configuration matching your install method:
 
+#### 🔹 Native Install (npm, Bun, or curl):
 ```json
 {
   "mcpServers": {
@@ -69,7 +76,32 @@ Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, 
   }
 }
 ```
-*(Note: You can also use `"musememory"` as the command name).*
+
+#### 🐳 Docker Install (How Docker connects to AI Agents):
+Because MCP operates over standard input/output (`stdio`), your AI agent simply launches the Docker container with `-i --rm` (interactive stdin attached) and mounts your workspace folder:
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/absolute/path/to/your/project/.musememory:/app/.musememory",
+        "musememory",
+        "mcp"
+      ]
+    }
+  }
+}
+```
+
+> **How it works with Docker**: The AI Agent launches the container on-demand, streams JSON-RPC over `stdio`, and all persistent memories are saved directly into your local project's `.musememory/` folder via the volume mount. No open network ports or background daemons required.
+
+---
 
 ### Step 3: Use it in ANY Workspace
 
@@ -82,6 +114,8 @@ Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, 
    memory briefing
    memory search "authentication redirect"
    ```
+
+*(For Docker users, you can run CLI commands with `docker run --rm -v $(pwd)/.musememory:/app/.musememory musememory search "auth"` or set an alias `alias memory='docker run -i --rm -v $(pwd)/.musememory:/app/.musememory musememory'`).*
 
 ---
 
@@ -210,21 +244,6 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 | `memory_import` | Imports validated memories from a snapshot. |
 | `memory_validate` | Audits store integrity and detects credential leaks. |
 | `graph_status` | Inspects CodeGraph AST integration status. |
-
----
-
-## 🐳 Docker Support
-
-Run `musememory` in an isolated container:
-
-```bash
-# Build & Run via Docker Compose
-docker compose up -d
-
-# Or run directly via Docker CLI
-docker build -t musememory .
-docker run -it -v $(pwd)/.musememory:/app/.musememory musememory
-```
 
 ---
 
