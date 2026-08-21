@@ -1,0 +1,10 @@
+id: m_1700000008000_rejected
+title: Rejected approach
+content: Using a message queue was rejected in favor of direct calls.
+project: kameli
+status: rejected
+type: decision
+created_at: 2026-07-15T10:00:00Z
+updated_at: 2026-07-15T10:00:00Z
+source: session s_8
+tags: [architecture]

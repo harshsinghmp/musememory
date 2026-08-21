@@ -1,0 +1,14 @@
+id: m_1700000009000_confirmed
+title: Confirmed fix
+content: The login redirect bug was fixed by validating the return URL.
+project: aria
+status: confirmed
+type: fix
+created_at: 2026-08-12T10:00:00Z
+updated_at: 2026-08-12T10:00:00Z
+source: session s_9
+tags: [auth, fix]
+verification:
+  level: user-confirmed
+  verified_at: 2026-08-12T10:00:00Z
+last_confirmed_at: 2026-08-12T10:00:00Z

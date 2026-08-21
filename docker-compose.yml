@@ -1,0 +1,10 @@
+services:
+  musememory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./.memory:/app/.memory
+    stdin_open: true
+    tty: true
+    command: ["mcp"]

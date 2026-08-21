@@ -1,0 +1,446 @@
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { findOrCreateProjectRoot } from "./root.ts";
+import { openStore, get, propose, confirm, supersede, save, link, markStale, reject } from "./store.ts";
+import { search } from "./search.ts";
+import { recordSessionStart } from "./sessions.ts";
+import { scanSecrets } from "./secrets.ts";
+import { validateStore } from "./schema.ts";
+import { getGraphStatus } from "./graph.ts";
+import { extractHarvestUnits, exportSnapshot, importSnapshot } from "./harvest.ts";
+import type { MemoryEntry, MemoryType } from "./types.ts";
+
+export async function runMcpServer(): Promise<void> {
+  const { root, memoryDir } = findOrCreateProjectRoot(process.cwd());
+  const store = openStore(memoryDir);
+
+  const server = new Server(
+    { name: "musememory", version: "1.0.0" },
+    { capabilities: { tools: {} } },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "memory_read",
+        description: "Read a full memory entry by id",
+        inputSchema: {
+          type: "object",
+          properties: { id: { type: "string" } },
+          required: ["id"],
+        },
+      },
+      {
+        name: "get_context",
+        description: "Ranked active context entries for prompt injection",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            project: { type: "string" },
+            limit: { type: "number" },
+            type: { type: "string" },
+            status: { type: "string" },
+            verified: { type: "boolean" },
+          },
+        },
+      },
+      {
+        name: "search",
+        description: "Ranked search over memory entries",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            limit: { type: "number" },
+            include_superseded: { type: "boolean" },
+            type: { type: "string" },
+            status: { type: "string" },
+            verified: { type: "boolean" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "memory_capture",
+        description: "Create a new memory entry with inline secret scan (refuses probable secrets)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string" },
+            project: { type: "string" },
+            title: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            type: { type: "string" },
+            confirmed: { type: "boolean" },
+          },
+          required: ["content", "project"],
+        },
+      },
+      {
+        name: "memory_harvest",
+        description: "Distill conversation/text into structured outcome, fix, decision, and failure memories",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string" },
+            project: { type: "string" },
+            confirmed: { type: "boolean" },
+          },
+          required: ["text", "project"],
+        },
+      },
+      {
+        name: "memory_recall",
+        description: "Rich recall of ranked entries with verification/related/session/graph fields",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            limit: { type: "number" },
+            project: { type: "string" },
+            type: { type: "string" },
+            status: { type: "string" },
+            verified: { type: "boolean" },
+          },
+        },
+      },
+      {
+        name: "memory_confirm",
+        description: "Promote a candidate, disputed, or stale entry to confirmed",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_supersede",
+        description: "Mark old memory entry superseded by new confirmed memory entry",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "The old memory ID to supersede" },
+            with: { type: "string", description: "The new confirmed memory ID" },
+            new_id: { type: "string", description: "Alias for with" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_link",
+        description: "Two-way link related memory entries",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            related: { type: "array", items: { type: "string" } },
+          },
+          required: ["id", "related"],
+        },
+      },
+      {
+        name: "memory_mark_stale",
+        description: "Mark a memory entry stale",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_reject",
+        description: "Reject a memory entry",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_export",
+        description: "Export memory snapshot for agency team synchronization",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "memory_import",
+        description: "Import memory snapshot entries into the store",
+        inputSchema: {
+          type: "object",
+          properties: {
+            entries: { type: "array", items: { type: "object" } },
+            overwrite: { type: "boolean" },
+          },
+          required: ["entries"],
+        },
+      },
+      {
+        name: "propose",
+        description: "Create a new memory entry (candidate by default; pass confirmed=true for confirmed)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string" },
+            project: { type: "string" },
+            title: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            type: { type: "string" },
+            confirmed: { type: "boolean" },
+          },
+          required: ["content", "project"],
+        },
+      },
+      {
+        name: "confirm_fix",
+        description: "Confirm a disputed entry as fixed (disputed -> confirmed)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            resolution: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "record_session",
+        description: "Record a session start entry",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string" },
+            note: { type: "string" },
+          },
+          required: ["project"],
+        },
+      },
+      {
+        name: "memory_validate",
+        description: "Validate the memory store for schema violations, secrets, broken links, and integrity",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dry_run: { type: "boolean" },
+          },
+        },
+      },
+      {
+        name: "graph_status",
+        description: "Check the status of the project graph provider (e.g. codegraph)",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+    ],
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const a = (args ?? {}) as Record<string, unknown>;
+
+    switch (name) {
+      case "memory_read": {
+        const entry = get(store, String(a.id));
+        if (!entry) return toolError(`no entry with id ${a.id}`);
+        return toolResult(entry);
+      }
+      case "get_context": {
+        const res = search(store, memoryDir, String(a.query ?? ""), {
+          limit: typeof a.limit === "number" ? a.limit : 5,
+          project: a.project ? String(a.project) : undefined,
+          includeSuperseded: false,
+          type: a.type ? String(a.type) : undefined,
+          status: a.status ? String(a.status) : undefined,
+          verified: a.verified === true,
+        });
+        return toolResult(res.results.map((r) => ({ ...r.entry, score: r.score })));
+      }
+      case "search": {
+        const res = search(store, memoryDir, String(a.query), {
+          limit: typeof a.limit === "number" ? a.limit : 10,
+          includeSuperseded: a.include_superseded === true,
+          type: a.type ? String(a.type) : undefined,
+          status: a.status ? String(a.status) : undefined,
+          verified: a.verified === true,
+        });
+        return toolResult({
+          results: res.results.map((r) => ({ ...r.entry, score: r.score })),
+          source: res.source,
+          stale: res.stale,
+        });
+      }
+      case "memory_capture": {
+        const content = String(a.content);
+        const title = a.title ? String(a.title) : undefined;
+        const secrets = scanSecrets(`${title ?? ""} ${content}`);
+        if (secrets.length > 0) return toolError(`probable secret detected: ${secrets.join(", ")}`);
+        try {
+          const entry = propose(store, {
+            content,
+            project: String(a.project),
+            title,
+            tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+            type: a.type ? (String(a.type) as MemoryType) : undefined,
+            confirmed: a.confirmed === true,
+          });
+          return toolResult(entry);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_harvest": {
+        const text = String(a.text);
+        const project = String(a.project);
+        const isConfirmed = a.confirmed === true;
+        const units = extractHarvestUnits(text);
+        const created: MemoryEntry[] = [];
+        for (const u of units) {
+          try {
+            const entry = propose(store, {
+              content: u.content,
+              project,
+              title: u.title,
+              tags: u.tags,
+              type: u.type,
+              confirmed: isConfirmed,
+            });
+            entry.salience = u.salience;
+            save(store, entry);
+            created.push(entry);
+          } catch {
+            // Ignore skipped entries with errors
+          }
+        }
+        return toolResult({ harvested_count: created.length, entries: created });
+      }
+      case "memory_recall": {
+        const res = search(store, memoryDir, String(a.query ?? ""), {
+          limit: typeof a.limit === "number" ? a.limit : 5,
+          project: a.project ? String(a.project) : undefined,
+          includeSuperseded: false,
+          type: a.type ? String(a.type) : undefined,
+          status: a.status ? String(a.status) : undefined,
+          verified: a.verified === true,
+        });
+        return toolResult(res.results.map((r) => ({ ...r.entry, score: r.score })));
+      }
+      case "memory_confirm": {
+        const entry = confirm(store, String(a.id));
+        if (!entry) return toolError(`could not confirm ${a.id} (not found or invalid status transition)`);
+        return toolResult(entry);
+      }
+      case "memory_supersede": {
+        const oldId = String(a.id);
+        const newId = String(a.with ?? a.new_id ?? "");
+        if (!newId) return toolError("memory_supersede requires 'with' or 'new_id' parameter");
+        const entry = supersede(store, oldId, newId);
+        if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
+        return toolResult(entry);
+      }
+      case "memory_link": {
+        const related = Array.isArray(a.related) ? a.related.map(String) : [];
+        const entry = link(store, String(a.id), related);
+        if (!entry) return toolError(`could not link ${a.id} (missing id or related id)`);
+        return toolResult(entry);
+      }
+      case "memory_mark_stale": {
+        const entry = markStale(store, String(a.id), a.reason ? String(a.reason) : undefined);
+        if (!entry) return toolError(`no entry with id ${a.id}`);
+        return toolResult(entry);
+      }
+      case "memory_reject": {
+        const entry = reject(store, String(a.id));
+        if (!entry) return toolError(`no entry with id ${a.id}`);
+        return toolResult(entry);
+      }
+      case "memory_export": {
+        const snapshot = exportSnapshot(store);
+        return toolResult(snapshot);
+      }
+      case "memory_import": {
+        const entries = (a.entries ?? []) as MemoryEntry[];
+        const res = importSnapshot(store, { entries }, { overwrite: a.overwrite === true });
+        return toolResult(res);
+      }
+      case "propose": {
+        const content = String(a.content);
+        const title = a.title ? String(a.title) : undefined;
+        try {
+          const entry = propose(store, {
+            content,
+            project: String(a.project),
+            title,
+            tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+            type: a.type ? (String(a.type) as MemoryType) : undefined,
+            confirmed: a.confirmed === true,
+          });
+          return toolResult(entry);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "confirm_fix": {
+        const entry = get(store, String(a.id));
+        if (!entry) return toolError(`no entry with id ${a.id}`);
+        if (entry.status !== "disputed") return toolError(`entry ${a.id} is not disputed`);
+        const updated = confirm(store, entry.id);
+        if (!updated) return toolError(`no entry with id ${a.id}`);
+        if (a.resolution) {
+          updated.content = `${updated.content}\n\nResolution: ${String(a.resolution)}`;
+          save(store, updated);
+        }
+        return toolResult(updated);
+      }
+      case "record_session": {
+        const { entry, sessionId } = recordSessionStart(store, String(a.project), a.note ? String(a.note) : undefined);
+        return toolResult({ ...entry, sessionId });
+      }
+      case "memory_validate": {
+        const report = validateStore(store);
+        return toolResult(report);
+      }
+      case "graph_status": {
+        const status = getGraphStatus(root);
+        return toolResult(status);
+      }
+      default:
+        return toolError(`unknown tool ${name}`);
+    }
+  });
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  process.stdin.resume();
+  await new Promise<void>((resolve) => {
+    process.stdin.on("end", () => resolve());
+    process.stdin.on("close", () => resolve());
+  });
+}
+
+function toolResult(content: unknown) {
+  return {
+    content: [{ type: "text", text: JSON.stringify(content, null, 2) }],
+  };
+}
+
+function toolError(message: string) {
+  return {
+    isError: true,
+    content: [{ type: "text", text: message }],
+  };
+}

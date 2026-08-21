@@ -1,0 +1,11 @@
+id: m_1700000003000_olddeploy
+title: Deploy via rsync
+content: Deployments use rsync to the staging server.
+project: aria
+status: superseded
+type: operation
+created_at: 2026-06-01T10:00:00Z
+updated_at: 2026-07-20T10:00:00Z
+source: session s_4
+tags: [deploy]
+superseded_by: [m_1700000004000_newdeploy]

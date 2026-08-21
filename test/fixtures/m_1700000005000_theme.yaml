@@ -1,0 +1,10 @@
+id: m_1700000005000_theme
+title: Dark mode theme
+content: The kameli theme uses dark mode by default.
+project: kameli
+status: active
+type: preference
+created_at: 2026-08-01T10:00:00Z
+updated_at: 2026-08-15T10:00:00Z
+source: session s_5
+tags: [theme, ui]

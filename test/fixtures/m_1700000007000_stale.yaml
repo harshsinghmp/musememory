@@ -1,0 +1,10 @@
+id: m_1700000007000_stale
+title: Old worker note
+content: The nightly worker used to run at 2am.
+project: aria
+status: stale
+type: operation
+created_at: 2026-01-10T10:00:00Z
+updated_at: 2026-01-10T10:00:00Z
+source: session s_7
+tags: [worker]

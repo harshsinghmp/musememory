@@ -1,0 +1,11 @@
+id: m_1700000004000_newdeploy
+title: Deploy via git push
+content: Deployments use git push to the staging server.
+project: aria
+status: confirmed
+type: operation
+created_at: 2026-07-20T10:00:00Z
+updated_at: 2026-07-20T10:00:00Z
+source: session s_4
+tags: [deploy]
+supersedes: [m_1700000003000_olddeploy]

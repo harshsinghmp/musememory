@@ -1,0 +1,10 @@
+id: m_1700000001000_auth
+title: Auth token expiry
+content: Auth tokens expire after 15 minutes and are verified with HMAC.
+project: aria
+status: active
+type: constraint
+created_at: 2026-07-05T10:00:00Z
+updated_at: 2026-08-05T10:00:00Z
+source: session s_2
+tags: [auth, security]

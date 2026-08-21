@@ -1,0 +1,40 @@
+{
+  "name": "musememory",
+  "version": "1.0.0",
+  "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
+  "main": "src/index.ts",
+  "type": "module",
+  "bin": {
+    "musememory": "./bin/musememory.ts",
+    "memory": "./bin/memory.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "validate": "bun run bin/musememory.ts validate --dry-run",
+    "start": "bun run bin/musememory.ts mcp"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "memory",
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "cognitive-architecture",
+    "vibeguard",
+    "agency"
+  ],
+  "author": "Harsh",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ajv": "^8.17.1",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@types/js-yaml": "^4.0.9",
+    "typescript": "^5.6.0"
+  }
+}
