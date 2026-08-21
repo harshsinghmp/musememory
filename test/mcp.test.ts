@@ -60,4 +60,18 @@ describe("mcp tool handlers logic", () => {
     expect(graph.available).toBe(false);
     cleanup(root);
   });
+
+  test("memory_detect_providers and memory_migrate handlers", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { detectProviders, runMigration } = await import("../src/migrator/index.ts");
+
+    const detected = detectProviders(root);
+    expect(Array.isArray(detected)).toBe(true);
+
+    const report = await runMigration(store, memoryDir, { dryRun: true });
+    expect(report.dryRun).toBe(true);
+    expect(Array.isArray(report.providers)).toBe(true);
+    cleanup(root);
+  });
 });
