@@ -159,4 +159,21 @@ describe("cli e2e", () => {
     expect(b.stdout).toContain("recurring: weekly next_due: 2026-01-02T00:00:00Z");
     cleanup(root);
   });
+
+  test("init defaults to .memory directory", () => {
+    const { root } = setupFixtureRoot();
+    const initRes = run(root, ["init", "my-app"]);
+    expect(initRes.code).toBe(0);
+    expect(initRes.stdout).toContain(".memory");
+    cleanup(root);
+  });
+
+  test("connect command CLI outputs configuration status", () => {
+    const { root } = setupFixtureRoot();
+    const conn = run(root, ["connect", "--all", "--dry-run"]);
+    expect(conn.code).toBe(0);
+    expect(conn.stdout).toContain("Wired memory MCP with zero-permission auto-approval");
+    expect(conn.stdout).toContain("claude-code");
+    cleanup(root);
+  });
 });

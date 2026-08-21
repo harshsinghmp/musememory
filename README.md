@@ -6,38 +6,36 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-70%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-75%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
 
-*Brand: **Muse Memory** · Infra: **musememory** · Primary Command: **`memory`** (alias: `musememory`)*
-
 </div>
 
 ---
 
-## ⚡ Naming & Command Architecture
+## ⚡ Architecture & Dual-Scope Storage
 
-- **Brand Name**: **Muse Memory**
-- **Infrastructure / Package / Directory**: `musememory` / `.musememory/`
-- **Primary Fast CLI Command**: **`memory`** (e.g. `memory search`, `memory context`, `memory ui`, `memory briefing`)
-- **Conflict-Safe Command Alias**: **`musememory`** (available if any conflicting tool claims `memory`)
+- **Primary Command**: **`memory`** (alias: `musememory`)
+- **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
+- **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
+- **Permission-Free Connect**: `memory connect <agent>` automatically configures your editor/agent MCP settings with pre-approved permissions.
 
 ---
 
 ## 🚀 Quick Run-Down for Non-Technical Users
 
-You want your AI coding agents (in Cursor, Claude Desktop, Windsurf, OpenCode, Cline, or Antigravity) to **remember what they did across conversations**, stop making the same mistakes, and maintain project decisions—without managing complex vector databases or cloud servers.
+You want your AI coding agents (in Claude Code, Cursor, Antigravity, Windsurf, Codex, Cline, or Gemini CLI) to **remember what they did across conversations**, stop making the same mistakes, and maintain project decisions—without managing complex vector databases or cloud servers.
 
-Here is the 3-step setup:
+Here is the 2-step zero-permission setup:
 
 ```
-┌───────────────────────────┐      ┌───────────────────────────┐      ┌───────────────────────────┐
-│ 1. Install (curl/npm/bun) │ ───► │ 2. Add MCP Config         │ ───► │ 3. AI Agent Auto-Remembers│
-│ curl, npm, bun, or docker │      │ Paste 5 lines of JSON     │      │ Auto-starts on agent open!│
-└───────────────────────────┘      └───────────────────────────┘      └───────────────────────────┘
+┌───────────────────────────┐      ┌───────────────────────────┐
+│ 1. Install (curl/npm/bun) │ ───► │ 2. One-Command Auto-Wire  │
+│ curl, npm, bun, or docker │      │ memory connect --all      │
+└───────────────────────────┘      └───────────────────────────┘
 ```
 
 ### Step 1: Install `musememory` on your machine
@@ -61,11 +59,24 @@ docker build -t musememory .
 
 ---
 
-### Step 2: Connect it to your AI Agent / Editor
+### Step 2: 100% Permission-Free Multi-Agent Connect
 
-Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings):
+Run a single command to automatically configure your AI agents with pre-approved tool execution (no annoying permission prompts or approval dialogs):
 
-#### 🔹 Native Install (curl, npm, or Bun):
+```bash
+# Wire all detected AI editors and agents with auto-approval
+memory connect --all
+
+# Or wire a specific agent
+memory connect claude-code   # Auto-approves tools in ~/.claude/settings.json
+memory connect cursor        # Auto-approves memory in ~/.cursor/mcp.json
+memory connect antigravity   # Configures Antigravity CLI MCP
+memory connect windsurf      # Configures Windsurf MCP config
+memory connect codex         # Configures Codex CLI MCP
+memory connect gemini-cli    # Configures Gemini CLI MCP
+```
+
+#### 🔹 Manual MCP Configuration (Alternative):
 ```json
 {
   "mcpServers": {
@@ -77,42 +88,42 @@ Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, 
 }
 ```
 
-#### 🐳 Docker Install:
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v",
-        "/absolute/path/to/your/project/.musememory:/app/.musememory",
-        "musememory",
-        "mcp"
-      ]
-    }
-  }
-}
-```
-
 ---
 
-### Step 3: Zero-Setup Universal Workspace Memory
+### Step 3: Zero-Setup Universal Workspace & Global Memory
 
 **Do I need to start Muse Memory manually?**
-> **No!** When configured in your MCP settings, your AI IDE / Agent **automatically launches Muse Memory as a background subprocess on agent launch** and stops it when closed. You do not need to run any manual background server.
+> **No!** When configured in your MCP settings, your AI IDE / Agent **automatically launches Muse Memory as a background subprocess on agent launch** and stops it when closed. You do not need to run any manual background server or database daemon.
 
 Whenever your AI Agent starts in *any* project folder:
-1. `memory` automatically detects or creates a `.musememory/` folder in your project.
+1. `memory` automatically detects or creates a `.memory/` folder in your project (or falls back to `~/.memory/` globally).
 2. The AI agent automatically retrieves relevant past fixes and constraints (`get_context`, `memory_recall`).
 3. When the AI solves a bug or makes an architectural decision, it distills it into an atomic memory entry (`memory_harvest`, `memory_capture`).
 4. You can check what your agents know anytime from your terminal:
    ```bash
    memory briefing
    memory search "authentication redirect"
+   
+   # Or view global memories
+   memory --global briefing
    ```
+
+---
+
+## 📊 Feature Comparison: Muse Memory vs. AgentMemory
+
+| Feature / Dimension | 🧠 Muse Memory (`musememory`) | ⚡ AgentMemory (`@agentmemory/agentmemory`) |
+| :--- | :--- | :--- |
+| **Core Architecture** | Pure TypeScript / Bun & Node.js. 100% standalone, zero compiled engine binaries or Docker daemons. | Node.js CLI + Rust `iii-engine` binary / Docker container daemon on port `:3111`. |
+| **Storage Model** | Human-readable atomic YAML files (`.memory/memories/*.yaml`) + `CURRENT.md` for active constraints. Git-friendly & mergeable. | SQLite binary database files managed by `iii-engine` in system data directories. |
+| **Storage Scoping** | **Local (`.memory/`) + Global (`~/.memory/`)** with project scoping, multi-client workspace isolation, and layered query support. | Global system state directory (`~/.local/share/agentmemory`) with project & agentId tags. |
+| **Zero-Leakage Defense** | **Built-in Pure TS Vibeguard**: Intercepts and blocks API keys (`sk-*`, `ghp_*`, `AKIA*`), DB URLs, and private keys inline before disk write. | Requires external redaction or agent-side discipline. |
+| **Retrieval & Search** | Token TF/IDF search with **temporal staleness decay** ($\tau = 90$d), verification rank bonuses, and CodeGraph AST symbol overlap bonuses. | Hybrid BM25 + Vector embeddings (`all-MiniLM-L6-v2` via Transformers.js) + Knowledge Graph RRF fusion. |
+| **Memory Lifecycle** | 5-state explicit lifecycle: `candidate` ➔ `confirmed` ➔ `superseded` / `disputed` / `stale` / `rejected`. Bidirectional graph linking. | 4-tier lifecycle: Observation ➔ Session Summary ➔ Lesson/Crystal ➔ Archival Knowledge Graph. |
+| **Visual Dashboard** | **Built-in Zero-Dependency UI (`memory ui`)**: Interactive 2D knowledge graph, staleness heatmaps, live search, one-click confirmation (port 3000). | Real-time web viewer (`dist/viewer`) on port `:3113` with session replay timeline and speed control. |
+| **Tool Surface** | 15 focused MCP tools (`get_context`, `memory_capture`, `memory_recall`, `memory_harvest`, `memory_confirm`, `memory_supersede`, etc.). | 54 MCP tools in full mode / 8 in core mode (`memory_smart_search`, `memory_save`, `memory_sessions`, etc.). |
+| **Zero-Permission Execution** | `memory connect <agent>` auto-generates MCP configurations with pre-approved permissions across all major agents. | `agentmemory connect <agent>` with hook scripts and marketplace plugins. |
+| **CodeGraph AST Integration** | **Native**: Direct integration with `.codegraph/` AST indexes for symbol-level memory impact scoring. | External recipe pairing via documentation. |
 
 ---
 
@@ -148,7 +159,7 @@ flowchart TD
         Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
     end
 
-    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.musememory/)"]
+    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.memory/)"]
         Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
         Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
         Decay["6. Temporal Staleness Decay & Auto-Archiving"]
@@ -164,7 +175,7 @@ flowchart TD
     Lifecycle --> Decay
 ```
 
-- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.musememory/memories/`.
+- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.memory/memories/`.
 - **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
 - **Smart Archiving & Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
 
@@ -178,21 +189,6 @@ flowchart TD
 
 ---
 
-## 🔮 Scope of Work & Roadmap
-
-For full historical details of completed v1.0.0 features, see [`CHANGELOG.md`](CHANGELOG.md).
-
-- [ ] **Scene-Based Hierarchical Consolidation (`mem_scenes`)**: Automated background 1-paragraph summary rollups of related memory cells (`memory consolidate`).
-- [ ] **Autonomous Verification Oracle (`memory verify <id>`)**: Auto-executes `test_command` in an isolated sandbox, automatically confirming verified code fixes.
-- [ ] **Dynamic Prompt Token Budgeter (`--token-budget N`)**: Knapsack packing algorithm delivering 95% token reduction under hard token ceilings.
-- [ ] **Multi-Hop Causality Graph Tracer (`memory trace <id>`)**: Recursive graph traversal walking full `decision` ➔ `failure` ➔ `fix` ➔ `superseded` causal pathways.
-- [ ] **In-Place Core Memory Partitioning (`memory core`)**: Letta/MemGPT 4-tier model supporting in-place runtime editing of permanent operating guidelines.
-- [ ] **Automated Post-Turn Transcript Harvester Hook**: Zero-prompt Git pre-commit and IDE session-end hook that automatically harvests memories.
-- [ ] **Real-Time Agency WebSocket Hub (`memory daemon`)**: Live peer-to-peer event notification daemon for multi-developer agency teams.
-- [ ] **Local Offline Hybrid Vector Engine**: Zero-cloud local ONNX/WASM embedding model for hybrid semantic + BM25 search at $> 10,000$ memory scale.
-
----
-
 ## 💻 CLI Command Reference
 
 ```bash
@@ -201,26 +197,27 @@ memory <command> [arguments] [flags]  # alias: musememory
 
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
-| `init` | `[path]` | Initialize `.musememory/` directory and `CURRENT.md` in workspace. |
-| `ui` | `[--port N]` | Launch zero-dependency visual knowledge graph dashboard. |
-| `context` | `[query] [--limit N] [--project P] [--type T] [--status S] [--verified]` | Retrieve Top-$K$ ranked active context for prompt injection. |
-| `search` | `<query> [--limit N] [--include-superseded] [--type T] [--status S]` | Ranked token search with scores and status indicators. |
-| `harvest` | `<text\|file> --project P [--confirmed]` | Distill raw text/transcripts into structured outcome/fix memory units. |
-| `capture` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]` | Fast proposal with inline zero-leakage secret scan. |
-| `propose` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]` | Create a candidate memory entry. |
-| `recall` | `<query> [--limit N] [--project P] [--type T] [--status S] [--verified]` | Rich recall displaying verification levels and related graph links. |
-| `confirm` | `<id>` | Promote `candidate`, `disputed`, or `stale` entry to `confirmed`. |
-| `supersede` | `<old_id> --with <new_id>` | Mark old entry superseded by new confirmed entry. |
-| `mark-stale` | `<id> [--reason <text>]` | Mark an entry stale and append deprecation reason. |
-| `reject` | `<id>` | Mark an entry rejected. |
-| `link` | `<id> --related <id1,id2>` | Synchronize bidirectional relation links between entries. |
-| `export` | `[--out <file.json>]` | Export memory snapshot for agency network sync. |
-| `import` | `<file.json> [--overwrite]` | Import and validate memory snapshot into local store. |
-| `validate` | `[--dry-run]` | Deep audit of schemas, secrets, broken links, and referential integrity. |
-| `briefing` | `[--limit N]` | Active summary of recent entries, status counts, and recurring due items. |
-| `stale` | `[--days N]` | Audit active entries exceeding per-type staleness policies. |
+| `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). |
+| `connect` | `[agent] [--all] [--dry-run]` | Auto-wire MCP server with zero-permission pre-approval (`claude-code`, `cursor`, `antigravity`, `windsurf`, `codex`, `gemini-cli`, `all`). |
+| `ui` | `[--port N] [--global]` | Launch zero-dependency visual knowledge graph dashboard. |
+| `context` | `[query] [--limit N] [--project P] [--type T] [--status S] [--verified] [--global]` | Retrieve Top-$K$ ranked active context for prompt injection. |
+| `search` | `<query> [--limit N] [--include-superseded] [--type T] [--status S] [--global]` | Ranked token search with scores and status indicators. |
+| `harvest` | `<text\|file> --project P [--confirmed] [--global]` | Distill raw text/transcripts into structured outcome/fix memory units. |
+| `capture` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]` | Fast proposal with inline zero-leakage secret scan. |
+| `propose` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]` | Create a candidate memory entry. |
+| `recall` | `<query> [--limit N] [--project P] [--type T] [--status S] [--verified] [--global]` | Rich recall displaying verification levels and related graph links. |
+| `confirm` | `<id> [--global]` | Promote `candidate`, `disputed`, or `stale` entry to `confirmed`. |
+| `supersede` | `<old_id> --with <new_id> [--global]` | Mark old entry superseded by new confirmed entry. |
+| `mark-stale` | `<id> [--reason <text>] [--global]` | Mark an entry stale and append deprecation reason. |
+| `reject` | `<id> [--global]` | Mark an entry rejected. |
+| `link` | `<id> --related <id1,id2> [--global]` | Synchronize bidirectional relation links between entries. |
+| `export` | `[--out <file.json>] [--global]` | Export memory snapshot for agency network sync. |
+| `import` | `<file.json> [--overwrite] [--global]` | Import and validate memory snapshot into local store. |
+| `validate` | `[--dry-run] [--global]` | Deep audit of schemas, secrets, broken links, and referential integrity. |
+| `briefing` | `[--limit N] [--global]` | Active summary of recent entries, status counts, and recurring due items. |
+| `stale` | `[--days N] [--global]` | Audit active entries exceeding per-type staleness policies. |
 | `session` | `start --project P [--note T]` / `end <id>` | Record session start/end timeline nodes. |
-| `current` | `get` / `set <text> --project P` | Read or append hard constraints to `.musememory/CURRENT.md`. |
+| `current` | `get` / `set <text> --project P` | Read or append hard constraints to `.memory/CURRENT.md`. |
 | `graph` | `status` | Query active CodeGraph provider status. |
 | `mcp` | *(none)* | Start stdio MCP server. |
 
@@ -253,7 +250,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 70 tests passing across 11 test suites
+bun test          # 75 tests passing across 12 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { findOrCreateProjectRoot } from "./root.ts";
+import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
 import { openStore, list, propose, confirm, supersede, markStale, reject, link } from "./store.ts";
 import { validateStore } from "./schema.ts";
 import { search } from "./search.ts";
@@ -16,10 +16,14 @@ export { scanSecrets };
 
 const USAGE = `Muse Memory (musememory) — Autonomous persistent memory system for AI agents
 
-Usage: memory <command> [args] (alias: musememory)
+Usage: memory <command> [args] [flags] (alias: musememory)
+
+Global Flags:
+  --global, -g                                  operate on global system memory store (~/.memory/)
 
 Commands:
-  init [path]                                   initialize .musememory/ folder in workspace
+  init [path] [--legacy] [--global]             initialize .memory/ folder (or ~/.memory/)
+  connect [agent] [--all] [--dry-run]           auto-wire MCP with zero-permission auto-approval (claude-code, cursor, antigravity, windsurf, codex, gemini-cli, all)
   ui [--port N]                                 launch zero-dependency visual graph dashboard
   context [query] [--limit N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context (default limit 5)
   search <query> [--limit N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
@@ -39,8 +43,8 @@ Commands:
   stale [--days N]                              active entries not updated in N days (default 90)
   session start --project P [--note T]          record session start entry
   session end <id>                              record session end entry
-  current get                                   read .musememory/CURRENT.md
-  current set <text> --project P                append constraint line to .musememory/CURRENT.md
+  current get                                   read .memory/CURRENT.md
+  current set <text> --project P                append constraint line to .memory/CURRENT.md
   graph status                                  display graph provider status
   mcp                                           run stdio MCP server
   --help                                        show this help
@@ -63,10 +67,12 @@ function parseFlags(args: string[]): { positional: string[]; flags: Record<strin
   const flags: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a.startsWith("--")) {
+    if (a === "-g") {
+      flags["global"] = "true";
+    } else if (a.startsWith("--")) {
       const key = a.slice(2);
       const next = args[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
+      if (next !== undefined && !next.startsWith("-")) {
         flags[key] = next;
         i++;
       } else {
@@ -79,8 +85,9 @@ function parseFlags(args: string[]): { positional: string[]; flags: Record<strin
   return { positional, flags };
 }
 
-function requireRoot(): { root: string; memoryDir: string; store: ReturnType<typeof openStore> } | null {
-  const { root, memoryDir } = findOrCreateProjectRoot(process.cwd());
+function requireRoot(flags: Record<string, string> = {}): { root: string; memoryDir: string; store: ReturnType<typeof openStore> } | null {
+  const isGlobal = flags["global"] === "true";
+  const { root, memoryDir } = findOrCreateProjectRoot(process.cwd(), { global: isGlobal });
   return { root, memoryDir, store: openStore(memoryDir) };
 }
 
@@ -110,20 +117,41 @@ export async function main(argv: string[]): Promise<number> {
 
   switch (cmd) {
     case "init": {
+      const isGlobal = flags["global"] === "true";
       const targetDir = positional[0] ? join(process.cwd(), positional[0]) : process.cwd();
-      const memoryDir = join(targetDir, ".musememory");
+      const memoryDirName = flags["legacy"] === "true" ? ".musememory" : ".memory";
+      const memoryDir = isGlobal
+        ? getGlobalMemoryDir()
+        : join(targetDir, memoryDirName);
       mkdirSync(join(memoryDir, "memories"), { recursive: true });
       const currentPath = join(memoryDir, "CURRENT.md");
       if (!existsSync(currentPath)) {
         writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
       }
-      console.log(`Initialized musememory in ${memoryDir}`);
+      console.log(`Initialized memory store in ${memoryDir}`);
       return 0;
+    }
+
+    case "connect": {
+      const agent = positional[0] ?? (flags["all"] === "true" ? "all" : "all");
+      const { connectAgent } = await import("./connect.ts");
+      const dryRun = flags["dry-run"] === "true";
+      const force = flags["force"] === "true";
+      try {
+        const reports = connectAgent(agent, undefined, { dryRun, force });
+        console.log(`🔌 Wired memory MCP with zero-permission auto-approval:`);
+        for (const r of reports) {
+          console.log(`  ✓ ${r.agent}: ${r.message}`);
+        }
+        return 0;
+      } catch (err: any) {
+        return fail(`connect error: ${err.message}`);
+      }
     }
 
     case "ui":
     case "dashboard": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const port = flags["port"] ? parseInt(flags["port"], 10) : 3000;
       const { startUiServer } = await import("./ui.ts");
@@ -139,7 +167,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "context": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
       const query = positional[0] ?? "";
@@ -156,7 +184,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "search": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       if (positional.length === 0) return usageError("search requires a query");
       const limit = parseInt(flags["limit"] ?? "10", 10) || 10;
@@ -177,7 +205,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "propose": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const text = positional[0];
       if (!text) return usageError("propose requires text");
@@ -200,7 +228,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "capture": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const text = positional[0];
       if (!text) return usageError("capture requires text");
@@ -223,7 +251,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "harvest": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const target = positional[0];
       if (!target) return usageError("harvest requires <text|file> --project P");
@@ -254,7 +282,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "recall": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const query = positional[0] ?? "";
       const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
@@ -271,7 +299,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "link": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const id = positional[0];
       const related = flags["related"];
@@ -284,7 +312,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "confirm": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const id = positional[0];
       if (!id) return usageError("confirm requires an id");
@@ -295,7 +323,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "supersede": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const oldId = positional[0];
       const newId = flags["with"];
@@ -307,7 +335,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "mark-stale": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const id = positional[0];
       if (!id) return usageError("mark-stale requires an id");
@@ -318,7 +346,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "reject": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const id = positional[0];
       if (!id) return usageError("reject requires an id");
@@ -329,7 +357,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "export": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const snapshot = exportSnapshot(ctx.store);
       const outPath = flags["out"];
@@ -343,7 +371,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "import": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const file = positional[0];
       if (!file) return usageError("import requires <file.json>");
@@ -359,7 +387,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "validate": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const isDryRun = flags["dry-run"] === "true";
       const report = validateStore(ctx.store);
@@ -408,7 +436,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "briefing": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const limit = parseInt(flags["limit"] ?? "5", 10) || 5;
       const entries = list(ctx.store);
@@ -450,7 +478,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "stale": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const daysOverride = flags["days"] ? parseInt(flags["days"], 10) : null;
       const now = Date.now();
@@ -468,7 +496,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "session": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const sub = positional[0];
       if (sub === "start") {
@@ -491,7 +519,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "current": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const sub = positional[0];
       if (sub === "get") {
@@ -511,7 +539,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "graph": {
-      const ctx = requireRoot();
+      const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const sub = positional[0];
       if (sub === "status") {

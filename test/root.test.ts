@@ -30,35 +30,48 @@ describe("hierarchical root detection", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("findOrCreateProjectRoot defaults to .musememory", () => {
+  test("findOrCreateProjectRoot defaults to .memory", () => {
     const root = temp();
     const targetDir = join(root, "fresh-project");
     mkdirSync(targetDir, { recursive: true });
     const res = findOrCreateProjectRoot(targetDir);
-    expect(res.memoryDir).toBe(join(targetDir, ".musememory"));
+    expect(res.memoryDir).toBe(join(targetDir, ".memory"));
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("legacy .muse-memory and .memory are supported for backward compatibility", () => {
+  test("legacy .musememory and .muse-memory are supported for backward compatibility", () => {
     const root = temp();
     mkdirSync(join(root, "proj1", ".muse-memory", "memories"), { recursive: true });
     const res1 = findProjectRoot(join(root, "proj1"));
     expect(res1).toEqual({ root: join(root, "proj1"), marker: "memory", memoryDirName: ".muse-memory" });
 
-    mkdirSync(join(root, "proj2", ".memory", "memories"), { recursive: true });
+    mkdirSync(join(root, "proj2", ".musememory", "memories"), { recursive: true });
     const res2 = findProjectRoot(join(root, "proj2"));
-    expect(res2).toEqual({ root: join(root, "proj2"), marker: "memory", memoryDirName: ".memory" });
+    expect(res2).toEqual({ root: join(root, "proj2"), marker: "memory", memoryDirName: ".musememory" });
+
+    mkdirSync(join(root, "proj3", ".memory", "memories"), { recursive: true });
+    const res3 = findProjectRoot(join(root, "proj3"));
+    expect(res3).toEqual({ root: join(root, "proj3"), marker: "memory", memoryDirName: ".memory" });
 
     rmSync(root, { recursive: true, force: true });
   });
 
-  test(".git wins over manifest", () => {
+  test("global path resolution with options.global", () => {
+    const root = temp();
+    const res = findOrCreateProjectRoot(root, { global: true });
+    expect(res.marker).toBe("global");
+    expect(res.memoryDir.endsWith(".memory")).toBe(true);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test(".git wins over manifest and defaults to .memory", () => {
     const root = temp();
     mkdirSync(join(root, "gitproj", ".git"), { recursive: true });
     writeFileSync(join(root, "gitproj", "package.json"), "{}");
     const res = findProjectRoot(join(root, "gitproj"));
     expect(res.root).toBe(join(root, "gitproj"));
     expect(res.marker).toBe("git");
+    expect(res.memoryDirName).toBe(".memory");
     rmSync(root, { recursive: true, force: true });
   });
 
