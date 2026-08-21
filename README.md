@@ -6,7 +6,7 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-84%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-91%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
@@ -21,6 +21,7 @@
 - **Primary Command**: **`memory`** (alias: `musememory`)
 - **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
 - **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
+- **Universal Provider Auto-Detection & Migration**: Auto-detects existing memory stores on first install across 24+ formats (`memory detect` / `memory migrate`) with strict state preservation (active ➔ confirmed, archived ➔ superseded, core constraints ➔ `CURRENT.md`).
 - **Dynamic Prompt Token Budgeter**: Exact token packing (`--token-budget <N>` / `token_budget` in MCP) for zero-bloat prompt injection.
 - **Universal Transcript Ingestion**: Ingest raw `.jsonl` conversation transcripts (`memory import-transcript <file.jsonl>`) from Claude Code, Antigravity, Cursor, and Codex.
 - **Operational Audit Ledger**: Append-only compliance log (`.memory/audit.jsonl` / `memory audit`) tracking all memory mutations.
@@ -183,8 +184,10 @@ memory <command> [arguments] [flags]  # alias: musememory
 
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
-| `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). |
+| `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). Auto-detects existing memories. |
 | `connect` | `[agent] [--all] [--dry-run]` | Auto-wire MCP server with zero-permission pre-approval (`claude-code`, `cursor`, `antigravity`, `windsurf`, `codex`, `gemini-cli`, `all`). |
+| `detect` | *(none)* | Scan workstation and local workspace for existing memory systems across 24+ formats. |
+| `migrate` | `[--from P] [--all] [--dry-run] [--overwrite] [--project P]` | Auto-detect and migrate memories into Muse Memory preserving active/archived state & secrets. |
 | `ui` | `[--port N] [--global]` | Launch zero-dependency visual knowledge graph dashboard. |
 | `context` | `[query] [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified] [--global]` | Retrieve Top-$K$ ranked active context (with token budget limit). |
 | `search` | `<query> [--limit N] [--token-budget N] [--include-superseded] [--type T] [--status S] [--global]` | Ranked token search with scores and status indicators. |
@@ -220,6 +223,8 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 | :--- | :--- |
 | `get_context` | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`. |
 | `search` | Searches memory units with query, token budget, project, type, and verification filters. |
+| `memory_detect_providers` | Scans workspace and machine for external memory formats (24+ providers). |
+| `memory_migrate` | Migrates memories from detected providers with state preservation and secret scrubbing. |
 | `memory_harvest` | Distills conversation turns into structured fix/outcome units. |
 | `memory_import_transcript` | Ingests JSONL transcripts into structured memory units. |
 | `memory_capture` | Saves memory with strict inline secret scanning. |
@@ -242,7 +247,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 84 tests passing across 15 test suites
+bun test          # 91 tests passing across 16 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

@@ -11,6 +11,7 @@ import { scanSecrets } from "./secrets.ts";
 import { getGraphStatus } from "./graph.ts";
 import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
 import { getAuditTrail } from "./audit.ts";
+import { detectProviders, runMigration } from "./migrator/index.ts";
 import { DEFAULT_CONTEXT_LIMIT, type MemoryEntry, type MemoryType } from "./types.ts";
 
 export { scanSecrets };
@@ -25,6 +26,8 @@ Global Flags:
 Commands:
   init [path] [--legacy] [--global]             initialize .memory/ folder (or ~/.memory/)
   connect [agent] [--all] [--dry-run]           auto-wire MCP with zero-permission auto-approval (claude-code, cursor, antigravity, windsurf, codex, gemini-cli, all)
+  detect                                        scan machine for existing external memory providers (24+ systems)
+  migrate [--from P] [--all] [--dry-run]        auto-detect & migrate memories preserving active/superseded states
   ui [--port N]                                 launch zero-dependency visual graph dashboard
   context [query] [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context
   search <query> [--limit N] [--token-budget N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
@@ -133,6 +136,72 @@ export async function main(argv: string[]): Promise<number> {
         writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
       }
       console.log(`Initialized memory store in ${memoryDir}`);
+      const detected = detectProviders(targetDir);
+      const found = detected.filter((d) => d.detected);
+      if (found.length > 0) {
+        console.log(`💡 Detected existing memory from: ${found.map((f) => f.name).join(", ")}. Run 'memory migrate' to auto-import.`);
+      }
+      return 0;
+    }
+
+    case "detect": {
+      const ctx = requireRoot(flags);
+      const startDir = ctx ? ctx.root : process.cwd();
+      const detected = detectProviders(startDir);
+      console.log(`🔍 Scanning for external agent memory providers:`);
+      let count = 0;
+      for (const p of detected) {
+        if (p.detected) {
+          count++;
+          console.log(`  ✓ ${p.name} (${p.category}, scope: ${p.scope})`);
+          for (const path of p.resolvedPaths) {
+            console.log(`    ➔ found: ${path}`);
+          }
+        }
+      }
+      if (count === 0) {
+        console.log(`  (no external memory providers detected on this machine)`);
+      } else {
+        console.log(`\nFound ${count} memory provider(s). Run 'memory migrate' to import.`);
+      }
+      return 0;
+    }
+
+    case "migrate": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      const provider = flags["from"] || positional[0];
+      const all = flags["all"] === "true";
+      const dryRun = flags["dry-run"] === "true";
+      const overwrite = flags["overwrite"] === "true";
+      const project = flags["project"];
+
+      console.log(`🚀 Starting Muse Memory Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
+      const report = await runMigration(ctx.store, ctx.memoryDir, {
+        provider,
+        all,
+        dryRun,
+        overwrite,
+        project,
+      });
+
+      console.log(`\n📋 Migration Report:`);
+      for (const p of report.providers) {
+        const icon = p.status === "success" ? "✓" : (p.status === "skipped" ? "⊘" : "✗");
+        console.log(`  ${icon} ${p.providerName}: ${p.migratedCount} memories migrated, ${p.supersededCount} archived, ${p.constraintsCount} constraints, ${p.secretsRedacted} secrets scrubbed`);
+        if (p.error) console.log(`     Error: ${p.error}`);
+      }
+
+      console.log(`\nSummary:`);
+      console.log(`  Total memories imported: ${report.totalMigrated}`);
+      console.log(`  Total superseded/archived: ${report.totalSuperseded}`);
+      console.log(`  Total working constraints (CURRENT.md): ${report.totalConstraints}`);
+      if (report.totalSecretsRedacted > 0) {
+        console.log(`  🔒 Total secrets blocked/redacted by Vibeguard: ${report.totalSecretsRedacted}`);
+      }
+      if (dryRun) {
+        console.log(`\n[DRY RUN complete - no files were written]`);
+      }
       return 0;
     }
 

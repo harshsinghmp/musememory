@@ -17,6 +17,8 @@ export const ALL_MEMORY_TOOLS = [
   "memory_reject",
   "memory_delete",
   "memory_audit",
+  "memory_detect_providers",
+  "memory_migrate",
   "memory_export",
   "memory_import",
   "memory_validate",

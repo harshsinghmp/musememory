@@ -13,6 +13,7 @@ import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
 import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
 import { getAuditTrail } from "./audit.ts";
+import { detectProviders, runMigration } from "./migrator/index.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export async function runMcpServer(): Promise<void> {
@@ -207,6 +208,28 @@ export async function runMcpServer(): Promise<void> {
             confirmed: { type: "boolean" },
           },
           required: ["transcript"],
+        },
+      },
+      {
+        name: "memory_detect_providers",
+        description: "Scan the machine and local workspace for existing external memory systems (24+ providers)",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "memory_migrate",
+        description: "Auto-detect and migrate memories from external providers preserving active/superseded state",
+        inputSchema: {
+          type: "object",
+          properties: {
+            provider: { type: "string", description: "Optional specific provider ID to migrate (e.g. agentmemory, beads, mem0, letta, everos)" },
+            all: { type: "boolean", description: "If true, attempts migration across all known provider definitions" },
+            dry_run: { type: "boolean", description: "If true, simulates migration without writing files" },
+            overwrite: { type: "boolean", description: "If true, overwrites existing memories with identical titles" },
+            project: { type: "string", description: "Default project to assign migrated memories" },
+          },
         },
       },
       {
@@ -484,6 +507,24 @@ export async function runMcpServer(): Promise<void> {
       case "graph_status": {
         const status = getGraphStatus(root);
         return toolResult(status);
+      }
+      case "memory_detect_providers": {
+        const detected = detectProviders(root);
+        return toolResult(detected);
+      }
+      case "memory_migrate": {
+        try {
+          const report = await runMigration(store, memoryDir, {
+            provider: a.provider ? String(a.provider) : undefined,
+            all: Boolean(a.all),
+            dryRun: Boolean(a.dry_run),
+            overwrite: Boolean(a.overwrite),
+            project: a.project ? String(a.project) : undefined,
+          });
+          return toolResult(report);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
       }
       default:
         return toolError(`unknown tool ${name}`);

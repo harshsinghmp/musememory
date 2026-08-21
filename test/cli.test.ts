@@ -211,4 +211,34 @@ describe("cli e2e", () => {
 
     cleanup(root);
   });
+
+  test("detect and migrate CLI commands", () => {
+    const { root } = setupFixtureRoot();
+    const beadsDir = join(root, ".beads");
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, "beads.json"),
+      JSON.stringify([
+        { id: "b10", title: "CLI Migrate Test Task", description: "Migrate task content", status: "open" }
+      ]),
+      "utf8"
+    );
+
+    // 1. Run detect
+    const det = run(root, ["detect"]);
+    expect(det.code).toBe(0);
+    expect(det.stdout).toContain("Beads");
+
+    // 2. Run migrate --dry-run
+    const dry = run(root, ["migrate", "--from", "beads", "--dry-run"]);
+    expect(dry.code).toBe(0);
+    expect(dry.stdout).toContain("[DRY RUN]");
+
+    // 3. Run migrate
+    const mig = run(root, ["migrate", "--from", "beads"]);
+    expect(mig.code).toBe(0);
+    expect(mig.stdout).toContain("Total memories imported: 1");
+
+    cleanup(root);
+  });
 });

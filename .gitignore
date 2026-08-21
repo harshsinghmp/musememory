@@ -6,5 +6,6 @@ dist/
 .muse-memory/
 .memory/
 .codegraph/
+.jez/
 coverage/
 *.log
