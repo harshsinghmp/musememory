@@ -14,12 +14,12 @@ import { DEFAULT_CONTEXT_LIMIT, type MemoryEntry, type MemoryType } from "./type
 
 export { scanSecrets };
 
-const USAGE = `musememory — self-organizing persistent memory system for AI agents
+const USAGE = `Muse Memory (musememory) — Autonomous persistent memory system for AI agents
 
-Usage: musememory <command> [args] (alias: memory)
+Usage: memory <command> [args] (alias: musememory)
 
 Commands:
-  init [path]                                   initialize .muse-memory/ folder in workspace
+  init [path]                                   initialize .musememory/ folder in workspace
   context [query] [--limit N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context (default limit 5)
   search <query> [--limit N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
   propose <text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]  create candidate entry (confirmed with --confirmed)
@@ -38,8 +38,8 @@ Commands:
   stale [--days N]                              active entries not updated in N days (default 90)
   session start --project P [--note T]          record session start entry
   session end <id>                              record session end entry
-  current get                                   read .muse-memory/CURRENT.md
-  current set <text> --project P                append constraint line to .muse-memory/CURRENT.md
+  current get                                   read .musememory/CURRENT.md
+  current set <text> --project P                append constraint line to .musememory/CURRENT.md
   graph status                                  display graph provider status
   mcp                                           run stdio MCP server
   --help                                        show this help
@@ -53,7 +53,7 @@ function fail(msg: string, code = 1): number {
 
 function usageError(msg: string): number {
   console.error(`error: ${msg}`);
-  console.error("run `musememory --help` for usage");
+  console.error("run `memory --help` for usage");
   return 2;
 }
 
@@ -110,7 +110,7 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case "init": {
       const targetDir = positional[0] ? join(process.cwd(), positional[0]) : process.cwd();
-      const memoryDir = join(targetDir, ".muse-memory");
+      const memoryDir = join(targetDir, ".musememory");
       mkdirSync(join(memoryDir, "memories"), { recursive: true });
       const currentPath = join(memoryDir, "CURRENT.md");
       if (!existsSync(currentPath)) {

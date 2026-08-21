@@ -11,19 +11,22 @@ export interface RootResult {
 
 /**
  * Hierarchical upward scan from startDir:
- * 1. nearest ancestor dir containing `.muse-memory/` (or legacy `.memory/`) wins
+ * 1. nearest ancestor dir containing `.musememory/` (or `.muse-memory/`, `.memory/`) wins
  * 2. else nearest containing `.git/`
  * 3. else null
  */
 export function findProjectRoot(startDir: string): RootResult {
   const ancestors = ancestorChain(startDir);
   for (const dir of ancestors) {
+    if (existsSync(join(dir, ".musememory"))) return { root: dir, marker: "memory", memoryDirName: ".musememory" };
     if (existsSync(join(dir, ".muse-memory"))) return { root: dir, marker: "memory", memoryDirName: ".muse-memory" };
     if (existsSync(join(dir, ".memory"))) return { root: dir, marker: "memory", memoryDirName: ".memory" };
   }
   for (const dir of ancestors) {
     if (existsSync(join(dir, ".git"))) {
-      const dirName = existsSync(join(dir, ".memory")) ? ".memory" : ".muse-memory";
+      let dirName = ".musememory";
+      if (existsSync(join(dir, ".muse-memory"))) dirName = ".muse-memory";
+      else if (existsSync(join(dir, ".memory"))) dirName = ".memory";
       return { root: dir, marker: "git", memoryDirName: dirName };
     }
   }
@@ -31,12 +34,18 @@ export function findProjectRoot(startDir: string): RootResult {
 }
 
 /**
- * Resolve project root or automatically initialize `.muse-memory/` in startDir if none found.
+ * Resolve project root or automatically initialize `.musememory/` in startDir if none found.
  */
 export function findOrCreateProjectRoot(startDir: string): { root: string; memoryDir: string; marker: MarkerKind } {
   const res = findProjectRoot(startDir);
   const root = res.root ?? startDir;
-  const memoryDirName = res.memoryDirName ?? (existsSync(join(root, ".memory")) ? ".memory" : ".muse-memory");
+  const memoryDirName =
+    res.memoryDirName ??
+    (existsSync(join(root, ".muse-memory"))
+      ? ".muse-memory"
+      : existsSync(join(root, ".memory"))
+        ? ".memory"
+        : ".musememory");
   const memoryDir = join(root, memoryDirName);
   const marker = res.marker ?? "auto";
   if (!existsSync(memoryDir)) {

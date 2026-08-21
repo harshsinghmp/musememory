@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "🧠 Installing musememory..."
+echo "🧠 Installing Muse Memory (musememory)..."
 
 # Check prerequisites
 if command -v bun >/dev/null 2>&1; then
@@ -19,5 +19,7 @@ fi
 echo "Running: $INSTALL_CMD"
 eval "$INSTALL_CMD"
 
-echo "🎉 musememory installed successfully!"
-echo "Run 'musememory --help' to get started."
+echo "🎉 Muse Memory installed successfully!"
+echo "You can now use the concise 'memory' command (or 'musememory'):"
+echo "  memory --help"
+echo "  memory search 'your query'"

@@ -1,20 +1,29 @@
-# 🧠 MuseMemory
+# 🧠 Muse Memory
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/name/muse-memory?style=for-the-badge&logo=github&color=blue)](https://github.com/name/muse-memory/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/name/musememory?style=for-the-badge&logo=github&color=blue)](https://github.com/name/musememory/releases)
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-68%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-69%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
 
-*Zero External Dependencies · 100% Self-Contained Vibeguard Secret Defense · Flat-YAML `.muse-memory/` Storage · Mathematical Salience Ranking · Dual MCP & CLI*
+*Brand: **Muse Memory** · Infra: **musememory** · Primary Command: **`memory`** (alias: `musememory`)*
 
 </div>
+
+---
+
+## ⚡ Naming & Command Architecture
+
+- **Brand Name**: **Muse Memory**
+- **Infrastructure / Package / Directory**: `musememory` / `.musememory/`
+- **Primary Fast CLI Command**: **`memory`** (e.g. `memory search`, `memory context`, `memory briefing`)
+- **Conflict-Safe Command Alias**: **`musememory`** (available if any conflicting tool claims `memory`)
 
 ---
 
@@ -39,38 +48,39 @@ Open your terminal and run **one** of these:
 # Option A: via npm (Node.js)
 npm install -g musememory
 
-# Option B: via Bun (faster)
+# Option B: via Bun (Lightning fast)
 bun add -g musememory
 
 # Option C: via one-line curl installer
-curl -fsSL https://raw.githubusercontent.com/name/muse-memory/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/name/musememory/main/scripts/install.sh | bash
 ```
 
 ### Step 2: Connect it to your AI Agent / Editor
 
-Add `musememory` to your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings):
+Add `memory` to your AI tool's MCP configuration (`claude_desktop_config.json`, Cursor Settings, Windsurf MCP, or Antigravity MCP settings):
 
 ```json
 {
   "mcpServers": {
-    "musememory": {
-      "command": "musememory",
+    "memory": {
+      "command": "memory",
       "args": ["mcp"]
     }
   }
 }
 ```
+*(Note: You can also use `"musememory"` as the command name).*
 
 ### Step 3: Use it in ANY Workspace
 
 **That's it!** Whenever your AI Agent starts in *any* project folder:
-1. `musememory` automatically detects or creates a `.muse-memory/` folder in your project.
+1. `memory` automatically detects or creates a `.musememory/` folder in your project.
 2. The AI agent automatically retrieves relevant past fixes and constraints (`get_context`, `memory_recall`).
 3. When the AI solves a bug or makes an architectural decision, it distills it into an atomic memory entry (`memory_harvest`, `memory_capture`).
-4. You can check what your agents know anytime from your terminal:
+4. You can check what your agents know anytime from your terminal using the short command:
    ```bash
-   musememory briefing
-   musememory search "authentication redirect"
+   memory briefing
+   memory search "authentication redirect"
    ```
 
 ---
@@ -90,7 +100,7 @@ flowchart TD
         Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
     end
 
-    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.muse-memory/)"]
+    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.musememory/)"]
         Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
         Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
         Decay["6. Temporal Staleness Decay & Auto-Archiving"]
@@ -106,7 +116,7 @@ flowchart TD
     Lifecycle --> Decay
 ```
 
-- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.muse-memory/memories/`.
+- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.musememory/memories/`.
 - **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
 - **Smart Archiving & Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
 
@@ -126,7 +136,8 @@ flowchart TD
 
 | Component | Status | Description |
 | :--- | :---: | :--- |
-| **Atomic File Engine** | ✅ Complete | Atomic tmp-rename file storage with zero database locks in `.muse-memory/`. |
+| **Short Command Interface** | ✅ Complete | Concise `memory <command>` CLI alongside conflict-safe `musememory <command>`. |
+| **Atomic File Engine** | ✅ Complete | Atomic tmp-rename file storage with zero database locks in `.musememory/`. |
 | **Lifecycle State Machine** | ✅ Complete | Formal transitions: `candidate`, `active`, `confirmed`, `superseded`, `stale`, `disputed`, `rejected`. |
 | **Outcome/Fix Harvester** | ✅ Complete | Distills root causes, fixes, decisions, constraints from conversations (`harvest`). |
 | **Salience & Multi-Factor Ranking** | ✅ Complete | Formula: $\text{Applicability} + \text{Status} + \text{Verification} + \text{Graph} + \text{Salience} + \text{Decay}$. |
@@ -134,10 +145,10 @@ flowchart TD
 | **Deep Referential Validator** | ✅ Complete | Checks schema, broken links, superseded pointers, and credential leaks. |
 | **Graph AST Integration** | ✅ Complete | Provider-neutral CodeGraph detector awarding symbol relevance bonuses. |
 | **Agency Network Sync** | ✅ Complete | Portable JSON snapshot `export` / `import` for team-wide cross-node sync. |
-| **Auto Root & Workspace Init** | ✅ Complete | `musememory init` and auto `.muse-memory/` bootstrapping in any workspace. |
+| **Auto Root & Workspace Init** | ✅ Complete | `memory init` and auto `.musememory/` bootstrapping in any workspace. |
 | **Dual Tool Surface** | ✅ Complete | 18 CLI commands + 13 MCP tools (JSON-RPC stdio). |
 | **Multi-Platform Distribution** | ✅ Complete | Standalone NPM package, Bun native, curl installer, and Docker container. |
-| **Automated Test Suite** | ✅ Complete | 68 tests passing across 10 suites with clean TypeScript static checks. |
+| **Automated Test Suite** | ✅ Complete | 69 tests passing across 10 suites with clean TypeScript static checks. |
 
 ### 🔮 Scope of Work & Roadmap (Next Milestones)
 
@@ -150,12 +161,12 @@ flowchart TD
 ## 💻 CLI Command Reference
 
 ```bash
-musememory <command> [arguments] [flags]  # alias: memory
+memory <command> [arguments] [flags]  # alias: musememory
 ```
 
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
-| `init` | `[path]` | Initialize `.muse-memory/` directory and `CURRENT.md` in workspace. |
+| `init` | `[path]` | Initialize `.musememory/` directory and `CURRENT.md` in workspace. |
 | `context` | `[query] [--limit N] [--project P] [--type T] [--status S] [--verified]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--include-superseded] [--type T] [--status S]` | Ranked token search with scores and status indicators. |
 | `harvest` | `<text\|file> --project P [--confirmed]` | Distill raw text/transcripts into structured outcome/fix memory units. |
@@ -173,7 +184,7 @@ musememory <command> [arguments] [flags]  # alias: memory
 | `briefing` | `[--limit N]` | Active summary of recent entries, status counts, and recurring due items. |
 | `stale` | `[--days N]` | Audit active entries exceeding per-type staleness policies. |
 | `session` | `start --project P [--note T]` / `end <id>` | Record session start/end timeline nodes. |
-| `current` | `get` / `set <text> --project P` | Read or append hard constraints to `.muse-memory/CURRENT.md`. |
+| `current` | `get` / `set <text> --project P` | Read or append hard constraints to `.musememory/CURRENT.md`. |
 | `graph` | `status` | Query active CodeGraph provider status. |
 | `mcp` | *(none)* | Start stdio MCP server. |
 
@@ -212,7 +223,7 @@ docker compose up -d
 
 # Or run directly via Docker CLI
 docker build -t musememory .
-docker run -it -v $(pwd)/.muse-memory:/app/.muse-memory musememory
+docker run -it -v $(pwd)/.musememory:/app/.musememory musememory
 ```
 
 ---
@@ -221,7 +232,7 @@ docker run -it -v $(pwd)/.muse-memory:/app/.muse-memory musememory
 
 ```bash
 bun install
-bun test          # 68 tests passing across 10 test suites
+bun test          # 69 tests passing across 10 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

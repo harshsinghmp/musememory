@@ -9,42 +9,46 @@ function temp(): string {
 }
 
 describe("hierarchical root detection", () => {
-  test("marker .muse-memory wins over .git and manifest, resolves from nested path", () => {
+  test("marker .musememory wins over .git and manifest, resolves from nested path", () => {
     const root = temp();
-    mkdirSync(join(root, "proj", ".muse-memory", "memories"), { recursive: true });
+    mkdirSync(join(root, "proj", ".musememory", "memories"), { recursive: true });
     mkdirSync(join(root, "proj", ".git"), { recursive: true });
     writeFileSync(join(root, "proj", "package.json"), "{}");
     mkdirSync(join(root, "proj", "sub", "deep"), { recursive: true });
     const res = findProjectRoot(join(root, "proj", "sub", "deep"));
-    expect(res).toEqual({ root: join(root, "proj"), marker: "memory", memoryDirName: ".muse-memory" });
+    expect(res).toEqual({ root: join(root, "proj"), marker: "memory", memoryDirName: ".musememory" });
     rmSync(root, { recursive: true, force: true });
   });
 
-  test(".muse-memory at higher level beats .git at lower level", () => {
+  test(".musememory at higher level beats .git at lower level", () => {
     const root = temp();
-    mkdirSync(join(root, ".muse-memory", "memories"), { recursive: true });
+    mkdirSync(join(root, ".musememory", "memories"), { recursive: true });
     mkdirSync(join(root, "subproj", ".git"), { recursive: true });
     mkdirSync(join(root, "subproj", "deep"), { recursive: true });
     const res = findProjectRoot(join(root, "subproj", "deep"));
-    expect(res).toEqual({ root, marker: "memory", memoryDirName: ".muse-memory" });
+    expect(res).toEqual({ root, marker: "memory", memoryDirName: ".musememory" });
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("findOrCreateProjectRoot defaults to .muse-memory and never .musememory", () => {
+  test("findOrCreateProjectRoot defaults to .musememory", () => {
     const root = temp();
     const targetDir = join(root, "fresh-project");
     mkdirSync(targetDir, { recursive: true });
     const res = findOrCreateProjectRoot(targetDir);
-    expect(res.memoryDir).toBe(join(targetDir, ".muse-memory"));
-    expect(res.memoryDir).not.toContain(".musememory");
+    expect(res.memoryDir).toBe(join(targetDir, ".musememory"));
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("legacy .memory is supported for backward compatibility", () => {
+  test("legacy .muse-memory and .memory are supported for backward compatibility", () => {
     const root = temp();
-    mkdirSync(join(root, "proj", ".memory", "memories"), { recursive: true });
-    const res = findProjectRoot(join(root, "proj"));
-    expect(res).toEqual({ root: join(root, "proj"), marker: "memory", memoryDirName: ".memory" });
+    mkdirSync(join(root, "proj1", ".muse-memory", "memories"), { recursive: true });
+    const res1 = findProjectRoot(join(root, "proj1"));
+    expect(res1).toEqual({ root: join(root, "proj1"), marker: "memory", memoryDirName: ".muse-memory" });
+
+    mkdirSync(join(root, "proj2", ".memory", "memories"), { recursive: true });
+    const res2 = findProjectRoot(join(root, "proj2"));
+    expect(res2).toEqual({ root: join(root, "proj2"), marker: "memory", memoryDirName: ".memory" });
+
     rmSync(root, { recursive: true, force: true });
   });
 
