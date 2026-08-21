@@ -110,23 +110,6 @@ Whenever your AI Agent starts in *any* project folder:
 
 ---
 
-## 📊 Feature Comparison: Muse Memory vs. AgentMemory
-
-| Feature / Dimension | 🧠 Muse Memory (`musememory`) | ⚡ AgentMemory (`@agentmemory/agentmemory`) |
-| :--- | :--- | :--- |
-| **Core Architecture** | Pure TypeScript / Bun & Node.js. 100% standalone, zero compiled engine binaries or Docker daemons. | Node.js CLI + Rust `iii-engine` binary / Docker container daemon on port `:3111`. |
-| **Storage Model** | Human-readable atomic YAML files (`.memory/memories/*.yaml`) + `CURRENT.md` for active constraints. Git-friendly & mergeable. | SQLite binary database files managed by `iii-engine` in system data directories. |
-| **Storage Scoping** | **Local (`.memory/`) + Global (`~/.memory/`)** with project scoping, multi-client workspace isolation, and layered query support. | Global system state directory (`~/.local/share/agentmemory`) with project & agentId tags. |
-| **Zero-Leakage Defense** | **Built-in Pure TS Vibeguard**: Intercepts and blocks API keys (`sk-*`, `ghp_*`, `AKIA*`), DB URLs, and private keys inline before disk write. | Requires external redaction or agent-side discipline. |
-| **Retrieval & Search** | Token TF/IDF search with **temporal staleness decay** ($\tau = 90$d), verification rank bonuses, and CodeGraph AST symbol overlap bonuses. | Hybrid BM25 + Vector embeddings (`all-MiniLM-L6-v2` via Transformers.js) + Knowledge Graph RRF fusion. |
-| **Memory Lifecycle** | 5-state explicit lifecycle: `candidate` ➔ `confirmed` ➔ `superseded` / `disputed` / `stale` / `rejected`. Bidirectional graph linking. | 4-tier lifecycle: Observation ➔ Session Summary ➔ Lesson/Crystal ➔ Archival Knowledge Graph. |
-| **Visual Dashboard** | **Built-in Zero-Dependency UI (`memory ui`)**: Interactive 2D knowledge graph, staleness heatmaps, live search, one-click confirmation (port 3000). | Real-time web viewer (`dist/viewer`) on port `:3113` with session replay timeline and speed control. |
-| **Tool Surface** | 15 focused MCP tools (`get_context`, `memory_capture`, `memory_recall`, `memory_harvest`, `memory_confirm`, `memory_supersede`, etc.). | 54 MCP tools in full mode / 8 in core mode (`memory_smart_search`, `memory_save`, `memory_sessions`, etc.). |
-| **Zero-Permission Execution** | `memory connect <agent>` auto-generates MCP configurations with pre-approved permissions across all major agents. | `agentmemory connect <agent>` with hook scripts and marketplace plugins. |
-| **CodeGraph AST Integration** | **Native**: Direct integration with `.codegraph/` AST indexes for symbol-level memory impact scoring. | External recipe pairing via documentation. |
-
----
-
 ## 🌐 Built-In Visual Dashboard (`memory ui`)
 
 Muse Memory includes a **100% self-contained, zero-dependency visual graph inspector**:
