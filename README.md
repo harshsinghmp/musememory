@@ -47,16 +47,20 @@ Here is the 2-step zero-permission setup:
 Choose **any one** of these installation methods:
 
 ```bash
-# Option A: via one-line curl installer (Recommended)
+# Option A: One-Line Installer (Recommended - auto-configures Bun or Node)
 curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
-# Option B: via npm (Node.js)
-npm install -g musememory
+# Option B: Local Repository Link (Instantaneous if repo is already cloned)
+cd musememory && bun link
+# (or: npm link)
 
-# Option C: via Bun (Lightning fast)
-bun add -g musememory
+# Option C: Global Git Install via Bun
+bun add -g git+https://github.com/harshsinghmp/musememory.git
 
-# Option D: via Docker
+# Option D: Global Git Install via NPM
+npm install -g --allow-git git+https://github.com/harshsinghmp/musememory.git
+
+# Option E: via Docker
 git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
