@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./.memory:/app/.memory
+      - ./.muse-memory:/app/.muse-memory
     stdin_open: true
     tty: true
     command: ["mcp"]

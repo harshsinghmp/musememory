@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { findProjectRoot, findOrCreateProjectRoot } from "./root.ts";
+import { findOrCreateProjectRoot } from "./root.ts";
 import { openStore, list, propose, confirm, supersede, markStale, reject, link } from "./store.ts";
 import { validateStore } from "./schema.ts";
 import { search } from "./search.ts";
@@ -19,7 +19,7 @@ const USAGE = `musememory — self-organizing persistent memory system for AI ag
 Usage: musememory <command> [args] (alias: memory)
 
 Commands:
-  init [path]                                   initialize .memory/ folder in workspace
+  init [path]                                   initialize .muse-memory/ folder in workspace
   context [query] [--limit N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context (default limit 5)
   search <query> [--limit N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
   propose <text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]  create candidate entry (confirmed with --confirmed)
@@ -38,8 +38,8 @@ Commands:
   stale [--days N]                              active entries not updated in N days (default 90)
   session start --project P [--note T]          record session start entry
   session end <id>                              record session end entry
-  current get                                   read .memory/CURRENT.md
-  current set <text> --project P                append constraint line to .memory/CURRENT.md
+  current get                                   read .muse-memory/CURRENT.md
+  current set <text> --project P                append constraint line to .muse-memory/CURRENT.md
   graph status                                  display graph provider status
   mcp                                           run stdio MCP server
   --help                                        show this help
@@ -110,7 +110,7 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case "init": {
       const targetDir = positional[0] ? join(process.cwd(), positional[0]) : process.cwd();
-      const memoryDir = join(targetDir, ".memory");
+      const memoryDir = join(targetDir, ".muse-memory");
       mkdirSync(join(memoryDir, "memories"), { recursive: true });
       const currentPath = join(memoryDir, "CURRENT.md");
       if (!existsSync(currentPath)) {
