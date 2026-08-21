@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/name/musememory?style=for-the-badge&logo=github&color=blue)](https://github.com/name/musememory/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=blue)](https://github.com/harshsinghmp/musememory/releases)
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
@@ -46,7 +46,7 @@ Choose **any one** of these installation methods:
 
 ```bash
 # Option A: via one-line curl installer (Recommended)
-curl -fsSL https://raw.githubusercontent.com/name/musememory/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
 # Option B: via npm (Node.js)
 npm install -g musememory
@@ -55,7 +55,7 @@ npm install -g musememory
 bun add -g musememory
 
 # Option D: via Docker
-git clone https://github.com/name/musememory.git && cd musememory
+git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
 
