@@ -30,6 +30,12 @@ export function tokenize(text: string): string[] {
   return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 }
 
+/** Estimates prompt token count for a memory entry (~4 characters per token heuristic). */
+export function estimateEntryTokens(entry: MemoryEntry): number {
+  const text = `${entry.id} ${entry.status} ${entry.project} ${entry.title}\n${entry.content}\n${(entry.tags ?? []).join(" ")} ${entry.type ?? ""} ${entry.verification?.level ?? ""}`;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
 export function daysSince(iso: string, now: number): number {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return 0;

@@ -6,7 +6,7 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-75%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-84%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
@@ -21,6 +21,9 @@
 - **Primary Command**: **`memory`** (alias: `musememory`)
 - **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
 - **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
+- **Dynamic Prompt Token Budgeter**: Exact token packing (`--token-budget <N>` / `token_budget` in MCP) for zero-bloat prompt injection.
+- **Universal Transcript Ingestion**: Ingest raw `.jsonl` conversation transcripts (`memory import-transcript <file.jsonl>`) from Claude Code, Antigravity, Cursor, and Codex.
+- **Operational Audit Ledger**: Append-only compliance log (`.memory/audit.jsonl` / `memory audit`) tracking all memory mutations.
 - **Permission-Free Connect**: `memory connect <agent>` automatically configures your editor/agent MCP settings with pre-approved permissions.
 
 ---
@@ -183,16 +186,19 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). |
 | `connect` | `[agent] [--all] [--dry-run]` | Auto-wire MCP server with zero-permission pre-approval (`claude-code`, `cursor`, `antigravity`, `windsurf`, `codex`, `gemini-cli`, `all`). |
 | `ui` | `[--port N] [--global]` | Launch zero-dependency visual knowledge graph dashboard. |
-| `context` | `[query] [--limit N] [--project P] [--type T] [--status S] [--verified] [--global]` | Retrieve Top-$K$ ranked active context for prompt injection. |
-| `search` | `<query> [--limit N] [--include-superseded] [--type T] [--status S] [--global]` | Ranked token search with scores and status indicators. |
+| `context` | `[query] [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified] [--global]` | Retrieve Top-$K$ ranked active context (with token budget limit). |
+| `search` | `<query> [--limit N] [--token-budget N] [--include-superseded] [--type T] [--status S] [--global]` | Ranked token search with scores and status indicators. |
 | `harvest` | `<text\|file> --project P [--confirmed] [--global]` | Distill raw text/transcripts into structured outcome/fix memory units. |
+| `import-transcript`| `<file.jsonl\|text> [--project P] [--confirmed] [--global]` | Ingest `.jsonl` session transcript from Claude Code / Antigravity / Cursor into memories (alias: `import-jsonl`). |
 | `capture` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]` | Fast proposal with inline zero-leakage secret scan. |
 | `propose` | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]` | Create a candidate memory entry. |
-| `recall` | `<query> [--limit N] [--project P] [--type T] [--status S] [--verified] [--global]` | Rich recall displaying verification levels and related graph links. |
+| `recall` | `<query> [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified] [--global]` | Rich recall displaying verification levels and related graph links. |
 | `confirm` | `<id> [--global]` | Promote `candidate`, `disputed`, or `stale` entry to `confirmed`. |
 | `supersede` | `<old_id> --with <new_id> [--global]` | Mark old entry superseded by new confirmed entry. |
 | `mark-stale` | `<id> [--reason <text>] [--global]` | Mark an entry stale and append deprecation reason. |
 | `reject` | `<id> [--global]` | Mark an entry rejected. |
+| `delete` | `<id> [--reason <text>] [--global]` | Permanently delete a memory entry and record audit event. |
+| `audit` | `[--operation OP] [--entry-id ID] [--limit N] [--global]` | Query append-only operational audit trail (`.memory/audit.jsonl`). |
 | `link` | `<id> --related <id1,id2> [--global]` | Synchronize bidirectional relation links between entries. |
 | `export` | `[--out <file.json>] [--global]` | Export memory snapshot for agency network sync. |
 | `import` | `<file.json> [--overwrite] [--global]` | Import and validate memory snapshot into local store. |
@@ -212,16 +218,19 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 | MCP Tool | Description |
 | :--- | :--- |
-| `get_context` | Fetches Top-$K$ ranked memories tailored for active prompt injection. |
-| `search` | Searches memory units with query, project, type, and verification filters. |
+| `get_context` | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`. |
+| `search` | Searches memory units with query, token budget, project, type, and verification filters. |
 | `memory_harvest` | Distills conversation turns into structured fix/outcome units. |
+| `memory_import_transcript` | Ingests JSONL transcripts into structured memory units. |
 | `memory_capture` | Saves memory with strict inline secret scanning. |
-| `memory_recall` | Rich inspection of knowledge units, verification, and relations. |
+| `memory_recall` | Rich inspection of knowledge units, verification, relations, and token budgeting. |
 | `memory_confirm` | Promotes candidate or stale memories to confirmed status. |
 | `memory_supersede`| Supersedes outdated knowledge with a confirmed target. |
 | `memory_link` | Connects related memory units bidirectionally. |
 | `memory_mark_stale`| Flags decaying knowledge units. |
 | `memory_reject` | Marks rejected or refuted hypotheses. |
+| `memory_delete` | Permanently deletes a memory unit and logs audit record. |
+| `memory_audit` | Queries the append-only operational audit ledger. |
 | `memory_export` | Exports full memory snapshot JSON. |
 | `memory_import` | Imports validated memories from a snapshot. |
 | `memory_validate` | Audits store integrity and detects credential leaks. |
@@ -233,7 +242,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 75 tests passing across 12 test suites
+bun test          # 84 tests passing across 15 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

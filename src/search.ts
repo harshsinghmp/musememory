@@ -1,21 +1,15 @@
 import type { Store } from "./store.ts";
-import { list, maxMtime } from "./store.ts";
-import { tokenize, sortCandidates, type ScoredEntry } from "./rank.ts";
-import type { MemoryEntry } from "./types.ts";
+import { list } from "./store.ts";
+import { tokenize, sortCandidates, estimateEntryTokens, type ScoredEntry } from "./rank.ts";
+import type { SearchOptions } from "./types.ts";
 
-export interface SearchOptions {
-  limit?: number;
-  project?: string;
-  includeSuperseded?: boolean;
-  type?: string;
-  status?: string;
-  verified?: boolean;
-}
+export type { SearchOptions };
 
 export interface SearchResult {
   results: ScoredEntry[];
   source: "live";
   stale: boolean;
+  totalTokensUsed?: number;
 }
 
 export function search(store: Store, _memoryDir: string, query: string, opts: SearchOptions = {}): SearchResult {
@@ -46,11 +40,28 @@ export function search(store: Store, _memoryDir: string, query: string, opts: Se
 
   const scored = sortCandidates(entries, queryTokens, now);
   const limit = opts.limit ?? 10;
-  const results = scored.slice(0, limit);
+  let results: ScoredEntry[] = [];
+  let totalTokensUsed = 0;
+
+  if (opts.tokenBudget && opts.tokenBudget > 0) {
+    for (const item of scored) {
+      if (results.length >= limit) break;
+      const tokens = estimateEntryTokens(item.entry);
+      if (totalTokensUsed + tokens <= opts.tokenBudget) {
+        results.push(item);
+        totalTokensUsed += tokens;
+      }
+    }
+  } else {
+    results = scored.slice(0, limit);
+    totalTokensUsed = results.reduce((acc, r) => acc + estimateEntryTokens(r.entry), 0);
+  }
 
   return {
     results,
     source: "live",
     stale: false,
+    totalTokensUsed,
   };
 }
+

@@ -1,17 +1,19 @@
-import { readdirSync, readFileSync, writeFileSync, renameSync, mkdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
+import { recordAuditEvent } from "./audit.ts";
 
 export interface Store {
   dir: string;
+  memoryDir?: string;
 }
 
 export function openStore(memoryDir: string): Store {
   const dir = join(memoryDir, "memories");
   mkdirSync(dir, { recursive: true });
-  return { dir };
+  return { dir, memoryDir };
 }
 
 /** Safe slug from an id: keep [a-z0-9_-], trim leading/trailing dashes and underscores. */
@@ -146,6 +148,15 @@ export function propose(
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "propose",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: opts.source ?? "agent",
+      details: { title: entry.title, type: entry.type, status: entry.status },
+    });
+  }
   return entry;
 }
 
@@ -161,6 +172,14 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   entry.verification = { level: "user-confirmed", verified_at: now };
   entry.updated_at = now;
   save(store, entry);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "confirm",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: "user",
+    });
+  }
   return entry;
 }
 
@@ -187,6 +206,14 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
 
   save(store, old);
   save(store, next);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "supersede",
+      entry_id: old.id,
+      project: old.project,
+      details: { superseded_by: newId },
+    });
+  }
   return old;
 }
 
@@ -198,6 +225,14 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "mark_stale",
+      entry_id: entry.id,
+      project: entry.project,
+      reason,
+    });
+  }
   return entry;
 }
 
@@ -234,5 +269,31 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   entry.status = "rejected";
   entry.updated_at = nowIso();
   save(store, entry);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "reject",
+      entry_id: entry.id,
+      project: entry.project,
+    });
+  }
   return entry;
 }
+
+/** Delete an entry permanently from store and record audit event. */
+export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
+  const file = fileForId(store, id);
+  if (!existsSync(file)) return false;
+  const entry = get(store, id);
+  unlinkSync(file);
+  if (store.memoryDir && entry) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "delete",
+      entry_id: id,
+      project: entry.project,
+      actor: actor ?? "agent",
+      reason,
+    });
+  }
+  return true;
+}
+

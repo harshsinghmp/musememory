@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
-import { openStore, list, propose, confirm, supersede, markStale, reject, link } from "./store.ts";
+import { openStore, list, propose, confirm, supersede, markStale, reject, link, deleteEntry } from "./store.ts";
 import { validateStore } from "./schema.ts";
 import { search } from "./search.ts";
 import { stalePolicyDays } from "./rank.ts";
@@ -9,7 +9,8 @@ import { getCurrent, setCurrent } from "./current.ts";
 import { recordSessionStart, recordSessionEnd, findSession } from "./sessions.ts";
 import { scanSecrets } from "./secrets.ts";
 import { getGraphStatus } from "./graph.ts";
-import { extractHarvestUnits, exportSnapshot, importSnapshot } from "./harvest.ts";
+import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
+import { getAuditTrail } from "./audit.ts";
 import { DEFAULT_CONTEXT_LIMIT, type MemoryEntry, type MemoryType } from "./types.ts";
 
 export { scanSecrets };
@@ -25,16 +26,19 @@ Commands:
   init [path] [--legacy] [--global]             initialize .memory/ folder (or ~/.memory/)
   connect [agent] [--all] [--dry-run]           auto-wire MCP with zero-permission auto-approval (claude-code, cursor, antigravity, windsurf, codex, gemini-cli, all)
   ui [--port N]                                 launch zero-dependency visual graph dashboard
-  context [query] [--limit N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context (default limit 5)
-  search <query> [--limit N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
+  context [query] [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified]   top-K active-ranked context
+  search <query> [--limit N] [--token-budget N] [--include-superseded] [--type T] [--status S] [--verified]   ranked results with score/source/stale
   propose <text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]  create candidate entry (confirmed with --confirmed)
   capture <text> --project P [--title T] [--tags a,b] [--type T] [--confirmed]  propose with inline secret scan
   harvest <text|file> --project P [--confirmed] distill outcomes/fixes into memory units
-  recall <query> [--limit N] [--project P] [--type T] [--status S] [--verified]  rich recall of ranked entries
+  import-transcript <file.jsonl> [--project P] [--confirmed] ingest JSONL transcript into memories (alias: import-jsonl)
+  recall <query> [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified]  rich recall of ranked entries
   confirm <id>                                  candidate/disputed/stale -> confirmed
   supersede <id> --with <newId>                 mark old superseded, link new's supersedes
   mark-stale <id> [--reason <text>]             mark entry stale (appends reason)
   reject <id>                                   mark entry rejected
+  delete <id> [--reason <text>]                 delete entry permanently and record audit log
+  audit [--operation OP] [--entry-id ID] [--limit N] query append-only audit trail
   link <id> --related <id,...>                  two-way link related entries
   export [--out <file.json>]                    export memory snapshot for agency sharing
   import <file.json> [--overwrite]              import memory snapshot into local store
@@ -170,9 +174,11 @@ export async function main(argv: string[]): Promise<number> {
       const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
+      const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
       const query = positional[0] ?? "";
       const res = search(ctx.store, ctx.memoryDir, query, {
         limit,
+        tokenBudget,
         project: flags["project"],
         includeSuperseded: false,
         type: flags["type"],
@@ -188,8 +194,10 @@ export async function main(argv: string[]): Promise<number> {
       if (!ctx) return 1;
       if (positional.length === 0) return usageError("search requires a query");
       const limit = parseInt(flags["limit"] ?? "10", 10) || 10;
+      const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
       const res = search(ctx.store, ctx.memoryDir, positional[0], {
         limit,
+        tokenBudget,
         includeSuperseded: flags["include-superseded"] === "true",
         type: flags["type"],
         status: flags["status"],
@@ -200,7 +208,7 @@ export async function main(argv: string[]): Promise<number> {
         console.log(`- ${r.entry.id}${badge} score=${r.score.toFixed(3)} (${r.entry.project}) ${r.entry.title}`);
         console.log(`  ${r.entry.content}`);
       }
-      console.log(`source=${res.source} stale=${res.stale} count=${res.results.length}`);
+      console.log(`source=${res.source} stale=${res.stale} count=${res.results.length}${res.totalTokensUsed ? ` tokens=${res.totalTokensUsed}` : ""}`);
       return 0;
     }
 
@@ -281,13 +289,31 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case "import-transcript":
+    case "import-jsonl": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      const filePath = positional[0];
+      if (!filePath) return usageError("import-transcript requires <file.jsonl|text>");
+      const project = flags["project"] ?? "default";
+      const isConfirmed = flags["confirmed"] === "true";
+      const res = importTranscript(ctx.store, filePath, { project, confirmed: isConfirmed });
+      console.log(`imported ${res.imported} memory units from transcript: ${res.entries.map((e) => e.id).join(", ")}`);
+      if (res.errors.length > 0) {
+        for (const err of res.errors) console.error(`  warning: ${err}`);
+      }
+      return 0;
+    }
+
     case "recall": {
       const ctx = requireRoot(flags);
       if (!ctx) return 1;
       const query = positional[0] ?? "";
       const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
+      const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
       const res = search(ctx.store, ctx.memoryDir, query, {
         limit,
+        tokenBudget,
         project: flags["project"],
         includeSuperseded: false,
         type: flags["type"],
@@ -353,6 +379,39 @@ export async function main(argv: string[]): Promise<number> {
       const entry = reject(ctx.store, id);
       if (!entry) return fail(`error: no entry with id ${id}`);
       console.log(`rejected ${entry.id}`);
+      return 0;
+    }
+
+    case "delete": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      const id = positional[0];
+      if (!id) return usageError("delete requires <id>");
+      const ok = deleteEntry(ctx.store, id, flags["reason"], "cli_user");
+      if (!ok) return fail(`error: no entry with id ${id}`);
+      console.log(`deleted entry ${id}`);
+      return 0;
+    }
+
+    case "audit": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      const limit = flags["limit"] ? parseInt(flags["limit"], 10) : 50;
+      const trail = getAuditTrail(ctx.memoryDir, {
+        operation: flags["operation"],
+        entryId: flags["entry-id"],
+        limit,
+      });
+      if (trail.length === 0) {
+        console.log("no audit records found");
+        return 0;
+      }
+      console.log(`📋 Audit Trail (${trail.length} records):`);
+      for (const r of trail) {
+        const details = r.details ? ` ${JSON.stringify(r.details)}` : "";
+        const reason = r.reason ? ` reason="${r.reason}"` : "";
+        console.log(`- [${r.timestamp}] ${r.operation.toUpperCase()} id=${r.entry_id} actor=${r.actor ?? "unknown"}${reason}${details}`);
+      }
       return 0;
     }
 

@@ -5,13 +5,14 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot } from "./root.ts";
-import { openStore, get, propose, confirm, supersede, save, link, markStale, reject } from "./store.ts";
+import { openStore, get, propose, confirm, supersede, save, link, markStale, reject, deleteEntry } from "./store.ts";
 import { search } from "./search.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { scanSecrets } from "./secrets.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
-import { extractHarvestUnits, exportSnapshot, importSnapshot } from "./harvest.ts";
+import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
+import { getAuditTrail } from "./audit.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export async function runMcpServer(): Promise<void> {
@@ -36,13 +37,14 @@ export async function runMcpServer(): Promise<void> {
       },
       {
         name: "get_context",
-        description: "Ranked active context entries for prompt injection",
+        description: "Ranked active context entries for prompt injection (with optional token budget)",
         inputSchema: {
           type: "object",
           properties: {
             query: { type: "string" },
             project: { type: "string" },
             limit: { type: "number" },
+            token_budget: { type: "number", description: "Maximum token budget to consume for retrieved context" },
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
@@ -57,6 +59,7 @@ export async function runMcpServer(): Promise<void> {
           properties: {
             query: { type: "string" },
             limit: { type: "number" },
+            token_budget: { type: "number", description: "Maximum token budget to consume" },
             include_superseded: { type: "boolean" },
             type: { type: "string" },
             status: { type: "string" },
@@ -96,12 +99,13 @@ export async function runMcpServer(): Promise<void> {
       },
       {
         name: "memory_recall",
-        description: "Rich recall of ranked entries with verification/related/session/graph fields",
+        description: "Rich recall of ranked entries with verification/related/session/graph fields and token budgeting",
         inputSchema: {
           type: "object",
           properties: {
             query: { type: "string" },
             limit: { type: "number" },
+            token_budget: { type: "number", description: "Maximum token budget to consume for retrieved recall entries" },
             project: { type: "string" },
             type: { type: "string" },
             status: { type: "string" },
@@ -166,6 +170,43 @@ export async function runMcpServer(): Promise<void> {
             id: { type: "string" },
           },
           required: ["id"],
+        },
+      },
+      {
+        name: "memory_delete",
+        description: "Permanently delete a memory entry by ID and record audit event",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_audit",
+        description: "Query the append-only audit trail of memory operations",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string" },
+            entry_id: { type: "string" },
+            limit: { type: "number" },
+          },
+        },
+      },
+      {
+        name: "memory_import_transcript",
+        description: "Ingest a JSONL transcript or raw log into structured outcome and fix memories",
+        inputSchema: {
+          type: "object",
+          properties: {
+            transcript: { type: "string", description: "File path or raw JSONL/log content" },
+            project: { type: "string" },
+            confirmed: { type: "boolean" },
+          },
+          required: ["transcript"],
         },
       },
       {
@@ -262,6 +303,7 @@ export async function runMcpServer(): Promise<void> {
       case "get_context": {
         const res = search(store, memoryDir, String(a.query ?? ""), {
           limit: typeof a.limit === "number" ? a.limit : 5,
+          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           project: a.project ? String(a.project) : undefined,
           includeSuperseded: false,
           type: a.type ? String(a.type) : undefined,
@@ -273,6 +315,7 @@ export async function runMcpServer(): Promise<void> {
       case "search": {
         const res = search(store, memoryDir, String(a.query), {
           limit: typeof a.limit === "number" ? a.limit : 10,
+          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           includeSuperseded: a.include_superseded === true,
           type: a.type ? String(a.type) : undefined,
           status: a.status ? String(a.status) : undefined,
@@ -282,6 +325,7 @@ export async function runMcpServer(): Promise<void> {
           results: res.results.map((r) => ({ ...r.entry, score: r.score })),
           source: res.source,
           stale: res.stale,
+          total_tokens_used: res.totalTokensUsed,
         });
       }
       case "memory_capture": {
@@ -328,9 +372,17 @@ export async function runMcpServer(): Promise<void> {
         }
         return toolResult({ harvested_count: created.length, entries: created });
       }
+      case "memory_import_transcript": {
+        const transcript = String(a.transcript);
+        const project = a.project ? String(a.project) : undefined;
+        const isConfirmed = a.confirmed === true;
+        const res = importTranscript(store, transcript, { project, confirmed: isConfirmed });
+        return toolResult(res);
+      }
       case "memory_recall": {
         const res = search(store, memoryDir, String(a.query ?? ""), {
           limit: typeof a.limit === "number" ? a.limit : 5,
+          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           project: a.project ? String(a.project) : undefined,
           includeSuperseded: false,
           type: a.type ? String(a.type) : undefined,
@@ -367,6 +419,21 @@ export async function runMcpServer(): Promise<void> {
         const entry = reject(store, String(a.id));
         if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
+      }
+      case "memory_delete": {
+        const id = String(a.id);
+        const reason = a.reason ? String(a.reason) : undefined;
+        const ok = deleteEntry(store, id, reason, "mcp_agent");
+        if (!ok) return toolError(`no entry found with id ${id}`);
+        return toolResult({ success: true, deleted_id: id });
+      }
+      case "memory_audit": {
+        const trail = getAuditTrail(memoryDir, {
+          operation: a.operation ? String(a.operation) : undefined,
+          entryId: a.entry_id ? String(a.entry_id) : undefined,
+          limit: typeof a.limit === "number" ? a.limit : 50,
+        });
+        return toolResult({ total: trail.length, entries: trail });
       }
       case "memory_export": {
         const snapshot = exportSnapshot(store);

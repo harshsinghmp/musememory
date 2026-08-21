@@ -176,4 +176,39 @@ describe("cli e2e", () => {
     expect(conn.stdout).toContain("claude-code");
     cleanup(root);
   });
+
+  test("import-transcript, audit, and delete CLI commands", () => {
+    const { root } = setupFixtureRoot();
+    const jsonlPath = join(root, "session.jsonl");
+    writeFileSync(
+      jsonlPath,
+      JSON.stringify({ content: "### Fix: Redis Session Serialization\nConfigured msgpack serializer for redis cache." }) + "\n",
+      "utf8",
+    );
+
+    // 1. Import transcript
+    const imp = run(root, ["import-transcript", jsonlPath, "--project", "aria", "--confirmed"]);
+    expect(imp.code).toBe(0);
+    expect(imp.stdout).toContain("imported 1 memory units from transcript");
+
+    // 2. Search with --token-budget
+    const s = run(root, ["search", "Redis", "--token-budget", "100"]);
+    expect(s.code).toBe(0);
+    expect(s.stdout).toContain("Redis Session Serialization");
+    expect(s.stdout).toContain("tokens=");
+
+    // 3. Query audit trail
+    const aud = run(root, ["audit"]);
+    expect(aud.code).toBe(0);
+    expect(aud.stdout).toContain("Audit Trail");
+
+    // 4. Propose and Delete
+    const p = run(root, ["propose", "temporary note to delete", "--project", "aria"]);
+    const id = p.stdout.match(/created (m_\d+_\w+)/)![1];
+    const del = run(root, ["delete", id, "--reason", "obsolete test entry"]);
+    expect(del.code).toBe(0);
+    expect(del.stdout).toContain(`deleted entry ${id}`);
+
+    cleanup(root);
+  });
 });

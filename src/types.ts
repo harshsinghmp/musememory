@@ -96,3 +96,34 @@ export const DEFAULT_STALE_DAYS = 90;
 export const DEFAULT_CONTEXT_LIMIT = 5;
 export const MAX_TITLE_LENGTH = 120;
 export const MAX_TAGS = 8;
+
+export type AuditOperation =
+  | "propose"
+  | "confirm"
+  | "supersede"
+  | "mark_stale"
+  | "reject"
+  | "delete"
+  | "import"
+  | "transcript_import";
+
+export interface AuditEntry {
+  timestamp: string;
+  operation: AuditOperation;
+  entry_id: string;
+  project?: string;
+  actor?: string;
+  reason?: string;
+  details?: Record<string, any>;
+}
+
+export interface SearchOptions {
+  limit?: number;
+  project?: string;
+  includeSuperseded?: boolean;
+  type?: string;
+  status?: string;
+  verified?: boolean;
+  tokenBudget?: number;
+}
+

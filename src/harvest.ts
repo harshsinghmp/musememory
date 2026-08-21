@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import type { Store } from "./store.ts";
 import { list, propose, save, get } from "./store.ts";
 import { validateEntry } from "./schema.ts";
@@ -126,6 +127,108 @@ export function defaultSalienceForType(type: MemoryType): number {
 }
 
 /**
+ * Extracts plain text strings from varied JSONL transcript step objects
+ * (supporting Claude Code, Antigravity, Cursor, and OpenAI/generic agent formats).
+ */
+export function parseJsonlTranscript(jsonlText: string): string[] {
+  if (!jsonlText) return [];
+  const lines = jsonlText.split("\n").map((l) => l.trim()).filter(Boolean);
+  const blocks: string[] = [];
+
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line);
+      // Direct string fields
+      if (typeof obj.content === "string") {
+        blocks.push(obj.content);
+      } else if (Array.isArray(obj.content)) {
+        for (const item of obj.content) {
+          if (typeof item === "string") blocks.push(item);
+          else if (item && typeof item.text === "string") blocks.push(item.text);
+        }
+      }
+      if (typeof obj.thinking === "string") {
+        blocks.push(obj.thinking);
+      }
+      if (typeof obj.message === "string") {
+        blocks.push(obj.message);
+      }
+      if (typeof obj.text === "string") {
+        blocks.push(obj.text);
+      }
+      if (obj.tool_calls && Array.isArray(obj.tool_calls)) {
+        for (const tc of obj.tool_calls) {
+          if (tc.arguments && typeof tc.arguments === "string") blocks.push(tc.arguments);
+        }
+      }
+    } catch {
+      // Plain text fallback
+      blocks.push(line);
+    }
+  }
+
+  return blocks;
+}
+
+export interface TranscriptImportOptions {
+  project?: string;
+  confirmed?: boolean;
+  source?: string;
+}
+
+export interface TranscriptImportResult {
+  imported: number;
+  entries: MemoryEntry[];
+  errors: string[];
+}
+
+/**
+ * Parses and ingests conversation transcripts (.jsonl or text) and auto-distills
+ * actionable memories into the store.
+ */
+export function importTranscript(
+  store: Store,
+  transcriptPathOrContent: string,
+  options: TranscriptImportOptions = {},
+): TranscriptImportResult {
+  let content = transcriptPathOrContent;
+  if (existsSync(transcriptPathOrContent)) {
+    content = readFileSync(transcriptPathOrContent, "utf8");
+  }
+
+  const blocks = parseJsonlTranscript(content);
+  const fullText = blocks.join("\n\n");
+  const units = extractHarvestUnits(fullText);
+  const project = options.project ?? "default";
+
+  const entries: MemoryEntry[] = [];
+  const errors: string[] = [];
+
+  for (const unit of units) {
+    try {
+      const entry = propose(store, {
+        project,
+        title: unit.title,
+        content: unit.content,
+        type: unit.type,
+        tags: unit.tags,
+        source: options.source ?? "transcript_import",
+        confirmed: options.confirmed ?? false,
+      });
+      entries.push(entry);
+    } catch (err: unknown) {
+      errors.push(`Failed to import unit "${unit.title}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return {
+    imported: entries.length,
+    entries,
+    errors,
+  };
+}
+
+/**
  * Export all entries from store into a portable JSON snapshot.
  */
 export function exportSnapshot(store: Store): {
@@ -188,3 +291,4 @@ export function importSnapshot(
 
   return { imported, skipped, errors };
 }
+
