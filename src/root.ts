@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type MarkerKind = "memory" | "git" | "global" | "env" | "auto" | null;
@@ -21,6 +21,17 @@ export function getGlobalMemoryDir(): string {
   if (custom) return custom;
   const home = process.env.HOME || process.env.USERPROFILE || ".";
   return join(home, ".memory");
+}
+
+function ensureMemoryDirectory(memoryDir: string): void {
+  const memoriesDir = join(memoryDir, "memories");
+  if (!existsSync(memoriesDir)) {
+    mkdirSync(memoriesDir, { recursive: true });
+  }
+  const currentPath = join(memoryDir, "CURRENT.md");
+  if (!existsSync(currentPath)) {
+    writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
+  }
 }
 
 /**
@@ -60,7 +71,7 @@ export function findProjectRoot(startDir: string, options: ResolveOptions = {}):
 }
 
 /**
- * Resolve project root or automatically initialize `.memory/` in startDir (or global) if none found.
+ * Resolve project root or automatically initialize `.memory/` (and CURRENT.md) in startDir (or global) if none found.
  */
 export function findOrCreateProjectRoot(
   startDir: string,
@@ -68,18 +79,14 @@ export function findOrCreateProjectRoot(
 ): { root: string; memoryDir: string; marker: MarkerKind } {
   if (options.global) {
     const globalDir = getGlobalMemoryDir();
-    if (!existsSync(globalDir)) {
-      mkdirSync(join(globalDir, "memories"), { recursive: true });
-    }
+    ensureMemoryDirectory(globalDir);
     return { root: globalDir, memoryDir: globalDir, marker: "global" };
   }
 
   const res = findProjectRoot(startDir, options);
   if (res.marker === "env" || res.marker === "global") {
     const memoryDir = res.root!;
-    if (!existsSync(memoryDir)) {
-      mkdirSync(join(memoryDir, "memories"), { recursive: true });
-    }
+    ensureMemoryDirectory(memoryDir);
     return { root: memoryDir, memoryDir, marker: res.marker };
   }
 
@@ -95,9 +102,7 @@ export function findOrCreateProjectRoot(
           : ".memory");
   const memoryDir = join(root, memoryDirName);
   const marker = res.marker ?? "auto";
-  if (!existsSync(memoryDir)) {
-    mkdirSync(join(memoryDir, "memories"), { recursive: true });
-  }
+  ensureMemoryDirectory(memoryDir);
   return { root, memoryDir, marker };
 }
 

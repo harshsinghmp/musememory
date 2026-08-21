@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { findProjectRoot, findOrCreateProjectRoot } from "../src/root.ts";
@@ -30,12 +30,13 @@ describe("hierarchical root detection", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("findOrCreateProjectRoot defaults to .memory", () => {
+  test("findOrCreateProjectRoot defaults to .memory and auto-generates CURRENT.md", () => {
     const root = temp();
     const targetDir = join(root, "fresh-project");
     mkdirSync(targetDir, { recursive: true });
     const res = findOrCreateProjectRoot(targetDir);
     expect(res.memoryDir).toBe(join(targetDir, ".memory"));
+    expect(existsSync(join(res.memoryDir, "CURRENT.md"))).toBe(true);
     rmSync(root, { recursive: true, force: true });
   });
 
