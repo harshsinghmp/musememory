@@ -49,6 +49,8 @@ Commands:
   link <id> --related <id,...>                  two-way link related entries
   export [--out <file.json>]                    export memory snapshot for agency sharing
   import <file.json> [--overwrite]              import memory snapshot into local store
+  list [--status S] [--type T] [--project P]    list all memories with status and metadata (alias: ls)
+  stats                                         display total memories, status distribution, and storage breakdown
   validate [--dry-run]                          deep validation of schema, secrets, and links
   briefing [--limit N]                          recent active entries + status counts + recurring
   stale [--days N]                              active entries not updated in N days (default 90)
@@ -763,6 +765,54 @@ export async function main(argv: string[]): Promise<number> {
       if (staleByPolicy.length > 0) {
         console.log(`stale by policy:`);
         for (const e of staleByPolicy) printEntry(e, true);
+      }
+      return 0;
+    }
+
+    case "ls":
+    case "list": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      let entries = list(ctx.store);
+      if (flags["status"]) entries = entries.filter((e) => e.status === flags["status"]);
+      if (flags["type"]) entries = entries.filter((e) => e.type === flags["type"]);
+      if (flags["project"]) entries = entries.filter((e) => e.project === flags["project"]);
+
+      if (entries.length === 0) {
+        console.log(`no memories found in ${ctx.memoryDir}`);
+        return 0;
+      }
+
+      console.log(`memories (${entries.length}) in ${ctx.memoryDir}:`);
+      for (const e of entries) {
+        printEntry(e);
+      }
+      return 0;
+    }
+
+    case "stats": {
+      const ctx = requireRoot(flags);
+      if (!ctx) return 1;
+      const entries = list(ctx.store);
+      const counts: Record<string, number> = {};
+      const typeCounts: Record<string, number> = {};
+      for (const e of entries) {
+        counts[e.status] = (counts[e.status] ?? 0) + 1;
+        if (e.type) typeCounts[e.type] = (typeCounts[e.type] ?? 0) + 1;
+      }
+      console.log(`\n====================================================`);
+      console.log(`Muse Memory Statistics (${ctx.memoryDir})`);
+      console.log(`====================================================`);
+      console.log(`Total Memories: ${entries.length}`);
+      console.log(`Status Breakdown:`);
+      for (const [status, count] of Object.entries(counts)) {
+        console.log(`  - ${status}: ${count}`);
+      }
+      if (Object.keys(typeCounts).length > 0) {
+        console.log(`Type Breakdown:`);
+        for (const [type, count] of Object.entries(typeCounts)) {
+          console.log(`  - ${type}: ${count}`);
+        }
       }
       return 0;
     }
