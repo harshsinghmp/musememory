@@ -549,6 +549,15 @@ export function connectAgent(agentName: string = "all", home: string = homedir()
     return reports;
   }
 
+  // Multiple comma-separated targets: "claude,cursor,hermes"
+  if (target.includes(",")) {
+    const targets = target.split(",").map((t) => t.trim()).filter(Boolean);
+    for (const t of targets) {
+      reports.push(connectSingleAgent(t, home, options));
+    }
+    return reports;
+  }
+
   // Explicit single agent connection
   reports.push(connectSingleAgent(target, home, options));
   return reports;

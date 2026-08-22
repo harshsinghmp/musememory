@@ -171,16 +171,37 @@ export async function main(argv: string[]): Promise<number> {
     case "migrate": {
       const ctx = requireRoot(flags);
       if (!ctx) return 1;
-      const provider = flags["from"] || positional[0];
+      let provider = flags["from"] || positional[0];
       const all = flags["all"] === "true";
       const dryRun = flags["dry-run"] === "true";
       const overwrite = flags["overwrite"] === "true";
       const project = flags["project"];
 
+      // Interactive provider selection if not specified and stdin is TTY
+      if (!provider && !all && process.stdin.isTTY) {
+        const detected = detectProviders(ctx.root).filter((p) => p.detected);
+        if (detected.length > 1) {
+          const { promptMultiSelect } = await import("./prompt.ts");
+          const selected = await promptMultiSelect(
+            "🔍 Detected External Memory Providers on Workstation:",
+            detected.map((p) => ({
+              id: p.id,
+              label: p.name,
+              hint: p.resolvedPaths[0],
+              category: p.category,
+            }))
+          );
+          if (selected.length === 0) return 0;
+          if (selected.length < detected.length) {
+            provider = selected.join(",");
+          }
+        }
+      }
+
       console.log(`🚀 Starting Muse Memory Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
       const report = await runMigration(ctx.store, ctx.memoryDir, {
         provider,
-        all,
+        all: all || !provider,
         dryRun,
         overwrite,
         project,
@@ -235,11 +256,36 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     case "connect": {
-      const agent = positional[0] ?? (flags["all"] === "true" ? "all" : "all");
+      let agent = positional[0];
       const { connectAgent } = await import("./connect.ts");
       const { detectAgents } = await import("./agents/detect.ts");
       const dryRun = flags["dry-run"] === "true";
       const force = flags["force"] === "true";
+      const isAllFlag = flags["all"] === "true" || flags["a"] === "true";
+
+      // Interactive agent selection if no specific target or --all flag given in interactive TTY
+      if (!agent && !isAllFlag && process.stdin.isTTY) {
+        const detected = detectAgents().filter((a) => a.installed);
+        if (detected.length > 0) {
+          const { promptMultiSelect } = await import("./prompt.ts");
+          const selected = await promptMultiSelect(
+            "🔌 Select Detected Coding Agents & IDEs to Wire with Muse Memory MCP:",
+            detected.map((a) => ({
+              id: a.id,
+              label: a.name,
+              hint: a.configPath || a.binaryPath,
+              category: a.category,
+            }))
+          );
+          if (selected.length === 0) return 0;
+          agent = selected.join(",");
+        }
+      }
+
+      if (!agent) {
+        agent = "all";
+      }
+
       try {
         const reports = connectAgent(agent, undefined, { dryRun, force });
         if (reports.length === 0) {
@@ -248,12 +294,12 @@ export async function main(argv: string[]): Promise<number> {
           return 0;
         }
 
-        console.log(`🔌 Auto-detected and connected ${reports.length} installed coding agent(s)${dryRun ? " [DRY RUN]" : ""}:`);
+        console.log(`🔌 Connected ${reports.length} coding agent(s)${dryRun ? " [DRY RUN]" : ""}:`);
         for (const r of reports) {
           console.log(`  ✓ ${r.agentName} (${r.agent}): ${r.message}`);
         }
 
-        if (agent === "all" || agent === "--all" || !positional[0]) {
+        if (agent === "all" || isAllFlag) {
           const allAgents = detectAgents();
           const uninstalledCount = allAgents.length - reports.length;
           console.log(`\n🛡️  Clean Workspace Guarantee: Skipped ${uninstalledCount} uninstalled agents to prevent creating unneeded files/folders.`);
