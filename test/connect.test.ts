@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { connectAgent, connectClaudeCode, connectCursor, ALL_MEMORY_TOOLS } from "../src/connect.ts";
@@ -40,10 +40,16 @@ describe("multi-agent connect and zero-permission auto-wiring", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  test("connectAgent('all') wires all supported agent platforms", () => {
+  test("connectAgent('all') wires detected installed agent platforms", () => {
     const home = temp();
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    mkdirSync(join(home, ".gemini", "antigravity-cli"), { recursive: true });
+    mkdirSync(join(home, ".codeium", "windsurf"), { recursive: true });
+    mkdirSync(join(home, ".codex"), { recursive: true });
+
     const reports = connectAgent("all", home);
-    expect(reports.length).toBe(6);
+    expect(reports.length).toBeGreaterThanOrEqual(5);
 
     const agents = reports.map((r) => r.agent);
     expect(agents).toContain("claude-code");
@@ -51,7 +57,6 @@ describe("multi-agent connect and zero-permission auto-wiring", () => {
     expect(agents).toContain("antigravity");
     expect(agents).toContain("windsurf");
     expect(agents).toContain("codex");
-    expect(agents).toContain("gemini-cli");
 
     rmSync(home, { recursive: true, force: true });
   });

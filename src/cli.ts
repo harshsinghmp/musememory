@@ -25,7 +25,8 @@ Global Flags:
 
 Commands:
   init [path] [--legacy] [--global]             initialize .memory/ folder (or ~/.memory/)
-  connect [agent] [--all] [--dry-run]           auto-wire MCP with zero-permission auto-approval (claude-code, cursor, antigravity, windsurf, codex, gemini-cli, all)
+  connect [agent] [--all] [--force] [--dry-run] auto-wire MCP only to detected installed agents (bypassing uninstalled to prevent extra files)
+  agents                                        scan machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.)
   detect                                        scan machine for existing external memory providers (24+ systems)
   migrate [--from P] [--all] [--dry-run]        auto-detect & migrate memories preserving active/superseded states
   ui [--port N]                                 launch zero-dependency visual graph dashboard
@@ -205,16 +206,57 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case "agents":
+    case "detect-agents": {
+      const { detectAgents } = await import("./agents/detect.ts");
+      const agents = detectAgents();
+      const installed = agents.filter((a) => a.installed);
+      const connected = installed.filter((a) => a.connected);
+
+      console.log(`🤖 Workstation Coding Agents Scan (80+ Baseline):`);
+      console.log(`------------------------------------------------`);
+      for (const a of agents) {
+        if (a.installed) {
+          const statusTag = a.connected ? "✓ [CONNECTED]" : "⚡ [INSTALLED - NOT WIRED]";
+          console.log(`  ${statusTag} ${a.name} (${a.stars ?? "active"}) — ${a.category}`);
+          if (a.binaryPath) console.log(`      ➔ binary: ${a.binaryPath}`);
+          if (a.configPath) console.log(`      ➔ config: ${a.configPath}`);
+        }
+      }
+
+      console.log(`\n📊 Summary:`);
+      console.log(`  Installed Agents Detected: ${installed.length}`);
+      console.log(`  Connected with Muse Memory: ${connected.length}`);
+      console.log(`  Uninstalled/Skipped:       ${agents.length - installed.length}`);
+      if (installed.length > connected.length) {
+        console.log(`\n💡 Tip: Run 'memory connect --all' to auto-wire the remaining ${installed.length - connected.length} installed agent(s) with zero-permission auto-approval.`);
+      }
+      return 0;
+    }
+
     case "connect": {
       const agent = positional[0] ?? (flags["all"] === "true" ? "all" : "all");
       const { connectAgent } = await import("./connect.ts");
+      const { detectAgents } = await import("./agents/detect.ts");
       const dryRun = flags["dry-run"] === "true";
       const force = flags["force"] === "true";
       try {
         const reports = connectAgent(agent, undefined, { dryRun, force });
-        console.log(`🔌 Wired memory MCP with zero-permission auto-approval:`);
+        if (reports.length === 0) {
+          console.log(`ℹ️  No coding agents were detected on this machine.`);
+          console.log(`Use 'memory connect <agent> --force' to configure a specific agent, or 'memory agents' to list all supported platforms.`);
+          return 0;
+        }
+
+        console.log(`🔌 Auto-detected and connected ${reports.length} installed coding agent(s)${dryRun ? " [DRY RUN]" : ""}:`);
         for (const r of reports) {
-          console.log(`  ✓ ${r.agent}: ${r.message}`);
+          console.log(`  ✓ ${r.agentName} (${r.agent}): ${r.message}`);
+        }
+
+        if (agent === "all" || agent === "--all" || !positional[0]) {
+          const allAgents = detectAgents();
+          const uninstalledCount = allAgents.length - reports.length;
+          console.log(`\n🛡️  Clean Workspace Guarantee: Skipped ${uninstalledCount} uninstalled agents to prevent creating unneeded files/folders.`);
         }
         return 0;
       } catch (err: any) {

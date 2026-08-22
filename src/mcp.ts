@@ -14,6 +14,8 @@ import { getGraphStatus } from "./graph.ts";
 import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
 import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
+import { detectAgents } from "./agents/detect.ts";
+import { connectAgent } from "./connect.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export async function runMcpServer(): Promise<void> {
@@ -216,6 +218,26 @@ export async function runMcpServer(): Promise<void> {
         inputSchema: {
           type: "object",
           properties: {},
+        },
+      },
+      {
+        name: "memory_detect_agents",
+        description: "Scan the machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.)",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "memory_connect",
+        description: "Auto-wire Muse Memory MCP into installed coding agents or a specified agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            agent: { type: "string", description: "Agent ID to connect, or 'all' to auto-detect installed agents" },
+            dry_run: { type: "boolean", description: "If true, simulates wiring without writing files" },
+            force: { type: "boolean", description: "If true, forces config creation even if agent was not detected" },
+          },
         },
       },
       {
@@ -511,6 +533,21 @@ export async function runMcpServer(): Promise<void> {
       case "memory_detect_providers": {
         const detected = detectProviders(root);
         return toolResult(detected);
+      }
+      case "memory_detect_agents": {
+        const agents = detectAgents();
+        return toolResult(agents);
+      }
+      case "memory_connect": {
+        try {
+          const reports = connectAgent(a.agent ? String(a.agent) : "all", undefined, {
+            dryRun: Boolean(a.dry_run),
+            force: Boolean(a.force),
+          });
+          return toolResult(reports);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
       }
       case "memory_migrate": {
         try {

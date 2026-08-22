@@ -6,7 +6,7 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-92%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-97%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
@@ -21,11 +21,11 @@
 - **Primary Command**: **`memory`** (alias: `musememory`)
 - **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
 - **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
-- **Universal Provider Auto-Detection & Migration**: Auto-detects existing memory stores on first install across 24+ formats (`memory detect` / `memory migrate`) with strict state preservation (active ➔ confirmed, archived ➔ superseded, core constraints ➔ `CURRENT.md`).
+- **Smart Agent Auto-Detection & Clean Connect**: Probes workstation for 80+ coding agents (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex, Gemini, Goose, Continue, Cline, Roo, Pi, Crush, etc.) and wires **ONLY installed agents**, skipping uninstalled ones to keep workspaces clean without generating unneeded folders.
+- **Universal Provider Auto-Detection & Migration**: Auto-detects existing memory stores across 24+ formats (`memory detect` / `memory migrate`) with strict state preservation (active ➔ confirmed, archived ➔ superseded, core constraints ➔ `CURRENT.md`).
 - **Dynamic Prompt Token Budgeter**: Exact token packing (`--token-budget <N>` / `token_budget` in MCP) for zero-bloat prompt injection.
 - **Universal Transcript Ingestion**: Ingest raw `.jsonl` conversation transcripts (`memory import-transcript <file.jsonl>`) from Claude Code, Antigravity, Cursor, and Codex.
 - **Operational Audit Ledger**: Append-only compliance log (`.memory/audit.jsonl` / `memory audit`) tracking all memory mutations.
-- **Permission-Free Connect**: `memory connect <agent>` automatically configures your editor/agent MCP settings with pre-approved permissions.
 
 ---
 
@@ -69,15 +69,21 @@ docker build -t musememory .
 
 ### Step 2: 100% Permission-Free Multi-Agent Connect
 
-Run a single command to automatically configure your AI agents with pre-approved tool execution (no annoying permission prompts or approval dialogs):
+Muse Memory scans your workstation for 80+ coding agents (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex CLI, Gemini CLI, Goose, Continue, Cline, Roo Code, Pi, Crush, etc.) and auto-wires MCP into **only installed agents**, skipping uninstalled ones to keep your filesystem clean:
 
 ```bash
-# Wire all detected AI editors and agents with auto-approval
+# 1. Scan your workstation for 80+ coding agents
+memory agents
+
+# 2. Auto-wire all installed agents with zero-permission auto-approval
 memory connect --all
 
-# Or wire a specific agent
+# 3. Or wire a specific agent explicitly
 memory connect claude-code   # Auto-approves tools in ~/.claude/settings.json
 memory connect cursor        # Auto-approves memory in ~/.cursor/mcp.json
+memory connect hermes        # Auto-wires MCP in ~/.hermes/config.yaml
+memory connect opencode      # Auto-wires local MCP in ~/.config/opencode/opencode.json
+memory connect openclaw      # Auto-wires MCP in ~/.openclaw/openclaw.json
 memory connect antigravity   # Configures Antigravity CLI MCP
 memory connect windsurf      # Configures Windsurf MCP config
 memory connect codex         # Configures Codex CLI MCP
@@ -189,7 +195,8 @@ memory <command> [arguments] [flags]  # alias: musememory
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). Auto-detects existing memories. |
-| `connect` | `[agent] [--all] [--dry-run]` | Auto-wire MCP server with zero-permission pre-approval (`claude-code`, `cursor`, `antigravity`, `windsurf`, `codex`, `gemini-cli`, `all`). |
+| `connect` | `[agent] [--all] [--force] [--dry-run]` | Auto-wire MCP server into detected installed agents (skipping uninstalled ones to keep files clean). |
+| `agents` | *(none)* | Scan machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for existing memory systems across 24+ formats. |
 | `migrate` | `[--from P] [--all] [--dry-run] [--overwrite] [--project P]` | Auto-detect and migrate memories into Muse Memory preserving active/archived state & secrets. |
 | `ui` | `[--port N] [--global]` | Launch zero-dependency visual knowledge graph dashboard. |
@@ -227,6 +234,8 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 | :--- | :--- |
 | `get_context` | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`. |
 | `search` | Searches memory units with query, token budget, project, type, and verification filters. |
+| `memory_detect_agents` | Scans machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.). |
+| `memory_connect` | Auto-wires MCP into installed agents or a specified agent with zero permissions. |
 | `memory_detect_providers` | Scans workspace and machine for external memory formats (24+ providers). |
 | `memory_migrate` | Migrates memories from detected providers with state preservation and secret scrubbing. |
 | `memory_harvest` | Distills conversation turns into structured fix/outcome units. |
@@ -251,7 +260,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 92 tests passing across 16 test suites
+bun test          # 97 tests passing across 17 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

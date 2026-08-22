@@ -1,0 +1,525 @@
+import type { AgentDefinition } from "./types.ts";
+
+export const AGENT_REGISTRY: AgentDefinition[] = [
+  // --- Closed Source / Major IDEs ---
+  {
+    id: "claude-code",
+    name: "Claude Code",
+    category: "proprietary",
+    stars: "142k",
+    binaries: ["claude"],
+    configPaths: [".claude.json", ".claude/settings.json", ".claude"],
+    mcpFormat: "claude-json",
+    description: "Anthropic's repo-aware terminal agent for code edits, refactors, and git workflows"
+  },
+  {
+    id: "cursor",
+    name: "Cursor",
+    category: "ide-agent",
+    stars: "Top IDE",
+    binaries: ["cursor"],
+    configPaths: [".cursor/mcp.json", ".cursor"],
+    mcpFormat: "cursor-json",
+    description: "AI-first code editor with built-in composer, terminal agent, and MCP support"
+  },
+  {
+    id: "antigravity",
+    name: "Antigravity",
+    category: "ide-agent",
+    stars: "DeepMind",
+    binaries: ["antigravity"],
+    configPaths: [".gemini/antigravity-cli/mcp_config.json", ".gemini/antigravity-cli"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Advanced agentic coding assistant with persistent memory and autonomous subagents"
+  },
+  {
+    id: "windsurf",
+    name: "Windsurf",
+    category: "ide-agent",
+    stars: "Codeium",
+    binaries: ["windsurf"],
+    configPaths: [".codeium/windsurf/mcp_config.json", ".codeium/windsurf"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Codeium's agentic IDE with Cascade flow and MCP integration"
+  },
+  {
+    id: "codex",
+    name: "Codex CLI",
+    category: "terminal-agent",
+    stars: "106k",
+    binaries: ["codex"],
+    configPaths: [".codex/mcp.json", ".codex/config.json", ".codex"],
+    mcpFormat: "standard-mcp-servers",
+    description: "OpenAI's local coding agent for reading/editing/running code with interactive TUI"
+  },
+  {
+    id: "gemini-cli",
+    name: "Gemini CLI",
+    category: "terminal-agent",
+    stars: "107k",
+    binaries: ["gemini"],
+    configPaths: [".gemini/mcp_config.json", ".gemini"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Google's terminal agent powered by Gemini with tools for repo work and research"
+  },
+  {
+    id: "hermes",
+    name: "Hermes Agent",
+    category: "terminal-agent",
+    stars: "232k",
+    binaries: ["hermes", "hermes-agent"],
+    configPaths: [".hermes/config.yaml", ".hermes"],
+    mcpFormat: "yaml-hermes",
+    description: "Nous Research's self-improving CLI agent with persistent memory & RPC execution"
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    category: "terminal-agent",
+    stars: "198k",
+    binaries: ["opencode"],
+    configPaths: [".config/opencode/opencode.json", ".opencode/opencode.json", ".opencode", ".config/opencode"],
+    mcpFormat: "opencode-json",
+    description: "Terminal-native coding agent with 75+ provider support and LSP integration"
+  },
+  {
+    id: "claw-code",
+    name: "Claw Code",
+    category: "terminal-agent",
+    stars: "195k",
+    binaries: ["claw", "claw-code"],
+    configPaths: [".oh-my-codex", ".claw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Clean-room Python/Rust rewrite of Claude Code architecture using oh-my-codex"
+  },
+  {
+    id: "pi",
+    name: "Pi / OH-MY-PI",
+    category: "terminal-agent",
+    stars: "92k",
+    binaries: ["pi"],
+    configPaths: [".pi/mcp.json", ".pi/config.json", ".pi", ".pi-mono"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Minimal, adaptable terminal coding harness from the pi-mono toolkit"
+  },
+  {
+    id: "openhands",
+    name: "OpenHands",
+    category: "terminal-agent",
+    stars: "84.3k",
+    binaries: ["openhands"],
+    configPaths: [".openhands/config.json", ".openhands/mcp.json", ".openhands"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Open-source agentic developer environment with CLI and web entrypoints"
+  },
+  {
+    id: "open-interpreter",
+    name: "Open Interpreter",
+    category: "terminal-agent",
+    stars: "68k",
+    binaries: ["interpreter", "open-interpreter"],
+    configPaths: [".open-interpreter"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Terminal tool that executes code and OS actions across local environments"
+  },
+  {
+    id: "oh-my-openagent",
+    name: "Oh My OpenAgent",
+    category: "harness",
+    stars: "68k",
+    binaries: ["oh-my-opencode", "lazycodex-ai"],
+    configPaths: [".local/share/oh-my-openagent", ".config/opencode/oh-my-opencode-slim.jsonc"],
+    mcpFormat: "opencode-json",
+    description: "Multi-harness agent OS layered over OpenCode, Codex, and Pi with Team Mode"
+  },
+  {
+    id: "cline",
+    name: "Cline CLI",
+    category: "terminal-agent",
+    stars: "66.3k",
+    binaries: ["cline"],
+    configPaths: [".cline/mcp_settings.json", ".cline"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Model-agnostic autonomous agent for planning, file edits, and tool use"
+  },
+  {
+    id: "goose",
+    name: "Goose",
+    category: "terminal-agent",
+    stars: "52.9k",
+    binaries: ["goose"],
+    configPaths: [".config/goose/config.yaml", ".goose/config.yaml", ".goose"],
+    mcpFormat: "yaml-goose",
+    description: "Local, extensible on-device agent designed to integrate with MCP"
+  },
+  {
+    id: "aider",
+    name: "Aider",
+    category: "terminal-agent",
+    stars: "48.3k",
+    binaries: ["aider"],
+    configPaths: [".aider.conf.yml", ".aider"],
+    mcpFormat: "manual",
+    description: "Pair-programming terminal agent for editing files via unified diffs and git"
+  },
+  {
+    id: "codewhale",
+    name: "Codewhale",
+    category: "terminal-agent",
+    stars: "40.8k",
+    binaries: ["codewhale"],
+    configPaths: [".codewhale"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Rust terminal coding agent across 30+ providers with fleet role pinning"
+  },
+  {
+    id: "continue",
+    name: "Continue CLI",
+    category: "ide-agent",
+    stars: "35.5k",
+    binaries: ["continue"],
+    configPaths: [".continue/config.json", ".continue"],
+    mcpFormat: "continue-json",
+    description: "Open-source terminal & editor extension for multi-model coding with privacy focus"
+  },
+  {
+    id: "reasonix",
+    name: "Reasonix",
+    category: "terminal-agent",
+    stars: "34.6k",
+    binaries: ["reasonix"],
+    configPaths: ["reasonix.toml", ".reasonix"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Single Go binary coding agent built for long unattended runs via ACP"
+  },
+  {
+    id: "deepagents",
+    name: "Deep Agents Code",
+    category: "terminal-agent",
+    stars: "27.8k",
+    binaries: ["deepagents", "deepagents-code"],
+    configPaths: [".deepagents"],
+    mcpFormat: "standard-mcp-servers",
+    description: "LangChain's official terminal coding agent built on Deep Agents SDK"
+  },
+  {
+    id: "crush",
+    name: "Crush",
+    category: "terminal-agent",
+    stars: "27.4k",
+    binaries: ["crush"],
+    configPaths: [".config/crush/crush.json", ".crush"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Charmbracelet's glamorous agentic coding TUI in Go; multi-provider & LSP-aware"
+  },
+  {
+    id: "qwen-code",
+    name: "Qwen Code",
+    category: "terminal-agent",
+    stars: "27.1k",
+    binaries: ["qwen-code", "qwen"],
+    configPaths: [".qwen"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Alibaba Qwen's official CLI agent for Qwen coder models"
+  },
+  {
+    id: "kilo-code",
+    name: "Kilo Code CLI",
+    category: "terminal-agent",
+    stars: "26.9k",
+    binaries: ["kilo", "kilo-code"],
+    configPaths: [".kilo"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Agentic engineering platform with orchestrator mode, skills, and checkpoints"
+  },
+  {
+    id: "grok-build",
+    name: "Grok Build",
+    category: "terminal-agent",
+    stars: "25.5k",
+    binaries: ["grok-build", "grok"],
+    configPaths: [".grok"],
+    mcpFormat: "standard-mcp-servers",
+    description: "xAI's official coding agent harness and mouse-interactive TUI"
+  },
+  {
+    id: "roo-code",
+    name: "Roo Code CLI",
+    category: "terminal-agent",
+    stars: "24.3k",
+    binaries: ["roo-code", "roo"],
+    configPaths: [".roo/mcp_settings.json", ".roo"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Multi-mode CLI agent (architect/code/debug/orchestrator modes) with MCP"
+  },
+  {
+    id: "swe-agent",
+    name: "SWE-agent",
+    category: "harness",
+    stars: "20.1k",
+    binaries: ["swe-agent"],
+    configPaths: [".swe-agent"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Benchmark-proven agent for resolving real repository GitHub issues and PRs"
+  },
+  {
+    id: "jcode",
+    name: "jcode",
+    category: "terminal-agent",
+    stars: "17.8k",
+    binaries: ["jcode"],
+    configPaths: [".jcode"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Rust TUI agent optimized for low RAM and scaling parallel sessions"
+  },
+  {
+    id: "prime-agent",
+    name: "Prime Agent",
+    category: "terminal-agent",
+    stars: "16.7k",
+    binaries: ["prime-agent", "prime"],
+    configPaths: [".prime"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Prime Intellect's self-improving RLM coding agent with durable IPython kernel"
+  },
+  {
+    id: "plandex",
+    name: "Plandex",
+    category: "terminal-agent",
+    stars: "15.6k",
+    binaries: ["plandex"],
+    configPaths: [".plandex"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Plan-first CLI agent for building features across multiple files with structured steps"
+  },
+  {
+    id: "mimo-code",
+    name: "MiMo Code",
+    category: "terminal-agent",
+    stars: "12.8k",
+    binaries: ["mimo", "mimo-cli"],
+    configPaths: [".mimo"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Xiaomi's official terminal coding agent with MCP, hooks, and git worktrees"
+  },
+  {
+    id: "trae-agent",
+    name: "Trae Agent",
+    category: "ide-agent",
+    stars: "12k",
+    binaries: ["trae"],
+    configPaths: [".trae/mcp.json", ".trae"],
+    mcpFormat: "standard-mcp-servers",
+    description: "ByteDance's research-friendly CLI agent with modular architecture & MCP"
+  },
+  {
+    id: "kimi-cli",
+    name: "Kimi CLI",
+    category: "terminal-agent",
+    stars: "11.2k",
+    binaries: ["kimi"],
+    configPaths: [".kimi/mcp.json", ".kimi"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Moonshot AI's CLI coding agent with skills, MCP support, and ACP integration"
+  },
+  {
+    id: "letta-code",
+    name: "Letta Code",
+    category: "terminal-agent",
+    stars: "3k",
+    binaries: ["letta", "letta-code"],
+    configPaths: [".letta/config.json", ".letta"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Memory-first CLI coding agent built on Letta/MemGPT platform with skills"
+  },
+  {
+    id: "openclaw",
+    name: "OpenClaw",
+    category: "openclaw-ecosystem",
+    stars: "387k",
+    binaries: ["openclaw"],
+    configPaths: [".openclaw/openclaw.json", ".openclaw/config.json", ".openclaw"],
+    mcpFormat: "openclaw-json",
+    description: "Original personal AI assistant with skills, tools, and multi-channel reach"
+  },
+  {
+    id: "nanobot",
+    name: "nanobot",
+    category: "openclaw-ecosystem",
+    stars: "47.1k",
+    binaries: ["nanobot"],
+    configPaths: [".nanobot"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Ultra-lightweight Python rewrite of OpenClaw with persistent memory"
+  },
+  {
+    id: "zeroclaw",
+    name: "ZeroClaw",
+    category: "openclaw-ecosystem",
+    stars: "32.6k",
+    binaries: ["zeroclaw"],
+    configPaths: [".zeroclaw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Autonomous AI agent runtime in Rust running on minimal hardware (<5MB RAM)"
+  },
+  {
+    id: "nanoclaw",
+    name: "NanoClaw",
+    category: "openclaw-ecosystem",
+    stars: "30.5k",
+    binaries: ["nanoclaw"],
+    configPaths: [".nanoclaw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Security-first lightweight alternative to OpenClaw in Apple/Docker containers"
+  },
+  {
+    id: "picoclaw",
+    name: "PicoClaw",
+    category: "openclaw-ecosystem",
+    stars: "29.9k",
+    binaries: ["picoclaw"],
+    configPaths: [".picoclaw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Ultra-lightweight Go assistant running on low-resource hardware (<10MB RAM)"
+  },
+  {
+    id: "ironclaw",
+    name: "IronClaw",
+    category: "openclaw-ecosystem",
+    stars: "12.6k",
+    binaries: ["ironclaw"],
+    configPaths: [".ironclaw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "NEAR AI's Rust rewrite of OpenClaw with WASM sandbox isolation"
+  },
+  {
+    id: "nullclaw",
+    name: "NullClaw",
+    category: "openclaw-ecosystem",
+    stars: "8k",
+    binaries: ["nullclaw"],
+    configPaths: [".nullclaw"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Fastest OpenClaw-compatible agent in Zig (678KB binary, <2ms startup)"
+  },
+  {
+    id: "moltis",
+    name: "Moltis",
+    category: "openclaw-ecosystem",
+    stars: "2.8k",
+    binaries: ["moltis"],
+    configPaths: [".moltis"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Secure, auditable Rust alternative to OpenClaw with built-in MCP servers"
+  },
+  {
+    id: "warp",
+    name: "Warp",
+    category: "proprietary",
+    stars: "64.3k",
+    binaries: ["warp", "warp-terminal"],
+    configPaths: [".warp"],
+    mcpFormat: "manual",
+    description: "Modern terminal with built-in AI agent mode orchestrating multi-step workflows"
+  },
+  {
+    id: "github-copilot",
+    name: "GitHub Copilot in CLI",
+    category: "proprietary",
+    stars: "11.1k",
+    binaries: ["gh"],
+    configPaths: [".config/github-copilot"],
+    mcpFormat: "manual",
+    description: "GitHub's agentic CLI for repository, PR, and issue workflows"
+  },
+  {
+    id: "command-code",
+    name: "Command Code",
+    category: "proprietary",
+    stars: "3.7k",
+    binaries: ["commandcode"],
+    configPaths: [".commandcode"],
+    mcpFormat: "standard-mcp-servers",
+    description: "CLI coding agent that learns style via neuro-symbolic taste profiles"
+  },
+  {
+    id: "ante",
+    name: "Ante",
+    category: "proprietary",
+    stars: "1.8k",
+    binaries: ["ante"],
+    configPaths: [".ante"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Antigma Labs 15MB Rust binary terminal coding agent with offline GGUF"
+  },
+  {
+    id: "pool",
+    name: "pool",
+    category: "proprietary",
+    stars: "403",
+    binaries: ["pool"],
+    configPaths: [".pool"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Poolside's terminal coding agent backed by Laguna models with ACP & MCP"
+  },
+  {
+    id: "auggie",
+    name: "Auggie",
+    category: "proprietary",
+    stars: "270",
+    binaries: ["auggie"],
+    configPaths: [".augment"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Augment Code's agentic coding CLI with custom slash commands and CI mode"
+  },
+  {
+    id: "nanocoder",
+    name: "Nanocoder",
+    category: "terminal-agent",
+    stars: "2.4k",
+    binaries: ["nanocoder"],
+    configPaths: [".nanocoder"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Local-first CLI coding agent with native tool calling and MCP support"
+  },
+  {
+    id: "tau",
+    name: "Tau",
+    category: "terminal-agent",
+    stars: "2.3k",
+    binaries: ["tau-ai", "tau"],
+    configPaths: [".tau"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Hugging Face's small, readable Python coding agent with durable JSONL sessions"
+  },
+  {
+    id: "san",
+    name: "San",
+    category: "terminal-agent",
+    stars: "73",
+    binaries: ["san"],
+    configPaths: [".san"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Go terminal-native runtime running Claude Code skills and MCP unmodified"
+  },
+  {
+    id: "waveloom",
+    name: "Waveloom",
+    category: "terminal-agent",
+    stars: "129",
+    binaries: ["waveloom"],
+    configPaths: [".waveloom"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Go terminal-native coding agent with Bubble Tea TUI and MCP auto-discovery"
+  },
+  {
+    id: "openharness",
+    name: "openHarness",
+    category: "harness",
+    stars: "96",
+    binaries: ["openharness"],
+    configPaths: [".openharness"],
+    mcpFormat: "standard-mcp-servers",
+    description: "Open-source Claude Code alternative with 42 tools and MCP support"
+  }
+];

@@ -74,4 +74,19 @@ describe("mcp tool handlers logic", () => {
     expect(Array.isArray(report.providers)).toBe(true);
     cleanup(root);
   });
+
+  test("memory_detect_agents and memory_connect handlers", async () => {
+    const { root } = setupFixtureRoot();
+    const { detectAgents } = await import("../src/agents/detect.ts");
+    const { connectAgent } = await import("../src/connect.ts");
+
+    const agents = detectAgents();
+    expect(Array.isArray(agents)).toBe(true);
+    expect(agents.length).toBeGreaterThan(40);
+
+    const reports = connectAgent("claude-code", root, { dryRun: true });
+    expect(Array.isArray(reports)).toBe(true);
+    expect(reports[0].agent).toBe("claude-code");
+    cleanup(root);
+  });
 });

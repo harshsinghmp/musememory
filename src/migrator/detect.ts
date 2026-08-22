@@ -190,6 +190,89 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
       ".actx"
     ],
     description: "Session history context cache and prompts"
+  },
+  {
+    id: "hermes",
+    name: "Hermes Agent",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.hermes/memories",
+      "~/.hermes/state.db",
+      "~/.hermes/kanban.db",
+      "~/.hermes"
+    ],
+    description: "Nous Research Hermes persistent memories and state database"
+  },
+  {
+    id: "openclaw",
+    name: "OpenClaw",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.openclaw/state",
+      "~/.openclaw/workspace",
+      "~/.openclaw"
+    ],
+    description: "OpenClaw personal assistant state snapshots and memory workspace"
+  },
+  {
+    id: "crush",
+    name: "Crush",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.crush/crush.db",
+      "~/.crush"
+    ],
+    description: "Charmbracelet Crush SQLite session and memory store"
+  },
+  {
+    id: "pi",
+    name: "Pi / OH-MY-PI",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.pi",
+      "~/.pi-mono"
+    ],
+    description: "Pi terminal agent skills, context, and session logs"
+  },
+  {
+    id: "aider",
+    name: "Aider",
+    category: "local-file",
+    scope: "hybrid",
+    paths: [
+      "~/.aider.chat.history.md",
+      ".aider.chat.history.md",
+      "~/.aider"
+    ],
+    description: "Aider markdown session history and chat transcripts"
+  },
+  {
+    id: "continue",
+    name: "Continue CLI",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.continue/sessions",
+      "~/.continue"
+    ],
+    description: "Continue IDE and CLI multi-model session logs"
+  },
+  {
+    id: "cline",
+    name: "Cline / Roo Code",
+    category: "local-file",
+    scope: "global",
+    paths: [
+      "~/.cline/tasks",
+      "~/.roo/tasks",
+      "~/.cline",
+      "~/.roo"
+    ],
+    description: "Cline and Roo Code persistent task checkpoints and memory context"
   }
 ];
 

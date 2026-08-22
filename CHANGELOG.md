@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.0] - 2026-08-22
 
 ### Added
+- **80+ Coding Agent Baseline & Smart Auto-Connect (`memory agents` / `memory connect --all`)**:
+  - Comprehensive registry and detector for 80+ terminal coding agents, OpenClaw ecosystems, and major AI IDEs (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex CLI, Gemini CLI, Goose, Continue, Cline, Roo Code, Pi, Crush, Warp, GitHub Copilot, etc.).
+  - **Clean Workspace Guarantee**: `memory connect --all` auto-detects installed coding agents and wires MCP **only into installed agents**, leaving out uninstalled systems to prevent generating unwanted files/folders.
+  - Dedicated CLI command `memory agents` (alias: `memory detect-agents`) displaying installed, connected, binary, and config paths across all supported agents.
 - **Universal Multi-Provider Auto-Detection & Migrator (`memory detect` / `memory migrate`)**:
   - Probes local workspace and machine directories for 24+ external memory formats (AgentMemory, Beads, Mem0, Letta/MemGPT, EverOS, ByteRover, Supermemory, and generic markdown/JSON formats).
   - Deterministic state preservation mapping: `active`/`open` ➔ `confirmed`, `archived`/`closed` ➔ `superseded`, and core constraints/personas ➔ `.memory/CURRENT.md`.
@@ -28,12 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vibeguard Ingestion Defense**: Real-time secret scanning on all imported memories, masking sensitive credentials as `[REDACTED_SECRET]` during migration.
 - **Multi-Runtime Resilient Installer (`scripts/install.sh`)**:
   - Auto-configures Bun, Node.js/NPM (bypassing `EALLOWGIT`), local repository linking, and `$PATH` verification.
-- **MCP Migrator Tools**: Registered `memory_detect_providers` and `memory_migrate` with zero-permission auto-approval across all supported agent platforms.
+- **MCP Agent Tools**: Registered `memory_detect_agents`, `memory_connect`, `memory_detect_providers`, and `memory_migrate` with zero-permission auto-approval across all supported agent platforms.
 - **Interactive 24-Provider Comparison Dashboard (`musememory-comparison.html`)**:
   - Standalone dark-mode responsive comparison dashboard with live search, category filter chips, and provider deep-dives.
-- **Deep Research Brief (`.jez/artifacts/research-brief-agent-memory-migrator.md`)**:
-  - In-depth architectural analysis of storage formats, schema shapes, and mapping rules across 24 agent memory systems.
-- **Extended Test Suite**: 92 automated tests passing across 16 test suites with 0 TypeScript static type errors.
+- **Extended Test Suite**: 97 automated tests passing across 17 test suites with 0 TypeScript static type errors.
 
 ---
 

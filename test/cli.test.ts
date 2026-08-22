@@ -172,8 +172,8 @@ describe("cli e2e", () => {
     const { root } = setupFixtureRoot();
     const conn = run(root, ["connect", "--all", "--dry-run"]);
     expect(conn.code).toBe(0);
-    expect(conn.stdout).toContain("Wired memory MCP with zero-permission auto-approval");
-    expect(conn.stdout).toContain("claude-code");
+    expect(conn.stdout).toContain("Auto-detected and connected");
+    expect(conn.stdout).toContain("Claude Code");
     cleanup(root);
   });
 
