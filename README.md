@@ -30,48 +30,55 @@
 
 ---
 
-## 🚀 Quick Run-Down
+## 🚀 Quick Start & Installation
 
-You want your AI coding agents (in Claude Code, Cursor, Antigravity, Windsurf, Codex, Cline, or Gemini CLI) to **remember what they did across conversations**, stop making the same mistakes, and maintain project decisions—without managing complex vector databases or cloud servers.
+> [!TIP]
+> ### ⚡ Instant 5-Second Setup (Zero-Install NPX / BunX)
+> **No global installation required. No package clutter.** Set up your memory system and wire your AI agents with a single command:
+> ```bash
+> npx musememory install
+> # (or with Bun: bunx musememory install)
+> ```
+> This one command:
+> 1. Initializes `.memory/` and `CURRENT.md` in your project folder (or `~/.memory/` with `--global`).
+> 2. Auto-detects all installed AI coding agents (Claude Code, Cursor, Antigravity, Windsurf, Codex, Gemini CLI, Hermes Agent, OpenCode, OpenClaw, etc.).
+> 3. Auto-wires the memory MCP server into installed agents with zero-permission auto-approval.
+> 4. Scans for existing memory stores (AgentMemory, Supermemory, Beads, Mem0, etc.) for instant migration.
+>
+> **Verify anytime**: `npx musememory doctor`  
+> **Query memories**: `npx musememory briefing` or `npx musememory search "auth"`
 
-### 🌟 Instant One-Line Setup (Zero Global Install via NPX):
+---
+
+### 📦 Persistent Global Installation Options
+
+If you prefer having the `memory` and `musememory` CLI commands permanently available in your `$PATH`, choose your favorite package manager:
 
 ```bash
-# Complete setup: initializes .memory/, auto-wires installed coding agents, and checks memory stores
-npx musememory install
-# (or with Bun: bunx musememory install)
-```
+# Option A: Bun Global (Instantaneous sub-millisecond execution)
+bun add -g musememory
+# (or from GitHub: bun add -g github:harshsinghmp/musememory)
 
-```
-┌──────────────────────────────────────────────┐      ┌───────────────────────────┐
-│ 1. Zero-Install One-Liner (NPX / BunX)       │ ───► │ 2. Verify Ecosystem Health│
-│ npx musememory install                       │      │ npx musememory doctor     │
-└──────────────────────────────────────────────┘      └───────────────────────────┘
-```
+# Option B: NPM Global
+npm install -g musememory
+# (or from GitHub: npm install -g github:harshsinghmp/musememory)
 
-### Alternative Installation Methods:
-
-Choose any method that matches your environment:
-
-```bash
-# Option A: One-Line NPX Setup (Recommended - zero global npm pollution)
-npx musememory install
-
-# Option B: One-Line Shell Script
+# Option C: One-Line Shell Installer (Auto-detects Bun or Node)
 curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
-# Option C: Local Repository Link (If cloned locally)
+# Option D: Local Repository Link (If cloned locally)
 cd musememory && bun link  # or npm link
 
-# Option D: Global Git Install via Bun
-bun add -g git+https://github.com/harshsinghmp/musememory.git
-
-# Option E: Global Git Install via NPM
-npm install -g --allow-git git+https://github.com/harshsinghmp/musememory.git
-
-# Option F: via Docker
-git clone https://github.com/harshsinghmp/musememory.git && cd musememory
+# Option E: Docker
 docker build -t musememory .
+```
+
+Once installed globally, you can run `memory` anywhere:
+```bash
+memory install          # One-line full workspace & agent configuration
+memory doctor           # Comprehensive system health check
+memory connect --all    # Auto-wire all detected AI coding agents
+memory briefing         # Summarize active knowledge & constraints
 ```
 
 ---
