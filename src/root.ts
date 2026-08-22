@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 export type MarkerKind = "memory" | "git" | "global" | "env" | "auto" | null;
 
@@ -19,7 +20,7 @@ export interface ResolveOptions {
 export function getGlobalMemoryDir(): string {
   const custom = process.env.MEMORY_DIR || process.env.MUSEMEMORY_DIR;
   if (custom) return custom;
-  const home = process.env.HOME || process.env.USERPROFILE || ".";
+  const home = process.env.HOME || process.env.USERPROFILE || homedir();
   return join(home, ".memory");
 }
 

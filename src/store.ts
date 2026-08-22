@@ -3,25 +3,118 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
-import { recordAuditEvent } from "./audit.ts";
+import { recordAuditEvent, getAuditTrail } from "./audit.ts";
+import { getCurrent, setCurrent } from "./current.ts";
+import { queryContext, formatPromptContext, type ContextQueryOptions } from "./retrieval.ts";
 
 export interface Store {
   dir: string;
   memoryDir?: string;
 }
 
-export function openStore(memoryDir: string): Store {
-  const dir = join(memoryDir, "memories");
-  mkdirSync(dir, { recursive: true });
-  return { dir, memoryDir };
+export class MemoryStore implements Store {
+  readonly dir: string;
+  readonly memoryDir?: string;
+
+  constructor(memoryDir: string) {
+    this.memoryDir = memoryDir;
+    this.dir = join(memoryDir, "memories");
+    mkdirSync(this.dir, { recursive: true });
+  }
+
+  get(id: string): MemoryEntry | null {
+    return get(this, id);
+  }
+
+  list(): MemoryEntry[] {
+    return list(this);
+  }
+
+  listIds(): string[] {
+    return listIds(this);
+  }
+
+  propose(opts: {
+    content: string;
+    project: string;
+    title?: string;
+    tags?: string[];
+    source?: string;
+    type?: MemoryType;
+    confirmed?: boolean;
+    verification?: Verification;
+    salience?: number;
+  }): MemoryEntry {
+    return propose(this, opts);
+  }
+
+  confirm(id: string): MemoryEntry | null {
+    return confirm(this, id);
+  }
+
+  supersede(oldId: string, newId: string): MemoryEntry | null {
+    return supersede(this, oldId, newId);
+  }
+
+  markStale(id: string, reason?: string): MemoryEntry | null {
+    return markStale(this, id, reason);
+  }
+
+  reject(id: string): MemoryEntry | null {
+    return reject(this, id);
+  }
+
+  delete(id: string, reason?: string, actor?: string): boolean {
+    return deleteEntry(this, id, reason, actor);
+  }
+
+  link(id: string, relatedIds: string[]): MemoryEntry | null {
+    return link(this, id, relatedIds);
+  }
+
+  getConstraints(): string[] {
+    if (!this.memoryDir) return [];
+    return getCurrent(this.memoryDir);
+  }
+
+  addConstraint(text: string, project: string): string[] {
+    if (!this.memoryDir) throw new Error("Cannot add constraint: memoryDir not configured");
+    const updated = setCurrent(this.memoryDir, text, project);
+    recordAuditEvent(this.memoryDir, {
+      operation: "propose",
+      entry_id: "CURRENT.md",
+      project,
+      actor: "agent",
+      details: { constraint: text },
+    });
+    return updated;
+  }
+
+  getAuditTrail(filter?: { operation?: string; entryId?: string; limit?: number }) {
+    if (!this.memoryDir) return [];
+    return getAuditTrail(this.memoryDir, filter);
+  }
+
+  query(query: string = "", options?: ContextQueryOptions) {
+    return queryContext(this, query, options);
+  }
+
+  formatContext(query: string = "", options?: ContextQueryOptions) {
+    return formatPromptContext(this, this.memoryDir, query, options);
+  }
+}
+
+export function openStore(memoryDir: string): MemoryStore {
+  return new MemoryStore(memoryDir);
 }
 
 /** Safe slug from an id: keep [a-z0-9_-], trim leading/trailing dashes and underscores. */
 export function slugifyId(id: string): string {
-  return id
+  const slug = id
     .replace(/[^a-z0-9_-]/gi, "")
     .replace(/^[-_]+|[-_]+$/g, "")
     .toLowerCase();
+  return slug.length > 0 ? slug : "entry";
 }
 
 export function fileForId(store: Store, id: string): string {
@@ -38,9 +131,13 @@ export function listIds(store: Store): string[] {
 export function get(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
   if (!existsSync(file)) return null;
-  const raw = readFileSync(file, "utf8");
-  // JSON_SCHEMA: keep ISO timestamps as strings (default schema resolves them to Date, breaking Ajv format checks)
-  return yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as MemoryEntry;
+  try {
+    const raw = readFileSync(file, "utf8");
+    // JSON_SCHEMA: keep ISO timestamps as strings (default schema resolves them to Date, breaking Ajv format checks)
+    return yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as MemoryEntry;
+  } catch {
+    return null;
+  }
 }
 
 export function list(store: Store): MemoryEntry[] {
@@ -97,7 +194,7 @@ export function nowIso(): string {
 
 export function makeId(slug: string): string {
   const clean = slugifyId(slug);
-  return `m_${Date.now()}_${clean.length > 0 ? clean : "entry"}`;
+  return `m_${Date.now()}_${clean}`;
 }
 
 function normalizeIdArray(val: string | string[] | null | undefined): string[] {
@@ -118,8 +215,16 @@ export function propose(
     type?: MemoryType;
     confirmed?: boolean;
     verification?: Verification;
+    salience?: number;
   },
 ): MemoryEntry {
+  if (!opts.content || !opts.content.trim()) {
+    throw new Error("Cannot propose memory entry with empty content");
+  }
+  if (!opts.project || !opts.project.trim()) {
+    throw new Error("Cannot propose memory entry with empty project");
+  }
+
   const secrets = scanSecrets(
     extractEntryText({
       title: opts.title,
@@ -144,6 +249,7 @@ export function propose(
     updated_at: now,
     source: opts.source ?? "manual",
     tags: opts.tags?.slice(0, 8) ?? [],
+    salience: typeof opts.salience === "number" ? opts.salience : undefined,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
@@ -258,6 +364,14 @@ export function link(store: Store, id: string, relatedIds: string[]): MemoryEntr
     other.related_memory_ids = union(other.related_memory_ids, [id]);
     other.updated_at = nowIso();
     save(store, other);
+  }
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "link",
+      entry_id: primary.id,
+      project: primary.project,
+      details: { related: targets },
+    });
   }
   return primary;
 }

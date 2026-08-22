@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Store } from "./store.ts";
-import { list, propose, save, get } from "./store.ts";
+import { list, propose, save, get, extractEntryText } from "./store.ts";
 import { validateEntry } from "./schema.ts";
 import { scanSecrets } from "./secrets.ts";
+import { recordAuditEvent } from "./audit.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export interface HarvestedUnit {
@@ -21,7 +22,7 @@ export interface HarvestedUnit {
  */
 export function extractHarvestUnits(text: string): HarvestedUnit[] {
   if (!text || typeof text !== "string") return [];
-  const lines = text.split("\n");
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
   const units: HarvestedUnit[] = [];
 
   let currentType: MemoryType | null = null;
@@ -54,18 +55,25 @@ export function extractHarvestUnits(text: string): HarvestedUnit[] {
       continue;
     }
 
-    const typeMatch = trimmed.match(
-      /^(?:###?\s*|\*\*\s*|[-*]\s*)?(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule)\s*[:\-\u2013]\s*(.*)$/i,
+    const speakerStripped = trimmed.replace(
+      /^(?:user|assistant|human|system|agent|client|developer)\s*[:\-\u2013]\s*/i,
+      "",
+    );
+
+    const typeMatch = speakerStripped.match(
+      /^(?:#{1,6}\s+|[-*]\s+)?\*{0,2}(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule)\*{0,2}\s*[:\-\u2013]\s*(.*)$/i,
     );
 
     if (typeMatch) {
       flush();
       const rawTag = typeMatch[1].toLowerCase();
       currentType = normalizeHarvestType(rawTag);
-      currentTitle = typeMatch[2].trim();
+      currentTitle = typeMatch[2].replace(/^\*{1,2}|\*{1,2}$/g, "").trim();
       if (currentTitle) {
         currentBuffer.push(currentTitle);
       }
+    } else if (trimmed.match(/^(?:user|assistant|human|system|agent|client|developer)\s*[:\-\u2013]/i)) {
+      flush();
     } else if (currentType !== null) {
       currentBuffer.push(trimmed);
     }
@@ -174,6 +182,7 @@ export interface TranscriptImportOptions {
   project?: string;
   confirmed?: boolean;
   source?: string;
+  sessionId?: string;
 }
 
 export interface TranscriptImportResult {
@@ -215,6 +224,10 @@ export function importTranscript(
         source: options.source ?? "transcript_import",
         confirmed: options.confirmed ?? false,
       });
+      if (options.sessionId) {
+        entry.session_id = options.sessionId;
+        save(store, entry);
+      }
       entries.push(entry);
     } catch (err: unknown) {
       errors.push(`Failed to import unit "${unit.title}": ${err instanceof Error ? err.message : String(err)}`);
@@ -269,7 +282,7 @@ export function importSnapshot(
       continue;
     }
 
-    const secrets = scanSecrets(`${entry.title} ${entry.content} ${(entry.tags ?? []).join(" ")}`);
+    const secrets = scanSecrets(extractEntryText(entry));
     if (secrets.length > 0) {
       errors.push(`Secret detected in entry ${entry.id}: ${secrets.join(", ")}`);
       continue;
@@ -287,6 +300,14 @@ export function importSnapshot(
     } catch (err: unknown) {
       errors.push(`Failed to save ${entry.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  if (imported > 0 && store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "import",
+      entry_id: "snapshot_batch",
+      details: { imported_count: imported, skipped_count: skipped, error_count: errors.length },
+    });
   }
 
   return { imported, skipped, errors };

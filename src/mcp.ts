@@ -19,7 +19,8 @@ import { connectAgent } from "./connect.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export async function runMcpServer(): Promise<void> {
-  const { root, memoryDir } = findOrCreateProjectRoot(process.cwd());
+  const targetDir = process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
+  const { root, memoryDir } = findOrCreateProjectRoot(targetDir);
   const store = openStore(memoryDir);
 
   const server = new Server(
@@ -339,8 +340,9 @@ export async function runMcpServer(): Promise<void> {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
 
-    switch (name) {
-      case "memory_read": {
+    try {
+      switch (name) {
+        case "memory_read": {
         const entry = get(store, String(a.id));
         if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
@@ -407,9 +409,8 @@ export async function runMcpServer(): Promise<void> {
               tags: u.tags,
               type: u.type,
               confirmed: isConfirmed,
+              salience: u.salience,
             });
-            entry.salience = u.salience;
-            save(store, entry);
             created.push(entry);
           } catch {
             // Ignore skipped entries with errors
@@ -566,7 +567,10 @@ export async function runMcpServer(): Promise<void> {
       default:
         return toolError(`unknown tool ${name}`);
     }
-  });
+  } catch (err: unknown) {
+    return toolError(err instanceof Error ? err.message : String(err));
+  }
+});
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

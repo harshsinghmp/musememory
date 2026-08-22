@@ -6,31 +6,31 @@
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
 ![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-107%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-118%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
-**Autonomous, Self-Organizing Cognitive Memory System for AI Agents &amp; Agency Networks**
+**Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
 
 </div>
 
 ---
 
-## ⚡ Architecture &amp; Dual-Scope Storage
+## ⚡ Architecture & Dual-Scope Storage
 
 - **Primary Command**: `**memory**` (alias: `musememory` or `**npx musememory**`)
 - **Zero-Install NPX Execution**: Run directly with `npx musememory <cmd>` or `bunx musememory <cmd>` without needing `npm i -g`.
 - **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
 - **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
-- **Smart Agent Auto-Detection &amp; Clean Connect**: Probes workstation for 80+ coding agents (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex, Gemini, Goose, Continue, Cline, Roo, Pi, Crush, etc.) and wires **ONLY installed agents**, skipping uninstalled ones to keep workspaces clean without generating unneeded folders.
-- **Universal Provider Auto-Detection &amp; Migration**: Auto-detects existing memory stores across 24+ formats (`memory detect` / `memory migrate`) with strict state preservation (active ➔ confirmed, archived ➔ superseded, core constraints ➔ `CURRENT.md`).
+- **Smart Agent Auto-Detection & Clean Connect**: Probes workstation for 80+ coding agents (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex, Gemini, Goose, Continue, Cline, Roo, Pi, Crush, etc.) and wires **ONLY installed agents**, skipping uninstalled ones to keep workspaces clean without generating unneeded folders.
+- **Universal Provider Auto-Detection & Migration**: Auto-detects existing memory stores across 24+ formats (`memory detect` / `memory migrate`) with strict state preservation (active ➔ confirmed, archived ➔ superseded, core constraints ➔ `CURRENT.md`).
 - **Dynamic Prompt Token Budgeter**: Exact token packing (`--token-budget <N>` / `token_budget` in MCP) for zero-bloat prompt injection.
 - **Universal Transcript Ingestion**: Ingest raw `.jsonl` conversation transcripts (`memory import-transcript <file.jsonl>`) from Claude Code, Antigravity, Cursor, and Codex.
 - **Operational Audit Ledger**: Append-only compliance log (`.memory/audit.jsonl` / `memory audit`) tracking all memory mutations.
 
 ---
 
-## 🚀 Quick Start &amp; Installation
+## 🚀 Quick Start & Installation
 
 > [!TIP]
 >
@@ -58,10 +58,15 @@
 ### 📦 Persistent Installation Options
 
 ```bash
-# Option A: One-Line Shell Installer (Recommended)
+# Option A: Global Install with NPM or Bun (Recommended)
+npm install -g musememory
+# or with Bun:
+bun add -g musememory
+
+# Option B: One-Line Shell Installer
 curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
-# Option B: Docker Container
+# Option C: Docker Container
 git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
@@ -277,12 +282,59 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ---
 
-## 🧪 Testing &amp; Verification
+## 🧹 Uninstallation & Complete Cleanup
+
+If you wish to export your knowledge base, unwire MCP connections, or completely remove Muse Memory from your machine:
+
+### Step 1: Export Your Memories (Recommended Backup)
+Export a portable JSON snapshot before removing data:
+```bash
+# Export local workspace memories
+memory export --out my-memories-backup.json
+
+# Or export global system memories
+memory export --global --out global-memories-backup.json
+```
+
+### Step 2: Unwire MCP from Coding Agents
+Unwire the Muse Memory MCP server from all configured AI coding agents (Claude Code, Cursor, Hermes, OpenCode, Codex, etc.):
+```bash
+# Dry-run inspection
+memory uninstall --dry-run
+
+# Unwire MCP configurations without touching memory files
+memory uninstall
+
+# Unwire a specific agent only
+memory uninstall claude-code
+```
+
+### Step 3: Complete Removal & Data Purge
+```bash
+# Unwire MCP agents AND purge the project .memory/ directory
+memory uninstall --purge
+
+# Remove storage directories
+rm -rf .memory/           # Local workspace store
+rm -rf ~/.memory/         # Global system store
+
+# Uninstall global binaries/packages
+npm uninstall -g musememory
+# or with Bun:
+bun remove -g musememory
+# or remove fallback symlinks
+rm -f ~/.local/bin/memory ~/.local/bin/musememory
+```
+
+---
+
+## 🧪 Testing & Verification
 
 ```bash
 bun install
-bun test          # 107 tests passing across 19 test suites
+bun test          # 118 tests passing across 20 test suites
 bunx tsc --noEmit # 0 type errors
+bun run build     # Clean bundled distribution build
 ```
 
 ---

@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import yaml from "js-yaml";
 import { detectAgents } from "./agents/detect.ts";
 import { AGENT_REGISTRY } from "./agents/registry.ts";
-import type { ConnectOptions, ConnectReport, DetectedAgent } from "./agents/types.ts";
+import type { AgentDefinition, ConnectOptions, ConnectReport, DetectedAgent } from "./agents/types.ts";
 
 export const ALL_MEMORY_TOOLS = [
   "memory_read",
@@ -68,523 +68,332 @@ function safeWriteYaml(path: string, data: Record<string, any>, dryRun = false):
   writeFileSync(path, dumped, "utf8");
 }
 
-/**
- * Configure Claude Code with stdio MCP server & pre-approved tool permissions.
- */
-export function connectClaudeCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const claudeJsonPath = join(home, ".claude.json");
-  const settingsJsonPath = join(home, ".claude", "settings.json");
-
-  const mcpConfig = safeReadJson(claudeJsonPath);
-  if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
-  mcpConfig.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(claudeJsonPath, mcpConfig, options.dryRun);
-
-  const settings = safeReadJson(settingsJsonPath);
-  const existingAllowed = Array.isArray(settings.allowedTools) ? settings.allowedTools : [];
-  const merged = Array.from(new Set([...existingAllowed, ...ALL_MEMORY_TOOLS]));
-  settings.allowedTools = merged;
-  safeWriteJson(settingsJsonPath, settings, options.dryRun);
-
-  return {
-    agent: "claude-code",
-    agentName: "Claude Code",
-    configPath: `${claudeJsonPath} & ${settingsJsonPath}`,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP to ${claudeJsonPath} and auto-approved ${ALL_MEMORY_TOOLS.length} tools in ${settingsJsonPath}`,
-  };
-}
-
-/**
- * Configure Cursor with stdio MCP server & autoApprove.
- */
-export function connectCursor(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const cursorMcpPath = join(home, ".cursor", "mcp.json");
-  const config = safeReadJson(cursorMcpPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  if (!Array.isArray(config.autoApprove)) {
-    config.autoApprove = [];
+function resolveAgentConfigFile(agent: AgentDefinition, home: string, foundConfig?: string | null): string {
+  if (foundConfig && existsSync(foundConfig)) {
+    try {
+      if (statSync(foundConfig).isFile()) return foundConfig;
+    } catch {}
   }
-  if (!config.autoApprove.includes("memory")) {
-    config.autoApprove.push("memory");
+  for (const p of agent.configPaths) {
+    if (p.endsWith(".json") || p.endsWith(".jsonc") || p.endsWith(".yaml") || p.endsWith(".yml")) {
+      return join(home, p);
+    }
   }
-  safeWriteJson(cursorMcpPath, config, options.dryRun);
-
-  return {
-    agent: "cursor",
-    agentName: "Cursor",
-    configPath: cursorMcpPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP and enabled autoApprove in ${cursorMcpPath}`,
-  };
+  const baseDir = join(home, agent.configPaths[0] ?? `.${agent.id}`);
+  if (agent.mcpFormat === "yaml-hermes" || agent.mcpFormat === "yaml-goose") {
+    return join(baseDir, "config.yaml");
+  }
+  return join(baseDir, "mcp.json");
 }
 
 /**
- * Configure Antigravity CLI with stdio MCP server.
+ * Declarative format transformer applying stdio MCP config and tool permissions.
  */
-export function connectAntigravity(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const agConfigPath = join(home, ".gemini", "antigravity-cli", "mcp_config.json");
-  const config = safeReadJson(agConfigPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(agConfigPath, config, options.dryRun);
+function wireAgentFormat(
+  agent: AgentDefinition,
+  home: string,
+  options: ConnectOptions = {},
+  foundConfig?: string | null,
+): ConnectReport {
+  const configPath = resolveAgentConfigFile(agent, home, foundConfig);
 
-  return {
-    agent: "antigravity",
-    agentName: "Antigravity",
-    configPath: agConfigPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${agConfigPath}`,
-  };
-}
-
-/**
- * Configure Windsurf with stdio MCP server.
- */
-export function connectWindsurf(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const windsurfPath = join(home, ".codeium", "windsurf", "mcp_config.json");
-  const config = safeReadJson(windsurfPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(windsurfPath, config, options.dryRun);
-
-  return {
-    agent: "windsurf",
-    agentName: "Windsurf",
-    configPath: windsurfPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${windsurfPath}`,
-  };
-}
-
-/**
- * Configure Codex CLI with stdio MCP server.
- */
-export function connectCodex(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const codexPath = join(home, ".codex", "mcp.json");
-  const config = safeReadJson(codexPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(codexPath, config, options.dryRun);
-
-  return {
-    agent: "codex",
-    agentName: "Codex CLI",
-    configPath: codexPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${codexPath}`,
-  };
-}
-
-/**
- * Configure Gemini CLI with stdio MCP server.
- */
-export function connectGemini(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const geminiPath = join(home, ".gemini", "mcp_config.json");
-  const config = safeReadJson(geminiPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(geminiPath, config, options.dryRun);
-
-  return {
-    agent: "gemini-cli",
-    agentName: "Gemini CLI",
-    configPath: geminiPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${geminiPath}`,
-  };
-}
-
-/**
- * Configure Hermes Agent with stdio MCP server in config.yaml.
- */
-export function connectHermes(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const hermesConfigPath = join(home, ".hermes", "config.yaml");
-  const doc = safeReadYaml(hermesConfigPath);
-  if (!doc.mcp_servers) doc.mcp_servers = {};
-  doc.mcp_servers.memory = {
-    command: "memory",
-    args: ["mcp"],
-    timeout: 120,
-    connect_timeout: 60,
-    enabled: true,
-  };
-  safeWriteYaml(hermesConfigPath, doc, options.dryRun);
-
-  return {
-    agent: "hermes",
-    agentName: "Hermes Agent",
-    configPath: hermesConfigPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${hermesConfigPath}`,
-  };
-}
-
-/**
- * Configure OpenCode with local stdio MCP server.
- */
-export function connectOpenCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const opencodeConfigPath = join(home, ".config", "opencode", "opencode.json");
-  const fallbackPath = join(home, ".opencode", "opencode.json");
-  const targetPath = existsSync(opencodeConfigPath) ? opencodeConfigPath : (existsSync(fallbackPath) ? fallbackPath : opencodeConfigPath);
-
-  const config = safeReadJson(targetPath);
-  if (!config.mcp) config.mcp = {};
-  config.mcp.memory = {
-    type: "local",
-    command: ["memory", "mcp"],
-    enabled: true,
-  };
-  safeWriteJson(targetPath, config, options.dryRun);
-
-  return {
-    agent: "opencode",
-    agentName: "OpenCode",
-    configPath: targetPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server into ${targetPath}`,
-  };
-}
-
-/**
- * Configure OpenClaw with stdio MCP server.
- */
-export function connectOpenClaw(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const openclawPath = join(home, ".openclaw", "openclaw.json");
-  const config = safeReadJson(openclawPath);
-  if (!config.mcp) config.mcp = {};
-  config.mcp.memory = {
-    command: ["memory", "mcp"],
-    enabled: true,
-  };
-  safeWriteJson(openclawPath, config, options.dryRun);
-
-  return {
-    agent: "openclaw",
-    agentName: "OpenClaw",
-    configPath: openclawPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${openclawPath}`,
-  };
-}
-
-/**
- * Configure Goose with stdio MCP server.
- */
-export function connectGoose(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const goosePath = join(home, ".config", "goose", "config.yaml");
-  const fallbackPath = join(home, ".goose", "config.yaml");
-  const targetPath = existsSync(goosePath) ? goosePath : (existsSync(fallbackPath) ? fallbackPath : goosePath);
-
-  const doc = safeReadYaml(targetPath);
-  if (!doc.extensions) doc.extensions = {};
-  doc.extensions.memory = {
-    cmd: "memory",
-    args: ["mcp"],
-    enabled: true,
-    type: "stdio",
-  };
-  safeWriteYaml(targetPath, doc, options.dryRun);
-
-  return {
-    agent: "goose",
-    agentName: "Goose",
-    configPath: targetPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP extension in ${targetPath}`,
-  };
-}
-
-/**
- * Configure Continue CLI/IDE with stdio MCP server.
- */
-export function connectContinue(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const continuePath = join(home, ".continue", "config.json");
-  const config = safeReadJson(continuePath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(continuePath, config, options.dryRun);
-
-  return {
-    agent: "continue",
-    agentName: "Continue CLI",
-    configPath: continuePath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${continuePath}`,
-  };
-}
-
-/**
- * Configure Cline with stdio MCP server & autoApprove.
- */
-export function connectCline(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const clinePath = join(home, ".cline", "mcp_settings.json");
-  const config = safeReadJson(clinePath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-    disabled: false,
-    autoApprove: ALL_MEMORY_TOOLS,
-  };
-  safeWriteJson(clinePath, config, options.dryRun);
-
-  return {
-    agent: "cline",
-    agentName: "Cline CLI",
-    configPath: clinePath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server & autoApprove in ${clinePath}`,
-  };
-}
-
-/**
- * Configure Roo Code CLI with stdio MCP server & autoApprove.
- */
-export function connectRooCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const rooPath = join(home, ".roo", "mcp_settings.json");
-  const config = safeReadJson(rooPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-    disabled: false,
-    autoApprove: ALL_MEMORY_TOOLS,
-  };
-  safeWriteJson(rooPath, config, options.dryRun);
-
-  return {
-    agent: "roo-code",
-    agentName: "Roo Code CLI",
-    configPath: rooPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server & autoApprove in ${rooPath}`,
-  };
-}
-
-/**
- * Configure generic JSON-based MCP agent.
- */
-export function connectGenericJsonAgent(agentId: string, agentName: string, relPath: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  let targetPath = join(home, relPath);
   try {
-    if (existsSync(targetPath)) {
-      if (statSync(targetPath).isDirectory()) {
-        targetPath = join(targetPath, "mcp.json");
-      }
-      // If it exists as a file, use targetPath directly
-    } else {
-      // Path does not exist yet: if no file extension, default to targetPath/mcp.json
-      if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc") && !targetPath.endsWith(".yaml") && !targetPath.endsWith(".yml")) {
-        targetPath = join(targetPath, "mcp.json");
-      }
-    }
-  } catch {
-    if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc")) {
-      targetPath = join(targetPath, "mcp.json");
-    }
-  }
+    switch (agent.mcpFormat) {
+    case "claude-json": {
+      const claudeJsonPath = join(home, ".claude.json");
+      const settingsJsonPath = join(home, ".claude", "settings.json");
 
-  const config = safeReadJson(targetPath);
-  if (!config.mcpServers) config.mcpServers = {};
-  config.mcpServers.memory = {
-    command: "memory",
-    args: ["mcp"],
-  };
-  safeWriteJson(targetPath, config, options.dryRun);
+      const mcpConfig = safeReadJson(claudeJsonPath);
+      if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+      mcpConfig.mcpServers.memory = { command: "memory", args: ["mcp"] };
+      safeWriteJson(claudeJsonPath, mcpConfig, options.dryRun);
 
-  return {
-    agent: agentId,
-    agentName,
-    configPath: targetPath,
-    updated: true,
-    installed: true,
-    permissionAutoApproved: true,
-    message: `Wired MCP server in ${targetPath}`,
-  };
-}
+      const settings = safeReadJson(settingsJsonPath);
+      const existingAllowed = Array.isArray(settings.allowedTools) ? settings.allowedTools : [];
+      settings.allowedTools = Array.from(new Set([...existingAllowed, ...ALL_MEMORY_TOOLS]));
+      safeWriteJson(settingsJsonPath, settings, options.dryRun);
 
-/**
- * Dispatch agent connection by ID.
- */
-export function connectSingleAgent(agentId: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const id = agentId.toLowerCase().trim();
-  switch (id) {
-    case "claude":
-    case "claude-code":
-      return connectClaudeCode(home, options);
-    case "cursor":
-      return connectCursor(home, options);
-    case "antigravity":
-    case "antigravity-cli":
-      return connectAntigravity(home, options);
-    case "windsurf":
-      return connectWindsurf(home, options);
-    case "codex":
-    case "codex-cli":
-      return connectCodex(home, options);
-    case "gemini":
-    case "gemini-cli":
-      return connectGemini(home, options);
-    case "hermes":
-    case "hermes-agent":
-      return connectHermes(home, options);
-    case "opencode":
-    case "oh-my-openagent":
-      return connectOpenCode(home, options);
-    case "openclaw":
-      return connectOpenClaw(home, options);
-    case "goose":
-      return connectGoose(home, options);
-    case "continue":
-      return connectContinue(home, options);
-    case "cline":
-      return connectCline(home, options);
-    case "roo":
-    case "roo-code":
-      return connectRooCode(home, options);
-    case "openhands":
-      return connectGenericJsonAgent("openhands", "OpenHands", ".openhands/config.json", home, options);
-    case "crush":
-      return connectGenericJsonAgent("crush", "Crush", ".config/crush/crush.json", home, options);
-    case "pi":
-    case "oh-my-pi":
-      return connectGenericJsonAgent("pi", "Pi", ".pi/mcp.json", home, options);
-    case "letta":
-    case "letta-code":
-    case "lettabot":
-      return connectGenericJsonAgent("letta", "Letta Code", ".letta/config.json", home, options);
-    case "trae":
-    case "trae-agent":
-      return connectGenericJsonAgent("trae", "Trae Agent", ".trae/mcp.json", home, options);
-    case "kimi":
-    case "kimi-cli":
-      return connectGenericJsonAgent("kimi", "Kimi CLI", ".kimi/mcp.json", home, options);
-    default: {
-      const matched = AGENT_REGISTRY.find(a => a.id === id || a.binaries.includes(id));
-      if (matched && matched.configPaths.length > 0) {
-        return connectGenericJsonAgent(matched.id, matched.name, matched.configPaths[0], home, options);
-      }
-      throw new Error(`Unsupported agent adapter: ${agentId}. Check 'memory agents' for the full list of 80+ supported agents.`);
-    }
-  }
-}
-
-/**
- * Wire memory into specified agent or AUTO-DETECT installed agents (leaving out all uninstalled ones).
- */
-export function connectAgent(agentName: string = "all", home: string = homedir(), options: ConnectOptions = {}): ConnectReport[] {
-  const target = agentName ? agentName.toLowerCase().trim() : "all";
-  const reports: ConnectReport[] = [];
-
-  if (target === "all" || target === "--all" || target === "") {
-    // 1. Auto-detect all agents installed on this machine
-    const detected = detectAgents(home);
-    const installed = detected.filter(a => a.installed);
-
-    if (installed.length === 0) {
-      // Fallback: If no agent detected on clean system, connect standard Claude Code only if forced
-      if (options.force) {
-        reports.push(connectClaudeCode(home, options));
-      }
-      return reports;
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath: `${claudeJsonPath} & ${settingsJsonPath}`,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP to ${claudeJsonPath} and auto-approved ${ALL_MEMORY_TOOLS.length} tools in ${settingsJsonPath}`,
+      };
     }
 
-    // 2. Connect ONLY the installed agents -- leave out uninstalled ones so NO extra files/folders are created!
-    const seenConfigs = new Set<string>();
-    const seenIds = new Set<string>();
+    case "cursor-json": {
+      const config = safeReadJson(configPath);
+      if (!config.mcpServers) config.mcpServers = {};
+      config.mcpServers.memory = { command: "memory", args: ["mcp"] };
+      if (!Array.isArray(config.autoApprove)) config.autoApprove = [];
+      if (!config.autoApprove.includes("memory")) config.autoApprove.push("memory");
+      safeWriteJson(configPath, config, options.dryRun);
 
-    for (const agent of installed) {
-      if (seenIds.has(agent.id)) continue;
-      seenIds.add(agent.id);
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP and enabled autoApprove in ${configPath}`,
+      };
+    }
 
-      try {
-        const report = connectSingleAgent(agent.id, home, options);
-        if (seenConfigs.has(report.configPath)) continue;
-        seenConfigs.add(report.configPath);
-        reports.push(report);
-      } catch (err: any) {
-        reports.push({
-          agent: agent.id,
-          agentName: agent.name,
-          configPath: agent.configPath || "unknown",
-          updated: false,
-          installed: true,
-          permissionAutoApproved: false,
-          message: `Failed to connect ${agent.name}: ${err.message}`,
+    case "yaml-hermes": {
+      const doc = safeReadYaml(configPath);
+      if (!doc.mcp_servers) doc.mcp_servers = {};
+      doc.mcp_servers.memory = { command: "memory", args: ["mcp"], enabled: true };
+      safeWriteYaml(configPath, doc, options.dryRun);
+
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
+    }
+
+    case "opencode-json":
+    case "openclaw-json": {
+      const config = safeReadJson(configPath);
+      if (!config.mcp) config.mcp = {};
+      config.mcp.memory = { type: "local", command: ["memory", "mcp"], enabled: true };
+      safeWriteJson(configPath, config, options.dryRun);
+
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
+    }
+
+    case "yaml-goose": {
+      const doc = safeReadYaml(configPath);
+      if (!doc.extensions) doc.extensions = {};
+      doc.extensions.memory = {
+        cmd: "memory",
+        args: ["mcp"],
+        enabled: true,
+        type: "stdio",
+      };
+      safeWriteYaml(configPath, doc, options.dryRun);
+
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
+    }
+
+    case "continue-json": {
+      const config = safeReadJson(configPath);
+      if (!Array.isArray(config.customMcpServers)) config.customMcpServers = [];
+      const exists = config.customMcpServers.some((s: any) => s.name === "memory");
+      if (!exists) {
+        config.customMcpServers.push({
+          name: "memory",
+          command: "memory",
+          args: ["mcp"],
         });
       }
+      safeWriteJson(configPath, config, options.dryRun);
+
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
     }
 
+    case "manual": {
+      if (agent.id === "aider") {
+        const doc = safeReadYaml(configPath);
+        if (!Array.isArray(doc["mcp-servers"])) doc["mcp-servers"] = [];
+        if (!doc["mcp-servers"].includes("memory mcp")) {
+          doc["mcp-servers"].push("memory mcp");
+        }
+        safeWriteYaml(configPath, doc, options.dryRun);
+      }
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
+    }
+
+    case "standard-mcp-servers":
+    default: {
+      if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
+        const doc = safeReadYaml(configPath);
+        if (!doc.mcp_servers) doc.mcp_servers = {};
+        doc.mcp_servers.memory = { command: "memory", args: ["mcp"] };
+        safeWriteYaml(configPath, doc, options.dryRun);
+      } else {
+        const config = safeReadJson(configPath);
+        if (!config.mcpServers) config.mcpServers = {};
+        config.mcpServers.memory = { command: "memory", args: ["mcp"] };
+        safeWriteJson(configPath, config, options.dryRun);
+      }
+
+      return {
+        agent: agent.id,
+        agentName: agent.name,
+        configPath,
+        updated: true,
+        installed: true,
+        permissionAutoApproved: true,
+        message: `Wired MCP server in ${configPath}`,
+      };
+    }
+  }
+  } catch (err: any) {
+    return {
+      agent: agent.id,
+      agentName: agent.name,
+      configPath,
+      updated: false,
+      installed: true,
+      permissionAutoApproved: false,
+      message: `Failed to wire ${agent.name}: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Universal Agent Connector Dispatcher:
+ * Connects an agent by ID or "all" to auto-wire detected installed coding agents.
+ */
+export function connectAgent(
+  target: string = "all",
+  home: string = homedir(),
+  options: ConnectOptions = {},
+): ConnectReport[] {
+  const targetLower = target.toLowerCase().trim();
+  const detected = detectAgents(home);
+
+  if (targetLower === "all" || targetLower === "detected") {
+    const installed = detected.filter((a) => a.installed || options.force);
+    const reports: ConnectReport[] = [];
+    for (const a of installed) {
+      const def = AGENT_REGISTRY.find((r) => r.id === a.id);
+      if (def) {
+        reports.push(wireAgentFormat(def, home, options, a.configPath));
+      }
+    }
     return reports;
   }
 
-  // Multiple comma-separated targets: "claude,cursor,hermes"
-  if (target.includes(",")) {
-    const targets = target.split(",").map((t) => t.trim()).filter(Boolean);
-    for (const t of targets) {
-      reports.push(connectSingleAgent(t, home, options));
-    }
-    return reports;
+  // Handle specific agent id
+  const def = AGENT_REGISTRY.find((r) => r.id === targetLower || r.id.replace("-cli", "") === targetLower);
+  if (!def) {
+    return [
+      {
+        agent: targetLower,
+        agentName: target,
+        configPath: "none",
+        updated: false,
+        installed: false,
+        permissionAutoApproved: false,
+        message: `Unknown agent '${target}'. Run 'memory agents' to inspect supported agents.`,
+      },
+    ];
   }
 
-  // Explicit single agent connection
-  reports.push(connectSingleAgent(target, home, options));
-  return reports;
+  return [wireAgentFormat(def, home, options)];
+}
+
+/**
+ * Convenience named exports for specific agents.
+ */
+export function connectClaudeCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("claude-code", home, options)[0];
+}
+export function connectCursor(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("cursor", home, options)[0];
+}
+export function connectAntigravity(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("antigravity", home, options)[0];
+}
+export function connectWindsurf(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("windsurf", home, options)[0];
+}
+export function connectCodex(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("codex", home, options)[0];
+}
+export function connectGeminiCli(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("gemini-cli", home, options)[0];
+}
+export function connectHermes(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("hermes", home, options)[0];
+}
+export function connectOpenCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("opencode", home, options)[0];
+}
+export function connectGoose(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("goose", home, options)[0];
+}
+export function connectAider(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("aider", home, options)[0];
+}
+export function connectOpenClaw(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("openclaw", home, options)[0];
+}
+export function connectClawCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("claw-code", home, options)[0];
+}
+export function connectPi(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("pi", home, options)[0];
+}
+export function connectOpenHands(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("openhands", home, options)[0];
+}
+export function connectOpenInterpreter(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("open-interpreter", home, options)[0];
+}
+export function connectContinue(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("continue", home, options)[0];
+}
+export function connectCrush(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("crush", home, options)[0];
+}
+export function connectRooCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("roo-code", home, options)[0];
+}
+export function connectCline(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  return connectAgent("cline", home, options)[0];
 }
 
 /**
  * Remove memory MCP configuration from a specific agent config.
  */
-export function disconnectSingleAgent(agentId: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+export function disconnectSingleAgent(
+  agentId: string,
+  home: string = homedir(),
+  options: ConnectOptions = {},
+): ConnectReport {
   const id = agentId.toLowerCase().trim();
   const detected = detectAgents(home);
   const matched = detected.find((a) => a.id === id || a.id.replace("-cli", "") === id);
@@ -605,25 +414,14 @@ export function disconnectSingleAgent(agentId: string, home: string = homedir(),
 
   try {
     if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
-      const raw = readFileSync(configPath, "utf8");
-      const doc = (yaml.load(raw) as any) || {};
-      if (doc.mcp_servers && doc.mcp_servers.memory) {
-        delete doc.mcp_servers.memory;
-      }
-      if (doc.extensions && doc.extensions.memory) {
-        delete doc.extensions.memory;
-      }
-      if (!options.dryRun) {
-        writeFileSync(configPath, yaml.dump(doc), "utf8");
-      }
+      const doc = safeReadYaml(configPath);
+      if (doc.mcp_servers && doc.mcp_servers.memory) delete doc.mcp_servers.memory;
+      if (doc.extensions && doc.extensions.memory) delete doc.extensions.memory;
+      safeWriteYaml(configPath, doc, options.dryRun);
     } else {
       const config = safeReadJson(configPath);
-      if (config.mcpServers && config.mcpServers.memory) {
-        delete config.mcpServers.memory;
-      }
-      if (config.mcp && config.mcp.memory) {
-        delete config.mcp.memory;
-      }
+      if (config.mcpServers && config.mcpServers.memory) delete config.mcpServers.memory;
+      if (config.mcp && config.mcp.memory) delete config.mcp.memory;
       if (Array.isArray(config.autoApprove)) {
         config.autoApprove = config.autoApprove.filter((t: string) => t !== "memory");
       }

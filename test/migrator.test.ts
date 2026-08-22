@@ -155,8 +155,8 @@ describe("universal memory migrator & auto-detection", () => {
       lettaPath,
       JSON.stringify({
         memory: {
-          human: "Principal: Harsh, Lead Architect & Agency Principal.",
-          persona: "Muse: Chief Agency Orchestrator and Technical Gatekeeper.",
+          human: "Principal: Lead Architect & Developer.",
+          persona: "AI Assistant: Autonomous Coding Agent.",
         },
         archival_memory: [
           "Archival fact 1: SQLite WAL mode enabled for zero-lock concurrency.",

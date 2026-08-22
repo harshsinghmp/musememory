@@ -104,6 +104,7 @@ export type AuditOperation =
   | "mark_stale"
   | "reject"
   | "delete"
+  | "link"
   | "import"
   | "transcript_import";
 
@@ -121,8 +122,8 @@ export interface SearchOptions {
   limit?: number;
   project?: string;
   includeSuperseded?: boolean;
-  type?: string;
-  status?: string;
+  type?: MemoryType | string;
+  status?: MemoryStatus | string;
   verified?: boolean;
   tokenBudget?: number;
 }

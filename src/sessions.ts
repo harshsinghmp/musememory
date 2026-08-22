@@ -46,3 +46,31 @@ export function recordSessionEnd(
   save(store, entry);
   return entry;
 }
+
+/**
+ * Retrieve all memories produced or linked within a specific working session.
+ */
+export function getSessionMemories(store: Store, sessionId: string): MemoryEntry[] {
+  return list(store).filter((e) => e.session_id === sessionId && e.type !== "session");
+}
+
+/**
+ * Link an array of memory IDs directly to a session timeline node.
+ */
+export function linkMemoriesToSession(
+  store: Store,
+  sessionId: string,
+  memoryIds: string[],
+): MemoryEntry[] {
+  const updated: MemoryEntry[] = [];
+  const entries = list(store);
+  for (const id of memoryIds) {
+    const entry = entries.find((e) => e.id === id);
+    if (entry) {
+      entry.session_id = sessionId;
+      save(store, entry);
+      updated.push(entry);
+    }
+  }
+  return updated;
+}

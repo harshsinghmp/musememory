@@ -54,4 +54,31 @@ describe("universal JSONL transcript ingestion", () => {
 
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("importTranscript attaches sessionId and integrates with getSessionMemories", async () => {
+    const { recordSessionStart, getSessionMemories } = await import("../src/sessions.ts");
+    const root = temp();
+    const store = openStore(root);
+
+    const { sessionId } = recordSessionStart(store, "auth-service", "Refactoring session");
+
+    const transcriptContent = [
+      JSON.stringify({ content: "### Fix: Patched Race Condition\nAdded mutex lock around token swap." }),
+    ].join("\n");
+
+    const res = importTranscript(store, transcriptContent, {
+      project: "auth-service",
+      confirmed: true,
+      sessionId,
+    });
+
+    expect(res.imported).toBe(1);
+    const sessionMemories = getSessionMemories(store, sessionId);
+    expect(sessionMemories.length).toBe(1);
+    expect(sessionMemories[0].title).toContain("Patched Race Condition");
+    expect(sessionMemories[0].session_id).toBe(sessionId);
+
+    rmSync(root, { recursive: true, force: true });
+  });
 });
+
