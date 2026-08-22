@@ -241,4 +241,25 @@ describe("cli e2e", () => {
 
     cleanup(root);
   });
+
+  test("install, doctor, and uninstall CLI commands", () => {
+    const { root } = setupFixtureRoot();
+
+    // 1. Run doctor
+    const doc = run(root, ["doctor"]);
+    expect(doc.code).toBe(0);
+    expect(doc.stdout).toContain("Health & Ecosystem Diagnostic Report");
+
+    // 2. Run install
+    const inst = run(root, ["install"]);
+    expect(inst.code).toBe(0);
+    expect(inst.stdout).toContain("Initialized Muse Memory");
+
+    // 3. Run uninstall --dry-run
+    const uninst = run(root, ["uninstall", "--dry-run"]);
+    expect(uninst.code).toBe(0);
+    expect(uninst.stdout).toContain("Muse Memory Uninstaller");
+
+    cleanup(root);
+  });
 });

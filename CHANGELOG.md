@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.0] - 2026-08-22
 
 ### Added
+- **Zero-Install NPX & BunX Distribution (`npx musememory <cmd>`)**:
+  - Single-file standalone Node.js production bundle (`dist/index.js`) supporting instant zero-install execution via `npx` or `bunx` with no global `npm i -g` required.
+- **One-Line System Installer & Diagnostic Doctor (`memory install` / `memory doctor`)**:
+  - `memory install`: One-line initialization, auto-connecting all detected coding agents and checking legacy memory stores.
+  - `memory doctor`: In-depth health check across storage paths, YAML schema validity, credential leaks, MCP auto-approvals, and operational audit trail.
+- **Clean Agent Uninstaller (`memory uninstall`)**:
+  - Safely unwires memory MCP server from all configured coding agent configs without leaving orphaned configuration entries or damaging user settings.
 - **80+ Coding Agent Baseline & Smart Auto-Connect (`memory agents` / `memory connect --all`)**:
   - Comprehensive registry and detector for 80+ terminal coding agents, OpenClaw ecosystems, and major AI IDEs (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex CLI, Gemini CLI, Goose, Continue, Cline, Roo Code, Pi, Crush, Warp, GitHub Copilot, etc.).
   - **Clean Workspace Guarantee**: `memory connect --all` auto-detects installed coding agents and wires MCP **only into installed agents**, leaving out uninstalled systems to prevent generating unwanted files/folders.
@@ -35,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP Agent Tools**: Registered `memory_detect_agents`, `memory_connect`, `memory_detect_providers`, and `memory_migrate` with zero-permission auto-approval across all supported agent platforms.
 - **Interactive 24-Provider Comparison Dashboard (`musememory-comparison.html`)**:
   - Standalone dark-mode responsive comparison dashboard with live search, category filter chips, and provider deep-dives.
-- **Extended Test Suite**: 105 automated tests passing across 18 test suites with 0 TypeScript static type errors.
+- **Extended Test Suite**: 107 automated tests passing across 19 test suites with 0 TypeScript static type errors.
 
 ---
 

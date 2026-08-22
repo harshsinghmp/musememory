@@ -24,6 +24,9 @@ Global Flags:
   --global, -g                                  operate on global system memory store (~/.memory/)
 
 Commands:
+  install [--global]                            one-line complete setup (initializes .memory/ and connects detected agents)
+  doctor [--global]                             run complete health check on storage, MCP connectivity, and audit trail
+  uninstall [agent] [--purge] [--dry-run]       unwire MCP from coding agents (and optionally purge .memory/)
   init [path] [--legacy] [--global]             initialize .memory/ folder (or ~/.memory/)
   connect [agent] [--all] [--force] [--dry-run] auto-wire MCP only to detected installed agents (bypassing uninstalled to prevent extra files)
   agents                                        scan machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.)
@@ -124,6 +127,77 @@ export async function main(argv: string[]): Promise<number> {
   const { positional, flags } = parseFlags(rest);
 
   switch (cmd) {
+    case "install": {
+      const isGlobal = flags["global"] === "true" || flags["g"] === "true";
+      const targetDir = positional[0] ? join(process.cwd(), positional[0]) : process.cwd();
+      const memoryDir = isGlobal ? getGlobalMemoryDir() : join(targetDir, ".memory");
+      mkdirSync(join(memoryDir, "memories"), { recursive: true });
+      const currentPath = join(memoryDir, "CURRENT.md");
+      if (!existsSync(currentPath)) {
+        writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
+      }
+      console.log(`🧠 Initialized Muse Memory in ${memoryDir}`);
+
+      // 1. Auto-connect detected coding agents
+      const { connectAgent } = await import("./connect.ts");
+      const reports = connectAgent("all", undefined, { dryRun: false, force: false });
+      if (reports.length > 0) {
+        console.log(`\n🔌 Auto-wired ${reports.length} detected coding agent(s) with zero permissions:`);
+        for (const r of reports) {
+          console.log(`  ✓ ${r.agentName}: ${r.message}`);
+        }
+      }
+
+      // 2. Check for legacy memory providers
+      const detected = detectProviders(targetDir).filter((p) => p.detected);
+      if (detected.length > 0) {
+        console.log(`\n💡 Detected ${detected.length} external memory provider(s): ${detected.map((d) => d.name).join(", ")}`);
+        console.log(`   ➔ Run 'memory migrate' to auto-import legacy memories.`);
+      }
+
+      console.log(`\n✨ Muse Memory is ready! Use 'memory doctor' to verify system health.`);
+      return 0;
+    }
+
+    case "doctor": {
+      const { runDoctor, printDoctorReport } = await import("./doctor.ts");
+      const isGlobal = flags["global"] === "true" || flags["g"] === "true";
+      const report = await runDoctor(positional[0], { global: isGlobal });
+      printDoctorReport(report);
+      return report.validation.valid ? 0 : 1;
+    }
+
+    case "uninstall": {
+      const { disconnectAllAgents, disconnectSingleAgent } = await import("./connect.ts");
+      const agent = positional[0];
+      const purge = flags["purge"] === "true";
+      const dryRun = flags["dry-run"] === "true";
+
+      console.log(`🧹 Running Muse Memory Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
+      if (agent && agent !== "all") {
+        const report = disconnectSingleAgent(agent, undefined, { dryRun });
+        console.log(`  ✓ ${report.agentName}: ${report.message}`);
+      } else {
+        const reports = disconnectAllAgents(undefined, { dryRun });
+        console.log(`\n🔌 Unwired ${reports.length} coding agent(s):`);
+        for (const r of reports) {
+          console.log(`  ✓ ${r.agentName}: ${r.message}`);
+        }
+      }
+
+      if (purge) {
+        const ctx = requireRoot(flags);
+        if (ctx && existsSync(ctx.memoryDir) && !dryRun) {
+          const { rmSync } = await import("node:fs");
+          rmSync(ctx.memoryDir, { recursive: true, force: true });
+          console.log(`  🗑️  Purged memory directory: ${ctx.memoryDir}`);
+        }
+      } else {
+        console.log(`\nℹ️  Memory files preserved in .memory/. Use 'memory uninstall --purge' to remove data.`);
+      }
+      return 0;
+    }
+
     case "init": {
       const isGlobal = flags["global"] === "true";
       const targetDir = positional[0] ? join(process.cwd(), positional[0]) : process.cwd();

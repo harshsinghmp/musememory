@@ -416,10 +416,16 @@ export function connectRooCode(home: string = homedir(), options: ConnectOptions
 export function connectGenericJsonAgent(agentId: string, agentName: string, relPath: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
   let targetPath = join(home, relPath);
   try {
-    if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
-      targetPath = join(targetPath, "mcp.json");
-    } else if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc")) {
-      targetPath = join(targetPath, "mcp.json");
+    if (existsSync(targetPath)) {
+      if (statSync(targetPath).isDirectory()) {
+        targetPath = join(targetPath, "mcp.json");
+      }
+      // If it exists as a file, use targetPath directly
+    } else {
+      // Path does not exist yet: if no file extension, default to targetPath/mcp.json
+      if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc") && !targetPath.endsWith(".yaml") && !targetPath.endsWith(".yml")) {
+        targetPath = join(targetPath, "mcp.json");
+      }
     }
   } catch {
     if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc")) {
@@ -572,5 +578,90 @@ export function connectAgent(agentName: string = "all", home: string = homedir()
 
   // Explicit single agent connection
   reports.push(connectSingleAgent(target, home, options));
+  return reports;
+}
+
+/**
+ * Remove memory MCP configuration from a specific agent config.
+ */
+export function disconnectSingleAgent(agentId: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
+  const id = agentId.toLowerCase().trim();
+  const detected = detectAgents(home);
+  const matched = detected.find((a) => a.id === id || a.id.replace("-cli", "") === id);
+  const agentName = matched ? matched.name : agentId;
+  const configPath = matched?.configPath || "";
+
+  if (!configPath || !existsSync(configPath)) {
+    return {
+      agent: id,
+      agentName,
+      configPath: configPath || "none",
+      updated: false,
+      installed: false,
+      permissionAutoApproved: false,
+      message: `No configuration found for ${agentName}`,
+    };
+  }
+
+  try {
+    if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
+      const raw = readFileSync(configPath, "utf8");
+      const doc = (yaml.load(raw) as any) || {};
+      if (doc.mcp_servers && doc.mcp_servers.memory) {
+        delete doc.mcp_servers.memory;
+      }
+      if (doc.extensions && doc.extensions.memory) {
+        delete doc.extensions.memory;
+      }
+      if (!options.dryRun) {
+        writeFileSync(configPath, yaml.dump(doc), "utf8");
+      }
+    } else {
+      const config = safeReadJson(configPath);
+      if (config.mcpServers && config.mcpServers.memory) {
+        delete config.mcpServers.memory;
+      }
+      if (config.mcp && config.mcp.memory) {
+        delete config.mcp.memory;
+      }
+      if (Array.isArray(config.autoApprove)) {
+        config.autoApprove = config.autoApprove.filter((t: string) => t !== "memory");
+      }
+      safeWriteJson(configPath, config, options.dryRun);
+    }
+
+    return {
+      agent: id,
+      agentName,
+      configPath,
+      updated: true,
+      installed: true,
+      permissionAutoApproved: false,
+      message: `Unwired memory MCP server from ${configPath}`,
+    };
+  } catch (err: any) {
+    return {
+      agent: id,
+      agentName,
+      configPath,
+      updated: false,
+      installed: true,
+      permissionAutoApproved: false,
+      message: `Failed to disconnect ${agentName}: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Unwire memory MCP from all connected coding agents.
+ */
+export function disconnectAllAgents(home: string = homedir(), options: ConnectOptions = {}): ConnectReport[] {
+  const detected = detectAgents(home);
+  const connected = detected.filter((a) => a.connected);
+  const reports: ConnectReport[] = [];
+
+  for (const a of connected) {
+    reports.push(disconnectSingleAgent(a.id, home, options));
+  }
   return reports;
 }

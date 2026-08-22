@@ -6,7 +6,7 @@
 [![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)](https://www.npmjs.com/package/musememory)
 [![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)](https://modelcontextprotocol.io/)
-[![CI Tests](https://img.shields.io/badge/Tests-105%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
+[![CI Tests](https://img.shields.io/badge/Tests-107%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)](test/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
@@ -18,7 +18,8 @@
 
 ## ⚡ Architecture & Dual-Scope Storage
 
-- **Primary Command**: **`memory`** (alias: `musememory`)
+- **Primary Command**: **`memory`** (alias: `musememory` or **`npx musememory`**)
+- **Zero-Install NPX Execution**: Run directly with `npx musememory <cmd>` or `bunx musememory <cmd>` without needing `npm i -g`.
 - **Local Workspace Storage**: `.memory/` (automatically detected in your project root; `.musememory/` supported for backward compatibility)
 - **Global System Storage**: `~/.memory/` (available across all directories or explicitly with `--global` / `-g`)
 - **Smart Agent Auto-Detection & Clean Connect**: Probes workstation for 80+ coding agents (Claude Code, Cursor, Hermes Agent, OpenCode, OpenClaw, Codex, Gemini, Goose, Continue, Cline, Roo, Pi, Crush, etc.) and wires **ONLY installed agents**, skipping uninstalled ones to keep workspaces clean without generating unneeded folders.
@@ -29,38 +30,46 @@
 
 ---
 
-## 🚀 Quick Run-Down for Non-Technical Users
+## 🚀 Quick Run-Down
 
 You want your AI coding agents (in Claude Code, Cursor, Antigravity, Windsurf, Codex, Cline, or Gemini CLI) to **remember what they did across conversations**, stop making the same mistakes, and maintain project decisions—without managing complex vector databases or cloud servers.
 
-Here is the 2-step zero-permission setup:
-
-```
-┌───────────────────────────┐      ┌───────────────────────────┐
-│ 1. Install (curl/npm/bun) │ ───► │ 2. One-Command Auto-Wire  │
-│ curl, npm, bun, or docker │      │ memory connect --all      │
-└───────────────────────────┘      └───────────────────────────┘
-```
-
-### Step 1: Install `musememory` on your machine
-
-Choose **any one** of these installation methods:
+### 🌟 Instant One-Line Setup (Zero Global Install via NPX):
 
 ```bash
-# Option A: One-Line Installer (Recommended - auto-configures Bun or Node)
+# Complete setup: initializes .memory/, auto-wires installed coding agents, and checks memory stores
+npx musememory install
+# (or with Bun: bunx musememory install)
+```
+
+```
+┌──────────────────────────────────────────────┐      ┌───────────────────────────┐
+│ 1. Zero-Install One-Liner (NPX / BunX)       │ ───► │ 2. Verify Ecosystem Health│
+│ npx musememory install                       │      │ npx musememory doctor     │
+└──────────────────────────────────────────────┘      └───────────────────────────┘
+```
+
+### Alternative Installation Methods:
+
+Choose any method that matches your environment:
+
+```bash
+# Option A: One-Line NPX Setup (Recommended - zero global npm pollution)
+npx musememory install
+
+# Option B: One-Line Shell Script
 curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
-# Option B: Local Repository Link (Instantaneous if repo is already cloned)
-cd musememory && bun link
-# (or: npm link)
+# Option C: Local Repository Link (If cloned locally)
+cd musememory && bun link  # or npm link
 
-# Option C: Global Git Install via Bun
+# Option D: Global Git Install via Bun
 bun add -g git+https://github.com/harshsinghmp/musememory.git
 
-# Option D: Global Git Install via NPM
+# Option E: Global Git Install via NPM
 npm install -g --allow-git git+https://github.com/harshsinghmp/musememory.git
 
-# Option E: via Docker
+# Option F: via Docker
 git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
@@ -194,6 +203,9 @@ memory <command> [arguments] [flags]  # alias: musememory
 
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
+| `install` | `[path] [--global]` | **One-line complete setup**: initializes `.memory/` and auto-wires all detected installed coding agents. |
+| `doctor` | `[path] [--global]` | **System diagnostic**: health check for storage, YAML schemas, secrets, MCP connectivity, and audit ledger. |
+| `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configuration from coding agents (and optionally purges `.memory/`). |
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory (or global `~/.memory/`). Auto-detects existing memories. |
 | `connect` | `[agent] [--all] [--force] [--dry-run]` | Auto-wire MCP server into detected installed agents (skipping uninstalled ones to keep files clean). |
 | `agents` | *(none)* | Scan machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.). |
@@ -260,7 +272,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 
 ```bash
 bun install
-bun test          # 105 tests passing across 18 test suites
+bun test          # 107 tests passing across 19 test suites
 bunx tsc --noEmit # 0 type errors
 ```
 

@@ -5,14 +5,22 @@
   "main": "src/index.ts",
   "type": "module",
   "bin": {
-    "memory": "./bin/memory.ts",
-    "musememory": "./bin/musememory.ts"
+    "memory": "./dist/index.js",
+    "musememory": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "scripts": {
+    "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "validate": "bun run bin/memory.ts validate --dry-run",
-    "start": "bun run bin/memory.ts mcp"
+    "validate": "bun run dist/index.js validate --dry-run",
+    "start": "bun run dist/index.js mcp",
+    "prepublishOnly": "bun run build && bun test"
   },
   "keywords": [
     "ai",
