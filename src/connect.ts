@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import yaml from "js-yaml";
@@ -414,7 +414,19 @@ export function connectRooCode(home: string = homedir(), options: ConnectOptions
  * Configure generic JSON-based MCP agent.
  */
 export function connectGenericJsonAgent(agentId: string, agentName: string, relPath: string, home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  const targetPath = join(home, relPath);
+  let targetPath = join(home, relPath);
+  try {
+    if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
+      targetPath = join(targetPath, "mcp.json");
+    } else if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc")) {
+      targetPath = join(targetPath, "mcp.json");
+    }
+  } catch {
+    if (!targetPath.endsWith(".json") && !targetPath.endsWith(".jsonc")) {
+      targetPath = join(targetPath, "mcp.json");
+    }
+  }
+
   const config = safeReadJson(targetPath);
   if (!config.mcpServers) config.mcpServers = {};
   config.mcpServers.memory = {

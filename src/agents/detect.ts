@@ -1,48 +1,58 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { execSync } from "node:child_process";
 import { AGENT_REGISTRY } from "./registry.ts";
 import type { DetectedAgent, AgentDefinition } from "./types.ts";
 
 const BINARY_CACHE = new Map<string, string | null>();
 
 /**
- * Check if binary exists in PATH or common global bin directories.
+ * Clear cached binary paths (useful for test isolation).
+ */
+export function clearBinaryCache(): void {
+  BINARY_CACHE.clear();
+}
+
+/**
+ * Fast, pure TypeScript check for binary existence in home bins, PATH, and system bins.
+ * Spawns 0 subshells.
  */
 export function findBinary(binName: string, home: string = homedir()): string | null {
-  if (BINARY_CACHE.has(binName)) {
-    return BINARY_CACHE.get(binName)!;
+  const cacheKey = `${home}:${binName}`;
+  if (BINARY_CACHE.has(cacheKey)) {
+    return BINARY_CACHE.get(cacheKey)!;
   }
 
-  // Fast direct path checks
-  const commonDirs = [
-    join(home, ".local", "bin", binName),
-    join(home, ".bun", "bin", binName),
-    join(home, ".cargo", "bin", binName),
-    join(home, ".nvm", "versions", "node", process.version, "bin", binName),
-    `/usr/local/bin/${binName}`,
-    `/usr/bin/${binName}`,
+  // 1. Direct priority path checks
+  const candidateDirs = [
+    join(home, ".local", "bin"),
+    join(home, ".bun", "bin"),
+    join(home, ".cargo", "bin"),
+    join(home, ".nvm", "versions", "node", process.version, "bin"),
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
   ];
 
-  for (const p of commonDirs) {
-    if (existsSync(p)) {
-      BINARY_CACHE.set(binName, p);
-      return p;
+  // 2. Add any additional directories from process.env.PATH
+  if (process.env.PATH) {
+    const pathDirs = process.env.PATH.split(":");
+    for (const d of pathDirs) {
+      if (d && !candidateDirs.includes(d)) {
+        candidateDirs.push(d);
+      }
     }
   }
 
-  try {
-    const stdout = execSync(`which ${binName} 2>/dev/null`, { encoding: "utf8", timeout: 200 }).trim();
-    if (stdout && existsSync(stdout)) {
-      BINARY_CACHE.set(binName, stdout);
-      return stdout;
+  for (const dir of candidateDirs) {
+    const fullPath = join(dir, binName);
+    if (existsSync(fullPath)) {
+      BINARY_CACHE.set(cacheKey, fullPath);
+      return fullPath;
     }
-  } catch {
-    // Ignore which failures
   }
 
-  BINARY_CACHE.set(binName, null);
+  BINARY_CACHE.set(cacheKey, null);
   return null;
 }
 

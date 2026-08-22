@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP Agent Tools**: Registered `memory_detect_agents`, `memory_connect`, `memory_detect_providers`, and `memory_migrate` with zero-permission auto-approval across all supported agent platforms.
 - **Interactive 24-Provider Comparison Dashboard (`musememory-comparison.html`)**:
   - Standalone dark-mode responsive comparison dashboard with live search, category filter chips, and provider deep-dives.
-- **Extended Test Suite**: 97 automated tests passing across 17 test suites with 0 TypeScript static type errors.
+- **Extended Test Suite**: 105 automated tests passing across 18 test suites with 0 TypeScript static type errors.
 
 ---
 

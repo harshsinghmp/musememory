@@ -26,7 +26,6 @@ export interface AgentDefinition {
   configPaths: string[];
   mcpFormat: AgentMcpFormat;
   description: string;
-  connect?: (home: string, options: ConnectOptions) => ConnectReport;
 }
 
 export interface DetectedAgent {
