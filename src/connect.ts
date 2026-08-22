@@ -538,7 +538,7 @@ export function connectAgent(agentName: string = "all", home: string = homedir()
       return reports;
     }
 
-    // 2. Connect ONLY the installed agents — leave out uninstalled ones so NO extra files/folders are created!
+    // 2. Connect ONLY the installed agents -- leave out uninstalled ones so NO extra files/folders are created!
     const seenConfigs = new Set<string>();
     const seenIds = new Set<string>();
 

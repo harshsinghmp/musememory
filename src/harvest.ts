@@ -55,7 +55,7 @@ export function extractHarvestUnits(text: string): HarvestedUnit[] {
     }
 
     const typeMatch = trimmed.match(
-      /^(?:###?\s*|\*\*\s*|[-*]\s*)?(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule)\s*[:\-–]\s*(.*)$/i,
+      /^(?:###?\s*|\*\*\s*|[-*]\s*)?(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule)\s*[:\-\u2013]\s*(.*)$/i,
     );
 
     if (typeMatch) {

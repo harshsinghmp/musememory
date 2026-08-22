@@ -146,7 +146,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Muse Memory — Visual Inspector</title>
+  <title>Muse Memory -- Visual Inspector</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -209,8 +209,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 </head>
 <body>
   <header>
-    <div class="brand">🧠 Muse Memory <span style="font-weight:400; font-size:13px; color:var(--text-muted);">Visual Inspector</span></div>
-    <div class="status-badge">● Live Store Active</div>
+    <div class="brand">Muse Memory <span style="font-weight:400; font-size:13px; color:var(--text-muted);">Visual Inspector</span></div>
+    <div class="status-badge">[LIVE] Store Active</div>
   </header>
   
   <div class="layout">

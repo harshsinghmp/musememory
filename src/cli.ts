@@ -16,7 +16,7 @@ import { DEFAULT_CONTEXT_LIMIT, type MemoryEntry, type MemoryType } from "./type
 
 export { scanSecrets };
 
-const USAGE = `Muse Memory (musememory) — Autonomous persistent memory system for AI agents
+const USAGE = `Muse Memory (musememory) -- Autonomous persistent memory system for AI agents
 
 Usage: memory <command> [args] [flags] (alias: musememory)
 
@@ -136,26 +136,26 @@ export async function main(argv: string[]): Promise<number> {
       if (!existsSync(currentPath)) {
         writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
       }
-      console.log(`🧠 Initialized Muse Memory in ${memoryDir}`);
+      console.log(`[+] Initialized Muse Memory in ${memoryDir}`);
 
       // 1. Auto-connect detected coding agents
       const { connectAgent } = await import("./connect.ts");
       const reports = connectAgent("all", undefined, { dryRun: false, force: false });
       if (reports.length > 0) {
-        console.log(`\n🔌 Auto-wired ${reports.length} detected coding agent(s) with zero permissions:`);
+        console.log(`\n[+] Auto-wired ${reports.length} detected coding agent(s) with zero permissions:`);
         for (const r of reports) {
-          console.log(`  ✓ ${r.agentName}: ${r.message}`);
+          console.log(`  * ${r.agentName}: ${r.message}`);
         }
       }
 
       // 2. Check for legacy memory providers
       const detected = detectProviders(targetDir).filter((p) => p.detected);
       if (detected.length > 0) {
-        console.log(`\n💡 Detected ${detected.length} external memory provider(s): ${detected.map((d) => d.name).join(", ")}`);
-        console.log(`   ➔ Run 'memory migrate' to auto-import legacy memories.`);
+        console.log(`\n[!] Detected ${detected.length} external memory provider(s): ${detected.map((d) => d.name).join(", ")}`);
+        console.log(`   -> Run 'memory migrate' to auto-import legacy memories.`);
       }
 
-      console.log(`\n✨ Muse Memory is ready! Use 'memory doctor' to verify system health.`);
+      console.log(`\n[OK] Muse Memory is ready! Use 'memory doctor' to verify system health.`);
       return 0;
     }
 
@@ -173,15 +173,15 @@ export async function main(argv: string[]): Promise<number> {
       const purge = flags["purge"] === "true";
       const dryRun = flags["dry-run"] === "true";
 
-      console.log(`🧹 Running Muse Memory Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
+      console.log(`[CLEAN] Running Muse Memory Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
       if (agent && agent !== "all") {
         const report = disconnectSingleAgent(agent, undefined, { dryRun });
-        console.log(`  ✓ ${report.agentName}: ${report.message}`);
+        console.log(`  * ${report.agentName}: ${report.message}`);
       } else {
         const reports = disconnectAllAgents(undefined, { dryRun });
-        console.log(`\n🔌 Unwired ${reports.length} coding agent(s):`);
+        console.log(`\n[+] Unwired ${reports.length} coding agent(s):`);
         for (const r of reports) {
-          console.log(`  ✓ ${r.agentName}: ${r.message}`);
+          console.log(`  * ${r.agentName}: ${r.message}`);
         }
       }
 
@@ -190,10 +190,10 @@ export async function main(argv: string[]): Promise<number> {
         if (ctx && existsSync(ctx.memoryDir) && !dryRun) {
           const { rmSync } = await import("node:fs");
           rmSync(ctx.memoryDir, { recursive: true, force: true });
-          console.log(`  🗑️  Purged memory directory: ${ctx.memoryDir}`);
+          console.log(`  [PURGED] Memory directory removed: ${ctx.memoryDir}`);
         }
       } else {
-        console.log(`\nℹ️  Memory files preserved in .memory/. Use 'memory uninstall --purge' to remove data.`);
+        console.log(`\n[INFO] Memory files preserved in .memory/. Use 'memory uninstall --purge' to remove data.`);
       }
       return 0;
     }
@@ -214,7 +214,7 @@ export async function main(argv: string[]): Promise<number> {
       const detected = detectProviders(targetDir);
       const found = detected.filter((d) => d.detected);
       if (found.length > 0) {
-        console.log(`💡 Detected existing memory from: ${found.map((f) => f.name).join(", ")}. Run 'memory migrate' to auto-import.`);
+        console.log(`[INFO] Detected existing memory from: ${found.map((f) => f.name).join(", ")}. Run 'memory migrate' to auto-import.`);
       }
       return 0;
     }
@@ -223,14 +223,14 @@ export async function main(argv: string[]): Promise<number> {
       const ctx = requireRoot(flags);
       const startDir = ctx ? ctx.root : process.cwd();
       const detected = detectProviders(startDir);
-      console.log(`🔍 Scanning for external agent memory providers:`);
+      console.log(`[SCAN] Scanning for external agent memory providers:`);
       let count = 0;
       for (const p of detected) {
         if (p.detected) {
           count++;
-          console.log(`  ✓ ${p.name} (${p.category}, scope: ${p.scope})`);
+          console.log(`  * ${p.name} (${p.category}, scope: ${p.scope})`);
           for (const path of p.resolvedPaths) {
-            console.log(`    ➔ found: ${path}`);
+            console.log(`    -> found: ${path}`);
           }
         }
       }
@@ -257,7 +257,7 @@ export async function main(argv: string[]): Promise<number> {
         if (detected.length > 1) {
           const { promptMultiSelect } = await import("./prompt.ts");
           const selected = await promptMultiSelect(
-            "🔍 Detected External Memory Providers on Workstation:",
+            "[SCAN] Detected External Memory Providers on Workstation:",
             detected.map((p) => ({
               id: p.id,
               label: p.name,
@@ -272,7 +272,7 @@ export async function main(argv: string[]): Promise<number> {
         }
       }
 
-      console.log(`🚀 Starting Muse Memory Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
+      console.log(`[MIGRATE] Starting Muse Memory Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
       const report = await runMigration(ctx.store, ctx.memoryDir, {
         provider,
         all: all || !provider,
@@ -281,9 +281,9 @@ export async function main(argv: string[]): Promise<number> {
         project,
       });
 
-      console.log(`\n📋 Migration Report:`);
+      console.log(`\nMigration Report:`);
       for (const p of report.providers) {
-        const icon = p.status === "success" ? "✓" : (p.status === "skipped" ? "⊘" : "✗");
+        const icon = p.status === "success" ? "[OK]" : (p.status === "skipped" ? "[-]" : "[FAIL]");
         console.log(`  ${icon} ${p.providerName}: ${p.migratedCount} memories migrated, ${p.supersededCount} archived, ${p.constraintsCount} constraints, ${p.secretsRedacted} secrets scrubbed`);
         if (p.error) console.log(`     Error: ${p.error}`);
       }
@@ -293,7 +293,7 @@ export async function main(argv: string[]): Promise<number> {
       console.log(`  Total superseded/archived: ${report.totalSuperseded}`);
       console.log(`  Total working constraints (CURRENT.md): ${report.totalConstraints}`);
       if (report.totalSecretsRedacted > 0) {
-        console.log(`  🔒 Total secrets blocked/redacted by Vibeguard: ${report.totalSecretsRedacted}`);
+        console.log(`  [SECURITY] Total secrets blocked/redacted by Vibeguard: ${report.totalSecretsRedacted}`);
       }
       if (dryRun) {
         console.log(`\n[DRY RUN complete - no files were written]`);
@@ -308,23 +308,23 @@ export async function main(argv: string[]): Promise<number> {
       const installed = agents.filter((a) => a.installed);
       const connected = installed.filter((a) => a.connected);
 
-      console.log(`🤖 Workstation Coding Agents Scan (80+ Baseline):`);
+      console.log(`[AGENTS] Workstation Coding Agents Scan (80+ Baseline):`);
       console.log(`------------------------------------------------`);
       for (const a of agents) {
         if (a.installed) {
-          const statusTag = a.connected ? "✓ [CONNECTED]" : "⚡ [INSTALLED - NOT WIRED]";
-          console.log(`  ${statusTag} ${a.name} (${a.stars ?? "active"}) — ${a.category}`);
-          if (a.binaryPath) console.log(`      ➔ binary: ${a.binaryPath}`);
-          if (a.configPath) console.log(`      ➔ config: ${a.configPath}`);
+          const statusTag = a.connected ? "[CONNECTED]" : "[INSTALLED - NOT WIRED]";
+          console.log(`  ${statusTag} ${a.name} (${a.stars ?? "active"}) -- ${a.category}`);
+          if (a.binaryPath) console.log(`      -> binary: ${a.binaryPath}`);
+          if (a.configPath) console.log(`      -> config: ${a.configPath}`);
         }
       }
 
-      console.log(`\n📊 Summary:`);
+      console.log(`\nSummary:`);
       console.log(`  Installed Agents Detected: ${installed.length}`);
       console.log(`  Connected with Muse Memory: ${connected.length}`);
       console.log(`  Uninstalled/Skipped:       ${agents.length - installed.length}`);
       if (installed.length > connected.length) {
-        console.log(`\n💡 Tip: Run 'memory connect --all' to auto-wire the remaining ${installed.length - connected.length} installed agent(s) with zero-permission auto-approval.`);
+        console.log(`\n[TIP] Run 'memory connect --all' to auto-wire the remaining ${installed.length - connected.length} installed agent(s) with zero-permission auto-approval.`);
       }
       return 0;
     }
@@ -343,7 +343,7 @@ export async function main(argv: string[]): Promise<number> {
         if (detected.length > 0) {
           const { promptMultiSelect } = await import("./prompt.ts");
           const selected = await promptMultiSelect(
-            "🔌 Select Detected Coding Agents & IDEs to Wire with Muse Memory MCP:",
+            "[CONNECT] Select Detected Coding Agents & IDEs to Wire with Muse Memory MCP:",
             detected.map((a) => ({
               id: a.id,
               label: a.name,
@@ -363,20 +363,20 @@ export async function main(argv: string[]): Promise<number> {
       try {
         const reports = connectAgent(agent, undefined, { dryRun, force });
         if (reports.length === 0) {
-          console.log(`ℹ️  No coding agents were detected on this machine.`);
+          console.log(`[INFO] No coding agents were detected on this machine.`);
           console.log(`Use 'memory connect <agent> --force' to configure a specific agent, or 'memory agents' to list all supported platforms.`);
           return 0;
         }
 
-        console.log(`🔌 Connected ${reports.length} coding agent(s)${dryRun ? " [DRY RUN]" : ""}:`);
+        console.log(`[CONNECT] Connected ${reports.length} coding agent(s)${dryRun ? " [DRY RUN]" : ""}:`);
         for (const r of reports) {
-          console.log(`  ✓ ${r.agentName} (${r.agent}): ${r.message}`);
+          console.log(`  * ${r.agentName} (${r.agent}): ${r.message}`);
         }
 
         if (agent === "all" || isAllFlag) {
           const allAgents = detectAgents();
           const uninstalledCount = allAgents.length - reports.length;
-          console.log(`\n🛡️  Clean Workspace Guarantee: Skipped ${uninstalledCount} uninstalled agents to prevent creating unneeded files/folders.`);
+          console.log(`\n[SHIELD] Clean Workspace Guarantee: Skipped ${uninstalledCount} uninstalled agents to prevent creating unneeded files/folders.`);
         }
         return 0;
       } catch (err: any) {
@@ -395,7 +395,7 @@ export async function main(argv: string[]): Promise<number> {
         memoryDir: ctx.memoryDir,
         store: ctx.store,
       });
-      console.log(`🧠 Muse Memory Visual Dashboard running at: http://localhost:${srv.port}`);
+      console.log(`[UI] Muse Memory Visual Dashboard running at: http://localhost:${srv.port}`);
       console.log(`Press Ctrl+C to stop.`);
       await new Promise<void>(() => {});
       return 0;
@@ -637,7 +637,7 @@ export async function main(argv: string[]): Promise<number> {
         console.log("no audit records found");
         return 0;
       }
-      console.log(`📋 Audit Trail (${trail.length} records):`);
+      console.log(`[AUDIT] Audit Trail (${trail.length} records):`);
       for (const r of trail) {
         const details = r.details ? ` ${JSON.stringify(r.details)}` : "";
         const reason = r.reason ? ` reason="${r.reason}"` : "";

@@ -180,65 +180,66 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
  * Print formatted terminal report for doctor.
  */
 export function printDoctorReport(report: DoctorReport): void {
-  console.log(`\n🏥 Muse Memory Health & Ecosystem Diagnostic Report`);
+  console.log(`\n====================================================`);
+  console.log(`Muse Memory Health & Ecosystem Diagnostic Report`);
   console.log(`====================================================`);
 
   // Storage
-  console.log(`\n📦 Memory Store & Storage:`);
+  console.log(`\n[STORAGE] Memory Store:`);
   console.log(`  Path: ${report.storage.path} [${report.storage.type.toUpperCase()}]`);
-  console.log(`  Initialized: ${report.storage.initialized ? "✓ Yes" : "✗ No (run 'memory init')"}`);
-  console.log(`  CURRENT.md: ${report.storage.currentMdExists ? `✓ Active (${report.storage.currentMdLines} constraints)` : "⚠️ Missing"}`);
+  console.log(`  Initialized: ${report.storage.initialized ? "[OK] Yes" : "[FAIL] No (run 'memory init')"}`);
+  console.log(`  CURRENT.md: ${report.storage.currentMdExists ? `[OK] Active (${report.storage.currentMdLines} constraints)` : "[WARN] Missing"}`);
   console.log(`  Total Memory Units: ${report.storage.totalEntries}`);
-  console.log(`    ➔ Confirmed: ${report.storage.statusCounts.confirmed || 0} | Candidate: ${report.storage.statusCounts.candidate || 0} | Stale: ${report.storage.statusCounts.stale || 0} | Superseded: ${report.storage.statusCounts.superseded || 0}`);
+  console.log(`    -> Confirmed: ${report.storage.statusCounts.confirmed || 0} | Candidate: ${report.storage.statusCounts.candidate || 0} | Stale: ${report.storage.statusCounts.stale || 0} | Superseded: ${report.storage.statusCounts.superseded || 0}`);
 
   // Validation
-  console.log(`\n🛡️  Store Integrity & Vibeguard Secret Scan:`);
+  console.log(`\n[SECURITY] Store Integrity & Vibeguard Secret Scan:`);
   if (report.validation.valid) {
-    console.log(`  ✓ All ${report.validation.validCount} memory files pass YAML schema validation`);
-    console.log(`  ✓ 0 secret leaks detected`);
-    console.log(`  ✓ 0 broken relational links`);
+    console.log(`  [OK] All ${report.validation.validCount} memory files pass YAML schema validation`);
+    console.log(`  [OK] 0 secret leaks detected`);
+    console.log(`  [OK] 0 broken relational links`);
   } else {
-    console.log(`  ⚠️ Schema / Integrity issues detected:`);
+    console.log(`  [WARN] Schema / Integrity issues detected:`);
     if (report.validation.invalidCount > 0) console.log(`     - Invalid schema files: ${report.validation.invalidCount}`);
-    if (report.validation.secretLeaksCount > 0) console.log(`     - 🔒 Credential leaks found: ${report.validation.secretLeaksCount}`);
+    if (report.validation.secretLeaksCount > 0) console.log(`     - [SECURITY] Credential leaks found: ${report.validation.secretLeaksCount}`);
     if (report.validation.brokenLinksCount > 0) console.log(`     - Broken links: ${report.validation.brokenLinksCount}`);
   }
 
   // Audit
-  console.log(`\n📜 Operational Compliance Audit Trail:`);
+  console.log(`\n[AUDIT] Operational Compliance Audit Trail:`);
   if (report.audit.exists) {
-    console.log(`  ✓ Active audit ledger (${report.audit.eventCount} events recorded, ${report.audit.sizeBytes} bytes)`);
-    if (report.audit.lastEvent) console.log(`  ➔ Last mutation: ${report.audit.lastEvent}`);
+    console.log(`  [OK] Active audit ledger (${report.audit.eventCount} events recorded, ${report.audit.sizeBytes} bytes)`);
+    if (report.audit.lastEvent) console.log(`  -> Last mutation: ${report.audit.lastEvent}`);
   } else {
-    console.log(`  ℹ️  No audit trail created yet (mutations will initialize audit.jsonl automatically)`);
+    console.log(`  [INFO] No audit trail created yet (mutations will initialize audit.jsonl automatically)`);
   }
 
   // Agents
-  console.log(`\n🤖 Coding Agents & MCP Connectivity:`);
+  console.log(`\n[AGENTS] Coding Agents & MCP Connectivity:`);
   console.log(`  Installed Agents Detected: ${report.agents.detectedInstalled}`);
   console.log(`  Connected to Muse Memory:  ${report.agents.connectedCount} / ${report.agents.detectedInstalled}`);
   if (report.agents.connectedList.length > 0) {
-    console.log(`  ✓ Connected: ${report.agents.connectedList.join(", ")}`);
+    console.log(`  [OK] Connected: ${report.agents.connectedList.join(", ")}`);
   }
   if (report.agents.unwiredList.length > 0) {
-    console.log(`  ⚡ Installed (Not Wired): ${report.agents.unwiredList.join(", ")}`);
-    console.log(`     ➔ Run 'memory connect --all' or 'npx musememory connect --all' to wire them.`);
+    console.log(`  [!] Installed (Not Wired): ${report.agents.unwiredList.join(", ")}`);
+    console.log(`     -> Run 'memory connect --all' or 'npx musememory connect --all' to wire them.`);
   }
 
   // Runtime
-  console.log(`\n⚡ Runtime & CLI Execution:`);
+  console.log(`\n[RUNTIME] Runtime & CLI Execution:`);
   console.log(`  Node.js: ${report.runtime.nodeVersion}${report.runtime.bunVersion ? ` | Bun: v${report.runtime.bunVersion}` : ""}`);
   if (report.runtime.globalBinaryFound) {
-    console.log(`  ✓ Global 'memory' binary: ${report.runtime.binaryPath}`);
+    console.log(`  [OK] Global 'memory' binary: ${report.runtime.binaryPath}`);
   } else {
-    console.log(`  ℹ️  Global binary not in PATH (you can use 'npx musememory <cmd>' or 'bunx musememory <cmd>')`);
+    console.log(`  [INFO] Global binary not in PATH (you can use 'npx musememory <cmd>' or 'bunx musememory <cmd>')`);
   }
-  console.log(`  ✓ NPX One-Line Command: 'npx musememory <command>' ready.`);
+  console.log(`  [OK] NPX One-Line Command: 'npx musememory <command>' ready.`);
 
   console.log(`\n====================================================`);
   if (report.validation.valid && report.storage.initialized && report.agents.unwiredCount === 0) {
-    console.log(`🎉 System Status: 100% HEALTHY & OPTIMAL\n`);
+    console.log(`[SUCCESS] System Status: 100% HEALTHY & OPTIMAL\n`);
   } else {
-    console.log(`💡 Recommended Action: Run 'memory connect --all' to wire any unwired coding agents.\n`);
+    console.log(`[TIP] Recommended Action: Run 'memory connect --all' to wire any unwired coding agents.\n`);
   }
 }
