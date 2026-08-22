@@ -170,10 +170,10 @@ describe("cli e2e", () => {
 
   test("connect command CLI outputs configuration status", () => {
     const { root } = setupFixtureRoot();
-    const conn = run(root, ["connect", "--all", "--dry-run"]);
+    const conn = run(root, ["connect", "claude-code", "--dry-run"]);
     expect(conn.code).toBe(0);
-    expect(conn.stdout).toContain("Connected");
     expect(conn.stdout).toContain("Claude Code");
+    expect(conn.stdout).toContain("[DRY RUN]");
     cleanup(root);
   });
 

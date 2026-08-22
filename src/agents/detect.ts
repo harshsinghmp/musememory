@@ -23,23 +23,28 @@ export function findBinary(binName: string, home: string = homedir()): string | 
     return BINARY_CACHE.get(cacheKey)!;
   }
 
-  // 1. Direct priority path checks
+  // 1. Direct priority path checks for this home directory
   const candidateDirs = [
     join(home, ".local", "bin"),
     join(home, ".bun", "bin"),
     join(home, ".cargo", "bin"),
-    join(home, ".nvm", "versions", "node", process.version, "bin"),
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
+    join(home, "bin"),
   ];
 
-  // 2. Add any additional directories from process.env.PATH
-  if (process.env.PATH) {
-    const pathDirs = process.env.PATH.split(":");
-    for (const d of pathDirs) {
-      if (d && !candidateDirs.includes(d)) {
-        candidateDirs.push(d);
+  // 2. Only check host system PATH when inspecting the active user's actual home directory
+  if (home === homedir()) {
+    candidateDirs.push(
+      join(home, ".nvm", "versions", "node", process.version, "bin"),
+      "/usr/local/bin",
+      "/usr/bin",
+      "/bin"
+    );
+    if (process.env.PATH) {
+      const pathDirs = process.env.PATH.split(":");
+      for (const d of pathDirs) {
+        if (d && !candidateDirs.includes(d)) {
+          candidateDirs.push(d);
+        }
       }
     }
   }
@@ -73,7 +78,9 @@ function isAgentConnected(agent: AgentDefinition, resolvedConfigPath: string | n
  * Detect all installed and configured coding agents on the user's workstation.
  */
 export function detectAgents(home: string = homedir()): DetectedAgent[] {
-  const xdgConfig = process.env.XDG_CONFIG_HOME || join(home, ".config");
+  const xdgConfig = (home === homedir() && process.env.XDG_CONFIG_HOME)
+    ? process.env.XDG_CONFIG_HOME
+    : join(home, ".config");
   const results: DetectedAgent[] = [];
 
   for (const def of AGENT_REGISTRY) {
