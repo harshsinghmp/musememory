@@ -248,6 +248,16 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 
 ---
 
+## 📋 Scope of Work Tracking & PR Workflow
+
+All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress` / `done`) and are mirrored in the README "Scope of Work & Roadmap" table.
+
+1. **No direct-to-main feature work**: every SOW item ships via a feature branch → pull request that references its issue (`Closes #N` in the PR body).
+2. **Status transitions**: flip the issue label to `in-progress` when a branch opens, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
+3. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
+
+---
+
 ## 🧪 Testing & Validation Standards
 
 All modifications must pass the full test suite and TypeScript validation before committing:
