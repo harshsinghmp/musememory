@@ -134,49 +134,14 @@ export function defaultSalienceForType(type: MemoryType): number {
   }
 }
 
-/**
- * Extracts plain text strings from varied JSONL transcript step objects
- * (supporting Claude Code, Antigravity, Cursor, and OpenAI/generic agent formats).
- */
-export function parseJsonlTranscript(jsonlText: string): string[] {
-  if (!jsonlText) return [];
-  const lines = jsonlText.split("\n").map((l) => l.trim()).filter(Boolean);
-  const blocks: string[] = [];
-
-  for (const line of lines) {
-    try {
-      const obj = JSON.parse(line);
-      // Direct string fields
-      if (typeof obj.content === "string") {
-        blocks.push(obj.content);
-      } else if (Array.isArray(obj.content)) {
-        for (const item of obj.content) {
-          if (typeof item === "string") blocks.push(item);
-          else if (item && typeof item.text === "string") blocks.push(item.text);
-        }
-      }
-      if (typeof obj.thinking === "string") {
-        blocks.push(obj.thinking);
-      }
-      if (typeof obj.message === "string") {
-        blocks.push(obj.message);
-      }
-      if (typeof obj.text === "string") {
-        blocks.push(obj.text);
-      }
-      if (obj.tool_calls && Array.isArray(obj.tool_calls)) {
-        for (const tc of obj.tool_calls) {
-          if (tc.arguments && typeof tc.arguments === "string") blocks.push(tc.arguments);
-        }
-      }
-    } catch {
-      // Plain text fallback
-      blocks.push(line);
-    }
-  }
-
-  return blocks;
-}
+import { parseJsonlTranscript } from "./transcript.ts";
+export {
+  parseJsonlTranscript,
+  searchTranscriptWithBookends,
+  type TranscriptMatch,
+  type TranscriptSearchResult,
+  type TranscriptSearchOptions,
+} from "./transcript.ts";
 
 export interface TranscriptImportOptions {
   project?: string;

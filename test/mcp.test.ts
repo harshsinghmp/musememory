@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { openStore, propose, confirm, supersede, get } from "../src/store.ts";
-import { search } from "../src/search.ts";
+import { search } from "../src/retrieval.ts";
 import { validateStore } from "../src/schema.ts";
 import { getGraphStatus } from "../src/graph.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
@@ -87,6 +87,26 @@ describe("mcp tool handlers logic", () => {
     const reports = connectAgent("claude-code", root, { dryRun: true });
     expect(Array.isArray(reports)).toBe(true);
     expect(reports[0].agent).toBe("claude-code");
+    cleanup(root);
+  });
+
+  test("formatPromptContext structures USER.md, constraints, and proactive reflection directive", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { formatPromptContext } = await import("../src/retrieval.ts");
+    const { setUserProfile } = await import("../src/user.ts");
+    const { setCurrent } = await import("../src/current.ts");
+
+    setUserProfile(memoryDir, "# Developer Persona\n- Strict TypeScript\n- Direct answers");
+    setCurrent(memoryDir, "Always verify build before committing.", "core");
+
+    const formatted = formatPromptContext(store, memoryDir, "deploy", { project: "aria" });
+    expect(formatted.markdown).toContain("### User Profile & Preferences (USER.md)");
+    expect(formatted.markdown).toContain("Strict TypeScript");
+    expect(formatted.markdown).toContain("### Active Working Constraints (CURRENT.md)");
+    expect(formatted.markdown).toContain("Always verify build before committing.");
+    expect(formatted.markdown).toContain("Memory Directive: When learning durable facts");
+
     cleanup(root);
   });
 });

@@ -6,12 +6,15 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot } from "./root.ts";
 import { openStore, get, propose, confirm, supersede, save, link, markStale, reject, deleteEntry } from "./store.ts";
-import { search } from "./search.ts";
+import { search, formatPromptContext } from "./retrieval.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { scanSecrets } from "./secrets.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
 import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
+import { searchTranscriptWithBookends } from "./transcript.ts";
+import { getUserProfile, setUserProfile } from "./user.ts";
+import { getGlobalMemoryDir } from "./root.ts";
 import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
 import { detectAgents } from "./agents/detect.ts";
@@ -24,7 +27,7 @@ export async function runMcpServer(): Promise<void> {
   const store = openStore(memoryDir);
 
   const server = new Server(
-    { name: "musememory", version: "1.0.0" },
+    { name: "musememory", version: "1.2.0" },
     { capabilities: { tools: {} } },
   );
 
@@ -326,6 +329,42 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_get_user_profile",
+        description: "Read the active user profile and preferences (USER.md)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            global: { type: "boolean", description: "If true, checks global user profile (~/.memory/USER.md)" },
+          },
+        },
+      },
+      {
+        name: "memory_set_user_profile",
+        description: "Update the user profile and preferences (USER.md) with inline secret scanning",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string", description: "Markdown formatted profile content" },
+            global: { type: "boolean", description: "If true, updates global ~/.memory/USER.md instead of local" },
+          },
+          required: ["content"],
+        },
+      },
+      {
+        name: "memory_search_transcripts",
+        description: "Full-text search over conversation transcripts (.jsonl or text) with conversation bookends (start/end) and context window",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or keywords" },
+            transcript: { type: "string", description: "File path to .jsonl transcript or raw transcript text" },
+            window_size: { type: "number", description: "Number of dialogue turns before and after each match (default: 2)" },
+            max_matches: { type: "number", description: "Maximum matching turns to return (default: 5)" },
+          },
+          required: ["query", "transcript"],
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -348,7 +387,7 @@ export async function runMcpServer(): Promise<void> {
         return toolResult(entry);
       }
       case "get_context": {
-        const res = search(store, memoryDir, String(a.query ?? ""), {
+        const formatted = formatPromptContext(store, memoryDir, String(a.query ?? ""), {
           limit: typeof a.limit === "number" ? a.limit : 5,
           tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           project: a.project ? String(a.project) : undefined,
@@ -357,7 +396,13 @@ export async function runMcpServer(): Promise<void> {
           status: a.status ? String(a.status) : undefined,
           verified: a.verified === true,
         });
-        return toolResult(res.results.map((r) => ({ ...r.entry, score: r.score })));
+        return toolResult({
+          markdown: formatted.markdown,
+          entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
+          total_tokens_used: formatted.totalTokensUsed,
+          constraints: formatted.constraints,
+          user_profile: formatted.userProfile,
+        });
       }
       case "search": {
         const res = search(store, memoryDir, String(a.query), {
@@ -560,6 +605,33 @@ export async function runMcpServer(): Promise<void> {
             project: a.project ? String(a.project) : undefined,
           });
           return toolResult(report);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_get_user_profile": {
+        const isGlobal = a.global === true;
+        const dir = isGlobal ? getGlobalMemoryDir() : memoryDir;
+        const profile = getUserProfile(dir);
+        return toolResult({ profile: profile ?? "No USER.md profile configured.", exists: Boolean(profile) });
+      }
+      case "memory_set_user_profile": {
+        try {
+          const isGlobal = a.global === true;
+          const dir = isGlobal ? getGlobalMemoryDir() : memoryDir;
+          setUserProfile(dir, String(a.content));
+          return toolResult({ success: true, message: `Updated USER.md in ${dir}` });
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_search_transcripts": {
+        try {
+          const res = searchTranscriptWithBookends(String(a.transcript), String(a.query), {
+            windowSize: typeof a.window_size === "number" ? a.window_size : undefined,
+            maxMatches: typeof a.max_matches === "number" ? a.max_matches : undefined,
+          });
+          return toolResult(res);
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }

@@ -4,7 +4,7 @@ import Ajv, { type ValidateFunction } from "ajv";
 import type { Store } from "./store.ts";
 import { list, get, extractEntryText } from "./store.ts";
 import { scanSecrets } from "./secrets.ts";
-import { stalePolicyDays, daysSince } from "./rank.ts";
+import { stalePolicyDays, daysSince } from "./retrieval.ts";
 import type { MemoryEntry } from "./types.ts";
 
 let cachedValidate: ValidateFunction | null = null;

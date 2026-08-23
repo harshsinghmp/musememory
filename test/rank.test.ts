@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { scoreEntry, sortCandidates, tokenize, stalePolicyDays } from "../src/rank.ts";
+import { scoreEntry, sortCandidates, tokenize, stalePolicyDays } from "../src/retrieval.ts";
 import { DEFAULT_STALE_DAYS } from "../src/types.ts";
 import type { MemoryEntry } from "../src/types.ts";
 

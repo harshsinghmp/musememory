@@ -41,9 +41,13 @@ describe("unified context & retrieval engine", () => {
     cleanup(root);
   });
 
-  test("formatPromptContext outputs structured Markdown with CURRENT.md constraints", () => {
+  test("formatPromptContext outputs structured Markdown with USER.md and CURRENT.md constraints", async () => {
     const { root, memoryDir } = setupFixtureRoot();
     const store = openStore(memoryDir);
+    const { setUserProfile } = await import("../src/user.ts");
+
+    // Set user profile
+    setUserProfile(memoryDir, "# Developer Profile\n- Tone: Ultra terse\n- Prefer strict TypeScript");
 
     // Set constraint in CURRENT.md
     setCurrent(memoryDir, "Zero-credential leakage policy strictly enforced.", "aria");
@@ -58,12 +62,16 @@ describe("unified context & retrieval engine", () => {
     });
 
     const formatted = formatPromptContext(store, memoryDir, "timeout limit", { project: "aria" });
+    expect(formatted.userProfile).toContain("Developer Profile");
     expect(formatted.constraints.length).toBeGreaterThan(0);
+    expect(formatted.markdown).toContain("### User Profile & Preferences (USER.md)");
+    expect(formatted.markdown).toContain("Ultra terse");
     expect(formatted.markdown).toContain("### Active Working Constraints (CURRENT.md)");
     expect(formatted.markdown).toContain("Zero-credential leakage policy");
     expect(formatted.markdown).toContain("### Relevant Memories & Learned Patterns");
     expect(formatted.markdown).toContain("API Timeout Limit");
     expect(formatted.markdown).toContain("5000ms");
+    expect(formatted.markdown).toContain("Memory Directive: When learning durable facts");
 
     cleanup(root);
   });

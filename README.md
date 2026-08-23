@@ -6,13 +6,27 @@
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
 ![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-118%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-128%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
 
 </div>
+
+---
+
+## 💡 What is Muse Memory? (TL;DR)
+
+Most AI chatbots and coding assistants have **"goldfish memory"**: every time you close a chat and start a new one, they forget everything about your project, your habits, and the bugs you solved yesterday.
+
+**Muse Memory gives your AI assistants a persistent, self-organizing notebook directly on your machine.**
+
+- 👤 **Remembers You (`USER.md`)**: Configures your role (developer, designer, marketer, casual) and communication preferences so the AI speaks your language.
+- 📐 **Remembers Project Rules (`CURRENT.md`)**: Injects active hard constraints and open loops so agents never break established invariants.
+- 🧠 **Learns As You Build**: Automatically captures bug workarounds and architectural decisions, feeding only relevant notes back into future sessions.
+- 🔌 **Auto-Connects to 80+ AI Tools**: Single-command setup (`npx musememory install`) wires Claude Code, Cursor, Windsurf, Hermes, OpenCode, and more.
+- 🛡️ **100% Private & Daemon-Free**: Pure file-backed storage (`.memory/`) with built-in secret scrubbing (Vibeguard) that prevents API keys or passwords from ever being saved.
 
 ---
 
@@ -196,6 +210,52 @@ flowchart TD
 
 ---
 
+## 👤 User Persona & Preferences (`USER.md`) & Setup Wizard
+
+Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style, communication preferences, and toolchain rules.
+
+### 🎭 5 Zero-Fingerprint Role Archetypes
+
+When running `memory install`, an interactive setup wizard configures your primary archetype (or choose one manually anytime):
+
+1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
+4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
+5. **`custom`**: Clean blank template ready for personalized instructions.
+
+```bash
+# View active profile
+memory user get
+
+# Initialize with a specific archetype
+memory user init developer
+memory user init designer --global
+
+# Update user profile
+memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
+```
+
+### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
+When `get_context` or `formatPromptContext()` builds the LLM prompt context, it structures information deterministically:
+1. **`### User Profile & Preferences (USER.md)`** (Tone, role, rules)
+2. **`### Active Working Constraints (CURRENT.md)`** (Project invariants & open loops)
+3. **`### Relevant Memories & Learned Patterns`** (Top-$K$ ranked memories)
+4. **`*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`**
+
+---
+
+## 📜 Full-Text Transcript Search with Conversation Bookends
+
+Search across past `.jsonl` transcripts (Claude Code, Cursor, Antigravity, Codex) with surrounding dialogue context windows and session start/end bookends:
+
+```bash
+# Search transcript with dialogue window
+memory search-transcript "database connection pooling" session.jsonl --window 2 --max 5
+```
+
+---
+
 ## 🛡️ Built-In Vibeguard Secret Defense (Zero External Dependencies)
 
 `musememory` includes a pure TypeScript, zero-dependency security scanner that protects your repositories:
@@ -208,25 +268,26 @@ flowchart TD
 ## 💻 CLI Command Reference
 
 ```bash
-memory [[ORCA_RICH_MD:12022cbed4f6a6985058316339d5a650:inline-html:%3Ccommand%3E]] [arguments] [flags]  # alias: musememory
+memory <command> [arguments] [flags]  # alias: musememory
 ```
-
 
 | Command             | Arguments / Flags                                                                                      | Description                                                                                                       |
 | :------------------- | :------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------- |
-| `install`           | `[path] [--global]`                                                                                    | **One-line complete setup**: initializes `.memory/` and auto-wires all detected installed coding agents.          |
+| `install`           | `[path] [--global]`                                                                                    | **One-line complete setup**: initializes `.memory/`, `USER.md` profile, and auto-wires all detected coding agents. |
 | `doctor`            | `[path] [--global]`                                                                                    | **System diagnostic**: health check for storage, YAML schemas, secrets, MCP connectivity, and audit ledger.       |
 | `uninstall`         | `[agent] [--purge] [--dry-run]`                                                                        | **Clean uninstaller**: unwires MCP configuration from coding agents (and optionally purges `.memory/`).           |
 | `init`              | `[path] [--legacy] [--global]`                                                                         | Initialize `.memory/` directory (or global `~/.memory/`). Auto-detects existing memories.                         |
+| `user`              | `[get\|init\|set] [args] [--global]`                                                                   | Manage `USER.md` persona & preferences across 5 clean archetypes (`developer`, `designer`, `marketer`, etc.).     |
 | `connect`           | `[agent] [--all] [--force] [--dry-run]`                                                                | Auto-wire MCP server into detected installed agents (skipping uninstalled ones to keep files clean).              |
 | `agents`            | *(none)*                                                                                               | Scan machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.).                |
 | `detect`            | *(none)*                                                                                               | Scan workstation and local workspace for existing memory systems across 24+ formats.                              |
-| `migrate`           | `[--from P] [--all] [--dry-run] [--overwrite] [--project P]`                                           | Auto-detect and migrate memories into Muse Memory preserving active/archived state &amp; secrets.                 |
+| `migrate`           | `[--from P] [--all] [--dry-run] [--overwrite] [--project P]`                                           | Auto-detect and migrate memories into Muse Memory preserving active/archived state & secrets.                     |
 | `ui`                | `[--port N] [--global]`                                                                                | Launch zero-dependency visual knowledge graph dashboard.                                                          |
 | `context`           | `[query] [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified] [--global]` | Retrieve Top-$K$ ranked active context (with token budget limit).                                                 |
 | `search`            | `<query> [--limit N] [--token-budget N] [--include-superseded] [--type T] [--status S] [--global]`     | Ranked token search with scores and status indicators.                                                            |
-| `harvest`           | `<text|file> --project P [--confirmed] [--global]`                                                     | Distill raw text/transcripts into structured outcome/fix memory units.                                            |
-| `import-transcript` | `<file.jsonl|text> [--project P] [--confirmed] [--global]`                                             | Ingest `.jsonl` session transcript from Claude Code / Antigravity / Cursor into memories (alias: `import-jsonl`). |
+| `search-transcript` | `<query> [file.jsonl] [--window N] [--max N]`                                                          | Search transcript with dialogue context window and start/end conversation bookends.                               |
+| `harvest`           | `<text\|file> --project P [--confirmed] [--global]`                                                    | Distill raw text/transcripts into structured outcome/fix memory units.                                            |
+| `import-transcript` | `<file.jsonl\|text> [--project P] [--confirmed] [--global]`                                            | Ingest `.jsonl` session transcript from Claude Code / Antigravity / Cursor into memories (alias: `import-jsonl`). |
 | `capture`           | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]`                      | Fast proposal with inline zero-leakage secret scan.                                                               |
 | `propose`           | `<text> --project P [--title T] [--tags a,b] [--type T] [--confirmed] [--global]`                      | Create a candidate memory entry.                                                                                  |
 | `recall`            | `<query> [--limit N] [--token-budget N] [--project P] [--type T] [--status S] [--verified] [--global]` | Rich recall displaying verification levels and related graph links.                                               |
@@ -239,7 +300,8 @@ memory [[ORCA_RICH_MD:12022cbed4f6a6985058316339d5a650:inline-html:%3Ccommand%3E
 | `link`              | `<id> --related <id1,id2> [--global]`                                                                  | Synchronize bidirectional relation links between entries.                                                         |
 | `export`            | `[--out <file.json>] [--global]`                                                                       | Export memory snapshot for agency network sync.                                                                   |
 | `import`            | `<file.json> [--overwrite] [--global]`                                                                 | Import and validate memory snapshot into local store.                                                             |
-| `validate`          | `[--dry-run] [--global]`                                                                               | Deep audit of schemas, secrets, broken links, and referential integrity.                                          |
+| `list` / `ls`       | `[--status S] [--type T] [--project P] [--global]`                                                     | List memory entries with multi-field status, type, and project filtering.                                         |
+| `stats`             | `[--global]`                                                                                           | Display breakdown statistics of total memories, status distribution, and type metrics.                            |
 | `briefing`          | `[--limit N] [--global]`                                                                               | Active summary of recent entries, status counts, and recurring due items.                                         |
 | `stale`             | `[--days N] [--global]`                                                                                | Audit active entries exceeding per-type staleness policies.                                                       |
 | `session`           | `start --project P [--note T]` / `end <id>`                                                            | Record session start/end timeline nodes.                                                                          |
@@ -255,29 +317,32 @@ memory [[ORCA_RICH_MD:12022cbed4f6a6985058316339d5a650:inline-html:%3Ccommand%3E
 When registered as an MCP server, `musememory` exposes the following tools to any AI model:
 
 
-| MCP Tool                   | Description                                                                                         |
+| MCP Tool                    | Description                                                                                         |
 | :-------------------------- | :--------------------------------------------------------------------------------------------------- |
-| `get_context`              | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`.  |
-| `search`                   | Searches memory units with query, token budget, project, type, and verification filters.            |
-| `memory_detect_agents`     | Scans machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.). |
-| `memory_connect`           | Auto-wires MCP into installed agents or a specified agent with zero permissions.                    |
-| `memory_detect_providers`  | Scans workspace and machine for external memory formats (24+ providers).                            |
-| `memory_migrate`           | Migrates memories from detected providers with state preservation and secret scrubbing.             |
-| `memory_harvest`           | Distills conversation turns into structured fix/outcome units.                                      |
-| `memory_import_transcript` | Ingests JSONL transcripts into structured memory units.                                             |
-| `memory_capture`           | Saves memory with strict inline secret scanning.                                                    |
-| `memory_recall`            | Rich inspection of knowledge units, verification, relations, and token budgeting.                   |
-| `memory_confirm`           | Promotes candidate or stale memories to confirmed status.                                           |
-| `memory_supersede`         | Supersedes outdated knowledge with a confirmed target.                                              |
-| `memory_link`              | Connects related memory units bidirectionally.                                                      |
-| `memory_mark_stale`        | Flags decaying knowledge units.                                                                     |
-| `memory_reject`            | Marks rejected or refuted hypotheses.                                                               |
-| `memory_delete`            | Permanently deletes a memory unit and logs audit record.                                            |
-| `memory_audit`             | Queries the append-only operational audit ledger.                                                   |
-| `memory_export`            | Exports full memory snapshot JSON.                                                                  |
-| `memory_import`            | Imports validated memories from a snapshot.                                                         |
-| `memory_validate`          | Audits store integrity and detects credential leaks.                                                |
-| `graph_status`             | Inspects CodeGraph AST integration status.                                                          |
+| `get_context`               | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`.  |
+| `search`                    | Searches memory units with query, token budget, project, type, and verification filters.            |
+| `memory_get_user_profile`   | Reads the active user persona and preferences (`USER.md`).                                          |
+| `memory_set_user_profile`   | Updates `USER.md` persona and preferences with inline secret defense.                               |
+| `memory_search_transcripts` | Full-text search over past `.jsonl` transcripts with conversation bookends and context window.      |
+| `memory_detect_agents`      | Scans machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.). |
+| `memory_connect`            | Auto-wires MCP into installed agents or a specified agent with zero permissions.                    |
+| `memory_detect_providers`   | Scans workspace and machine for external memory formats (24+ providers).                            |
+| `memory_migrate`            | Migrates memories from detected providers with state preservation and secret scrubbing.             |
+| `memory_harvest`            | Distills conversation turns into structured fix/outcome units.                                      |
+| `memory_import_transcript`  | Ingests JSONL transcripts into structured memory units.                                             |
+| `memory_capture`            | Saves memory with strict inline secret scanning.                                                    |
+| `memory_recall`             | Rich inspection of knowledge units, verification, relations, and token budgeting.                   |
+| `memory_confirm`            | Promotes candidate or stale memories to confirmed status.                                           |
+| `memory_supersede`          | Supersedes outdated knowledge with a confirmed target.                                              |
+| `memory_link`               | Connects related memory units bidirectionally.                                                      |
+| `memory_mark_stale`         | Flags decaying knowledge units.                                                                     |
+| `memory_reject`             | Marks rejected or refuted hypotheses.                                                               |
+| `memory_delete`             | Permanently deletes a memory unit and logs audit record.                                            |
+| `memory_audit`              | Queries the append-only operational audit ledger.                                                   |
+| `memory_export`             | Exports full memory snapshot JSON.                                                                  |
+| `memory_import`             | Imports validated memories from a snapshot.                                                         |
+| `memory_validate`           | Audits store integrity and detects credential leaks.                                                |
+| `graph_status`              | Inspects CodeGraph AST integration status.                                                          |
 
 
 ---
@@ -332,9 +397,9 @@ rm -f ~/.local/bin/memory ~/.local/bin/musememory
 
 ```bash
 bun install
-bun test          # 118 tests passing across 20 test suites
+bun test          # 128 tests passing across 22 test suites
 bunx tsc --noEmit # 0 type errors
-bun run build     # Clean bundled distribution build
+bun run build     # Clean bundled distribution build (dist/index.js)
 ```
 
 ---

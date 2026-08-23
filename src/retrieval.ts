@@ -1,6 +1,7 @@
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 import { getCurrent } from "./current.ts";
+import { getUserProfile } from "./user.ts";
 import { graphSymbolOverlapBonus } from "./graph.ts";
 import type { MemoryEntry, MemoryType, MemoryStatus, SearchOptions } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS, DEFAULT_STALE_DAYS } from "./types.ts";
@@ -34,6 +35,7 @@ export interface FormattedContext {
   entries: ScoredEntry[];
   totalTokensUsed: number;
   constraints: string[];
+  userProfile?: string | null;
 }
 
 /** Per-type staleness policy in days; null = never stale. */
@@ -197,8 +199,15 @@ export function formatPromptContext(
 ): FormattedContext {
   const result = queryContext(store, query, options);
   const constraints = memoryDir ? getCurrent(memoryDir) : [];
+  const userProfile = getUserProfile(memoryDir);
 
   const parts: string[] = [];
+
+  if (userProfile) {
+    parts.push("### User Profile & Preferences (USER.md)");
+    parts.push(userProfile);
+    parts.push("");
+  }
 
   if (constraints.length > 0) {
     parts.push("### Active Working Constraints (CURRENT.md)");
@@ -222,10 +231,14 @@ export function formatPromptContext(
     }
   }
 
+  parts.push("---");
+  parts.push("*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call `memory_capture` immediately.*");
+
   return {
     markdown: parts.join("\n").trim(),
     entries: result.results,
     totalTokensUsed: result.totalTokensUsed ?? 0,
     constraints,
+    userProfile,
   };
 }

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { GraphMetadata, MemoryEntry } from "./types.ts";
-import { tokenize } from "./rank.ts";
+import { tokenize } from "./retrieval.ts";
 
 export type GraphProviderType = "codegraph" | "none";
 

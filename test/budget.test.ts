@@ -3,8 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore, propose } from "../src/store.ts";
-import { estimateEntryTokens } from "../src/rank.ts";
-import { search } from "../src/search.ts";
+import { estimateEntryTokens, search } from "../src/retrieval.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "budget-test-"));

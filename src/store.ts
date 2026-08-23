@@ -5,20 +5,46 @@ import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent } from "./current.ts";
+import { getUserProfile, setUserProfile, initUserProfile } from "./user.ts";
 import { queryContext, formatPromptContext, type ContextQueryOptions } from "./retrieval.ts";
+
+export interface StorageLayout {
+  root: string;
+  memoryDir: string;
+  memoriesDir: string;
+  currentMd: string;
+  userMd: string;
+  auditJsonl: string;
+}
+
+export function getStorageLayout(memoryDir: string): StorageLayout {
+  return {
+    root: memoryDir.endsWith(".memory") || memoryDir.endsWith(".musememory") || memoryDir.endsWith(".muse-memory")
+      ? join(memoryDir, "..")
+      : memoryDir,
+    memoryDir,
+    memoriesDir: join(memoryDir, "memories"),
+    currentMd: join(memoryDir, "CURRENT.md"),
+    userMd: join(memoryDir, "USER.md"),
+    auditJsonl: join(memoryDir, "audit.jsonl"),
+  };
+}
 
 export interface Store {
   dir: string;
   memoryDir?: string;
+  layout?: StorageLayout;
 }
 
 export class MemoryStore implements Store {
   readonly dir: string;
   readonly memoryDir?: string;
+  readonly layout: StorageLayout;
 
   constructor(memoryDir: string) {
     this.memoryDir = memoryDir;
-    this.dir = join(memoryDir, "memories");
+    this.layout = getStorageLayout(memoryDir);
+    this.dir = this.layout.memoriesDir;
     mkdirSync(this.dir, { recursive: true });
   }
 
@@ -72,6 +98,15 @@ export class MemoryStore implements Store {
     return link(this, id, relatedIds);
   }
 
+  getUserProfile(): string | null {
+    return getUserProfile(this.memoryDir);
+  }
+
+  setUserProfile(content: string): void {
+    if (!this.memoryDir) throw new Error("Cannot set user profile: memoryDir not configured");
+    setUserProfile(this.memoryDir, content);
+  }
+
   getConstraints(): string[] {
     if (!this.memoryDir) return [];
     return getCurrent(this.memoryDir);
@@ -103,6 +138,8 @@ export class MemoryStore implements Store {
     return formatPromptContext(this, this.memoryDir, query, options);
   }
 }
+
+export { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
 
 export function openStore(memoryDir: string): MemoryStore {
   return new MemoryStore(memoryDir);

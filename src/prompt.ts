@@ -108,3 +108,54 @@ export async function promptMultiSelect<T extends string>(
     });
   });
 }
+
+/**
+ * Prompt user to select exactly one option from a numbered list.
+ */
+export async function promptSingleSelect<T extends string>(
+  title: string,
+  options: SelectOption<T>[],
+  defaultId: T,
+  isInteractive = Boolean(process.stdin.isTTY && process.env.NODE_ENV !== "test" && !process.env.CI),
+): Promise<T> {
+  if (options.length === 0) return defaultId;
+  if (!isInteractive) {
+    return defaultId;
+  }
+
+  console.log(`\n${title}`);
+  console.log(`------------------------------------------------`);
+  options.forEach((opt, idx) => {
+    const num = `[${idx + 1}]`.padEnd(5);
+    const hint = opt.hint ? ` (${opt.hint})` : "";
+    const isDef = opt.id === defaultId ? " (Default)" : "";
+    console.log(`  ${num} ${opt.label}${isDef}${hint}`);
+  });
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(`\nSelect role archetype [1-${options.length}] (default: 1): `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim();
+      if (!trimmed) {
+        return resolve(defaultId);
+      }
+      const num = parseInt(trimmed, 10);
+      if (!isNaN(num) && num >= 1 && num <= options.length) {
+        return resolve(options[num - 1].id);
+      }
+      const matched = options.find(
+        (o) => o.id.toLowerCase() === trimmed.toLowerCase() || o.label.toLowerCase().includes(trimmed.toLowerCase()),
+      );
+      if (matched) {
+        return resolve(matched.id);
+      }
+      resolve(defaultId);
+    });
+  });
+}
+

@@ -262,4 +262,41 @@ describe("cli e2e", () => {
 
     cleanup(root);
   });
+
+  test("user and search-transcript CLI commands", () => {
+    const { root } = setupFixtureRoot();
+
+    // 1. memory user init
+    const uInit = run(root, ["user", "init", "designer"]);
+    expect(uInit.code).toBe(0);
+    expect(uInit.stdout).toContain("UI/UX Designer");
+
+    // 2. memory user get
+    const uGet = run(root, ["user", "get"]);
+    expect(uGet.code).toBe(0);
+    expect(uGet.stdout).toContain("User Profile");
+    expect(uGet.stdout).toContain("UI/UX Designer");
+
+    // 3. memory user set
+    const uSet = run(root, ["user", "set", "# Updated Profile\n- Likes dark mode"]);
+    expect(uSet.code).toBe(0);
+    expect(uSet.stdout).toContain("Updated USER.md");
+
+    // 4. memory search-transcript
+    const transFile = join(root, "session.jsonl");
+    writeFileSync(
+      transFile,
+      JSON.stringify({ content: "Initial greeting" }) + "\n" +
+      JSON.stringify({ content: "Fixing GraphQL schema caching bug" }) + "\n" +
+      JSON.stringify({ content: "Session finished" }),
+      "utf8"
+    );
+
+    const sTrans = run(root, ["search-transcript", "GraphQL schema", transFile]);
+    expect(sTrans.code).toBe(0);
+    expect(sTrans.stdout).toContain("Conversation Overview");
+    expect(sTrans.stdout).toContain("Fixing GraphQL schema caching bug");
+
+    cleanup(root);
+  });
 });

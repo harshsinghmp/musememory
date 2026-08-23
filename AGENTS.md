@@ -4,7 +4,7 @@
 > **Binary Names**: `memory` (primary), `musememory` (alias), `npx musememory` (zero-install)  
 > **Storage Locations**: Local `.memory/` (per project) and Global `~/.memory/` (user-wide)  
 > **MCP Protocol**: MCP 2024-11-05 (stdio transport)  
-> **Test Suite**: 118 passing tests across 20 test suites  
+> **Test Suite**: 128 passing tests across 22 test suites  
 
 ---
 
@@ -36,6 +36,7 @@ Muse Memory is a zero-daemon, file-backed cognitive memory engine designed to gi
 │                                                             │
 │  .memory/                                                   │
 │  ├── CURRENT.md         # Active hard constraints & open loops│
+│  ├── USER.md            # Persona & developer preferences     │
 │  ├── audit.jsonl        # Append-only operational audit trail│
 │  └── memories/                                              │
 │      ├── m_1700000001000_auth.yaml                          │
@@ -52,23 +53,30 @@ musememory/
 ├── bin/                    # Command-line entry points (memory.ts, musememory.ts)
 ├── src/                    # Core TypeScript source code
 │   ├── audit.ts            # Append-only compliance audit ledger
-│   ├── cli.ts              # Command dispatcher & formatting
+│   ├── cli.ts              # Command router & dispatcher
+│   ├── cli/                # Modular domain command handlers
+│   │   ├── ecosystem.ts    # Install, doctor, uninstall, init, connect, agents, migrate, ui
+│   │   ├── lifecycle.ts    # Propose, capture, confirm, supersede, stale, reject, delete, list, stats
+│   │   ├── persona.ts      # USER.md persona profile and CURRENT.md working constraints
+│   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, import-transcript
+│   │   └── shared.ts       # Flag parsing, root detection, and entry printing
 │   ├── connect.ts          # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine
 │   ├── graph.ts            # CodeGraph AST integration adapter
 │   ├── harvest.ts          # Chat/transcript distillation & JSON snapshot sync
 │   ├── mcp.ts              # Model Context Protocol stdio server
-│   ├── rank.ts             # Calibrated scoring & ranking re-exports
+│   ├── prompt.ts           # Interactive terminal select prompts & wizard
 │   ├── retrieval.ts        # Unified Context & Retrieval Engine with knapsack token budgeting
 │   ├── root.ts             # Hierarchical root detection & auto-bootstrap
 │   ├── schema.ts           # JSON Schema & store referential validator
-│   ├── search.ts           # Token search & retrieval delegation
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
 │   ├── sessions.ts         # Session timeline nodes & cognition graph
-│   ├── store.ts            # Dual-Scope MemoryStore atomic file storage & state machine
+│   ├── store.ts            # Dual-Scope MemoryStore with StorageLayout & state machine
+│   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & bookend search
 │   ├── types.ts            # Core TypeScript interfaces & enums
 │   ├── ui.ts               # Embedded zero-dependency visual graph server
+│   ├── user.ts             # Persona & working preference engine with 5 role archetypes
 │   ├── agents/             # Workstation coding agents detection & registry (80+ platforms)
 │   │   ├── detect.ts       # Pure TypeScript binary & config scanner
 │   │   ├── registry.ts     # Declarative metadata registry of 80+ agents
@@ -78,7 +86,7 @@ musememory/
 │       ├── engine.ts       # Orchestrator & state preservation mapper
 │       ├── types.ts        # Migrator interfaces & normalizers
 │       └── adapters/       # Specialized parsers (AgentMemory, Beads, Mem0, Letta, EverOS, etc.)
-├── test/                   # Comprehensive automated test suites (118 tests across 20 test suites)
+├── test/                   # Comprehensive automated test suites (128 tests across 22 test suites)
 ├── scripts/                # Distribution & installation scripts (install.sh)
 ├── package.json            # Package metadata, dependencies, and bin declarations
 └── README.md               # User documentation & quick start guide
@@ -162,18 +170,46 @@ Agents must choose the correct storage scope based on knowledge generality:
 
 ---
 
+## 👤 Persona & Working Preference Engine (`USER.md`)
+
+Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in the user's role, communication style, and toolchain rules.
+
+### 5 Clean Archetypes:
+1. **`developer`**: Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. **`marketer`**: Conversion-rate optimization (CRO), punchy copy, SEO clustering, audience hooks.
+4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
+5. **`custom`**: Clean blank template for custom instructions.
+
+### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
+When `get_context` or `formatPromptContext()` builds the context for the agent, it orders information deterministically:
+1. `### User Profile & Preferences (USER.md)`
+2. `### Active Working Constraints (CURRENT.md)`
+3. `### Relevant Memories & Learned Patterns` (Top-$K$ ranked memories)
+4. `*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`
+
+---
+
+## 📜 Full-Text Transcript Search with Conversation Bookends
+
+In addition to knowledge distillation, agents can perform full-text searches over raw `.jsonl` conversation transcripts using `memory_search_transcripts` or `memory search-transcript <query> [file.jsonl]`. Results include:
+- **Conversation Bookends**: The initial user prompt + concluding turn.
+- **Context Window**: $N$ dialogue turns immediately preceding and following every matched turn.
+
+---
+
 ## 🛡️ Vibeguard Zero-Leakage Policy for Agents
 
 Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.ts`](src/secrets.ts)) that guards every write transaction:
 
-1. **Auto-Interception**: `store.propose`, `store.save`, `importSnapshot`, and `importTranscript` automatically scan content and throw immediately if a secret is detected.
+1. **Auto-Interception**: `store.propose`, `store.save`, `setUserProfile`, `importSnapshot`, and `importTranscript` automatically scan content and throw immediately if a secret is detected.
 2. **Blocked Patterns**:
    - OpenAI / Anthropic / AI API keys (`sk-...`, `sk-proj-...`)
    - GitHub Personal Access Tokens (`ghp_...`, `gho_...`, `github_pat_...`)
    - NPM tokens (`npm_...`)
    - AWS Access Key IDs (`AKIA...`, `ASIA...`)
    - Private Key blocks (`-----BEGIN ... PRIVATE KEY-----`)
-   - Database URIs (`postgres://user:pass@host:5432/db`)
+   - Database URIs (`postgres://[USER]:[PASS]@[HOST]:5432/[DB]`)
    - Hardcoded password assignments (`password = ...`, `api_key = ...`)
 3. **Agent Action**: If proposing memories from conversation transcripts, always sanitize credentials as `[REDACTED_SECRET]` before proposing.
 
@@ -183,8 +219,11 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 
 | MCP Tool | Execution Phase | Agent Purpose |
 |---|---|---|
-| `get_context` | **Session Start** | Load Top-$K$ relevant memories and active constraints before writing any code. |
+| `get_context` | **Session Start** | Load Top-$K$ relevant memories, USER.md profile, and active constraints before writing any code. |
 | `search` | **Investigation** | Query knowledge base with token budget, status, and type filtering. |
+| `memory_get_user_profile` | **Context Loading** | Read active `USER.md` profile and preferences. |
+| `memory_set_user_profile` | **Preferences** | Update `USER.md` profile with inline secret defense. |
+| `memory_search_transcripts` | **History Search** | Search past `.jsonl` transcripts with conversation bookends and surrounding context. |
 | `memory_capture` | **During Fixes** | Propose a new memory unit with inline Vibeguard secret inspection. |
 | `memory_confirm` | **Decision Approval** | Promote candidate insight to confirmed status. |
 | `memory_supersede` | **Refactoring** | Mark outdated knowledge superseded by a confirmed replacement. |
@@ -210,7 +249,7 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 All modifications must pass the full test suite and TypeScript validation before committing:
 
 ```bash
-bun test          # 118 passing tests across 20 test suites
+bun test          # 128 passing tests across 22 test suites
 bunx tsc --noEmit # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
