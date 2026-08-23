@@ -330,64 +330,34 @@ export function connectAgent(
 
 /**
  * Convenience named exports for specific agents.
+ * Each binds an exported name to its AGENT_REGISTRY id; all wiring
+ * (config path, format, server-entry shape) comes from registry metadata
+ * via connectAgent → wireAgentFormat.
  */
-export function connectClaudeCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("claude-code", home, options)[0];
+function makeNamedConnector(agentId: string) {
+  return (home: string = homedir(), options: ConnectOptions = {}): ConnectReport =>
+    connectAgent(agentId, home, options)[0];
 }
-export function connectCursor(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("cursor", home, options)[0];
-}
-export function connectAntigravity(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("antigravity", home, options)[0];
-}
-export function connectWindsurf(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("windsurf", home, options)[0];
-}
-export function connectCodex(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("codex", home, options)[0];
-}
-export function connectGeminiCli(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("gemini-cli", home, options)[0];
-}
-export function connectHermes(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("hermes", home, options)[0];
-}
-export function connectOpenCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("opencode", home, options)[0];
-}
-export function connectGoose(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("goose", home, options)[0];
-}
-export function connectAider(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("aider", home, options)[0];
-}
-export function connectOpenClaw(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("openclaw", home, options)[0];
-}
-export function connectClawCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("claw-code", home, options)[0];
-}
-export function connectPi(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("pi", home, options)[0];
-}
-export function connectOpenHands(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("openhands", home, options)[0];
-}
-export function connectOpenInterpreter(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("open-interpreter", home, options)[0];
-}
-export function connectContinue(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("continue", home, options)[0];
-}
-export function connectCrush(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("crush", home, options)[0];
-}
-export function connectRooCode(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("roo-code", home, options)[0];
-}
-export function connectCline(home: string = homedir(), options: ConnectOptions = {}): ConnectReport {
-  return connectAgent("cline", home, options)[0];
-}
+
+export const connectClaudeCode = makeNamedConnector("claude-code");
+export const connectCursor = makeNamedConnector("cursor");
+export const connectAntigravity = makeNamedConnector("antigravity");
+export const connectWindsurf = makeNamedConnector("windsurf");
+export const connectCodex = makeNamedConnector("codex");
+export const connectGeminiCli = makeNamedConnector("gemini-cli");
+export const connectHermes = makeNamedConnector("hermes");
+export const connectOpenCode = makeNamedConnector("opencode");
+export const connectGoose = makeNamedConnector("goose");
+export const connectAider = makeNamedConnector("aider");
+export const connectOpenClaw = makeNamedConnector("openclaw");
+export const connectClawCode = makeNamedConnector("claw-code");
+export const connectPi = makeNamedConnector("pi");
+export const connectOpenHands = makeNamedConnector("openhands");
+export const connectOpenInterpreter = makeNamedConnector("open-interpreter");
+export const connectContinue = makeNamedConnector("continue");
+export const connectCrush = makeNamedConnector("crush");
+export const connectRooCode = makeNamedConnector("roo-code");
+export const connectCline = makeNamedConnector("cline");
 
 /**
  * Remove memory MCP configuration from a specific agent config.
