@@ -1,4 +1,4 @@
-# 🧠 Muse Memory
+# <h1> 🧠 Muse Memory</h1>
 
 <div align="center">
 
@@ -92,6 +92,79 @@ memory doctor           # Comprehensive system health check
 memory connect --all    # Auto-wire all detected AI coding agents
 memory briefing         # Summarize active knowledge & constraints
 ```
+
+---
+
+## 🔄 Complete NPX Lifecycle (Install → Verify → Uninstall)
+
+Every command below works with **zero installation** via `npx musememory <cmd>` (or `bunx musememory <cmd>`). Swap in plain `memory <cmd>` if you did a global install.
+
+### 1️⃣ Install & Auto-Wire
+
+```bash
+# Full setup: init .memory/, detect agents, wire MCP, scan for migratable stores
+npx musememory install
+
+# Initialize a workspace only (no agent wiring)
+npx musememory init
+```
+
+### 2️⃣ Verify Installation
+
+```bash
+# Ecosystem health diagnostic (storage, agents, MCP wiring)
+npx musememory doctor
+
+# Smoke-test the store
+npx musememory stats
+npx musememory briefing
+```
+
+### 3️⃣ Connect Agents
+
+```bash
+# Scan workstation for 80+ coding agents
+npx musememory agents
+
+# Auto-wire all detected agents (zero permissions)
+npx musememory connect all
+
+# Wire one specific agent
+npx musememory connect claude-code
+
+# Re-wire / repair configs that were edited or deleted
+npx musememory connect all --force
+```
+
+### 4️⃣ Uninstall (Clean Removal)
+
+```bash
+# Preview what would be unwired
+npx musememory uninstall --dry-run
+
+# Unwire MCP from all agents (keeps .memory/ data)
+npx musememory uninstall
+
+# Unwire AND purge project .memory/ data
+npx musememory uninstall --purge
+
+# Remove a persistent global install (if you used Option A above)
+npm uninstall -g musememory    # or: bun remove -g musememory
+rm -f ~/.local/bin/memory ~/.local/bin/musememory
+```
+
+### 🛠️ Troubleshooting
+
+| Symptom | Check | Fix |
+|---|---|---|
+| `command not found: memory` | You skipped global install, or `~/.local/bin` is not on PATH | Use `npx musememory <cmd>` instead, or add `~/.local/bin` to PATH |
+| `npx` hangs or prompts to install | Package not cached yet | Confirm prompt with `y`, or pre-install: `npm install -g musememory` |
+| Bun vs npm mismatch / broken binary | `which memory` points at stale symlink | `rm -f ~/.local/bin/memory ~/.local/bin/musememory`, reinstall via npm/bun |
+| Agent doesn't show the MCP server | Run `npx musememory doctor` and re-check agent config | `npx musememory connect <agent> --force` to rewrite config |
+| MCP configured but tools missing | Agent session started before wiring | Restart the agent session so it reloads MCP config |
+| Permission errors during connect/uninstall | Config files owned by another user | Fix ownership of the agent config dir, then retry |
+| Store seems empty / wrong scope | You may be in a subdirectory; root detection walks up | Run from project root, or set an explicit dir: `npx musememory stats <dir>` |
+| Stale/partial install after upgrade | Old dist cached by npx | Clear npx cache (`npx clear-npx-cache`) or reinstall globally |
 
 ---
 

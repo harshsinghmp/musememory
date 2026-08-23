@@ -60,19 +60,23 @@ musememory/
 │   │   ├── persona.ts      # USER.md persona profile and CURRENT.md working constraints
 │   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, import-transcript
 │   │   └── shared.ts       # Flag parsing, root detection, and entry printing
-│   ├── connect.ts          # Declarative zero-permission auto-wiring across 80+ agent platforms
+│   ├── commands/            # Shared command core (single seam for CLI + MCP)
+│   │   ├── lifecycle.ts     # Propose, supersede, confirm, link, stale, reject, delete ops
+│   │   └── retrieval.ts     # Harvest distillation loop
+│   ├── connect.ts           # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine
 │   ├── graph.ts            # CodeGraph AST integration adapter
-│   ├── harvest.ts          # Chat/transcript distillation & JSON snapshot sync
+│   ├── harvest.ts          # Chat/transcript distillation (re-exports snapshot fns)
 │   ├── mcp.ts              # Model Context Protocol stdio server
 │   ├── prompt.ts           # Interactive terminal select prompts & wizard
 │   ├── retrieval.ts        # Unified Context & Retrieval Engine with knapsack token budgeting
-│   ├── root.ts             # Hierarchical root detection & auto-bootstrap
+│   ├── root.ts             # Hierarchical root detection & auto-bootstrap (shared memory-dir path helpers)
 │   ├── schema.ts           # JSON Schema & store referential validator
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
 │   ├── sessions.ts         # Session timeline nodes & cognition graph
-│   ├── store.ts            # Dual-Scope MemoryStore with StorageLayout & state machine
+│   ├── snapshot.ts         # Portable JSON memory snapshot export/import
+│   ├── store.ts            # Dual-scope storage layout, lifecycle state machine & free-fn ops (MemoryStore class = deprecated shim)
 │   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & bookend search
 │   ├── types.ts            # Core TypeScript interfaces & enums
 │   ├── ui.ts               # Embedded zero-dependency visual graph server
