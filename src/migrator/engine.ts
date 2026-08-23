@@ -1,5 +1,5 @@
 import type { Store } from "../store.ts";
-import { propose, save, list } from "../store.ts";
+import { propose, list, markStale, markSuperseded, addConstraint } from "../store.ts";
 import { detectProviders } from "./detect.ts";
 import { AgentMemoryAdapter } from "./adapters/agentmemory.ts";
 import { BeadsAdapter } from "./adapters/beads.ts";
@@ -11,16 +11,9 @@ import { SupermemoryAdapter } from "./adapters/supermemory.ts";
 import { GenericAdapter } from "./adapters/generic.ts";
 import { scanSecrets, redactSecrets } from "../secrets.ts";
 import { getCurrent, setCurrent } from "../current.ts";
+import { workspaceRootFor } from "../root.ts";
 import { recordAuditEvent } from "../audit.ts";
-import { dirname } from "node:path";
 import type { MigrationOptions, MigrationReport, MigrationProviderReport, ProviderAdapter, MigratedRecord } from "./types.ts";
-
-function getWorkspaceRoot(dir: string): string {
-  if (dir.endsWith(".memory") || dir.endsWith(".musememory") || dir.endsWith(".muse-memory")) {
-    return dirname(dir);
-  }
-  return dir;
-}
 
 const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   agentmemory: AgentMemoryAdapter,
@@ -46,7 +39,7 @@ export async function runMigration(
   memoryDir: string,
   options: MigrationOptions = {}
 ): Promise<MigrationReport> {
-  const workspaceRoot = getWorkspaceRoot(memoryDir || store.dir);
+  const workspaceRoot = workspaceRootFor(memoryDir || store.dir);
   const detected = detectProviders(workspaceRoot);
   const provFilter = options.provider?.toLowerCase();
   const targetProviders = provFilter
@@ -122,12 +115,12 @@ export async function runMigration(
         }
 
         if (record.isConstraint) {
-          // Append active working constraint / persona to CURRENT.md
+          // Append active working constraint / persona to CURRENT.md (audited via addConstraint)
           if (!options.dryRun) {
             const currentLines = getCurrent(memoryDir);
             const line = `- [${provider.name}] ${record.title}: ${finalContent.replace(/[\r\n]+/g, " ")}`;
             if (!currentLines.includes(line)) {
-              setCurrent(memoryDir, line, record.project || options.project || "default");
+              addConstraint(memoryDir, line, record.project || options.project || "default");
             }
           }
           providerReport.constraintsCount++;
@@ -146,9 +139,13 @@ export async function runMigration(
               verification: record.verification,
             });
 
-            if (record.status === "superseded" || record.status === "stale") {
-              entry.status = record.status;
-              save(store, entry);
+            // Route archived source states through lifecycle transitions (audited per entry)
+            if (record.status === "superseded") {
+              markSuperseded(store, entry.id);
+              providerReport.supersededCount++;
+              report.totalSuperseded++;
+            } else if (record.status === "stale") {
+              markStale(store, entry.id);
               providerReport.supersededCount++;
               report.totalSuperseded++;
             }

@@ -6,6 +6,7 @@ import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent } from "./current.ts";
 import { getUserProfile, setUserProfile, initUserProfile } from "./user.ts";
+import { workspaceRootFor } from "./root.ts";
 import { queryContext, formatPromptContext, type ContextQueryOptions } from "./retrieval.ts";
 
 export interface StorageLayout {
@@ -19,9 +20,7 @@ export interface StorageLayout {
 
 export function getStorageLayout(memoryDir: string): StorageLayout {
   return {
-    root: memoryDir.endsWith(".memory") || memoryDir.endsWith(".musememory") || memoryDir.endsWith(".muse-memory")
-      ? join(memoryDir, "..")
-      : memoryDir,
+    root: workspaceRootFor(memoryDir),
     memoryDir,
     memoriesDir: join(memoryDir, "memories"),
     currentMd: join(memoryDir, "CURRENT.md"),
@@ -36,6 +35,11 @@ export interface Store {
   layout?: StorageLayout;
 }
 
+/**
+ * @deprecated Compatibility shim kept only for legacy tests. Production code must
+ * call the exported free functions (propose, confirm, supersede, ...) directly —
+ * this class adds no behavior beyond 1-line delegation.
+ */
 export class MemoryStore implements Store {
   readonly dir: string;
   readonly memoryDir?: string;
@@ -114,15 +118,7 @@ export class MemoryStore implements Store {
 
   addConstraint(text: string, project: string): string[] {
     if (!this.memoryDir) throw new Error("Cannot add constraint: memoryDir not configured");
-    const updated = setCurrent(this.memoryDir, text, project);
-    recordAuditEvent(this.memoryDir, {
-      operation: "propose",
-      entry_id: "CURRENT.md",
-      project,
-      actor: "agent",
-      details: { constraint: text },
-    });
-    return updated;
+    return addConstraint(this.memoryDir, text, project);
   }
 
   getAuditTrail(filter?: { operation?: string; entryId?: string; limit?: number }) {
@@ -143,6 +139,19 @@ export { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } f
 
 export function openStore(memoryDir: string): MemoryStore {
   return new MemoryStore(memoryDir);
+}
+
+/** Append a working constraint to CURRENT.md and record an audit event. */
+export function addConstraint(memoryDir: string, text: string, project: string): string[] {
+  const updated = setCurrent(memoryDir, text, project);
+  recordAuditEvent(memoryDir, {
+    operation: "propose",
+    entry_id: "CURRENT.md",
+    project,
+    actor: "agent",
+    details: { constraint: text },
+  });
+  return updated;
 }
 
 /** Safe slug from an id: keep [a-z0-9_-], trim leading/trailing dashes and underscores. */
@@ -374,6 +383,30 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
       entry_id: entry.id,
       project: entry.project,
       reason,
+    });
+  }
+  return entry;
+}
+
+/**
+ * Migration archive transition: candidate -> superseded for imported records whose
+ * source state was archived/superseded and which have no replacement pair in this
+ * store (pair-based supersessions must use supersede(oldId, newId)). Logs audit.
+ */
+export function markSuperseded(store: Store, id: string, reason?: string): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+  entry.status = "superseded";
+  if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
+  entry.updated_at = nowIso();
+  save(store, entry);
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "supersede",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: "migrator",
+      details: { reason: reason ?? "migrated archived state" },
     });
   }
   return entry;

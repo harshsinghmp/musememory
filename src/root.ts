@@ -1,8 +1,21 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 export type MarkerKind = "memory" | "git" | "global" | "env" | "auto" | null;
+
+/** Recognized memory storage directory names. */
+export const MEMORY_DIR_NAMES = [".memory", ".musememory", ".muse-memory"] as const;
+
+/** True when path points at a memory storage dir (.memory/.musememory/.muse-memory suffix). */
+export function isMemoryDirPath(path: string): boolean {
+  return MEMORY_DIR_NAMES.some((n) => path.endsWith(n));
+}
+
+/** Workspace root for a memory dir path (its parent); non-memory paths returned unchanged. */
+export function workspaceRootFor(memoryDir: string): string {
+  return isMemoryDirPath(memoryDir) ? dirname(memoryDir) : memoryDir;
+}
 
 export interface RootResult {
   root: string | null;
@@ -93,14 +106,7 @@ export function findOrCreateProjectRoot(
 
   const root = res.root ?? startDir;
   const memoryDirName =
-    res.memoryDirName ??
-    (existsSync(join(root, ".memory"))
-      ? ".memory"
-      : existsSync(join(root, ".musememory"))
-        ? ".musememory"
-        : existsSync(join(root, ".muse-memory"))
-          ? ".muse-memory"
-          : ".memory");
+    res.memoryDirName ?? MEMORY_DIR_NAMES.find((n) => existsSync(join(root, n))) ?? ".memory";
   const memoryDir = join(root, memoryDirName);
   const marker = res.marker ?? "auto";
   ensureMemoryDirectory(memoryDir);
