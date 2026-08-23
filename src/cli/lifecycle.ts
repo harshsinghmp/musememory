@@ -1,8 +1,17 @@
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-import { scanSecrets } from "../secrets.ts";
+import { list } from "../store.ts";
+import {
+  proposeMemory,
+  supersedeMemory,
+  confirmMemory,
+  linkMemory,
+  markStaleMemory,
+  rejectMemory,
+  deleteMemory,
+} from "../commands/lifecycle.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { validateStore } from "../schema.ts";
-import { exportSnapshot, importSnapshot } from "../harvest.ts";
+import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
 import { recordSessionStart, recordSessionEnd, findSession } from "../sessions.ts";
 import type { MemoryType } from "../types.ts";
@@ -25,18 +34,21 @@ export async function handleProposeCommand({ positional, flags }: ParsedArgs): P
   if (!text) return usageError("propose requires text");
   const project = flags["project"];
   if (!project) return usageError("propose requires --project");
-  const secrets = scanSecrets(`${flags["title"] ?? ""} ${text}`);
-  if (secrets.length > 0) return fail(`error: probable secret detected in propose text: ${secrets.join(", ")}`);
   const tags = flags["tags"] ? flags["tags"].split(",").map((t) => t.trim()).filter(Boolean) : undefined;
   const type = flags["type"] as MemoryType | undefined;
-  const entry = ctx.store.propose({
-    content: text,
-    project,
-    title: flags["title"],
-    tags,
-    type,
-    confirmed: flags["confirmed"] === "true",
-  });
+  let entry;
+  try {
+    entry = proposeMemory(ctx.store, {
+      content: text,
+      project,
+      title: flags["title"],
+      tags,
+      type,
+      confirmed: flags["confirmed"] === "true",
+    });
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`created ${entry.id}`);
   return 0;
 }
@@ -52,8 +64,11 @@ export async function handleLinkCommand({ positional, flags }: ParsedArgs): Prom
   const related = flags["related"];
   if (!id || !related) return usageError("link requires <id> --related <id,...>");
   const relatedIds = related.split(",").map((s) => s.trim()).filter(Boolean);
-  const entry = ctx.store.link(id, relatedIds);
-  if (!entry) return fail(`error: could not link ${id} (missing id or related id)`);
+  try {
+    linkMemory(ctx.store, id, relatedIds);
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`linked ${id} -> ${relatedIds.join(",")}`);
   return 0;
 }
@@ -63,8 +78,12 @@ export async function handleConfirmCommand({ positional, flags }: ParsedArgs): P
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("confirm requires an id");
-  const entry = ctx.store.confirm(id);
-  if (!entry) return fail(`error: no entry with id ${id}`);
+  let entry;
+  try {
+    entry = confirmMemory(ctx.store, id);
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`confirmed ${entry.id} -> confirmed`);
   return 0;
 }
@@ -75,8 +94,11 @@ export async function handleSupersedeCommand({ positional, flags }: ParsedArgs):
   const oldId = positional[0];
   const newId = flags["with"];
   if (!oldId || !newId) return usageError("supersede requires <id> --with <newId>");
-  const old = ctx.store.supersede(oldId, newId);
-  if (!old) return fail(`error: could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
+  try {
+    supersedeMemory(ctx.store, { oldId, newId });
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`superseded ${oldId} by ${newId}`);
   return 0;
 }
@@ -86,8 +108,12 @@ export async function handleMarkStaleCommand({ positional, flags }: ParsedArgs):
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("mark-stale requires an id");
-  const entry = ctx.store.markStale(id, flags["reason"]);
-  if (!entry) return fail(`error: no entry with id ${id}`);
+  let entry;
+  try {
+    entry = markStaleMemory(ctx.store, id, flags["reason"]);
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`marked ${entry.id} stale`);
   return 0;
 }
@@ -97,8 +123,12 @@ export async function handleRejectCommand({ positional, flags }: ParsedArgs): Pr
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("reject requires an id");
-  const entry = ctx.store.reject(id);
-  if (!entry) return fail(`error: no entry with id ${id}`);
+  let entry;
+  try {
+    entry = rejectMemory(ctx.store, id);
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`rejected ${entry.id}`);
   return 0;
 }
@@ -108,8 +138,11 @@ export async function handleDeleteCommand({ positional, flags }: ParsedArgs): Pr
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("delete requires <id>");
-  const ok = ctx.store.delete(id, flags["reason"], "cli_user");
-  if (!ok) return fail(`error: no entry with id ${id}`);
+  try {
+    deleteMemory(ctx.store, id, flags["reason"], "cli_user");
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
   console.log(`deleted entry ${id}`);
   return 0;
 }
@@ -219,7 +252,7 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
   const limit = parseInt(flags["limit"] ?? "5", 10) || 5;
-  const entries = ctx.store.list();
+  const entries = list(ctx.store);
   const counts: Record<string, number> = {};
   for (const e of entries) counts[e.status] = (counts[e.status] ?? 0) + 1;
   const recent = entries
@@ -260,7 +293,7 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
 export async function handleListCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  let entries = ctx.store.list();
+  let entries = list(ctx.store);
   if (flags["status"]) entries = entries.filter((e) => e.status === flags["status"]);
   if (flags["type"]) entries = entries.filter((e) => e.type === flags["type"]);
   if (flags["project"]) entries = entries.filter((e) => e.project === flags["project"]);
@@ -280,7 +313,7 @@ export async function handleListCommand({ flags }: ParsedArgs): Promise<number> 
 export async function handleStatsCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const entries = ctx.store.list();
+  const entries = list(ctx.store);
   const counts: Record<string, number> = {};
   const typeCounts: Record<string, number> = {};
   for (const e of entries) {
@@ -309,7 +342,7 @@ export async function handleStaleCommand({ flags }: ParsedArgs): Promise<number>
   if (!ctx) return 1;
   const daysOverride = flags["days"] ? parseInt(flags["days"], 10) : null;
   const now = Date.now();
-  const stale = ctx.store.list().filter((e) => {
+  const stale = list(ctx.store).filter((e) => {
     if (e.status !== "active") return false;
     const policy = stalePolicyDays(e.type);
     if (policy === null) return false;

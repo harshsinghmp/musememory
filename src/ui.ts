@@ -3,7 +3,7 @@ import type { Store } from "./store.ts";
 import { list, get, confirm, markStale, supersede, link, save, nowIso } from "./store.ts";
 import { getCurrent, setCurrent } from "./current.ts";
 import { validateStore } from "./schema.ts";
-import { exportSnapshot } from "./harvest.ts";
+import { exportSnapshot } from "./snapshot.ts";
 
 export interface UiServerOptions {
   port?: number;

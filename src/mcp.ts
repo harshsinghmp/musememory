@@ -5,13 +5,23 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot } from "./root.ts";
-import { openStore, get, propose, confirm, supersede, save, link, markStale, reject, deleteEntry } from "./store.ts";
+import { openStore, get, confirm, save, type Store } from "./store.ts";
+import {
+  proposeMemory,
+  supersedeMemory,
+  confirmMemory,
+  linkMemory,
+  markStaleMemory,
+  rejectMemory,
+  deleteMemory,
+} from "./commands/lifecycle.ts";
+import { harvestMemory } from "./commands/retrieval.ts";
 import { search, formatPromptContext } from "./retrieval.ts";
 import { recordSessionStart } from "./sessions.ts";
-import { scanSecrets } from "./secrets.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
-import { extractHarvestUnits, exportSnapshot, importSnapshot, importTranscript } from "./harvest.ts";
+import { importTranscript } from "./harvest.ts";
+import { exportSnapshot, importSnapshot } from "./snapshot.ts";
 import { searchTranscriptWithBookends } from "./transcript.ts";
 import { getUserProfile, setUserProfile } from "./user.ts";
 import { getGlobalMemoryDir } from "./root.ts";
@@ -421,15 +431,11 @@ export async function runMcpServer(): Promise<void> {
         });
       }
       case "memory_capture": {
-        const content = String(a.content);
-        const title = a.title ? String(a.title) : undefined;
-        const secrets = scanSecrets(`${title ?? ""} ${content}`);
-        if (secrets.length > 0) return toolError(`probable secret detected: ${secrets.join(", ")}`);
         try {
-          const entry = propose(store, {
-            content,
+          const entry = proposeMemory(store, {
+            content: String(a.content),
             project: String(a.project),
-            title,
+            title: a.title ? String(a.title) : undefined,
             tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
             type: a.type ? (String(a.type) as MemoryType) : undefined,
             confirmed: a.confirmed === true,
@@ -440,27 +446,11 @@ export async function runMcpServer(): Promise<void> {
         }
       }
       case "memory_harvest": {
-        const text = String(a.text);
-        const project = String(a.project);
-        const isConfirmed = a.confirmed === true;
-        const units = extractHarvestUnits(text);
-        const created: MemoryEntry[] = [];
-        for (const u of units) {
-          try {
-            const entry = propose(store, {
-              content: u.content,
-              project,
-              title: u.title,
-              tags: u.tags,
-              type: u.type,
-              confirmed: isConfirmed,
-              salience: u.salience,
-            });
-            created.push(entry);
-          } catch {
-            // Ignore skipped entries with errors
-          }
-        }
+        const created = harvestMemory(store, {
+          text: String(a.text),
+          project: String(a.project),
+          confirmed: a.confirmed === true,
+        });
         return toolResult({ harvested_count: created.length, entries: created });
       }
       case "memory_import_transcript": {
@@ -483,39 +473,33 @@ export async function runMcpServer(): Promise<void> {
         return toolResult(res.results.map((r) => ({ ...r.entry, score: r.score })));
       }
       case "memory_confirm": {
-        const entry = confirm(store, String(a.id));
-        if (!entry) return toolError(`could not confirm ${a.id} (not found or invalid status transition)`);
+        const entry = confirmMemory(store, String(a.id));
         return toolResult(entry);
       }
       case "memory_supersede": {
         const oldId = String(a.id);
         const newId = String(a.with ?? a.new_id ?? "");
         if (!newId) return toolError("memory_supersede requires 'with' or 'new_id' parameter");
-        const entry = supersede(store, oldId, newId);
-        if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
+        const entry = supersedeMemory(store, { oldId, newId });
         return toolResult(entry);
       }
       case "memory_link": {
         const related = Array.isArray(a.related) ? a.related.map(String) : [];
-        const entry = link(store, String(a.id), related);
-        if (!entry) return toolError(`could not link ${a.id} (missing id or related id)`);
+        const entry = linkMemory(store, String(a.id), related);
         return toolResult(entry);
       }
       case "memory_mark_stale": {
-        const entry = markStale(store, String(a.id), a.reason ? String(a.reason) : undefined);
-        if (!entry) return toolError(`no entry with id ${a.id}`);
+        const entry = markStaleMemory(store, String(a.id), a.reason ? String(a.reason) : undefined);
         return toolResult(entry);
       }
       case "memory_reject": {
-        const entry = reject(store, String(a.id));
-        if (!entry) return toolError(`no entry with id ${a.id}`);
+        const entry = rejectMemory(store, String(a.id));
         return toolResult(entry);
       }
       case "memory_delete": {
         const id = String(a.id);
         const reason = a.reason ? String(a.reason) : undefined;
-        const ok = deleteEntry(store, id, reason, "mcp_agent");
-        if (!ok) return toolError(`no entry found with id ${id}`);
+        deleteMemory(store, id, reason, "mcp_agent");
         return toolResult({ success: true, deleted_id: id });
       }
       case "memory_audit": {
@@ -536,13 +520,11 @@ export async function runMcpServer(): Promise<void> {
         return toolResult(res);
       }
       case "propose": {
-        const content = String(a.content);
-        const title = a.title ? String(a.title) : undefined;
         try {
-          const entry = propose(store, {
-            content,
+          const entry = proposeMemory(store, {
+            content: String(a.content),
             project: String(a.project),
-            title,
+            title: a.title ? String(a.title) : undefined,
             tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
             type: a.type ? (String(a.type) as MemoryType) : undefined,
             confirmed: a.confirmed === true,
