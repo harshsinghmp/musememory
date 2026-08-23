@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Harvest/Snapshot Separation**: Portable JSON snapshot export/import moved to `src/snapshot.ts`; `harvest.ts` keeps transcript distillation.
 
 ### Planned (Phase 3 & Beyond)
+- **Delete Deprecated `MemoryStore` Shim** *(target: October 2026)*: Remove the deprecated `MemoryStore` class from `src/store.ts` once its two remaining direct-method tests are migrated to free-function calls; free functions are already the sole production surface.
 - **Self-Evolving Skill Distillation**: Autonomous extraction of recurring multi-turn fix patterns into modular agent skill folders (`.agents/skills/`).
 - **3-Layer Progressive Disclosure**: Tiered context injection (`L1: Summary` ➔ `L2: Core Anchors` ➔ `L3: Full Raw State`).
 - **Bi-Temporal Reinforcement Feedback**: Recording valid/event time alongside system time with implicit +1/-1 reinforcement scores.
