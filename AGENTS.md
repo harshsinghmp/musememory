@@ -60,19 +60,23 @@ musememory/
 │   │   ├── persona.ts      # USER.md persona profile and CURRENT.md working constraints
 │   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, import-transcript
 │   │   └── shared.ts       # Flag parsing, root detection, and entry printing
-│   ├── connect.ts          # Declarative zero-permission auto-wiring across 80+ agent platforms
+│   ├── commands/            # Shared command core (single seam for CLI + MCP)
+│   │   ├── lifecycle.ts     # Propose, supersede, confirm, link, stale, reject, delete ops
+│   │   └── retrieval.ts     # Harvest distillation loop
+│   ├── connect.ts           # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine
 │   ├── graph.ts            # CodeGraph AST integration adapter
-│   ├── harvest.ts          # Chat/transcript distillation & JSON snapshot sync
+│   ├── harvest.ts          # Chat/transcript distillation (re-exports snapshot fns)
 │   ├── mcp.ts              # Model Context Protocol stdio server
 │   ├── prompt.ts           # Interactive terminal select prompts & wizard
 │   ├── retrieval.ts        # Unified Context & Retrieval Engine with knapsack token budgeting
-│   ├── root.ts             # Hierarchical root detection & auto-bootstrap
+│   ├── root.ts             # Hierarchical root detection & auto-bootstrap (shared memory-dir path helpers)
 │   ├── schema.ts           # JSON Schema & store referential validator
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
 │   ├── sessions.ts         # Session timeline nodes & cognition graph
-│   ├── store.ts            # Dual-Scope MemoryStore with StorageLayout & state machine
+│   ├── snapshot.ts         # Portable JSON memory snapshot export/import
+│   ├── store.ts            # Dual-scope storage layout, lifecycle state machine & free-fn ops (MemoryStore class = deprecated shim)
 │   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & bookend search
 │   ├── types.ts            # Core TypeScript interfaces & enums
 │   ├── ui.ts               # Embedded zero-dependency visual graph server
@@ -241,6 +245,16 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 | `memory_export` / `import` | **Team Sharing** | Export/import portable JSON memory snapshots. |
 | `memory_validate` | **Integrity Check** | Verify YAML schema conformity and referential integrity. |
 | `graph_status` | **AST Graph** | Inspect CodeGraph symbol overlap provider status. |
+
+---
+
+## 📋 Scope of Work Tracking & PR Workflow
+
+All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress` / `done`) and are mirrored in the README "Scope of Work & Roadmap" table.
+
+1. **No direct-to-main feature work**: every SOW item ships via a feature branch → pull request that references its issue (`Closes #N` in the PR body).
+2. **Status transitions**: flip the issue label to `in-progress` when a branch opens, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
+3. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
 
 ---
 

@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Shared Command Core (`src/commands/`)**: CLI and MCP now route lifecycle mutations (propose, supersede, confirm, link, mark-stale, reject, delete) and the harvest distillation loop through a single command core with structured results; adapters only parse args and format output. Duplicate MCP handler logic, double secret-scanning, and divergent error strings eliminated.
+- **Single Storage Interface**: Free functions in `src/store.ts` are now the sole production surface; the `MemoryStore` class is a deprecated compatibility shim.
+- **Migrator Respects Lifecycle State Machine**: Migration writes now flow through audited store transitions (`markSuperseded`, `markStale`, `addConstraint`) instead of raw status assignment — every migrated entry lands in `audit.jsonl`.
+- **Registry-Driven Connectors**: 19 near-identical `connectX()` wrappers collapsed into a factory over the agent registry metadata (468 → 439 LOC, zero behavior change).
+- **Deduplicated Root Detection**: Memory-dir suffix detection unified into one shared helper (`src/root.ts`) used by store, migrator, and root bootstrap.
+- **Harvest/Snapshot Separation**: Portable JSON snapshot export/import moved to `src/snapshot.ts`; `harvest.ts` keeps transcript distillation.
+
 ### Planned (Phase 3 & Beyond)
+- **Delete Deprecated `MemoryStore` Shim** *(target: October 2026)*: Remove the deprecated `MemoryStore` class from `src/store.ts` once its two remaining direct-method tests are migrated to free-function calls; free functions are already the sole production surface.
 - **Self-Evolving Skill Distillation**: Autonomous extraction of recurring multi-turn fix patterns into modular agent skill folders (`.agents/skills/`).
 - **3-Layer Progressive Disclosure**: Tiered context injection (`L1: Summary` ➔ `L2: Core Anchors` ➔ `L3: Full Raw State`).
 - **Bi-Temporal Reinforcement Feedback**: Recording valid/event time alongside system time with implicit +1/-1 reinforcement scores.

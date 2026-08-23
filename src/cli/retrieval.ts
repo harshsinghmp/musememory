@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { search } from "../retrieval.ts";
-import { extractHarvestUnits, importTranscript } from "../harvest.ts";
+import { importTranscript } from "../harvest.ts";
+import { harvestMemory } from "../commands/retrieval.ts";
 import { searchTranscriptWithBookends } from "../transcript.ts";
 import { DEFAULT_CONTEXT_LIMIT } from "../types.ts";
 import { requireRoot, printEntry, type ParsedArgs } from "./shared.ts";
@@ -85,25 +86,16 @@ export async function handleHarvestCommand({ positional, flags }: ParsedArgs): P
   const project = flags["project"];
   if (!project) return usageError("harvest requires --project");
   const rawText = existsSync(target) ? readFileSync(target, "utf8") : target;
-  const units = extractHarvestUnits(rawText);
-  if (units.length === 0) {
+  const created = harvestMemory(ctx.store, {
+    text: rawText,
+    project,
+    confirmed: flags["confirmed"] === "true",
+  });
+  if (created.length === 0) {
     console.log("no distinct harvest units identified");
     return 0;
   }
-  const isConfirmed = flags["confirmed"] === "true";
-  const createdIds: string[] = [];
-  for (const u of units) {
-    const entry = ctx.store.propose({
-      content: u.content,
-      project,
-      title: u.title,
-      tags: u.tags,
-      type: u.type,
-      confirmed: isConfirmed,
-    });
-    entry.salience = u.salience;
-    createdIds.push(entry.id);
-  }
+  const createdIds = created.map((e) => e.id);
   console.log(`harvested ${createdIds.length} memory units: ${createdIds.join(", ")}`);
   return 0;
 }
