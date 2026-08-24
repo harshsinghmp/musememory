@@ -136,6 +136,10 @@ export interface SearchOptions {
   project?: string;
   includeSuperseded?: boolean;
   type?: MemoryType | string;
+  /** Multi-type filter (SOW-106 agent contracts). */
+  types?: string[];
+  /** Entry must carry at least one of these tags (SOW-106 agent contracts). */
+  tags?: string[];
   status?: MemoryStatus | string;
   verified?: boolean;
   tokenBudget?: number;

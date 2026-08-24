@@ -21,6 +21,10 @@ export interface ContextQueryOptions extends SearchOptions {
   tokenBudget?: number;
   includeSuperseded?: boolean;
   type?: MemoryType | string;
+  /** Multi-type filter (SOW-106 agent contracts). */
+  types?: string[];
+  /** Entry must carry at least one of these tags (SOW-106 agent contracts). */
+  tags?: string[];
   status?: MemoryStatus | string;
    verified?: boolean;
    includeExpired?: boolean;
@@ -168,6 +172,12 @@ export function queryContext(
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
+  }
+  if (options.types?.length) {
+    entries = entries.filter((e) => e.type !== undefined && options.types!.includes(e.type));
+  }
+  if (options.tags?.length) {
+    entries = entries.filter((e) => (e.tags ?? []).some((t) => options.tags!.includes(t)));
   }
   if (options.status) {
     entries = entries.filter((e) => e.status === options.status);
