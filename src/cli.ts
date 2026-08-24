@@ -42,6 +42,7 @@ import {
   handleTraceCommand,
   handleLoopsCommand,
   handleDistillCommand,
+  handleVerifyCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
 
@@ -73,6 +74,7 @@ Core Memory Lifecycle Commands:
   trace <id> [--depth N]        Walk causal graph pathways from an entry (default depth 5)
   loops                         Prioritized open-loop report: git state, stale candidates, constraints
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
+  verify <id> [--timeout S]     Execute a fix entry's test_command; exit 0 promotes + independently verifies
   briefing [--limit N]          Executive summary of active, recurring, and stale memories
 
 Context & Retrieval Commands:
@@ -204,6 +206,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleLoopsCommand(parsed);
     case "distill":
       return handleDistillCommand(parsed);
+    case "verify":
+      return handleVerifyCommand(parsed);
     case "session":
       return handleSessionCommand(parsed);
 

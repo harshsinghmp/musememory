@@ -14,6 +14,7 @@ import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
 import { distillSkills } from "../distill.ts";
+import { verifyEntry } from "../verify.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -425,6 +426,19 @@ export async function handleDistillCommand({ flags }: ParsedArgs): Promise<numbe
   } catch (err: unknown) {
     return fail(err instanceof Error ? err.message : String(err));
   }
+}
+
+export async function handleVerifyCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const id = positional[0];
+  if (!id) return usageError("verify requires <id>");
+  const timeout = flags["timeout"] ? parseInt(flags["timeout"], 10) : undefined;
+  const result = await verifyEntry(ctx.store, ctx.root, ctx.memoryDir, id, { timeout });
+  if (result.stdout?.trim()) console.log(result.stdout.trim());
+  if (result.stderr?.trim()) console.error(result.stderr.trim());
+  console.log(`${result.ok ? "[pass]" : "[fail]"} ${result.message}`);
+  return result.ok ? 0 : 1;
 }
 
 export async function handleSessionCommand({ positional, flags }: ParsedArgs): Promise<number> {

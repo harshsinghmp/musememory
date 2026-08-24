@@ -172,6 +172,7 @@ export function propose(
     salience?: number;
     validFrom?: string;
     validTo?: string;
+    test_command?: string;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -208,6 +209,7 @@ export function propose(
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom,
     valid_to: opts.validTo,
+    test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
