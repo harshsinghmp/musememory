@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { openStore, propose, get, save } from "../src/store.ts";
-import { collectNudges, renderNudges } from "../src/nudge.ts";
+import { collectNudges, renderNudges, dueEntries } from "../src/nudge.ts";
+import type { MemoryEntry } from "../src/types.ts";
 import { makeTempRoot, cleanup } from "./helpers.ts";
 
 let roots: string[] = [];
@@ -17,6 +18,22 @@ function setup() {
 }
 
 const DAY = 86_400_000;
+
+function baseEntry(overrides: Partial<MemoryEntry> = {}): MemoryEntry {
+  const now = new Date().toISOString();
+  return {
+    id: "m_1700000000000_test",
+    title: "Test entry",
+    content: "test content",
+    project: "p",
+    status: "confirmed",
+    created_at: now,
+    updated_at: now,
+    source: "manual",
+    tags: [],
+    ...overrides,
+  } as MemoryEntry;
+}
 
 /** Backdate an entry's timestamps so staleness policy / candidate-age checks trigger. */
 function backdate(store: ReturnType<typeof openStore>, id: string, daysAgo: number) {
@@ -85,6 +102,23 @@ describe("SOW-101 memory nudge", () => {
 
     const report = collectNudges(store, root, `${root}/.memory`);
     expect(report.items.length).toBe(0);
+  });
+
+  test("dueEntries sorts ascending, drops far-future and dead statuses", () => {
+    const now = Date.now();
+    const mk = (due: string | undefined, status: MemoryEntry["status"] = "confirmed") =>
+      baseEntry({ due_at: due, status });
+    const entries = [
+      mk(new Date(now + 5 * DAY).toISOString()),
+      mk(new Date(now - DAY).toISOString()),
+      mk(new Date(now + 30 * DAY).toISOString()), // far future — dropped
+      mk(undefined), // no due — dropped
+      mk(new Date(now + 2 * DAY).toISOString(), "superseded"), // dead status — dropped
+    ];
+    const sorted = dueEntries(entries as never[], now);
+    expect(sorted.length).toBe(2);
+    expect(Date.parse(sorted[0].due_at!)).toBeLessThan(Date.parse(sorted[1].due_at!));
+    expect(Date.parse(sorted[0].due_at!)).toBeLessThan(now); // overdue first
   });
 
   test("renderNudges reports count and all-clear line", () => {

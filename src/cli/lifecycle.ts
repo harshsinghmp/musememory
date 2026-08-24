@@ -13,7 +13,7 @@ import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
-import { collectNudges, renderNudges } from "../nudge.ts";
+import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
 import { distillSkills } from "../distill.ts";
 import { verifyEntry } from "../verify.ts";
 import { validateStore } from "../schema.ts";
@@ -292,6 +292,15 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   if (staleByPolicy.length > 0) {
     console.log(`stale by policy:`);
     for (const e of staleByPolicy) printEntry(e, true);
+  }
+  const due = dueEntries(entries);
+  if (due.length > 0) {
+    console.log(`due / overdue:`);
+    for (const e of due) {
+      const days = Math.ceil((Date.parse(e.due_at!) - Date.now()) / 86_400_000);
+      const when = days < 0 ? `OVERDUE ${-days}d` : `due in ${days}d`;
+      console.log(`- ${e.id} [${e.status}] ${when} — ${e.title}`);
+    }
   }
   return 0;
 }

@@ -1,5 +1,6 @@
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
+import type { MemoryEntry } from "./types.ts";
 import { daysSince, stalePolicyDays } from "./retrieval.ts";
 import { collectLoops } from "./loops.ts";
 
@@ -19,6 +20,20 @@ export interface NudgeReport {
 const DUE_SOON_DAYS = 7;
 
 /**
+ * Overdue + due-soon entries (due_at within the next DUE_SOON_DAYS days),
+ * sorted by due date ascending. Superseded/rejected entries excluded.
+ */
+export function dueEntries(entries: MemoryEntry[], now: number = Date.now()): MemoryEntry[] {
+  return entries
+    .filter((e) => {
+      if (e.status === "superseded" || e.status === "rejected" || !e.due_at) return false;
+      const t = Date.parse(e.due_at);
+      return !Number.isNaN(t) && t <= now + DUE_SOON_DAYS * 86_400_000;
+    })
+    .sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+}
+
+/**
  * Proactive Nudge Scanner (SOW-101, read-only, deterministic):
  * - overdue / due-soon entries (due_at)
  * - confirmed/active entries past their per-type staleness policy
@@ -33,29 +48,25 @@ export function collectNudges(
 ): NudgeReport {
   const items: NudgeItem[] = [];
 
+  for (const e of dueEntries(list(store), now)) {
+    const days = (Date.parse(e.due_at!) - now) / 86_400_000;
+    if (days < 0) {
+      items.push({
+        severity: "overdue",
+        label: `overdue: ${e.id}`,
+        detail: `${e.title} (due ${e.due_at!.slice(0, 10)}, ${Math.floor(-days)}d ago)`,
+      });
+    } else {
+      items.push({
+        severity: "due-soon",
+        label: `due soon: ${e.id}`,
+        detail: `${e.title} (due in ${Math.ceil(days)}d)`,
+      });
+    }
+  }
+
   for (const e of list(store)) {
     if (e.status === "superseded" || e.status === "rejected") continue;
-
-    if (e.due_at) {
-      const t = Date.parse(e.due_at);
-      if (!Number.isNaN(t)) {
-        const days = (t - now) / 86_400_000;
-        if (days < 0) {
-          items.push({
-            severity: "overdue",
-            label: `overdue: ${e.id}`,
-            detail: `${e.title} (due ${e.due_at.slice(0, 10)}, ${Math.floor(-days)}d ago)`,
-          });
-        } else if (days <= DUE_SOON_DAYS) {
-          items.push({
-            severity: "due-soon",
-            label: `due soon: ${e.id}`,
-            detail: `${e.title} (due in ${Math.ceil(days)}d)`,
-          });
-        }
-      }
-    }
-
     const policy = stalePolicyDays(e.type);
     if (policy !== null && (e.status === "confirmed" || e.status === "active")) {
       const age = daysSince(e.valid_from ?? e.updated_at, now);
