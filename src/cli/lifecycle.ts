@@ -12,6 +12,7 @@ import {
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
+import { collectLoops, renderLoops } from "../loops.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -387,6 +388,14 @@ export async function handleTraceCommand({ positional, flags }: ParsedArgs): Pro
   const node = traceGraph(ctx.store, id, depth);
   if (!node) return fail(`error: no entry with id ${id}`);
   for (const line of renderTrace(node)) console.log(line);
+  return 0;
+}
+
+export async function handleLoopsCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const report = collectLoops(ctx.store, ctx.root, ctx.memoryDir);
+  for (const line of renderLoops(report)) console.log(line);
   return 0;
 }
 
