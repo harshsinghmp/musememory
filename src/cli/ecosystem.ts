@@ -333,3 +333,16 @@ export async function handleMcpCommand(): Promise<number> {
   await runMcpServer();
   return 0;
 }
+
+export async function handleDaemonCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const port = flags["port"] ? parseInt(flags["port"], 10) : 7878;
+  const { startHub } = await import("../daemon.ts");
+  const hub = await startHub(port, ctx.memoryDir);
+  console.log(`Agency hub listening on ${hub.url}`);
+  console.log(`Publish events: curl -X POST http://localhost:${hub.port}/publish -d '{"type":"agent.joined","payload":{"name":"me"}}'`);
+  return new Promise<number>(() => {
+    // Run until terminated; SIGINT/SIGTERM default handling tears down the server.
+  });
+}

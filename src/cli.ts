@@ -11,6 +11,7 @@ import {
   handleUiCommand,
   handleGraphCommand,
   handleMcpCommand,
+  handleDaemonCommand,
 } from "./cli/ecosystem.ts";
 import {
   handleContextCommand,
@@ -104,6 +105,7 @@ Ecosystem, Migration & Connectivity:
   validate [--dry-run]          Validate YAML schemas and referential integrity
   graph status                  Inspect CodeGraph AST provider status
   ui / dashboard [--port 3000]  Launch embedded visual knowledge graph UI
+  daemon [--port N]             Real-time agency hub (SSE event stream + publish API, default port 7878)
   mcp                           Run stdio MCP server for agent platforms
 `;
 
@@ -143,6 +145,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleGraphCommand(parsed);
     case "mcp":
       return handleMcpCommand();
+    case "daemon":
+      return handleDaemonCommand(parsed);
 
     // Context & Retrieval
     case "context":
