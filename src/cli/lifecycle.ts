@@ -10,6 +10,7 @@ import {
   deleteMemory,
 } from "../commands/lifecycle.ts";
 import { stalePolicyDays } from "../retrieval.ts";
+import { consolidateScenes } from "../consolidate.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -352,6 +353,27 @@ export async function handleStaleCommand({ flags }: ParsedArgs): Promise<number>
   });
   for (const e of stale) printEntry(e);
   console.log(`stale: ${stale.length} active entries not updated in ${daysOverride ?? "policy"} days`);
+  return 0;
+}
+
+export async function handleConsolidateCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const report = consolidateScenes(ctx.store, {
+    project: flags["project"],
+    dryRun: flags["dry-run"] === "true",
+  });
+  if (report.scenesCreated.length === 0 && report.skippedClusters.length === 0) {
+    console.log("No scene-worthy clusters found.");
+    return 0;
+  }
+  for (const s of report.scenesCreated) {
+    const id = s.id ? ` (${s.id})` : "";
+    console.log(`[scene]${id} ${s.title} <- ${s.members.join(", ")}`);
+  }
+  for (const sk of report.skippedClusters) {
+    console.log(`[skip] ${sk.reason}: ${sk.members.join(", ")}`);
+  }
   return 0;
 }
 

@@ -38,6 +38,7 @@ import {
   handleListCommand,
   handleStatsCommand,
   handleStaleCommand,
+  handleConsolidateCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
 
@@ -65,6 +66,7 @@ Core Memory Lifecycle Commands:
   list / ls [--status S] [--type T] [--project P] List memory entries with multi-field filtering
   stats                         Display total memory counts and status/type distribution
   stale [--days N]              List entries exceeding staleness policy
+  consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   briefing [--limit N]          Executive summary of active, recurring, and stale memories
 
 Context & Retrieval Commands:
@@ -188,6 +190,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleStatsCommand(parsed);
     case "stale":
       return handleStaleCommand(parsed);
+    case "consolidate":
+      return handleConsolidateCommand(parsed);
     case "session":
       return handleSessionCommand(parsed);
 

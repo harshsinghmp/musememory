@@ -17,6 +17,7 @@ import {
 } from "./commands/lifecycle.ts";
 import { harvestMemory } from "./commands/retrieval.ts";
 import { search, formatPromptContext } from "./retrieval.ts";
+import { consolidateScenes } from "./consolidate.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -389,6 +390,17 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_consolidate",
+        description: "Cluster confirmed memories into scene rollup entries (architecture summaries linked to members); idempotent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Restrict consolidation to one project" },
+            dry_run: { type: "boolean", description: "If true, reports clusters without writing scenes" },
+          },
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -590,6 +602,13 @@ export async function runMcpServer(): Promise<void> {
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }
+      }
+      case "memory_consolidate": {
+        const report = consolidateScenes(store, {
+          project: a.project ? String(a.project) : undefined,
+          dryRun: a.dry_run === true,
+        });
+        return toolResult(report);
       }
       case "graph_status": {
         const status = getGraphStatus(root);
