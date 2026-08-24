@@ -56,3 +56,6 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/extensions.json
+
+# Deepwork state (git-local)
+.slim/deepwork/

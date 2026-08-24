@@ -80,11 +80,11 @@
   <div class="container">
     <header>
       <div class="title-group">
-        <h1>🧠 Muse Memory vs 24 Agent Memory Providers</h1>
+        <h1>🧠 Muse Memory vs 29 Agent Memory Providers</h1>
         <p>Comprehensive Architectural Comparison, State Preservation Mapping & Autonomous Migrator Specification</p>
       </div>
       <div class="stats-bar">
-        <div class="stat-pill">Compared Providers: <span>24 + Muse Memory</span></div>
+        <div class="stat-pill">Compared Providers: <span>29 + Muse Memory</span></div>
         <div class="stat-pill">Migrator Engine: <span style="color:#10b981;">Live & Tested (107 Tests)</span></div>
         <div class="stat-pill">Zero Secret Exposure: <span style="color:#10b981;">Enforced via Vibeguard</span></div>
         <div class="stat-pill">CLI Migrator: <span style="color:#60a5fa;"><code>memory detect && memory migrate</code></span></div>
@@ -117,7 +117,7 @@
         <input type="text" id="searchInput" placeholder="Search provider, storage type, mapping, or keyword (e.g. SQLite, Markdown, Letta, Mem0)..." onkeyup="filterTable()">
       </div>
       <div class="filter-chips">
-        <div class="chip active" onclick="setCategory('all', this)">All (25)</div>
+        <div class="chip active" onclick="setCategory('all', this)">All (30)</div>
         <div class="chip" onclick="setCategory('local-file', this)">Local File-First</div>
         <div class="chip" onclick="setCategory('graph-rag', this)">Graph / Vector DB</div>
         <div class="chip" onclick="setCategory('agent-harness', this)">Agent Harness</div>
@@ -468,6 +468,70 @@
             <td><span class="badge badge-danger">Unbounded SQL Query</span></td>
             <td><span class="badge badge-warning">Requires Daemon</span></td>
             <td><span class="badge badge-success">Local Binary</span></td>
+          </tr>
+          <!-- 25. Mnemosyne -->
+          <tr data-category="local-file">
+            <td><a href="https://github.com/mnemosyne-oss/mnemosyne" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">25. Mnemosyne</a></td>
+            <td><span class="badge badge-purple">Local File-First</span></td>
+            <td>Single-File SQLite (<code>~/.hermes/mnemosyne</code>) + sqlite-vec/FTS5 Hybrid</td>
+            <td>Global User DB (BEAM 3-Tier)</td>
+            <td><code>importance + valid_until</code>; expired ➔ <code>stale</code>, consolidated ➔ <code>confirmed</code></td>
+            <td><span class="badge badge-warning">Hygiene Noise Scan</span></td>
+            <td><span class="badge badge-warning">Top-K Only</span></td>
+            <td><span class="badge badge-warning">Manual Config (8+ Guides)</span></td>
+            <td><span class="badge badge-success">100% Local</span></td>
+          </tr>
+
+          <!-- 26. Autocontext -->
+          <tr data-category="agent-harness">
+            <td><a href="https://github.com/greyhaven-ai/autocontext" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">26. Autocontext</a></td>
+            <td><span class="badge badge-warning">Agent Harness</span></td>
+            <td>Filesystem ContextBundles (<code>runs/</code> + <code>knowledge/</code>, SHA-256 digests)</td>
+            <td>Per-Scenario Knowledge Dirs</td>
+            <td>evidence-gated <code>proposed→active</code> ➔ <code>confirmed</code>, negative-result ledger ➔ <code>rejected</code></td>
+            <td><span class="badge badge-danger">None</span></td>
+            <td><span class="badge badge-danger">N/A (Eval Harness)</span></td>
+            <td><span class="badge badge-warning">MCP Serve / CLI / TUI</span></td>
+            <td><span class="badge badge-success">100% Local</span></td>
+          </tr>
+
+          <!-- 27. OpenViking -->
+          <tr data-category="graph-rag">
+            <td><a href="https://github.com/volcengine/OpenViking" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">27. OpenViking</a></td>
+            <td><span class="badge badge-info">Graph / Vector DB</span></td>
+            <td><code>viking://</code> Virtual FS w/ Tiered L0/L1/L2 Summaries (Server Daemon + Embeddings)</td>
+            <td>Server-Global Directory Tree</td>
+            <td>session-commit async extraction ➔ <code>confirmed</code>, retrieval trajectories logged</td>
+            <td><span class="badge badge-danger">None</span></td>
+            <td><span class="badge badge-success">Tiered Drill-Down (34–91% Savings)</span></td>
+            <td><span class="badge badge-warning">Desktop Helper Detect+Wiring</span></td>
+            <td><span class="badge badge-danger">Requires Daemon + Embeddings</span></td>
+          </tr>
+
+          <!-- 28. GBrain -->
+          <tr data-category="local-file">
+            <td><a href="https://github.com/garrytan/gbrain" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">28. GBrain</a></td>
+            <td><span class="badge badge-purple">Local File-First</span></td>
+            <td>Markdown Pages in Private GitHub Repo + PGLite Embedded Postgres</td>
+            <td>Private Repo Brain (Global)</td>
+            <td>cron "dream cycle" dedup/salience; per-page provenance ➔ <code>confirmed</code>/<code>superseded</code></td>
+            <td><span class="badge badge-warning">Scrubbed on Ingest</span></td>
+            <td><span class="badge badge-success">Cost Presets (conservative/balanced/tokenmax)</span></td>
+            <td><span class="badge badge-warning">Plugin Marketplace + MEMORY_VERBS Protocol</span></td>
+            <td><span class="badge badge-warning">Local-First (24/7 Daemon Design)</span></td>
+          </tr>
+
+          <!-- 29. Hindsight -->
+          <tr data-category="graph-rag">
+            <td><a href="https://github.com/vectorize-io/hindsight" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">29. Hindsight</a></td>
+            <td><span class="badge badge-info">Graph / Vector DB</span></td>
+            <td>Postgres + pgvector Banks (Embedded <code>pg0</code> or In-Process Option)</td>
+            <td>Banks per User/Agent/Project</td>
+            <td>consolidation ➔ evidence-backed observations (proof counts, refined-not-overwritten)</td>
+            <td><span class="badge badge-success">Memory Defense (45 Secret/PII Patterns)</span></td>
+            <td><span class="badge badge-success">4-Strategy RRF + Rerank, Token-Limit Trimmed</span></td>
+            <td><span class="badge badge-warning">npx Coding-Agents Wiring (12 CLIs)</span></td>
+            <td><span class="badge badge-warning">Embedded Option, Postgres Dep</span></td>
           </tr>
         </tbody>
       </table>
@@ -837,6 +901,106 @@
             <div class="label" style="margin-top:6px;">Mapping Rule:</div>
             is_archived: false ➔ confirmed<br>
             is_archived: true ➔ superseded
+          </div>
+        </div>
+
+        <!-- Mnemosyne -->
+        <div class="provider-card" data-category="local-file">
+          <div>
+            <div class="provider-card-header">
+              <div class="provider-card-title"><a href="https://github.com/mnemosyne-oss/mnemosyne" target="_blank">Mnemosyne</a></div>
+              <span class="badge badge-purple">Single-File SQLite</span>
+            </div>
+            <div class="provider-card-body">
+              Zero-daemon single-file SQLite memory (BEAM 3-tier: working/episodic/triple-store) with sqlite-vec + FTS5 hybrid search and recency-halflife decay.
+            </div>
+          </div>
+          <div class="migration-box">
+            <div class="label">Detection Path:</div>
+            ~/.hermes/mnemosyne/data<br>
+            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
+            high-importance / unexpired ➔ confirmed<br>
+            expired (valid_until passed) ➔ stale
+          </div>
+        </div>
+
+        <!-- Autocontext -->
+        <div class="provider-card" data-category="agent-harness">
+          <div>
+            <div class="provider-card-header">
+              <div class="provider-card-title"><a href="https://github.com/greyhaven-ai/autocontext" target="_blank">Autocontext</a></div>
+              <span class="badge badge-warning">Eval Harness</span>
+            </div>
+            <div class="provider-card-body">
+              Recursive self-improvement harness (not a memory system): immutable ContextBundles, evidence-gated promotion, negative-result ledgers.
+            </div>
+          </div>
+          <div class="migration-box">
+            <div class="label">Detection Path:</div>
+            knowledge/&lt;scenario&gt;/context_bundles/ | runs/&lt;run_id&gt;/<br>
+            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
+            active bundles ➔ confirmed<br>
+            negative_result.json entries ➔ rejected
+          </div>
+        </div>
+
+        <!-- OpenViking -->
+        <div class="provider-card" data-category="graph-rag">
+          <div>
+            <div class="provider-card-header">
+              <div class="provider-card-title"><a href="https://github.com/volcengine/OpenViking" target="_blank">OpenViking</a></div>
+              <span class="badge badge-info">Virtual FS Context DB</span>
+            </div>
+            <div class="provider-card-body">
+              ByteDance context database exposing memories/resources/skills as a <code>viking://</code> filesystem with tiered L0/L1/L2 summaries and directory drill-down retrieval. Requires server daemon + embedding provider.
+            </div>
+          </div>
+          <div class="migration-box">
+            <div class="label">Detection Path:</div>
+            ~/.openviking/ | openviking-server process<br>
+            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
+            session-committed memories ➔ confirmed<br>
+            pruned directories ➔ superseded
+          </div>
+        </div>
+
+        <!-- GBrain -->
+        <div class="provider-card" data-category="local-file">
+          <div>
+            <div class="provider-card-header">
+              <div class="provider-card-title"><a href="https://github.com/garrytan/gbrain" target="_blank">GBrain</a></div>
+              <span class="badge badge-purple">Markdown Repo Brain</span>
+            </div>
+            <div class="provider-card-body">
+              Markdown pages in a private GitHub repo as durable store + PGLite embedded Postgres index. Cron "dream cycle" (dedup/salience/contradictions), signal-detector open-loop extraction, gap-analysis briefings — ships the full proactive layer musememory plans (SOW-101/102/103).
+            </div>
+          </div>
+          <div class="migration-box">
+            <div class="label">Detection Path:</div>
+            gbrain repo clone | ~/.gbrain/<br>
+            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
+            live pages ➔ confirmed<br>
+            dream-cycle deduped/stale pages ➔ superseded
+          </div>
+        </div>
+
+        <!-- Hindsight -->
+        <div class="provider-card" data-category="graph-rag">
+          <div>
+            <div class="provider-card-header">
+              <div class="provider-card-title"><a href="https://github.com/vectorize-io/hindsight" target="_blank">Hindsight</a></div>
+              <span class="badge badge-info">Banked Postgres Memory</span>
+            </div>
+            <div class="provider-card-body">
+              Server-based memory in isolated banks (Postgres+pgvector, embedded pg0 or in-process option). Background consolidation into evidence-backed observations; Memory Defense scans every write against 45 secret/PII patterns.
+            </div>
+          </div>
+          <div class="migration-box">
+            <div class="label">Detection Path:</div>
+            hindsight bank endpoint | pg0 data dir<br>
+            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
+            observations w/ proof counts ➔ confirmed<br>
+            weakened/refined observations ➔ superseded
           </div>
         </div>
 
