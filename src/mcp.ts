@@ -21,6 +21,7 @@ import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
 import { distillSkills } from "./distill.ts";
+import { verifyEntry } from "./verify.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -435,6 +436,18 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_verify",
+        description: "Verification oracle: execute a fix entry's test_command; exit 0 promotes candidates to confirmed and stamps independently-verified",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Fix entry id carrying a test_command" },
+            timeout: { type: "number", description: "Command timeout in seconds (default 60)" },
+          },
+          required: ["id"],
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -663,6 +676,13 @@ export async function runMcpServer(): Promise<void> {
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }
+      }
+      case "memory_verify": {
+        const result = await verifyEntry(store, root, memoryDir, String(a.id), {
+          timeout: typeof a.timeout === "number" ? a.timeout : undefined,
+        });
+        if (!result.ok) return toolError(result.message);
+        return toolResult(result);
       }
       case "graph_status": {
         const status = getGraphStatus(root);

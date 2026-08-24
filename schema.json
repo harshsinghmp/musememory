@@ -38,6 +38,7 @@
     "last_confirmed_at": { "type": ["string", "null"], "format": "date-time" },
     "related_memory_ids": { "type": "array", "items": { "type": "string" } },
     "session_id": { "type": "string" },
+    "test_command": { "type": "string" },
     "recurring": {
       "type": "object",
       "required": ["interval"],

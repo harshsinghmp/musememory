@@ -75,6 +75,8 @@ export interface MemoryEntry {
   last_confirmed_at?: string | null;
   related_memory_ids?: string[];
   session_id?: string;
+  /** Executable verification command for the Verification Oracle (memory verify). */
+  test_command?: string;
   recurring?: Recurring;
   graph?: GraphMetadata;
 }
@@ -112,7 +114,8 @@ export type AuditOperation =
   | "delete"
   | "link"
   | "import"
-  | "transcript_import";
+  | "transcript_import"
+  | "verify";
 
 export interface AuditEntry {
   timestamp: string;
