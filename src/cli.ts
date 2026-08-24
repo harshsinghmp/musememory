@@ -22,6 +22,7 @@ import {
   handleSearchTranscriptCommand,
   handleHookCommand,
   handleHarvestAutoCommand,
+  handleReindexCommand,
 } from "./cli/retrieval.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import {
@@ -82,7 +83,8 @@ Core Memory Lifecycle Commands:
 
 Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context
-  search <query> [--limit N] [--token-budget N] Scored token retrieval
+  search <query> [--limit N] [--token-budget N] [--hybrid] Scored token retrieval (hybrid: offline vector+BM25 via index)
+  reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
   recall [query]                Search active/confirmed memories with filters
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
@@ -164,6 +166,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleHarvestAutoCommand(parsed);
     case "hook":
       return handleHookCommand(parsed);
+    case "reindex":
+      return handleReindexCommand(parsed);
     case "import-transcript":
     case "import-jsonl":
       return handleImportTranscriptCommand(parsed);

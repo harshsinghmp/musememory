@@ -22,6 +22,7 @@ import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
 import { distillSkills } from "./distill.ts";
 import { verifyEntry } from "./verify.ts";
+import { hybridSearch } from "./vector.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -85,6 +86,7 @@ export async function runMcpServer(): Promise<void> {
             limit: { type: "number" },
             token_budget: { type: "number", description: "Maximum token budget to consume" },
             include_superseded: { type: "boolean" },
+            hybrid: { type: "boolean", description: "Use the offline vector+BM25 index (requires 'memory reindex'); falls back to live scoring when absent" },
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
@@ -489,6 +491,20 @@ export async function runMcpServer(): Promise<void> {
         });
       }
       case "search": {
+        if (a.hybrid === true) {
+          const hybrid = hybridSearch(store, memoryDir, String(a.query), {
+            limit: typeof a.limit === "number" ? a.limit : 10,
+          });
+          if (hybrid) {
+            return toolResult({
+              results: hybrid.map((r) => ({ ...r.entry, score: r.score, cosine: r.cosine, bm25: r.bm25 })),
+              source: "hybrid",
+              stale: false,
+              total_tokens_used: 0,
+            });
+          }
+          // fall through to live scoring when no index exists
+        }
         const res = search(store, memoryDir, String(a.query), {
           limit: typeof a.limit === "number" ? a.limit : 10,
           tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
