@@ -13,6 +13,7 @@ import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
+import { collectNudges, renderNudges } from "../nudge.ts";
 import { distillSkills } from "../distill.ts";
 import { verifyEntry } from "../verify.ts";
 import { validateStore } from "../schema.ts";
@@ -399,6 +400,15 @@ export async function handleLoopsCommand({ flags }: ParsedArgs): Promise<number>
   const report = collectLoops(ctx.store, ctx.root, ctx.memoryDir);
   for (const line of renderLoops(report)) console.log(line);
   return 0;
+}
+
+export async function handleNudgeCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const report = collectNudges(ctx.store, ctx.root, ctx.memoryDir);
+  for (const line of renderNudges(report)) console.log(line);
+  // Exit code reflects nudge count (capped at 125 to stay a valid POSIX status).
+  return Math.min(report.items.length, 125);
 }
 
 export async function handleDistillCommand({ flags }: ParsedArgs): Promise<number> {
