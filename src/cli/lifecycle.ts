@@ -11,6 +11,7 @@ import {
 } from "../commands/lifecycle.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
+import { traceGraph, renderTrace } from "../trace.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -374,6 +375,18 @@ export async function handleConsolidateCommand({ flags }: ParsedArgs): Promise<n
   for (const sk of report.skippedClusters) {
     console.log(`[skip] ${sk.reason}: ${sk.members.join(", ")}`);
   }
+  return 0;
+}
+
+export async function handleTraceCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const id = positional[0];
+  if (!id) return usageError("trace requires <id>");
+  const depth = parseInt(flags["depth"] ?? "5", 10) || 5;
+  const node = traceGraph(ctx.store, id, depth);
+  if (!node) return fail(`error: no entry with id ${id}`);
+  for (const line of renderTrace(node)) console.log(line);
   return 0;
 }
 
