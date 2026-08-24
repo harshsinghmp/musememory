@@ -68,7 +68,7 @@ Core Memory Lifecycle Commands:
   briefing [--limit N]          Executive summary of active, recurring, and stale memories
 
 Context & Retrieval Commands:
-  context [query] [--limit N] [--token-budget N] Top-ranked prompt injection context
+  context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context
   search <query> [--limit N] [--token-budget N] Scored token retrieval
   recall [query]                Search active/confirmed memories with filters
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends

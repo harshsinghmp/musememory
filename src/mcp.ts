@@ -66,6 +66,7 @@ export async function runMcpServer(): Promise<void> {
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
+            depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Progressive disclosure tier: L1 = id+title lines, L2 = title+content+tags (default), L3 = full raw entry" },
           },
         },
       },
@@ -418,6 +419,7 @@ export async function runMcpServer(): Promise<void> {
           type: a.type ? String(a.type) : undefined,
           status: a.status ? String(a.status) : undefined,
           verified: a.verified === true,
+          depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
         });
         return toolResult({
           markdown: formatted.markdown,
