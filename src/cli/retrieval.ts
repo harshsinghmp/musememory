@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { search, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
+import { hybridSearch } from "../vector.ts";
 import { importTranscript } from "../harvest.ts";
 import { harvestMemory } from "../commands/retrieval.ts";
 import { installGitHook, harvestAuto } from "../hook.ts";
@@ -62,6 +63,23 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
   if (positional.length === 0) return usageError("search requires a query");
   const limit = parseInt(flags["limit"] ?? "10", 10) || 10;
   const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
+
+  // Hybrid vector+BM25 path (requires a built index)
+  if (flags["hybrid"] === "true") {
+    const hybrid = hybridSearch(ctx.store, ctx.memoryDir, positional[0], { limit });
+    if (!hybrid) {
+      console.error("no vector index found — run 'memory reindex' first; falling back to live scoring");
+    } else {
+      for (const r of hybrid) {
+        const badge = r.entry.status !== "active" ? ` [${r.entry.status}]` : "";
+        console.log(`- ${r.entry.id}${badge} score=${r.score.toFixed(3)} cos=${r.cosine.toFixed(3)} bm25=${r.bm25.toFixed(3)} (${r.entry.project}) ${r.entry.title}`);
+        console.log(`  ${r.entry.content}`);
+      }
+      console.log(`source=hybrid count=${hybrid.length}`);
+      return 0;
+    }
+  }
+
   const res = search(ctx.store, ctx.memoryDir, positional[0], {
     limit,
     tokenBudget,
@@ -147,6 +165,16 @@ export async function handleSearchTranscriptCommand({ positional, flags }: Parse
   const maxMatches = flags["max"] ? parseInt(flags["max"], 10) : 5;
   const res = searchTranscriptWithBookends(targetFile, query, { windowSize, maxMatches });
   console.log(res.formattedSummary);
+  return 0;
+}
+
+export async function handleReindexCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const { rebuildIndex, saveIndex } = await import("../vector.ts");
+  const index = rebuildIndex(ctx.store);
+  saveIndex(index, ctx.memoryDir);
+  console.log(`indexed ${Object.keys(index.entries).length} entries -> ${join(ctx.memoryDir, "index.json")}`);
   return 0;
 }
 
