@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { findOrCreateProjectRoot } from "../root.ts";
-import { openStore, MemoryStore } from "../store.ts";
+import { openStore, type Store } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
 
 export interface ParsedArgs {
@@ -36,7 +36,7 @@ export function parseFlags(args: string[]): ParsedArgs {
   return { positional, flags };
 }
 
-export function requireRoot(flags: Record<string, string> = {}): { root: string; memoryDir: string; store: MemoryStore } | null {
+export function requireRoot(flags: Record<string, string> = {}): { root: string; memoryDir: string; store: Store } | null {
   const isGlobal = flags["global"] === "true";
   const { root, memoryDir } = findOrCreateProjectRoot(process.cwd(), { global: isGlobal });
   return { root, memoryDir, store: openStore(memoryDir) };

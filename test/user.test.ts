@@ -10,7 +10,6 @@ import {
   ARCHETYPE_TEMPLATES,
   type UserArchetype,
 } from "../src/user.ts";
-import { openStore } from "../src/store.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "user-test-"));
@@ -75,12 +74,11 @@ describe("USER.md profile & preferences engine", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("MemoryStore methods getUserProfile and setUserProfile integrate seamlessly", () => {
+  test("setUserProfile and getUserProfile roundtrip through the store module", () => {
     const root = temp();
-    const store = openStore(root);
 
-    store.setUserProfile("# Developer Profile\n- Prefers TypeScript and Bun");
-    expect(store.getUserProfile()).toContain("Prefers TypeScript and Bun");
+    setUserProfile(root, "# Developer Profile\n- Prefers TypeScript and Bun");
+    expect(getUserProfile(root)).toContain("Prefers TypeScript and Bun");
 
     rmSync(root, { recursive: true, force: true });
   });

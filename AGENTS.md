@@ -76,7 +76,7 @@ musememory/
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
 │   ├── sessions.ts         # Session timeline nodes & cognition graph
 │   ├── snapshot.ts         # Portable JSON memory snapshot export/import
-│   ├── store.ts            # Dual-scope storage layout, lifecycle state machine & free-fn ops (MemoryStore class = deprecated shim)
+│   ├── store.ts            # Dual-scope storage layout, lifecycle state machine & free-fn ops
 │   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & bookend search
 │   ├── types.ts            # Core TypeScript interfaces & enums
 │   ├── ui.ts               # Embedded zero-dependency visual graph server
