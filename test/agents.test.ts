@@ -90,6 +90,8 @@ describe("80+ coding agent baseline registry & smart auto-detection", () => {
 
   test("connectGoose and connectOpenClaw wire MCP configurations properly", () => {
     const home = temp();
+    mkdirSync(join(home, ".config", "goose"), { recursive: true });
+    mkdirSync(join(home, ".openclaw"), { recursive: true });
     
     // Goose
     const gooseReport = connectGoose(home);

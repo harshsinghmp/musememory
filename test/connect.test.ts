@@ -9,14 +9,26 @@ function temp(): string {
 }
 
 describe("multi-agent connect and zero-permission auto-wiring", () => {
-  test("connectClaudeCode writes mcp config and auto-approves all memory tools", () => {
+  test("connectClaudeCode wires mcp config without creating .claude folder when absent", () => {
     const home = temp();
     const report = connectClaudeCode(home);
     expect(report.agent).toBe("claude-code");
-    expect(report.permissionAutoApproved).toBe(true);
+    expect(report.permissionAutoApproved).toBe(false);
 
     const claudeJson = JSON.parse(readFileSync(join(home, ".claude.json"), "utf8"));
     expect(claudeJson.mcpServers.memory.command).toBe("memory");
+
+    // Zero-folder-creation policy: no .claude directory may be fabricated.
+    expect(existsSync(join(home, ".claude"))).toBe(false);
+
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  test("connectClaudeCode auto-approves tools only into existing .claude settings", () => {
+    const home = temp();
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    const report = connectClaudeCode(home);
+    expect(report.permissionAutoApproved).toBe(true);
 
     const settingsJson = JSON.parse(readFileSync(join(home, ".claude", "settings.json"), "utf8"));
     expect(Array.isArray(settingsJson.allowedTools)).toBe(true);
@@ -27,8 +39,9 @@ describe("multi-agent connect and zero-permission auto-wiring", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  test("connectCursor configures mcp.json with autoApprove", () => {
+  test("connectCursor updates existing .cursor dir without creating it", () => {
     const home = temp();
+    mkdirSync(join(home, ".cursor"), { recursive: true });
     const report = connectCursor(home);
     expect(report.agent).toBe("cursor");
     expect(report.permissionAutoApproved).toBe(true);
@@ -36,6 +49,16 @@ describe("multi-agent connect and zero-permission auto-wiring", () => {
     const cursorMcp = JSON.parse(readFileSync(join(home, ".cursor", "mcp.json"), "utf8"));
     expect(cursorMcp.mcpServers.memory.command).toBe("memory");
     expect(cursorMcp.autoApprove).toContain("memory");
+
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  test("connect skips agents whose config directories do not exist", () => {
+    const home = temp();
+    const report = connectCursor(home);
+    expect(report.updated).toBe(false);
+    expect(existsSync(join(home, ".cursor"))).toBe(false);
+    expect(report.message).toContain("--force");
 
     rmSync(home, { recursive: true, force: true });
   });
@@ -63,7 +86,7 @@ describe("multi-agent connect and zero-permission auto-wiring", () => {
 
   test("dryRun does not write files to disk", () => {
     const home = temp();
-    const reports = connectAgent("claude-code", home, { dryRun: true });
+    const reports = connectAgent("claude-code", home, { dryRun: true, force: true });
     expect(reports[0].updated).toBe(true);
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
     expect(existsSync(join(home, ".claude", "settings.json"))).toBe(false);

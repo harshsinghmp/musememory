@@ -100,6 +100,20 @@ function wireAgentFormat(
 ): ConnectReport {
   const configPath = resolveAgentConfigFile(agent, home, foundConfig);
 
+  // Zero-folder-creation policy: never materialize config directories that do
+  // not already exist. Only --force explicitly opts in to creating them.
+  if (!options.force && !existsSync(configPath) && !existsSync(dirname(configPath))) {
+    return {
+      agent: agent.id,
+      agentName: agent.name,
+      configPath,
+      updated: false,
+      installed: false,
+      permissionAutoApproved: false,
+      message: `Skipped ${agent.name}: no existing config at ${configPath} (use --force to create it)`,
+    };
+  }
+
   try {
     switch (agent.mcpFormat) {
     case "claude-json": {
@@ -110,6 +124,20 @@ function wireAgentFormat(
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
       mcpConfig.mcpServers.memory = { command: "memory", args: ["mcp"] };
       safeWriteJson(claudeJsonPath, mcpConfig, options.dryRun);
+
+      // Never fabricate the .claude/ directory: only tighten permissions when
+      // the user's Claude settings already exist on disk.
+      if (!existsSync(settingsJsonPath) && !existsSync(join(home, ".claude"))) {
+        return {
+          agent: agent.id,
+          agentName: agent.name,
+          configPath: claudeJsonPath,
+          updated: true,
+          installed: true,
+          permissionAutoApproved: false,
+          message: `Wired MCP to ${claudeJsonPath} (skipped permission auto-approve: no existing .claude settings found)`,
+        };
+      }
 
       const settings = safeReadJson(settingsJsonPath);
       const existingAllowed = Array.isArray(settings.allowedTools) ? settings.allowedTools : [];
