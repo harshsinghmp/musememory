@@ -1,5 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { openStore, propose, confirm, supersede, markStale, reject, get, list, save, makeId, slugifyId, link } from "../src/store.ts";
+import { openStore, propose, confirm, supersede, markStale, reject, get, list, save, makeId, slugifyId, link, addConstraint, deleteEntry } from "../src/store.ts";
+import { getCurrent } from "../src/current.ts";
+import { getAuditTrail } from "../src/audit.ts";
+import { queryContext, formatPromptContext } from "../src/retrieval.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
 
 describe("store graph", () => {
@@ -172,43 +175,43 @@ describe("store graph", () => {
     cleanup(root);
   });
 
-  test("MemoryStore provides deep dual-scope constraints, audit, and retrieval methods", () => {
+  test("free functions provide deep dual-scope constraints, audit, and retrieval", () => {
     const { root, memoryDir } = setupFixtureRoot();
     const store = openStore(memoryDir);
 
     // 1. Dual-scope constraints
-    store.addConstraint("Max concurrency 5 workers", "worker-pool");
-    const constraints = store.getConstraints();
+    addConstraint(memoryDir, "Max concurrency 5 workers", "worker-pool");
+    const constraints = getCurrent(memoryDir);
     expect(constraints.length).toBe(1);
     expect(constraints[0]).toContain("Max concurrency 5 workers");
 
-    // 2. OOP propose & confirm
-    const entry = store.propose({
+    // 2. Propose & confirm
+    const entry = propose(store, {
       title: "Worker concurrency limit",
       content: "Ensure pool size does not exceed 5 workers.",
       project: "worker-pool",
       type: "constraint",
     });
     expect(entry.status).toBe("candidate");
-    store.confirm(entry.id);
-    expect(store.get(entry.id)!.status).toBe("confirmed");
+    confirm(store, entry.id);
+    expect(get(store, entry.id)!.status).toBe("confirmed");
 
     // 3. Audit trail integration
-    const audit = store.getAuditTrail();
+    const audit = getAuditTrail(memoryDir);
     expect(audit.length).toBeGreaterThan(0);
 
     // 4. Integrated retrieval and markdown formatting
-    const queryRes = store.query("workers concurrency", { project: "worker-pool" });
+    const queryRes = queryContext(store, "workers concurrency", { project: "worker-pool" });
     expect(queryRes.results.length).toBe(1);
     expect(queryRes.results[0].entry.id).toBe(entry.id);
 
-    const formatted = store.formatContext("workers concurrency", { project: "worker-pool" });
+    const formatted = formatPromptContext(store, memoryDir, "workers concurrency", { project: "worker-pool" });
     expect(formatted.markdown).toContain("Max concurrency 5 workers");
     expect(formatted.markdown).toContain("Worker concurrency limit");
 
     // 5. Delete
-    expect(store.delete(entry.id)).toBe(true);
-    expect(store.get(entry.id)).toBeNull();
+    expect(deleteEntry(store, entry.id)).toBe(true);
+    expect(get(store, entry.id)).toBeNull();
 
     cleanup(root);
   });

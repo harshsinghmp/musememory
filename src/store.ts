@@ -3,11 +3,10 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
-import { recordAuditEvent, getAuditTrail } from "./audit.ts";
+import { recordAuditEvent } from "./audit.ts";
 import { getCurrent, setCurrent } from "./current.ts";
 import { getUserProfile, setUserProfile, initUserProfile } from "./user.ts";
 import { workspaceRootFor } from "./root.ts";
-import { queryContext, formatPromptContext, type ContextQueryOptions } from "./retrieval.ts";
 
 export interface StorageLayout {
   root: string;
@@ -35,110 +34,13 @@ export interface Store {
   layout?: StorageLayout;
 }
 
-/**
- * @deprecated Compatibility shim kept only for legacy tests. Production code must
- * call the exported free functions (propose, confirm, supersede, ...) directly —
- * this class adds no behavior beyond 1-line delegation.
- */
-export class MemoryStore implements Store {
-  readonly dir: string;
-  readonly memoryDir?: string;
-  readonly layout: StorageLayout;
-
-  constructor(memoryDir: string) {
-    this.memoryDir = memoryDir;
-    this.layout = getStorageLayout(memoryDir);
-    this.dir = this.layout.memoriesDir;
-    mkdirSync(this.dir, { recursive: true });
-  }
-
-  get(id: string): MemoryEntry | null {
-    return get(this, id);
-  }
-
-  list(): MemoryEntry[] {
-    return list(this);
-  }
-
-  listIds(): string[] {
-    return listIds(this);
-  }
-
-  propose(opts: {
-    content: string;
-    project: string;
-    title?: string;
-    tags?: string[];
-    source?: string;
-    type?: MemoryType;
-    confirmed?: boolean;
-    verification?: Verification;
-    salience?: number;
-  }): MemoryEntry {
-    return propose(this, opts);
-  }
-
-  confirm(id: string): MemoryEntry | null {
-    return confirm(this, id);
-  }
-
-  supersede(oldId: string, newId: string): MemoryEntry | null {
-    return supersede(this, oldId, newId);
-  }
-
-  markStale(id: string, reason?: string): MemoryEntry | null {
-    return markStale(this, id, reason);
-  }
-
-  reject(id: string): MemoryEntry | null {
-    return reject(this, id);
-  }
-
-  delete(id: string, reason?: string, actor?: string): boolean {
-    return deleteEntry(this, id, reason, actor);
-  }
-
-  link(id: string, relatedIds: string[]): MemoryEntry | null {
-    return link(this, id, relatedIds);
-  }
-
-  getUserProfile(): string | null {
-    return getUserProfile(this.memoryDir);
-  }
-
-  setUserProfile(content: string): void {
-    if (!this.memoryDir) throw new Error("Cannot set user profile: memoryDir not configured");
-    setUserProfile(this.memoryDir, content);
-  }
-
-  getConstraints(): string[] {
-    if (!this.memoryDir) return [];
-    return getCurrent(this.memoryDir);
-  }
-
-  addConstraint(text: string, project: string): string[] {
-    if (!this.memoryDir) throw new Error("Cannot add constraint: memoryDir not configured");
-    return addConstraint(this.memoryDir, text, project);
-  }
-
-  getAuditTrail(filter?: { operation?: string; entryId?: string; limit?: number }) {
-    if (!this.memoryDir) return [];
-    return getAuditTrail(this.memoryDir, filter);
-  }
-
-  query(query: string = "", options?: ContextQueryOptions) {
-    return queryContext(this, query, options);
-  }
-
-  formatContext(query: string = "", options?: ContextQueryOptions) {
-    return formatPromptContext(this, this.memoryDir, query, options);
-  }
-}
-
 export { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
 
-export function openStore(memoryDir: string): MemoryStore {
-  return new MemoryStore(memoryDir);
+/** Open the memories directory for a memory dir, creating it if missing. */
+export function openStore(memoryDir: string): Store {
+  const layout = getStorageLayout(memoryDir);
+  mkdirSync(layout.memoriesDir, { recursive: true });
+  return { dir: layout.memoriesDir, memoryDir, layout };
 }
 
 /** Append a working constraint to CURRENT.md and record an audit event. */
