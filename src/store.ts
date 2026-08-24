@@ -164,6 +164,8 @@ export function propose(
     content: string;
     project: string;
     title?: string;
+    /** Deterministic id override (content-hash idempotent re-ingest). Must match ^m_[0-9]+_[a-z0-9_-]+$. */
+    id?: string;
     tags?: string[];
     source?: string;
     type?: MemoryType;
@@ -198,7 +200,7 @@ export function propose(
 
   const now = nowIso();
   const entry: MemoryEntry = {
-    id: makeId(opts.title ?? opts.content.slice(0, 60)),
+    id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
     title: (opts.title ?? opts.content.slice(0, 120)).slice(0, 120),
     content: opts.content,
     project: opts.project,
