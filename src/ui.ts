@@ -191,6 +191,12 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     .card-snippet { font-size: 12px; color: var(--text-muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     
     .main { flex: 1; display: flex; flex-direction: column; position: relative; }
+    .graph-controls { background: var(--panel); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+    .control-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+    .control-label { min-width: 60px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; }
+    #timelineSlider { flex: 1; max-width: 420px; accent-color: var(--accent); }
+    .cluster-check { display: inline-flex; align-items: center; gap: 4px; background: #21262d; border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; cursor: pointer; user-select: none; }
+    .cluster-check input { accent-color: var(--accent); cursor: pointer; }
     .graph-container { flex: 1; position: relative; background: #0d1117; }
     canvas { width: 100%; height: 100%; display: block; }
     
@@ -230,6 +236,14 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     </div>
     
     <div class="main">
+      <div class="graph-controls" id="graphControls">
+        <div class="control-row">
+          <span class="control-label">Timeline</span>
+          <input type="range" id="timelineSlider" min="0" max="1000" value="1000" />
+          <span class="control-label" id="timelineLabel">all</span>
+        </div>
+        <div class="control-row" id="clusterFilters"><span class="control-label">Clusters</span></div>
+      </div>
       <div class="graph-container">
         <canvas id="graphCanvas"></canvas>
       </div>
@@ -249,12 +263,24 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     let currentFilter = 'all';
     let searchQuery = '';
 
+    // ---- Graph state (3D force-directed) ----
+    const TYPE_COLORS = { fix: '#3fb950', decision: '#58a6ff', constraint: '#f85149', failure: '#d29922', architecture: '#bc8cff', operation: '#39c5cf', preference: '#f778ba', discovery: '#8b949e', session: '#6e7681' };
+    let nodes3d = [];       // { id, title, type, status, x, y, z, degree, visible }
+    let edges3d = [];       // [fromIndex, toIndex]
+    let rotX = 0.35, rotY = 0, zoom = 1;
+    let dragging = false, dragMoved = false, lastX = 0, lastY = 0;
+    let hiddenClusters = new Set();
+    let timelineCutoff = null; // ISO string; null = all
+    let simAlpha = 1;
+
     async function loadData() {
       try {
         const res = await fetch('/api/memories');
         allMemories = await res.json();
         renderList();
-        renderGraph();
+        initGraph();
+        buildClusterFilters();
+        if (!graphLoopStarted) { graphLoopStarted = true; requestAnimationFrame(tick); }
       } catch (err) {
         console.error('Failed to load memories:', err);
       }
@@ -263,7 +289,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     function renderList() {
       const container = document.getElementById('memoryList');
       container.innerHTML = '';
-      
+
       const filtered = allMemories.filter(m => {
         if (currentFilter !== 'all' && m.type !== currentFilter) return false;
         if (searchQuery) {
@@ -294,17 +320,18 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       const pane = document.getElementById('detailPane');
       pane.classList.add('open');
       document.getElementById('dTitle').textContent = m.title;
-      
+
       const meta = document.getElementById('dMeta');
       meta.innerHTML = \`
         <span class="meta-tag">ID: \${m.id}</span>
         <span class="meta-tag">Status: \${m.status}</span>
         <span class="meta-tag">Salience: \${m.salience || 0.5}</span>
         <span class="meta-tag">Verification: \${m.verification ? m.verification.level : 'unverified'}</span>
+        <span class="meta-tag">Links: \${(m.related_memory_ids || []).length}</span>
       \`;
 
       document.getElementById('dContent').textContent = m.content;
-      
+
       const actions = document.getElementById('dActions');
       actions.innerHTML = '';
       if (m.status !== 'confirmed') {
@@ -337,60 +364,248 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       if (updated) selectMemory(updated);
     }
 
-    // Canvas Force Graph
-    function renderGraph() {
-      const canvas = document.getElementById('graphCanvas');
+    // ===================== Knowledge Graph UI v2 =====================
+    // 3D force-directed layout on a 2D canvas: repulsion + springs +
+    // centering, perspective projection, drag-to-rotate, wheel-to-zoom,
+    // timeline filtering by updated_at and cluster checkboxes.
+
+    let graphLoopStarted = false;
+
+    function nodeVisible(n) {
+      if (hiddenClusters.has('project:' + (n.project || 'none'))) return false;
+      if (hiddenClusters.has('type:' + n.type)) return false;
+      if (timelineCutoff && n.updatedAt < timelineCutoff) return false;
+      return true;
+    }
+
+    function initGraph() {
+      const byId = new Map(nodes3d.map(n => [n.id, n]));
+      const degreeOf = new Map();
+      edges3d = [];
+      for (const m of allMemories) {
+        for (const rid of (m.related_memory_ids || [])) {
+          edges3d.push([m.id, rid]);
+          degreeOf.set(m.id, (degreeOf.get(m.id) || 0) + 1);
+        }
+      }
+      nodes3d = allMemories.map((m, i) => {
+        const prev = byId.get(m.id);
+        const angle = (i / Math.max(1, allMemories.length)) * Math.PI * 2;
+        return {
+          id: m.id,
+          title: m.title,
+          type: m.type || 'discovery',
+          status: m.status,
+          project: m.project,
+          updatedAt: m.updated_at || '',
+          degree: degreeOf.get(m.id) || 0,
+          // Preserve existing positions across reloads; seed new nodes on a ring.
+          x: prev ? prev.x : Math.cos(angle) * 160,
+          y: prev ? prev.y : (Math.random() - 0.5) * 60,
+          z: prev ? prev.z : Math.sin(angle) * 160,
+        };
+      });
+      simAlpha = 1; // re-energize layout after data changes
+    }
+
+    function simulateStep() {
+      if (nodes3d.length === 0) return;
+      const alpha = simAlpha;
+      // Pairwise repulsion (O(n^2) — fine at memory-store scale)
+      for (let i = 0; i < nodes3d.length; i++) {
+        for (let j = i + 1; j < nodes3d.length; j++) {
+          const a = nodes3d[i], b = nodes3d[j];
+          let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+          let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
+          const force = (900 * alpha) / dist2;
+          const dist = Math.sqrt(dist2);
+          dx /= dist; dy /= dist; dz /= dist;
+          a.x += dx * force; a.y += dy * force; a.z += dz * force;
+          b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+        }
+      }
+      // Springs along graph edges
+      for (const [fromId, toId] of edges3d) {
+        const a = nodes3d.find(n => n.id === fromId);
+        const b = nodes3d.find(n => n.id === toId);
+        if (!a || !b) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        const target = 120;
+        const force = ((dist - target) / dist) * 0.02 * alpha;
+        a.x += dx * force; a.y += dy * force; a.z += dz * force;
+        b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+      }
+      // Gentle pull toward origin so the cloud stays framed
+      for (const n of nodes3d) {
+        n.x *= (1 - 0.002 * alpha);
+        n.y *= (1 - 0.002 * alpha);
+        n.z *= (1 - 0.002 * alpha);
+      }
+      simAlpha = Math.max(0.05, simAlpha * 0.995);
+    }
+
+    function project(x, y, z, width, height) {
+      // Rotate around Y then X, then perspective-project.
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      let x1 = x * cosY - z * sinY;
+      let z1 = x * sinY + z * cosY;
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+      let y1 = y * cosX - z1 * sinX;
+      let z2 = y * sinX + z1 * cosX;
+      const fov = 600;
+      const scale = (fov / (fov + z2 + 400)) * zoom;
+      return { sx: width / 2 + x1 * scale, sy: height / 2 + y1 * scale, scale };
+    }
+
+    function drawGraph(canvas) {
       const ctx = canvas.getContext('2d');
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!nodes3d.length) {
+        ctx.fillStyle = '#8b949e';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('No memories yet — capture some first.', canvas.width / 2 - 110, canvas.height / 2);
+        return;
+      }
 
-      const nodes = allMemories.map((m, i) => ({
-        id: m.id,
-        title: m.title,
-        type: m.type || 'discovery',
-        status: m.status,
-        x: (canvas.width / 2) + Math.cos(i) * 160 + (Math.random() - 0.5) * 40,
-        y: (canvas.height / 2) + Math.sin(i) * 140 + (Math.random() - 0.5) * 40,
-        radius: m.status === 'confirmed' ? 9 : 7
-      }));
+      const projected = new Map();
+      for (const n of nodes3d) {
+        n.visible = nodeVisible(n);
+        if (n.visible) projected.set(n, project(n.x, n.y, n.z, canvas.width, canvas.height));
+      }
 
-      function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw relations
-        ctx.strokeStyle = '#30363d';
-        ctx.lineWidth = 1.5;
-        allMemories.forEach(m => {
-          const from = nodes.find(n => n.id === m.id);
-          (m.related_memory_ids || []).forEach(rid => {
-            const to = nodes.find(n => n.id === rid);
-            if (from && to) {
-              ctx.beginPath();
-              ctx.moveTo(from.x, from.y);
-              ctx.lineTo(to.x, to.y);
-              ctx.stroke();
-            }
-          });
-        });
+      // Edges between visible nodes
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1.2;
+      for (const [fromId, toId] of edges3d) {
+        const a = nodes3d.find(n => n.id === fromId);
+        const b = nodes3d.find(n => n.id === toId);
+        if (!a || !b || !a.visible || !b.visible) continue;
+        const pa = projected.get(a), pb = projected.get(b);
+        if (!pa || !pb) continue;
+        ctx.beginPath();
+        ctx.moveTo(pa.sx, pa.sy);
+        ctx.lineTo(pb.sx, pb.sy);
+        ctx.stroke();
+      }
 
-        // Draw nodes
-        nodes.forEach(n => {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-          ctx.fillStyle = n.type === 'fix' ? '#3fb950' : n.type === 'decision' ? '#58a6ff' : n.type === 'constraint' ? '#f85149' : '#bc8cff';
-          ctx.fill();
-          ctx.strokeStyle = selectedMemory && selectedMemory.id === n.id ? '#ffffff' : '#161b22';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-
+      // Nodes: color by type, size by degree
+      for (const n of nodes3d) {
+        if (!n.visible) continue;
+        const p = projected.get(n);
+        if (!p) continue;
+        const radius = (6 + Math.min(10, n.degree * 2)) * p.scale;
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = TYPE_COLORS[n.type] || '#8b949e';
+        ctx.globalAlpha = n.status === 'stale' || n.status === 'superseded' ? 0.35 : 1;
+        ctx.fill();
+        ctx.strokeStyle = selectedMemory && selectedMemory.id === n.id ? '#ffffff' : '#161b22';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        if (nodes3d.length <= 40 || zoom > 1.4) {
           ctx.fillStyle = '#8b949e';
           ctx.font = '11px sans-serif';
-          ctx.fillText(n.title.slice(0, 20), n.x + 12, n.y + 4);
-        });
+          ctx.fillText(n.title.slice(0, 24), p.sx + radius + 4, p.sy + 4);
+        }
       }
-      draw();
     }
+
+    function tick() {
+      const canvas = document.getElementById('graphCanvas');
+      if (canvas) {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        if (rect.width > 0 && (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height))) {
+          canvas.width = Math.floor(rect.width);
+          canvas.height = Math.floor(rect.height);
+        }
+        simulateStep();
+        drawGraph(canvas);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function buildClusterFilters() {
+      const container = document.getElementById('clusterFilters');
+      // Keep the label, rebuild checkboxes
+      container.querySelectorAll('.cluster-check').forEach(el => el.remove());
+      const projects = [...new Set(allMemories.map(m => m.project || 'none'))];
+      const types = [...new Set(allMemories.map(m => m.type || 'discovery'))];
+      const makeCheck = (group, value) => {
+        const label = document.createElement('label');
+        label.className = 'cluster-check';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !hiddenClusters.has(group + ':' + value);
+        box.onchange = () => {
+          if (box.checked) hiddenClusters.delete(group + ':' + value);
+          else hiddenClusters.add(group + ':' + value);
+        };
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(value));
+        container.appendChild(label);
+      };
+      projects.forEach(p => makeCheck('project', p));
+      types.forEach(t => makeCheck('type', t));
+    }
+
+    function setupTimeline() {
+      const slider = document.getElementById('timelineSlider');
+      const label = document.getElementById('timelineLabel');
+      const times = allMemories.map(m => Date.parse(m.updated_at || '')).filter(t => !Number.isNaN(t));
+      if (times.length === 0) { slider.disabled = true; label.textContent = 'n/a'; return; }
+      slider.disabled = false;
+      const min = Math.min(...times), max = Math.max(...times);
+      slider.oninput = () => {
+        const t = parseInt(slider.value, 10) / 1000;
+        if (t >= 1) { timelineCutoff = null; label.textContent = 'all'; }
+        else {
+          const cutoffMs = min + (max - min) * t;
+          timelineCutoff = new Date(cutoffMs).toISOString();
+          label.textContent = new Date(cutoffMs).toLocaleDateString();
+        }
+      };
+    }
+
+    // ---- Canvas interactions: drag rotates, wheel zooms, click selects ----
+    function setupCanvasInteractions() {
+      const canvas = document.getElementById('graphCanvas');
+      canvas.addEventListener('mousedown', (e) => { dragging = true; dragMoved = false; lastX = e.clientX; lastY = e.clientY; });
+      window.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+        rotY += dx * 0.005;
+        rotX = Math.max(-1.4, Math.min(1.4, rotX + dy * 0.005));
+        lastX = e.clientX; lastY = e.clientY;
+      });
+      window.addEventListener('mouseup', () => { dragging = false; });
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoom = Math.max(0.3, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+      }, { passive: false });
+      canvas.addEventListener('click', (e) => {
+        if (dragMoved) return; // it was a rotate, not a click
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        let best = null, bestDist = Infinity;
+        for (const n of nodes3d) {
+          if (!nodeVisible(n)) continue;
+          const p = project(n.x, n.y, n.z, canvas.width, canvas.height);
+          const d = Math.hypot(p.sx - mx, p.sy - my);
+          const hitR = (6 + Math.min(10, n.degree * 2)) * p.scale + 6;
+          if (d < hitR && d < bestDist) { best = n; bestDist = d; }
+        }
+        if (best) {
+          const mem = allMemories.find(m => m.id === best.id);
+          if (mem) selectMemory(mem);
+        }
+      });
+    }
+
+    setupCanvasInteractions();
+    setupTimeline();
 
     document.getElementById('searchInput').addEventListener('input', (e) => {
       searchQuery = e.target.value;
@@ -406,7 +621,6 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       });
     });
 
-    window.addEventListener('resize', renderGraph);
     loadData();
   </script>
 </body>
