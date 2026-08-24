@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **MemoryStore Shim Removal**: Deleted the deprecated `MemoryStore` class from `src/store.ts`; free functions are now the sole storage surface and `openStore()` returns a plain `Store` object.
+- **Scene-Based Hierarchical Consolidation (`memory consolidate`)**: Clusters confirmed memories by (project, type) + weighted token-bag cosine similarity; clusters of ≥3 members become confirmed `Scene:` architecture rollups bidirectionally linked to every member. Idempotent (clusters already covered by a scene are skipped), supports `--project`/`--dry-run`, and is exposed as the `memory_consolidate` MCP tool.
 - **Bi-Temporal Reinforcement Feedback**: Memory entries gain optional `valid_from`/`valid_to` valid-time stamps and a `reinforcement` counter (+1 on confirm, −1 on stale/reject/supersede). Retrieval decay now uses `valid_from` (event time) when set, and reinforcement adds a bounded ±0.05×min(|n|,5) score adjustment.
 - **In-Place Core Memory Partitioning (`memory core`)**: Letta/MemGPT-style permanent operating guidelines in `.memory/CORE.md` across four tiers (`identity`, `directives`, `conventions`, `context`). CLI `memory core <tier> [--set T|--remove|--show]` plus bare listing; new `memory_core` MCP tool; CORE.md content injected into `get_context` between the USER profile and CURRENT constraints sections; Vibeguard secret scan guards writes.
 - **3-Layer Progressive Disclosure**: `get_context` gains a `depth` tier (default L2). L1 = one line per memory (id + title), L2 = current behavior (title + content + tags), L3 = full raw entry with complete metadata block. Exposed via MCP `depth` param and CLI `memory context --depth L1|L2|L3`.
@@ -25,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned (Phase 3 & Beyond)
 - **Self-Evolving Skill Distillation**: Autonomous extraction of recurring multi-turn fix patterns into modular agent skill folders (`.agents/skills/`).
-- **3-Layer Progressive Disclosure**: Tiered context injection (`L1: Summary` ➔ `L2: Core Anchors` ➔ `L3: Full Raw State`).
-- **Bi-Temporal Reinforcement Feedback**: Recording valid/event time alongside system time with implicit +1/-1 reinforcement scores.
 - **Ambient Open-Loop Tracker**: Proactive tracking of uncommitted branches, pending migrations, and unresolved debugging sessions.
 - **Knowledge Graph UI v2**: 3D force-directed WebGL graph with timeline scrubbing and cluster filtering.
 
