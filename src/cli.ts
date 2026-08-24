@@ -20,7 +20,7 @@ import {
   handleImportTranscriptCommand,
   handleSearchTranscriptCommand,
 } from "./cli/retrieval.ts";
-import { handleCurrentCommand, handleUserCommand } from "./cli/persona.ts";
+import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import {
   handleProposeCommand,
   handleCaptureCommand,
@@ -76,6 +76,7 @@ Context & Retrieval Commands:
 Persona & Constraints Commands:
   user [get|init|set] [--global] Manage USER.md persona & working preferences
   current [get|set]             Manage CURRENT.md active project constraints
+  core [tier] [--set T|--remove|--show] Manage CORE.md permanent partitions (identity|directives|conventions|context)
 
 Ecosystem, Migration & Connectivity:
   connect [agent|all] [--force] Auto-wire MCP into detected coding agents with zero permissions
@@ -150,6 +151,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleUserCommand(parsed);
     case "current":
       return handleCurrentCommand(parsed);
+    case "core":
+      return handleCoreCommand(parsed);
 
     // Lifecycle & Governance
     case "propose":

@@ -1,5 +1,6 @@
 import { getCurrent, setCurrent } from "../current.ts";
 import { getUserProfile, setUserProfile, initUserProfile, userFilePath, type UserArchetype } from "../user.ts";
+import { CORE_TIERS, readCore, setCore, removeCore, type CoreTier } from "../core.ts";
 import { getGlobalMemoryDir } from "../root.ts";
 import { requireRoot, type ParsedArgs } from "./shared.ts";
 
@@ -73,4 +74,50 @@ export async function handleUserCommand({ positional, flags }: ParsedArgs): Prom
   }
 
   return usageError("user requires get|init|set");
+}
+
+export async function handleCoreCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const tier = positional[0] as CoreTier | undefined;
+
+  // Bare `memory core`: list all tiers
+  if (!tier) {
+    const tiers = readCore(ctx.memoryDir);
+    for (const t of CORE_TIERS) {
+      console.log(`=== ${t} ===`);
+      if (tiers[t].length === 0) console.log("(empty)");
+      else for (const line of tiers[t]) console.log(line);
+    }
+    return 0;
+  }
+
+  if (!(CORE_TIERS as readonly string[]).includes(tier)) {
+    return usageError(`unknown core tier "${tier}" (expected: ${CORE_TIERS.join("|")})`);
+  }
+
+  if (flags["set"] !== undefined) {
+    try {
+      const tiers = setCore(ctx.memoryDir, tier, flags["set"]);
+      console.log(`[+] CORE.md '${tier}' now has ${tiers[tier].length} lines`);
+      return 0;
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (flags["remove"] !== undefined || flags["remove"] === "") {
+    const tiers = removeCore(ctx.memoryDir, tier);
+    console.log(`[-] CORE.md '${tier}' cleared (${tiers[tier].length} lines)`);
+    return 0;
+  }
+
+  // Default / --show: print the tier
+  const lines = readCore(ctx.memoryDir)[tier];
+  if (lines.length === 0) {
+    console.log(`(empty)`);
+    return 0;
+  }
+  for (const line of lines) console.log(line);
+  return 0;
 }
