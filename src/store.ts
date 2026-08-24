@@ -172,6 +172,8 @@ export function propose(
     salience?: number;
     validFrom?: string;
     validTo?: string;
+    dueAt?: string;
+    expiresAt?: string;
     test_command?: string;
   },
 ): MemoryEntry {
@@ -209,6 +211,8 @@ export function propose(
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom,
     valid_to: opts.validTo,
+    due_at: opts.dueAt,
+    expires_at: opts.expiresAt,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };

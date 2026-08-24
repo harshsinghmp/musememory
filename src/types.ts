@@ -77,6 +77,10 @@ export interface MemoryEntry {
   session_id?: string;
   /** Executable verification command for the Verification Oracle (memory verify). */
   test_command?: string;
+  /** Follow-up deadline; boosts scoring when due soon or overdue (SOW-104). */
+  due_at?: string;
+  /** Expiry timestamp; expired entries are excluded from default context retrieval (SOW-104). */
+  expires_at?: string;
   recurring?: Recurring;
   graph?: GraphMetadata;
 }
