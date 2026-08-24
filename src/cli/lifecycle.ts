@@ -14,6 +14,7 @@ import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
 import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
+import { loadRoutines, runRoutine, crontabLine, type Routine } from "../routines.ts";
 import { distillSkills } from "../distill.ts";
 import { verifyEntry } from "../verify.ts";
 import { validateStore } from "../schema.ts";
@@ -418,6 +419,43 @@ export async function handleNudgeCommand({ flags }: ParsedArgs): Promise<number>
   for (const line of renderNudges(report)) console.log(line);
   // Exit code reflects nudge count (capped at 125 to stay a valid POSIX status).
   return Math.min(report.items.length, 125);
+}
+
+export async function handleRoutineCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const sub = positional[0] ?? "";
+  if (sub === "run") {
+    const name = positional[1];
+    if (!name) return usageError("usage: memory routine run <name>");
+    try {
+      return await runRoutine(ctx.memoryDir, name);
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (sub === "install") {
+    let routines: Record<string, Routine>;
+    try {
+      routines = loadRoutines(ctx.memoryDir).routines;
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+    const names = positional[1] ? [positional[1]] : Object.keys(routines);
+    if (names.length === 0) {
+      console.log("No routines defined. Create .memory/routines.yaml:");
+      console.log('  routines:\n    morning:\n      schedule: "0 8 * * *"\n      run: ["brief", "nudge"]');
+      return 0;
+    }
+    console.log("# Add these lines to your crontab (crontab -e):");
+    for (const n of names) {
+      const r = routines[n];
+      if (!r) return fail(`unknown routine: ${n}`);
+      console.log(crontabLine(n, r));
+    }
+    return 0;
+  }
+  return usageError("usage: memory routine run <name> | memory routine install [name]");
 }
 
 export async function handleDistillCommand({ flags }: ParsedArgs): Promise<number> {
