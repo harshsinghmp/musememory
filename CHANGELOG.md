@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **MemoryStore Shim Removal**: Deleted the deprecated `MemoryStore` class from `src/store.ts`; free functions are now the sole storage surface and `openStore()` returns a plain `Store` object.
+- **Bi-Temporal Reinforcement Feedback**: Memory entries gain optional `valid_from`/`valid_to` valid-time stamps and a `reinforcement` counter (+1 on confirm, −1 on stale/reject/supersede). Retrieval decay now uses `valid_from` (event time) when set, and reinforcement adds a bounded ±0.05×min(|n|,5) score adjustment.
 
 ### Changed
 - **Shared Command Core (`src/commands/`)**: CLI and MCP now route lifecycle mutations (propose, supersede, confirm, link, mark-stale, reject, delete) and the harvest distillation loop through a single command core with structured results; adapters only parse args and format output. Duplicate MCP handler logic, double secret-scanning, and divergent error strings eliminated.

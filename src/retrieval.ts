@@ -87,9 +87,11 @@ export function applicability(entry: MemoryEntry, queryTokens: string[]): number
 
 /**
  * Multi-factor score formula:
- * score = 1.0 * applicability + statusPenalty + verificationBonus + graphBonus + salienceBonus + 0.3 * exp(-daysSince(updated_at)/90)
+ * score = 1.0 * applicability + statusPenalty + verificationBonus + graphBonus + salienceBonus
+ *       + reinforcementBonus + 0.3 * exp(-daysSince(decayBase)/90)
  *
- * Verification weighting & graph signals are strictly bounded so they never override explicit supersession.
+ * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
+ * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
  */
 export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: number): number {
   const app = applicability(entry, queryTokens);
@@ -98,8 +100,11 @@ export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: numbe
   const verificationBonus = VERIFICATION_BONUS[vLevel] ?? 0;
   const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
   const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
-  const decay = 0.3 * Math.exp(-daysSince(entry.updated_at, now) / 90);
-  return app + statusPenalty + verificationBonus + graphBonus + salienceBonus + decay;
+  const r = entry.reinforcement ?? 0;
+  const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
+  const decayBase = entry.valid_from ?? entry.updated_at;
+  const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
+  return app + statusPenalty + verificationBonus + graphBonus + salienceBonus + reinforcementBonus + decay;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
