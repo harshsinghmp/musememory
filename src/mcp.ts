@@ -20,6 +20,7 @@ import { search, formatPromptContext } from "./retrieval.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
+import { distillSkills } from "./distill.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -423,6 +424,17 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_distill",
+        description: "Distill recurring confirmed fix patterns into .agents/skills/<slug>/SKILL.md folders (never overwrites existing skills)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            min_count: { type: "number", description: "Minimum cluster size to emit a skill (default 3)" },
+            dry_run: { type: "boolean", description: "If true, reports clusters without writing skill folders" },
+          },
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -640,6 +652,17 @@ export async function runMcpServer(): Promise<void> {
       case "memory_loops": {
         const report = collectLoops(store, root, memoryDir);
         return toolResult(report);
+      }
+      case "memory_distill": {
+        try {
+          const report = distillSkills(store, root, {
+            minCount: typeof a.min_count === "number" ? a.min_count : undefined,
+            dryRun: a.dry_run === true,
+          });
+          return toolResult(report);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
       }
       case "graph_status": {
         const status = getGraphStatus(root);

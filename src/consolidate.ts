@@ -32,7 +32,7 @@ export function tokenBag(text: string, weight = 1): Map<string, number> {
   return bag;
 }
 
-function mergeBag(target: Map<string, number>, add: Map<string, number>): void {
+export function mergeBag(target: Map<string, number>, add: Map<string, number>): void {
   for (const [t, v] of add) target.set(t, (target.get(t) ?? 0) + v);
 }
 
