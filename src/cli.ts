@@ -41,6 +41,7 @@ import {
   handleConsolidateCommand,
   handleTraceCommand,
   handleLoopsCommand,
+  handleDistillCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
 
@@ -71,6 +72,7 @@ Core Memory Lifecycle Commands:
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   trace <id> [--depth N]        Walk causal graph pathways from an entry (default depth 5)
   loops                         Prioritized open-loop report: git state, stale candidates, constraints
+  distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
   briefing [--limit N]          Executive summary of active, recurring, and stale memories
 
 Context & Retrieval Commands:
@@ -200,6 +202,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleTraceCommand(parsed);
     case "loops":
       return handleLoopsCommand(parsed);
+    case "distill":
+      return handleDistillCommand(parsed);
     case "session":
       return handleSessionCommand(parsed);
 

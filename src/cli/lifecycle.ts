@@ -13,6 +13,7 @@ import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
+import { distillSkills } from "../distill.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -397,6 +398,33 @@ export async function handleLoopsCommand({ flags }: ParsedArgs): Promise<number>
   const report = collectLoops(ctx.store, ctx.root, ctx.memoryDir);
   for (const line of renderLoops(report)) console.log(line);
   return 0;
+}
+
+export async function handleDistillCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const minCount = flags["min-count"] ? parseInt(flags["min-count"], 10) : undefined;
+  try {
+    const report = distillSkills(ctx.store, ctx.root, {
+      minCount,
+      dryRun: flags["dry-run"] === "true",
+    });
+    for (const c of report.created) {
+      console.log(`[skill] ${c.slug} (${c.path}) <- ${c.members.join(", ")}`);
+    }
+    for (const s of report.skippedExisting) {
+      console.log(`[skip] skill '${s.slug}' already exists: ${s.members.join(", ")}`);
+    }
+    if (report.clustersBelowThreshold > 0) {
+      console.log(`[info] ${report.clustersBelowThreshold} cluster(s) below --min-count`);
+    }
+    if (report.created.length === 0 && report.skippedExisting.length === 0) {
+      console.log("No recurring fix patterns found.");
+    }
+    return 0;
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export async function handleSessionCommand({ positional, flags }: ParsedArgs): Promise<number> {
