@@ -18,6 +18,7 @@ import {
 import { harvestMemory } from "./commands/retrieval.ts";
 import { search, formatPromptContext } from "./retrieval.ts";
 import { consolidateScenes } from "./consolidate.ts";
+import { traceGraph } from "./trace.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -401,6 +402,18 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_trace",
+        description: "Walk causal pathways (supersedes/superseded_by + related links) from a memory entry as a cycle-safe tree",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Root memory entry id" },
+            depth: { type: "number", description: "Maximum traversal depth (default 5)" },
+          },
+          required: ["id"],
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -609,6 +622,11 @@ export async function runMcpServer(): Promise<void> {
           dryRun: a.dry_run === true,
         });
         return toolResult(report);
+      }
+      case "memory_trace": {
+        const node = traceGraph(store, String(a.id), typeof a.depth === "number" ? a.depth : 5);
+        if (!node) return toolError(`no entry with id ${a.id}`);
+        return toolResult(node);
       }
       case "graph_status": {
         const status = getGraphStatus(root);
