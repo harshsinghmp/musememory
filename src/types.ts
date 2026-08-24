@@ -58,6 +58,12 @@ export interface MemoryEntry {
   status: MemoryStatus;
   created_at: string;
   updated_at: string;
+  /** Valid-time (event time) start; decay uses this when set (bi-temporal). */
+  valid_from?: string;
+  /** Valid-time end, set when an entry leaves active knowledge (stale/rejected/superseded). */
+  valid_to?: string;
+  /** Reinforcement counter: +1 on confirm, -1 on stale/reject/supersede. */
+  reinforcement?: number;
   source?: string;
   tags?: string[];
   type?: MemoryType;

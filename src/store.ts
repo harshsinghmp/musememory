@@ -151,6 +151,12 @@ function normalizeIdArray(val: string | string[] | null | undefined): string[] {
   return val;
 }
 
+/** Bi-temporal close-out: stamp valid_to once and decrement reinforcement. */
+function closeOutValidity(entry: MemoryEntry): void {
+  if (!entry.valid_to) entry.valid_to = nowIso();
+  entry.reinforcement = (entry.reinforcement ?? 0) - 1;
+}
+
 /** Create a new entry. Defaults: status candidate, type discovery, verification unverified. */
 export function propose(
   store: Store,
@@ -164,6 +170,8 @@ export function propose(
     confirmed?: boolean;
     verification?: Verification;
     salience?: number;
+    validFrom?: string;
+    validTo?: string;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -198,6 +206,8 @@ export function propose(
     source: opts.source ?? "manual",
     tags: opts.tags?.slice(0, 8) ?? [],
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
+    valid_from: opts.validFrom,
+    valid_to: opts.validTo,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
@@ -223,6 +233,7 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   entry.status = "confirmed";
   entry.disputed_by = undefined;
   entry.last_confirmed_at = now;
+  entry.reinforcement = (entry.reinforcement ?? 0) + 1;
   entry.verification = { level: "user-confirmed", verified_at: now };
   entry.updated_at = now;
   save(store, entry);
@@ -246,6 +257,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (next.status !== "confirmed") return null;
 
   old.status = "superseded";
+  closeOutValidity(old);
   const prevOld = normalizeIdArray(old.superseded_by);
   if (!prevOld.includes(newId)) {
     old.superseded_by = [...prevOld, newId];
@@ -276,6 +288,7 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "stale";
+  closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -299,6 +312,7 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "superseded";
+  closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -353,6 +367,7 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "rejected";
+  closeOutValidity(entry);
   entry.updated_at = nowIso();
   save(store, entry);
   if (store.memoryDir) {
