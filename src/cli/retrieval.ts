@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { search } from "../retrieval.ts";
+import { search, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
 import { importTranscript } from "../harvest.ts";
 import { harvestMemory } from "../commands/retrieval.ts";
 import { searchTranscriptWithBookends } from "../transcript.ts";
@@ -23,6 +23,25 @@ export async function handleContextCommand({ positional, flags }: ParsedArgs): P
   const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
   const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
   const query = positional[0] ?? "";
+  const depth = flags["depth"] as DisclosureDepth | undefined;
+  if (depth && depth !== "L1" && depth !== "L2" && depth !== "L3") {
+    return usageError("--depth must be one of L1|L2|L3");
+  }
+  if (depth) {
+    // Progressive disclosure: render the tiered prompt-injection block
+    const formatted = formatPromptContext(ctx.store, ctx.memoryDir, query, {
+      limit,
+      tokenBudget,
+      project: flags["project"],
+      includeSuperseded: false,
+      type: flags["type"],
+      status: flags["status"],
+      verified: flags["verified"] === "true",
+      depth,
+    });
+    console.log(formatted.markdown);
+    return 0;
+  }
   const res = search(ctx.store, ctx.memoryDir, query, {
     limit,
     tokenBudget,

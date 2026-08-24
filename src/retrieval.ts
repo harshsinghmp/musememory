@@ -12,6 +12,8 @@ export interface ScoredEntry {
   score: number;
 }
 
+export type DisclosureDepth = "L1" | "L2" | "L3";
+
 export interface ContextQueryOptions extends SearchOptions {
   query?: string;
   project?: string;
@@ -22,6 +24,8 @@ export interface ContextQueryOptions extends SearchOptions {
   status?: MemoryStatus | string;
   verified?: boolean;
   now?: number;
+  /** Progressive disclosure tier for formatted context (default L2). */
+  depth?: DisclosureDepth;
 }
 
 export interface SearchResult {
@@ -231,16 +235,41 @@ export function formatPromptContext(
   }
 
   if (result.results.length > 0) {
+    const depth = options.depth ?? "L2";
     parts.push("### Relevant Memories & Learned Patterns");
-    for (const r of result.results) {
-      const typeBadge = r.entry.type ? ` [${r.entry.type.toUpperCase()}]` : "";
-      const statusBadge = r.entry.status === "confirmed" ? " (Confirmed)" : "";
-      parts.push(`#### ${r.entry.title}${typeBadge}${statusBadge}`);
-      parts.push(r.entry.content);
-      if (r.entry.tags && r.entry.tags.length > 0) {
-        parts.push(`*Tags: ${r.entry.tags.join(", ")}*`);
+    if (depth === "L1") {
+      // One line per memory: id + title only
+      for (const r of result.results) {
+        parts.push(`- ${r.entry.id} ${r.entry.title}`);
       }
       parts.push("");
+    } else {
+      for (const r of result.results) {
+        const e = r.entry;
+        const typeBadge = e.type ? ` [${e.type.toUpperCase()}]` : "";
+        const statusBadge = e.status === "confirmed" ? " (Confirmed)" : "";
+        parts.push(`#### ${e.title}${typeBadge}${statusBadge}`);
+        parts.push(e.content);
+        if (depth === "L3") {
+          // Full raw entry metadata
+          const meta: string[] = [`id: ${e.id}`, `status: ${e.status}`, `project: ${e.project}`];
+          if (e.type) meta.push(`type: ${e.type}`);
+          if (e.created_at) meta.push(`created_at: ${e.created_at}`);
+          if (e.updated_at) meta.push(`updated_at: ${e.updated_at}`);
+          if (e.tags?.length) meta.push(`tags: ${e.tags.join(", ")}`);
+          if (e.verification?.level) meta.push(`verification: ${e.verification.level}`);
+          if (e.related_memory_ids?.length) meta.push(`related: ${e.related_memory_ids.join(", ")}`);
+          if (e.session_id) meta.push(`session: ${e.session_id}`);
+          if (e.salience !== undefined) meta.push(`salience: ${e.salience}`);
+          parts.push("<raw>");
+          for (const m of meta) parts.push(m);
+          parts.push("</raw>");
+        }
+        if (e.tags && e.tags.length > 0) {
+          parts.push(`*Tags: ${e.tags.join(", ")}*`);
+        }
+        parts.push("");
+      }
     }
   }
 
