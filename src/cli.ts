@@ -40,6 +40,7 @@ import {
   handleStaleCommand,
   handleConsolidateCommand,
   handleTraceCommand,
+  handleLoopsCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
 
@@ -69,6 +70,7 @@ Core Memory Lifecycle Commands:
   stale [--days N]              List entries exceeding staleness policy
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   trace <id> [--depth N]        Walk causal graph pathways from an entry (default depth 5)
+  loops                         Prioritized open-loop report: git state, stale candidates, constraints
   briefing [--limit N]          Executive summary of active, recurring, and stale memories
 
 Context & Retrieval Commands:
@@ -196,6 +198,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleConsolidateCommand(parsed);
     case "trace":
       return handleTraceCommand(parsed);
+    case "loops":
+      return handleLoopsCommand(parsed);
     case "session":
       return handleSessionCommand(parsed);
 

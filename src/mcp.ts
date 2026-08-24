@@ -19,6 +19,7 @@ import { harvestMemory } from "./commands/retrieval.ts";
 import { search, formatPromptContext } from "./retrieval.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
+import { collectLoops } from "./loops.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
 import { getGraphStatus } from "./graph.ts";
@@ -414,6 +415,14 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_loops",
+        description: "Read-only prioritized open-loop report: uncommitted git changes, unmerged branches, stale candidates, disputed entries, and CURRENT.md constraints",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -627,6 +636,10 @@ export async function runMcpServer(): Promise<void> {
         const node = traceGraph(store, String(a.id), typeof a.depth === "number" ? a.depth : 5);
         if (!node) return toolError(`no entry with id ${a.id}`);
         return toolResult(node);
+      }
+      case "memory_loops": {
+        const report = collectLoops(store, root, memoryDir);
+        return toolResult(report);
       }
       case "graph_status": {
         const status = getGraphStatus(root);
