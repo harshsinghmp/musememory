@@ -59,3 +59,6 @@ Thumbs.db
 
 # Deepwork state (git-local)
 .slim/deepwork/
+
+# bun local state
+.bun/
