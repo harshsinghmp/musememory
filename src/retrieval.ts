@@ -2,6 +2,7 @@ import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 import { getCurrent } from "./current.ts";
 import { getUserProfile } from "./user.ts";
+import { formatCoreBlock } from "./core.ts";
 import { graphSymbolOverlapBonus } from "./graph.ts";
 import type { MemoryEntry, MemoryType, MemoryStatus, SearchOptions } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS, DEFAULT_STALE_DAYS } from "./types.ts";
@@ -205,12 +206,19 @@ export function formatPromptContext(
   const result = queryContext(store, query, options);
   const constraints = memoryDir ? getCurrent(memoryDir) : [];
   const userProfile = getUserProfile(memoryDir);
+  const coreBlock = formatCoreBlock(memoryDir);
 
   const parts: string[] = [];
 
   if (userProfile) {
     parts.push("### User Profile & Preferences (USER.md)");
     parts.push(userProfile);
+    parts.push("");
+  }
+
+  if (coreBlock) {
+    parts.push("### Core Memory (CORE.md)");
+    parts.push(coreBlock);
     parts.push("");
   }
 

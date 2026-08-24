@@ -24,6 +24,7 @@ import { importTranscript } from "./harvest.ts";
 import { exportSnapshot, importSnapshot } from "./snapshot.ts";
 import { searchTranscriptWithBookends } from "./transcript.ts";
 import { getUserProfile, setUserProfile } from "./user.ts";
+import { CORE_TIERS, readCore, setCore, removeCore, type CoreTier } from "./core.ts";
 import { getGlobalMemoryDir } from "./root.ts";
 import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
@@ -375,6 +376,18 @@ export async function runMcpServer(): Promise<void> {
         },
       },
       {
+        name: "memory_core",
+        description: "Read or edit permanent core memory partitions (CORE.md) with tiers: identity, directives, conventions, context",
+        inputSchema: {
+          type: "object",
+          properties: {
+            tier: { type: "string", enum: CORE_TIERS as unknown as string[], description: "Core partition tier" },
+            set: { type: "string", description: "Replace the tier's content with this text (secret-scanned)" },
+            remove: { type: "boolean", description: "If true, clears the tier's content" },
+          },
+        },
+      },
+      {
         name: "graph_status",
         description: "Check the status of the project graph provider (e.g. codegraph)",
         inputSchema: {
@@ -553,6 +566,28 @@ export async function runMcpServer(): Promise<void> {
       case "memory_validate": {
         const report = validateStore(store);
         return toolResult(report);
+      }
+      case "memory_core": {
+        const tier = a.tier ? (String(a.tier) as CoreTier) : undefined;
+        if (tier && !(CORE_TIERS as readonly string[]).includes(tier)) {
+          return toolError(`unknown core tier "${tier}" (expected: ${CORE_TIERS.join("|")})`);
+        }
+        try {
+          if (tier && a.set !== undefined) {
+            const tiers = setCore(memoryDir, tier, String(a.set));
+            return toolResult({ tier, lines: tiers[tier] });
+          }
+          if (tier && a.remove === true) {
+            const tiers = removeCore(memoryDir, tier);
+            return toolResult({ tier, lines: tiers[tier] });
+          }
+          if (tier) {
+            return toolResult({ tier, lines: readCore(memoryDir)[tier] });
+          }
+          return toolResult(readCore(memoryDir));
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
       }
       case "graph_status": {
         const status = getGraphStatus(root);
