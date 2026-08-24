@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { search, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
 import { importTranscript } from "../harvest.ts";
 import { harvestMemory } from "../commands/retrieval.ts";
+import { installGitHook, harvestAuto } from "../hook.ts";
 import { searchTranscriptWithBookends } from "../transcript.ts";
 import { DEFAULT_CONTEXT_LIMIT } from "../types.ts";
 import { requireRoot, printEntry, type ParsedArgs } from "./shared.ts";
@@ -146,5 +147,32 @@ export async function handleSearchTranscriptCommand({ positional, flags }: Parse
   const maxMatches = flags["max"] ? parseInt(flags["max"], 10) : 5;
   const res = searchTranscriptWithBookends(targetFile, query, { windowSize, maxMatches });
   console.log(res.formattedSummary);
+  return 0;
+}
+
+export async function handleHookCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  if (positional[0] !== "install") return usageError("hook requires install");
+  if (flags["git"] !== "true") return usageError("hook install requires --git");
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const result = installGitHook(ctx.root);
+  console.log(result.message);
+  return result.installed ? 0 : 1;
+}
+
+export async function handleHarvestAutoCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const res = harvestAuto(ctx.store, ctx.root, ctx.memoryDir, {
+    from: flags["from"],
+    project: flags["project"],
+  });
+  for (const p of res.processed) {
+    console.log(`[harvested] ${p.file} -> ${p.movedTo} (${p.imported} unit(s) proposed as candidates)`);
+  }
+  for (const err of res.errors) {
+    console.error(`  warning: ${err}`);
+  }
+  console.log(res.message);
   return 0;
 }

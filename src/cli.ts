@@ -19,6 +19,8 @@ import {
   handleHarvestCommand,
   handleImportTranscriptCommand,
   handleSearchTranscriptCommand,
+  handleHookCommand,
+  handleHarvestAutoCommand,
 } from "./cli/retrieval.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import {
@@ -94,6 +96,8 @@ Ecosystem, Migration & Connectivity:
   detect                        Scan machine for 24+ external memory formats
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
   harvest <file|text> --project P Distill conversation transcripts into structured memory units
+  harvest-auto [--from <glob>] [--project P] Harvest inbox transcripts as candidates and archive them
+  hook install --git            Install the harvester as a git pre-commit hook (never clobbers)
   import-transcript <file.jsonl> Universal JSONL transcript ingestion with session binding
   export [--out file.json]      Export portable JSON memory snapshot
   import <file.json>            Import portable JSON memory snapshot
@@ -152,6 +156,10 @@ export async function main(argv: string[]): Promise<number> {
       return handleSearchTranscriptCommand(parsed);
     case "harvest":
       return handleHarvestCommand(parsed);
+    case "harvest-auto":
+      return handleHarvestAutoCommand(parsed);
+    case "hook":
+      return handleHookCommand(parsed);
     case "import-transcript":
     case "import-jsonl":
       return handleImportTranscriptCommand(parsed);
