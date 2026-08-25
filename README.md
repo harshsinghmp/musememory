@@ -363,6 +363,7 @@ Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull req
 | ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
 | ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
 | ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ☐ | AST Symbol Graph Integration (CodeGraph / Graphify provider) — SOW-107 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
 
 ---
 

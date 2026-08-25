@@ -150,6 +150,15 @@ commands over plain YAML files keeps Muse Memory's constraint set intact and the
 - **Acceptance criteria**: contract documented in both repos; `--for-agent` filter tested; missing field = backward-compatible default; muse-agents `build.sh --check` extended validation agreed upstream.
 - **Effort**: M · **Non-goals**: runtime coupling, muse-agents fork changes beyond schema/docs.
 
+### SOW-107: AST Symbol Graph Integration (CodeGraph / Graphify) ☐
+
+- **Problem**: The scoring formula's graph bonus was removed in the over-engineering audit (`19b22db`) because nothing ever populated `entry.graph.symbol_names` — it always scored 0. Competitors (Greplica, Engraphis) ship working AST-powered code-aware recall; this is a genuine parity gap.
+- **Approach**: Provider abstraction in `src/graph.ts` (`detectProvider`/`getGraphStatus` already exist) supporting CodeGraph CLI and/or Graphify as pluggable providers. `memory graph index` runs the provider over the repo and caches a symbol→path map under `.memory/`. Capture/harvest stamp `entry.graph.symbol_names` (+ `affected_paths`) when content references indexed symbols. Restore `graphSymbolOverlapBonus` — now backed by real data. Coverage surfaces via the existing `memory graph status` CLI + `graph_status` MCP tool.
+- **Standalone**: opt-in — without a provider installed, behavior is identical to today (no bonus, no index step).
+- **Composed**: muse-agents personas can request `graph index` in Pre-flight for large refactors.
+- **Acceptance criteria**: with a provider installed, captured memories referencing real symbols get non-empty `graph.symbol_names`; scoring bonus demonstrably ranks symbol-matching memories higher; without a provider, zero behavior change; provider invocation never blocks capture.
+- **Effort**: M · **Non-goals**: shipping our own AST parser (delegate to provider), daemon indexer.
+
 ---
 
 ## 7. Delivery
