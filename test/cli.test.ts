@@ -145,21 +145,6 @@ describe("cli e2e", () => {
     cleanup(root);
   });
 
-  test("briefing shows recurring due entries", () => {
-    const { root, memoryDir } = setupFixtureRoot();
-    const id = "m_999_recurring";
-    writeFileSync(
-      join(memoryDir, "memories", `${id}.yaml`),
-      `id: ${id}\ntitle: Weekly backup\ncontent: run weekly backup\nproject: aria\nstatus: active\ntype: operation\ncreated_at: 2026-01-01T00:00:00Z\nupdated_at: 2026-01-01T00:00:00Z\nsource: test\ntags: [backup]\nrecurring:\n  interval: weekly\n  next_due: 2026-01-02T00:00:00Z\n`,
-    );
-    const b = run(root, ["briefing"]);
-    expect(b.code).toBe(0);
-    expect(b.stdout).toContain("recurring due:");
-    expect(b.stdout).toContain(id);
-    expect(b.stdout).toContain("recurring: weekly next_due: 2026-01-02T00:00:00Z");
-    cleanup(root);
-  });
-
   test("init defaults to .memory directory", () => {
     const { root } = setupFixtureRoot();
     const initRes = run(root, ["init", "my-app"]);

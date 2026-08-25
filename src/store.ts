@@ -1,11 +1,10 @@
-import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import { getCurrent, setCurrent } from "./current.ts";
-import { getUserProfile, setUserProfile, initUserProfile } from "./user.ts";
 import { workspaceRootFor } from "./root.ts";
 
 export interface StorageLayout {
@@ -33,8 +32,6 @@ export interface Store {
   memoryDir?: string;
   layout?: StorageLayout;
 }
-
-export { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
 
 /** Open the memories directory for a memory dir, creating it if missing. */
 export function openStore(memoryDir: string): Store {
@@ -122,18 +119,6 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
   renameSync(tmp, file);
-}
-
-export function mtimeOf(store: Store, id: string): number {
-  const file = fileForId(store, id);
-  if (!existsSync(file)) return 0;
-  return statSync(file).mtimeMs;
-}
-
-export function maxMtime(store: Store): number {
-  const ids = listIds(store);
-  if (ids.length === 0) return 0;
-  return Math.max(...ids.map((id) => mtimeOf(store, id)));
 }
 
 export function nowIso(): string {

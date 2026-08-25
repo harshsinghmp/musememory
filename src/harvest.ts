@@ -4,11 +4,6 @@ import type { Store } from "./store.ts";
 import { propose, save, list } from "./store.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
-export {
-  exportSnapshot,
-  importSnapshot,
-} from "./snapshot.ts";
-
 export interface HarvestedUnit {
   title: string;
   content: string;
@@ -138,13 +133,6 @@ export function defaultSalienceForType(type: MemoryType): number {
 }
 
 import { parseJsonlTranscript } from "./transcript.ts";
-export {
-  parseJsonlTranscript,
-  searchTranscriptWithBookends,
-  type TranscriptMatch,
-  type TranscriptSearchResult,
-  type TranscriptSearchOptions,
-} from "./transcript.ts";
 
 export interface TranscriptImportOptions {
   project?: string;

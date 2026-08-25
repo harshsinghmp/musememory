@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { search, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
+import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
 import { hybridSearch } from "../vector.ts";
 import { importTranscript } from "../harvest.ts";
 import { harvestMemory } from "../commands/retrieval.ts";
@@ -8,17 +8,7 @@ import { installGitHook, harvestAuto } from "../hook.ts";
 import { searchTranscriptWithBookends } from "../transcript.ts";
 import { DEFAULT_CONTEXT_LIMIT } from "../types.ts";
 import { resolveAgentFile, parseAgentMemoryContract } from "../agentcontract.ts";
-import { requireRoot, printEntry, type ParsedArgs } from "./shared.ts";
-
-function usageError(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 2;
-}
-
-function fail(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 1;
-}
+import { requireRoot, printEntry, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export async function handleContextCommand({ positional, flags }: ParsedArgs): Promise<number> {
   // SOW-106: resolve agent memory contract before requireRoot so scope=global can flip the flag.
@@ -60,7 +50,7 @@ export async function handleContextCommand({ positional, flags }: ParsedArgs): P
     console.log(formatted.markdown);
     return 0;
   }
-  const res = search(ctx.store, ctx.memoryDir, query, {
+  const res = queryContext(ctx.store, query, {
     limit,
     tokenBudget,
     project: flags["project"],
@@ -98,7 +88,7 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
     }
   }
 
-  const res = search(ctx.store, ctx.memoryDir, positional[0], {
+  const res = queryContext(ctx.store, positional[0], {
     limit,
     tokenBudget,
     includeSuperseded: flags["include-superseded"] === "true",
@@ -121,7 +111,7 @@ export async function handleRecallCommand({ positional, flags }: ParsedArgs): Pr
   const query = positional[0] ?? "";
   const limit = parseInt(flags["limit"] ?? String(DEFAULT_CONTEXT_LIMIT), 10) || DEFAULT_CONTEXT_LIMIT;
   const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
-  const res = search(ctx.store, ctx.memoryDir, query, {
+  const res = queryContext(ctx.store, query, {
     limit,
     tokenBudget,
     project: flags["project"],

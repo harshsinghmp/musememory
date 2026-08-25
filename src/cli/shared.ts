@@ -42,6 +42,16 @@ export function requireRoot(flags: Record<string, string> = {}): { root: string;
   return { root, memoryDir, store: openStore(memoryDir) };
 }
 
+export function usageError(msg: string): number {
+  console.error(`Error: ${msg}`);
+  return 2;
+}
+
+export function fail(msg: string): number {
+  console.error(`Error: ${msg}`);
+  return 1;
+}
+
 export function printEntry(e: MemoryEntry, badge = false): void {
   const status = e.status === "active" ? "" : ` [${e.status}]`;
   const extra = badge ? " [stale-by-policy]" : "";

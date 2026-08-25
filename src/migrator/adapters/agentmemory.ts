@@ -60,8 +60,6 @@ export const AgentMemoryAdapter: ProviderAdapter = {
             level: "independently-verified",
             verified_by: "migrator:agentmemory"
           },
-          created_at: item.createdAt || item.created_at || new Date().toISOString(),
-          updated_at: item.updatedAt || item.updated_at || new Date().toISOString(),
         });
       }
     } catch {

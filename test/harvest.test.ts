@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { openStore, propose, get, list } from "../src/store.ts";
-import { extractHarvestUnits, exportSnapshot, importSnapshot, defaultSalienceForType } from "../src/harvest.ts";
+import { extractHarvestUnits, defaultSalienceForType } from "../src/harvest.ts";
+import { exportSnapshot, importSnapshot } from "../src/snapshot.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
 
 describe("harvest & agency network sync", () => {

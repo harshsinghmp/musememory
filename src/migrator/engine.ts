@@ -3,11 +3,7 @@ import { propose, list, markStale, markSuperseded, addConstraint } from "../stor
 import { detectProviders } from "./detect.ts";
 import { AgentMemoryAdapter } from "./adapters/agentmemory.ts";
 import { BeadsAdapter } from "./adapters/beads.ts";
-import { Mem0Adapter } from "./adapters/mem0.ts";
 import { LettaAdapter } from "./adapters/letta.ts";
-import { EverOsAdapter } from "./adapters/everos.ts";
-import { ByteRoverAdapter } from "./adapters/byterover.ts";
-import { SupermemoryAdapter } from "./adapters/supermemory.ts";
 import { GenericAdapter } from "./adapters/generic.ts";
 import { scanSecrets, redactSecrets } from "../secrets.ts";
 import { getCurrent, setCurrent } from "../current.ts";
@@ -18,11 +14,7 @@ import type { MigrationOptions, MigrationReport, MigrationProviderReport, Provid
 const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   agentmemory: AgentMemoryAdapter,
   beads: BeadsAdapter,
-  mem0: Mem0Adapter,
   letta: LettaAdapter,
-  everos: EverOsAdapter,
-  byterover: ByteRoverAdapter,
-  supermemory: SupermemoryAdapter,
 };
 
 export function getAdapter(providerId: string): ProviderAdapter {

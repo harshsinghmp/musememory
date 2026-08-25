@@ -22,17 +22,7 @@ import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
 import { recordSessionStart, recordSessionEnd, findSession } from "../sessions.ts";
 import type { MemoryType } from "../types.ts";
-import { requireRoot, printEntry, type ParsedArgs } from "./shared.ts";
-
-function usageError(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 2;
-}
-
-function fail(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 1;
-}
+import { requireRoot, printEntry, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export async function handleProposeCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
@@ -270,19 +260,6 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   console.log(`counts: ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" ")}`);
   for (const e of recent) printEntry(e);
   const now = Date.now();
-  const recurringDue = entries.filter((e) => {
-    if (!e.recurring?.interval) return false;
-    if (!e.recurring.next_due) return true;
-    const t = Date.parse(e.recurring.next_due);
-    return Number.isNaN(t) || t <= now;
-  });
-  if (recurringDue.length > 0) {
-    console.log(`recurring due:`);
-    for (const e of recurringDue) {
-      console.log(`- ${e.id} [${e.status}] (${e.project}) ${e.title}`);
-      console.log(`  recurring: ${e.recurring!.interval} next_due: ${e.recurring!.next_due ?? "due-now"}`);
-    }
-  }
   const staleByPolicy = entries.filter((e) => {
     if (e.status !== "active" && e.status !== "confirmed") return false;
     const policy = stalePolicyDays(e.type);

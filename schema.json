@@ -41,15 +41,6 @@
     "related_memory_ids": { "type": "array", "items": { "type": "string" } },
     "session_id": { "type": "string" },
     "test_command": { "type": "string" },
-    "recurring": {
-      "type": "object",
-      "required": ["interval"],
-      "properties": {
-        "interval": { "type": "string" },
-        "next_due": { "type": ["string", "null"], "format": "date-time" }
-      },
-      "additionalProperties": false
-    },
     "graph": {
       "type": "object",
       "required": ["provider"],

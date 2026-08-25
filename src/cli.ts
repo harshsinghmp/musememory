@@ -84,7 +84,7 @@ Core Memory Lifecycle Commands:
   routine install [name]        Print crontab line(s) for routines (user installs; no system mutation)
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
   verify <id> [--timeout S]     Execute a fix entry's test_command; exit 0 promotes + independently verifies
-  briefing [--limit N]          Executive summary of active, recurring, and stale memories
+  briefing [--limit N]          Executive summary of active and stale memories
 
 Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context

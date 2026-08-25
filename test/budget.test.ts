@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore, propose } from "../src/store.ts";
-import { estimateEntryTokens, search } from "../src/retrieval.ts";
+import { estimateEntryTokens, queryContext } from "../src/retrieval.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "budget-test-"));
@@ -52,11 +52,11 @@ describe("dynamic prompt token budgeter", () => {
     }
 
     // Unlimited search returns all 5
-    const fullRes = search(store, root, "architecture", { limit: 10 });
+    const fullRes = queryContext(store, "architecture", { limit: 10 });
     expect(fullRes.results.length).toBe(5);
 
     // Search with token budget that fits ~2 entries (approx 70 tokens)
-    const budgetRes = search(store, root, "architecture", { tokenBudget: 75, limit: 10 });
+    const budgetRes = queryContext(store, "architecture", { tokenBudget: 75, limit: 10 });
     expect(budgetRes.results.length).toBeLessThan(5);
     expect(budgetRes.results.length).toBeGreaterThan(0);
     expect(budgetRes.totalTokensUsed).toBeLessThanOrEqual(75);

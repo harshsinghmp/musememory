@@ -35,11 +35,6 @@ export interface Verification {
   test_result?: string;
 }
 
-export interface Recurring {
-  interval: string;
-  next_due: string | null;
-}
-
 export interface GraphMetadata {
   provider: string;
   graph_revision?: string;
@@ -81,7 +76,6 @@ export interface MemoryEntry {
   due_at?: string;
   /** Expiry timestamp; expired entries are excluded from default context retrieval (SOW-104). */
   expires_at?: string;
-  recurring?: Recurring;
   graph?: GraphMetadata;
 }
 

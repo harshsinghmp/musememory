@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Store } from "./store.ts";
-import { list, get, confirm, markStale, supersede, link, save, nowIso } from "./store.ts";
+import { list, get, confirm, markStale } from "./store.ts";
 import { getCurrent, setCurrent } from "./current.ts";
 import { validateStore } from "./schema.ts";
 import { exportSnapshot } from "./snapshot.ts";

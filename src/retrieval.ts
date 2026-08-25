@@ -3,8 +3,7 @@ import { list } from "./store.ts";
 import { getCurrent } from "./current.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
-import { graphSymbolOverlapBonus } from "./graph.ts";
-import type { MemoryEntry, MemoryType, MemoryStatus, SearchOptions } from "./types.ts";
+import type { MemoryEntry, SearchOptions } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS, DEFAULT_STALE_DAYS } from "./types.ts";
 
 export interface ScoredEntry {
@@ -16,19 +15,8 @@ export type DisclosureDepth = "L1" | "L2" | "L3";
 
 export interface ContextQueryOptions extends SearchOptions {
   query?: string;
-  project?: string;
-  limit?: number;
-  tokenBudget?: number;
-  includeSuperseded?: boolean;
-  type?: MemoryType | string;
-  /** Multi-type filter (SOW-106 agent contracts). */
-  types?: string[];
-  /** Entry must carry at least one of these tags (SOW-106 agent contracts). */
-  tags?: string[];
-  status?: MemoryStatus | string;
-   verified?: boolean;
-   includeExpired?: boolean;
-   now?: number;
+  includeExpired?: boolean;
+  now?: number;
   /** Progressive disclosure tier for formatted context (default L2). */
   depth?: DisclosureDepth;
 }
@@ -118,7 +106,7 @@ export function isExpired(entry: MemoryEntry, now: number): boolean {
 
 /**
  * Multi-factor score formula:
- * score = 1.0 * applicability + statusPenalty + verificationBonus + graphBonus + salienceBonus
+ * score = 1.0 * applicability + statusPenalty + verificationBonus + salienceBonus
  *       + reinforcementBonus + dueDateBonus + 0.3 * exp(-daysSince(decayBase)/90)
  *
  * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
@@ -129,14 +117,13 @@ export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: numbe
   const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
   const vLevel = entry.verification?.level ?? "unverified";
   const verificationBonus = VERIFICATION_BONUS[vLevel] ?? 0;
-  const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
   const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
   const r = entry.reinforcement ?? 0;
   const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
   const dueBonus = dueDateBonus(entry, now);
   const decayBase = entry.valid_from ?? entry.updated_at;
   const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
-  return app + statusPenalty + verificationBonus + graphBonus + salienceBonus + reinforcementBonus + dueBonus + decay;
+  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + decay;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
@@ -221,16 +208,6 @@ export function queryContext(
     stale: false,
     totalTokensUsed,
   };
-}
-
-/** Backwards-compatible search wrapper */
-export function search(
-  store: Store,
-  _memoryDir: string,
-  query: string,
-  opts: SearchOptions = {},
-): SearchResult {
-  return queryContext(store, query, opts);
 }
 
 /**

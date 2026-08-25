@@ -5,8 +5,7 @@ import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
 import { openStore, list } from "./store.ts";
 import { validateStore } from "./schema.ts";
 import { getAuditTrail } from "./audit.ts";
-import { detectAgents } from "./agents/detect.ts";
-import { findBinary } from "./agents/detect.ts";
+import { detectAgents, findBinary } from "./agents/detect.ts";
 
 export interface DoctorReport {
   storage: {
