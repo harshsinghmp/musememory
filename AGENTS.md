@@ -256,6 +256,7 @@ All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress`
 2. **Start every SOW as a PR immediately**: when the feature branch opens, open a **draft PR** right away (`gh pr create --draft`) referencing the issue — before any implementation. Convert to ready-for-review only when the item is complete and validated. Work is never batched onto an untracked branch.
 3. **Status transitions**: flip the issue label to `in-progress` when the branch + draft PR open, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
 4. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
+5. **Registry sync is automatic**: publishing to npm happens via CI (`.github/workflows/npm-publish.yml`) whenever a `v*` tag is pushed — the same act that creates the GitHub release. Never run `npm publish` manually except as a CI-failure fallback. Version bumps in `package.json` accompany every release tag.
 
 ---
 
