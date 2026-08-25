@@ -253,8 +253,9 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress` / `done`) and are mirrored in the README "Scope of Work & Roadmap" table.
 
 1. **No direct-to-main feature work**: every SOW item ships via a feature branch → pull request that references its issue (`Closes #N` in the PR body).
-2. **Status transitions**: flip the issue label to `in-progress` when a branch opens, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
-3. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
+2. **Start every SOW as a PR immediately**: when the feature branch opens, open a **draft PR** right away (`gh pr create --draft`) referencing the issue — before any implementation. Convert to ready-for-review only when the item is complete and validated. Work is never batched onto an untracked branch.
+3. **Status transitions**: flip the issue label to `in-progress` when the branch + draft PR open, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
+4. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
 
 ---
 
