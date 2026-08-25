@@ -4,17 +4,7 @@ import { getGlobalMemoryDir } from "../root.ts";
 import { userFilePath, initUserProfile } from "../user.ts";
 import { detectProviders, runMigration } from "../migrator/index.ts";
 import { getGraphStatus } from "../graph.ts";
-import { requireRoot, type ParsedArgs } from "./shared.ts";
-
-function usageError(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 2;
-}
-
-function fail(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 1;
-}
+import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export async function handleInstallCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const isGlobal = flags["global"] === "true" || flags["g"] === "true";

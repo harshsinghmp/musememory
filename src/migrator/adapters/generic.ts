@@ -47,8 +47,6 @@ export const GenericAdapter: ProviderAdapter = {
                   tags: Array.isArray(item.tags) ? item.tags.map(String) : ["imported"],
                   source: `migrated:${filename}`,
                   isConstraint,
-                  created_at: item.created_at || item.createdAt || new Date().toISOString(),
-                  updated_at: item.updated_at || item.updatedAt || new Date().toISOString(),
                 });
               }
             }

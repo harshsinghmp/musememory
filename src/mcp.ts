@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { findOrCreateProjectRoot } from "./root.ts";
+import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
 import { openStore, get, confirm, save, type Store } from "./store.ts";
 import {
   proposeMemory,
@@ -16,7 +16,7 @@ import {
   deleteMemory,
 } from "./commands/lifecycle.ts";
 import { harvestMemory } from "./commands/retrieval.ts";
-import { search, formatPromptContext } from "./retrieval.ts";
+import { queryContext, formatPromptContext } from "./retrieval.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -31,7 +31,6 @@ import { exportSnapshot, importSnapshot } from "./snapshot.ts";
 import { searchTranscriptWithBookends } from "./transcript.ts";
 import { getUserProfile, setUserProfile } from "./user.ts";
 import { CORE_TIERS, readCore, setCore, removeCore, type CoreTier } from "./core.ts";
-import { getGlobalMemoryDir } from "./root.ts";
 import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
 import { detectAgents } from "./agents/detect.ts";
@@ -121,22 +120,6 @@ export async function runMcpServer(): Promise<void> {
             confirmed: { type: "boolean" },
           },
           required: ["text", "project"],
-        },
-      },
-      {
-        name: "memory_recall",
-        description: "Rich recall of ranked entries with verification/related/session/graph fields and token budgeting",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: { type: "string" },
-            limit: { type: "number" },
-            token_budget: { type: "number", description: "Maximum token budget to consume for retrieved recall entries" },
-            project: { type: "string" },
-            type: { type: "string" },
-            status: { type: "string" },
-            verified: { type: "boolean" },
-          },
         },
       },
       {
@@ -295,22 +278,6 @@ export async function runMcpServer(): Promise<void> {
             overwrite: { type: "boolean" },
           },
           required: ["entries"],
-        },
-      },
-      {
-        name: "propose",
-        description: "Create a new memory entry (candidate by default; pass confirmed=true for confirmed)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            content: { type: "string" },
-            project: { type: "string" },
-            title: { type: "string" },
-            tags: { type: "array", items: { type: "string" } },
-            type: { type: "string" },
-            confirmed: { type: "boolean" },
-          },
-          required: ["content", "project"],
         },
       },
       {
@@ -490,6 +457,7 @@ export async function runMcpServer(): Promise<void> {
           user_profile: formatted.userProfile,
         });
       }
+      case "memory_recall":
       case "search": {
         if (a.hybrid === true) {
           const hybrid = hybridSearch(store, memoryDir, String(a.query), {
@@ -505,7 +473,7 @@ export async function runMcpServer(): Promise<void> {
           }
           // fall through to live scoring when no index exists
         }
-        const res = search(store, memoryDir, String(a.query), {
+        const res = queryContext(store, String(a.query), {
           limit: typeof a.limit === "number" ? a.limit : 10,
           tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           includeSuperseded: a.include_superseded === true,
@@ -520,6 +488,7 @@ export async function runMcpServer(): Promise<void> {
           total_tokens_used: res.totalTokensUsed,
         });
       }
+      case "propose":
       case "memory_capture": {
         try {
           const entry = proposeMemory(store, {
@@ -549,18 +518,6 @@ export async function runMcpServer(): Promise<void> {
         const isConfirmed = a.confirmed === true;
         const res = importTranscript(store, transcript, { project, confirmed: isConfirmed });
         return toolResult(res);
-      }
-      case "memory_recall": {
-        const res = search(store, memoryDir, String(a.query ?? ""), {
-          limit: typeof a.limit === "number" ? a.limit : 5,
-          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
-          project: a.project ? String(a.project) : undefined,
-          includeSuperseded: false,
-          type: a.type ? String(a.type) : undefined,
-          status: a.status ? String(a.status) : undefined,
-          verified: a.verified === true,
-        });
-        return toolResult(res.results.map((r) => ({ ...r.entry, score: r.score })));
       }
       case "memory_confirm": {
         const entry = confirmMemory(store, String(a.id));
@@ -608,21 +565,6 @@ export async function runMcpServer(): Promise<void> {
         const entries = (a.entries ?? []) as MemoryEntry[];
         const res = importSnapshot(store, { entries }, { overwrite: a.overwrite === true });
         return toolResult(res);
-      }
-      case "propose": {
-        try {
-          const entry = proposeMemory(store, {
-            content: String(a.content),
-            project: String(a.project),
-            title: a.title ? String(a.title) : undefined,
-            tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
-            type: a.type ? (String(a.type) as MemoryType) : undefined,
-            confirmed: a.confirmed === true,
-          });
-          return toolResult(entry);
-        } catch (err: unknown) {
-          return toolError(err instanceof Error ? err.message : String(err));
-        }
       }
       case "confirm_fix": {
         const entry = get(store, String(a.id));

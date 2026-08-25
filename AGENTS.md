@@ -4,7 +4,7 @@
 > **Binary Names**: `memory` (primary), `musememory` (alias), `npx musememory` (zero-install)  
 > **Storage Locations**: Local `.memory/` (per project) and Global `~/.memory/` (user-wide)  
 > **MCP Protocol**: MCP 2024-11-05 (stdio transport)  
-> **Test Suite**: 128 passing tests across 22 test suites  
+> **Test Suite**: `bun test` (count grows per PR — run it, don't quote it)  
 
 ---
 
@@ -90,7 +90,7 @@ musememory/
 │       ├── engine.ts       # Orchestrator & state preservation mapper
 │       ├── types.ts        # Migrator interfaces & normalizers
 │       └── adapters/       # Specialized parsers (AgentMemory, Beads, Mem0, Letta, EverOS, etc.)
-├── test/                   # Comprehensive automated test suites (128 tests across 22 test suites)
+├── test/                   # Comprehensive automated test suites (run `bun test` for current count)
 ├── scripts/                # Distribution & installation scripts (install.sh)
 ├── package.json            # Package metadata, dependencies, and bin declarations
 └── README.md               # User documentation & quick start guide
@@ -263,7 +263,16 @@ All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress`
 All modifications must pass the full test suite and TypeScript validation before committing:
 
 ```bash
-bun test          # 128 passing tests across 22 test suites
+bun test          # full suite — must pass before committing
 bunx tsc --noEmit # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
+
+## 🐚 Shell Wrapper Constraints
+
+The sandboxed bash proxy rejects several common constructs — rewrite instead of retrying:
+
+- **Loops** (`for`/`while`): not proxied. Write the loop to a temp script (e.g. `/tmp/opencode/x.sh`) and run `bash /tmp/opencode/x.sh`.
+- **Subshells** (`( cmd & )`): syntax error. Use bare `nohup cmd > log 2>&1 &` form instead.
+- **Command substitution in quoted args** (e.g. `git commit -m "$(cat <<'EOF' …)"`): mangles the message. Pass `-m "plain text"` directly.
+- **`pkill -f <pattern>`** can match its own wrapper shell and hang. Prefer `pgrep -fa` to list PIDs, then `kill <pid>` individually.

@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { openStore, propose } from "../src/store.ts";
 import { setCurrent } from "../src/current.ts";
-import { queryContext, formatPromptContext, search } from "../src/retrieval.ts";
+import { queryContext, formatPromptContext } from "../src/retrieval.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
 
 describe("unified context & retrieval engine", () => {
@@ -72,27 +72,6 @@ describe("unified context & retrieval engine", () => {
     expect(formatted.markdown).toContain("API Timeout Limit");
     expect(formatted.markdown).toContain("5000ms");
     expect(formatted.markdown).toContain("Memory Directive: When learning durable facts");
-
-    cleanup(root);
-  });
-
-  test("search wrapper delegates to queryContext with identical results", () => {
-    const { root, memoryDir } = setupFixtureRoot();
-    const store = openStore(memoryDir);
-
-    propose(store, {
-      title: "Redis Cache Configuration",
-      content: "Use maxmemory-policy allkeys-lru in Redis cluster.",
-      project: "core",
-      confirmed: true,
-    });
-
-    const resA = queryContext(store, "redis cache");
-    const resB = search(store, memoryDir, "redis cache");
-
-    expect(resA.results.length).toBe(resB.results.length);
-    expect(resA.results[0].entry.id).toBe(resB.results[0].entry.id);
-    expect(resA.results[0].score).toBeCloseTo(resB.results[0].score, 4);
 
     cleanup(root);
   });

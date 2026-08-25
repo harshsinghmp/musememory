@@ -45,6 +45,8 @@ import {
   handleConsolidateCommand,
   handleTraceCommand,
   handleLoopsCommand,
+  handleNudgeCommand,
+  handleRoutineCommand,
   handleDistillCommand,
   handleVerifyCommand,
   handleSessionCommand,
@@ -77,9 +79,12 @@ Core Memory Lifecycle Commands:
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   trace <id> [--depth N]        Walk causal graph pathways from an entry (default depth 5)
   loops                         Prioritized open-loop report: git state, stale candidates, constraints
+  nudge                         Proactive attention list: overdue/due-soon entries, stale-by-policy, open loops
+  routine run <name>            Execute a routine's steps from .memory/routines.yaml
+  routine install [name]        Print crontab line(s) for routines (user installs; no system mutation)
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
   verify <id> [--timeout S]     Execute a fix entry's test_command; exit 0 promotes + independently verifies
-  briefing [--limit N]          Executive summary of active, recurring, and stale memories
+  briefing [--limit N]          Executive summary of active and stale memories
 
 Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context
@@ -220,6 +225,10 @@ export async function main(argv: string[]): Promise<number> {
       return handleTraceCommand(parsed);
     case "loops":
       return handleLoopsCommand(parsed);
+    case "nudge":
+      return handleNudgeCommand(parsed);
+    case "routine":
+      return handleRoutineCommand(parsed);
     case "distill":
       return handleDistillCommand(parsed);
     case "verify":

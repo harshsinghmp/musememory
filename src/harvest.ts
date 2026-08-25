@@ -1,12 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import type { Store } from "./store.ts";
-import { propose, save } from "./store.ts";
+import { propose, save, list } from "./store.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
-
-export {
-  exportSnapshot,
-  importSnapshot,
-} from "./snapshot.ts";
 
 export interface HarvestedUnit {
   title: string;
@@ -137,25 +133,66 @@ export function defaultSalienceForType(type: MemoryType): number {
 }
 
 import { parseJsonlTranscript } from "./transcript.ts";
-export {
-  parseJsonlTranscript,
-  searchTranscriptWithBookends,
-  type TranscriptMatch,
-  type TranscriptSearchResult,
-  type TranscriptSearchOptions,
-} from "./transcript.ts";
 
 export interface TranscriptImportOptions {
   project?: string;
   confirmed?: boolean;
   source?: string;
   sessionId?: string;
+  /** Extract commitment patterns into open-loop candidates (default true). */
+  openLoops?: boolean;
 }
 
 export interface TranscriptImportResult {
   imported: number;
   entries: MemoryEntry[];
   errors: string[];
+  /** Open-loop candidate entries proposed from detected commitments (SOW-103). */
+  openLoops: MemoryEntry[];
+}
+
+/** Deterministic commitment patterns; matched against speaker-stripped lines. */
+const COMMITMENT_PATTERNS: RegExp[] = [
+  /\btodo\b\s*[:\-]\s*(.{4,})/i,
+  /\b(?:i'll|i will|i am going to)\s+(.{4,})/i,
+  /\bneed to\s+(.{4,})/i,
+  /\bfollow up (?:on|with)\s+(.{4,})/i,
+  /\bremind me to\s+(.{4,})/i,
+];
+
+/**
+ * Open-Loop Extraction (SOW-103): detects commitment phrasing ("I'll fix X",
+ * "TODO: Y", "need to Z") in transcript text. Deterministic — no LLM calls.
+ */
+export function extractCommitments(text: string): string[] {
+  if (!text || typeof text !== "string") return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+    const line = rawLine.trim().replace(
+      /^(?:user|assistant|human|system|agent|client|developer)\s*[:\-\u2013]\s*/i,
+      "",
+    );
+    for (const pattern of COMMITMENT_PATTERNS) {
+      const m = line.match(pattern);
+      if (m) {
+        const content = m[0].trim();
+        const key = content.toLowerCase().replace(/\s+/g, " ");
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push(content);
+        }
+        break; // one commitment per line
+      }
+    }
+  }
+  return out;
+}
+
+/** Stable id for an open-loop commitment: same text always yields the same id. */
+export function openLoopId(text: string): string {
+  const h = createHash("sha256").update(text.toLowerCase().replace(/\s+/g, " ").trim()).digest("hex");
+  return `m_0_ol${h.slice(0, 12)}`;
 }
 
 /**
@@ -201,10 +238,40 @@ export function importTranscript(
     }
   }
 
+  // SOW-103: commitment extraction -> open-loop candidates, idempotent via content-hash ids.
+  const openLoops: MemoryEntry[] = [];
+  if (options.openLoops !== false) {
+    const existing = new Set(list(store).map((e) => e.id));
+    for (const commitment of extractCommitments(fullText)) {
+      const id = openLoopId(commitment);
+      if (existing.has(id)) continue; // already ingested from a previous run
+      try {
+        const entry = propose(store, {
+          id,
+          project,
+          title: commitment.slice(0, 80),
+          content: commitment,
+          type: "operation",
+          tags: ["open-loop", "harvested"],
+          source: options.source ?? "transcript_import",
+        });
+        if (options.sessionId) {
+          entry.session_id = options.sessionId;
+          save(store, entry);
+        }
+        existing.add(id);
+        openLoops.push(entry);
+      } catch (err: unknown) {
+        errors.push(`Failed to record open loop "${commitment}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
   return {
     imported: entries.length,
     entries,
     errors,
+    openLoops,
   };
 }
 

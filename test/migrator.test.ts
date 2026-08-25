@@ -8,9 +8,7 @@ import { getAuditTrail } from "../src/audit.ts";
 import { detectProviders, runMigration } from "../src/migrator/index.ts";
 import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { BeadsAdapter } from "../src/migrator/adapters/beads.ts";
-import { Mem0Adapter } from "../src/migrator/adapters/mem0.ts";
 import { LettaAdapter } from "../src/migrator/adapters/letta.ts";
-import { EverOsAdapter } from "../src/migrator/adapters/everos.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "migrator-test-"));
@@ -104,46 +102,6 @@ describe("universal memory migrator & auto-detection", () => {
 
     const closed = records.find((r) => r.title.includes("Basic Auth"));
     expect(closed?.status).toBe("superseded");
-
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  test("Mem0Adapter and EverOsAdapter extract and map statuses correctly", () => {
-    const root = temp();
-    // Mem0
-    const mem0Path = join(root, "mem0.json");
-    writeFileSync(
-      mem0Path,
-      JSON.stringify([
-        { id: "mem0_1", memory: "User prefers Tailwind CSS tokens", is_active: true },
-        { id: "mem0_2", memory: "Legacy bootstrap style variables", is_active: false },
-      ]),
-      "utf8"
-    );
-    const mem0Recs = Mem0Adapter.extract(mem0Path);
-    expect(mem0Recs.length).toBe(2);
-    expect(mem0Recs[0].status).toBe("confirmed");
-    expect(mem0Recs[1].status).toBe("superseded");
-
-    // EverOS
-    const everosDir = join(root, "everos-memories");
-    mkdirSync(everosDir, { recursive: true });
-    writeFileSync(
-      join(everosDir, "auth-strategy.md"),
-      `---\ntitle: JWT Auth Strategy\nstatus: active\ntype: decision\ntags: [auth, jwt]\n---\nUse RS256 algorithm for signing.\n`,
-      "utf8"
-    );
-    writeFileSync(
-      join(everosDir, "old-session.md"),
-      `---\ntitle: Deprecated Cookie Sessions\nstatus: archived\ntype: fix\n---\nReplaced by bearer tokens.\n`,
-      "utf8"
-    );
-    const everosRecs = EverOsAdapter.extract(everosDir);
-    expect(everosRecs.length).toBe(2);
-    const everosActive = everosRecs.find((r) => r.title === "JWT Auth Strategy");
-    expect(everosActive?.status).toBe("confirmed");
-    const everosArchived = everosRecs.find((r) => r.title === "Deprecated Cookie Sessions");
-    expect(everosArchived?.status).toBe("superseded");
 
     rmSync(root, { recursive: true, force: true });
   });

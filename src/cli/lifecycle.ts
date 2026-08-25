@@ -13,6 +13,8 @@ import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
+import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
+import { loadRoutines, runRoutine, crontabLine, type Routine } from "../routines.ts";
 import { distillSkills } from "../distill.ts";
 import { verifyEntry } from "../verify.ts";
 import { validateStore } from "../schema.ts";
@@ -20,17 +22,7 @@ import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
 import { recordSessionStart, recordSessionEnd, findSession } from "../sessions.ts";
 import type { MemoryType } from "../types.ts";
-import { requireRoot, printEntry, type ParsedArgs } from "./shared.ts";
-
-function usageError(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 2;
-}
-
-function fail(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 1;
-}
+import { requireRoot, printEntry, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export async function handleProposeCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
@@ -268,19 +260,6 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   console.log(`counts: ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" ")}`);
   for (const e of recent) printEntry(e);
   const now = Date.now();
-  const recurringDue = entries.filter((e) => {
-    if (!e.recurring?.interval) return false;
-    if (!e.recurring.next_due) return true;
-    const t = Date.parse(e.recurring.next_due);
-    return Number.isNaN(t) || t <= now;
-  });
-  if (recurringDue.length > 0) {
-    console.log(`recurring due:`);
-    for (const e of recurringDue) {
-      console.log(`- ${e.id} [${e.status}] (${e.project}) ${e.title}`);
-      console.log(`  recurring: ${e.recurring!.interval} next_due: ${e.recurring!.next_due ?? "due-now"}`);
-    }
-  }
   const staleByPolicy = entries.filter((e) => {
     if (e.status !== "active" && e.status !== "confirmed") return false;
     const policy = stalePolicyDays(e.type);
@@ -291,6 +270,15 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   if (staleByPolicy.length > 0) {
     console.log(`stale by policy:`);
     for (const e of staleByPolicy) printEntry(e, true);
+  }
+  const due = dueEntries(entries);
+  if (due.length > 0) {
+    console.log(`due / overdue:`);
+    for (const e of due) {
+      const days = Math.ceil((Date.parse(e.due_at!) - Date.now()) / 86_400_000);
+      const when = days < 0 ? `OVERDUE ${-days}d` : `due in ${days}d`;
+      console.log(`- ${e.id} [${e.status}] ${when} — ${e.title}`);
+    }
   }
   return 0;
 }
@@ -399,6 +387,52 @@ export async function handleLoopsCommand({ flags }: ParsedArgs): Promise<number>
   const report = collectLoops(ctx.store, ctx.root, ctx.memoryDir);
   for (const line of renderLoops(report)) console.log(line);
   return 0;
+}
+
+export async function handleNudgeCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const report = collectNudges(ctx.store, ctx.root, ctx.memoryDir);
+  for (const line of renderNudges(report)) console.log(line);
+  // Exit code reflects nudge count (capped at 125 to stay a valid POSIX status).
+  return Math.min(report.items.length, 125);
+}
+
+export async function handleRoutineCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const sub = positional[0] ?? "";
+  if (sub === "run") {
+    const name = positional[1];
+    if (!name) return usageError("usage: memory routine run <name>");
+    try {
+      return await runRoutine(ctx.memoryDir, name);
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (sub === "install") {
+    let routines: Record<string, Routine>;
+    try {
+      routines = loadRoutines(ctx.memoryDir).routines;
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+    const names = positional[1] ? [positional[1]] : Object.keys(routines);
+    if (names.length === 0) {
+      console.log("No routines defined. Create .memory/routines.yaml:");
+      console.log('  routines:\n    morning:\n      schedule: "0 8 * * *"\n      run: ["brief", "nudge"]');
+      return 0;
+    }
+    console.log("# Add these lines to your crontab (crontab -e):");
+    for (const n of names) {
+      const r = routines[n];
+      if (!r) return fail(`unknown routine: ${n}`);
+      console.log(crontabLine(n, r));
+    }
+    return 0;
+  }
+  return usageError("usage: memory routine run <name> | memory routine install [name]");
 }
 
 export async function handleDistillCommand({ flags }: ParsedArgs): Promise<number> {

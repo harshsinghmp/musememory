@@ -1,11 +1,10 @@
-import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import { getCurrent, setCurrent } from "./current.ts";
-import { getUserProfile, setUserProfile, initUserProfile } from "./user.ts";
 import { workspaceRootFor } from "./root.ts";
 
 export interface StorageLayout {
@@ -33,8 +32,6 @@ export interface Store {
   memoryDir?: string;
   layout?: StorageLayout;
 }
-
-export { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
 
 /** Open the memories directory for a memory dir, creating it if missing. */
 export function openStore(memoryDir: string): Store {
@@ -124,18 +121,6 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
   renameSync(tmp, file);
 }
 
-export function mtimeOf(store: Store, id: string): number {
-  const file = fileForId(store, id);
-  if (!existsSync(file)) return 0;
-  return statSync(file).mtimeMs;
-}
-
-export function maxMtime(store: Store): number {
-  const ids = listIds(store);
-  if (ids.length === 0) return 0;
-  return Math.max(...ids.map((id) => mtimeOf(store, id)));
-}
-
 export function nowIso(): string {
   return new Date().toISOString();
 }
@@ -164,6 +149,8 @@ export function propose(
     content: string;
     project: string;
     title?: string;
+    /** Deterministic id override (content-hash idempotent re-ingest). Must match ^m_[0-9]+_[a-z0-9_-]+$. */
+    id?: string;
     tags?: string[];
     source?: string;
     type?: MemoryType;
@@ -172,6 +159,8 @@ export function propose(
     salience?: number;
     validFrom?: string;
     validTo?: string;
+    dueAt?: string;
+    expiresAt?: string;
     test_command?: string;
   },
 ): MemoryEntry {
@@ -196,7 +185,7 @@ export function propose(
 
   const now = nowIso();
   const entry: MemoryEntry = {
-    id: makeId(opts.title ?? opts.content.slice(0, 60)),
+    id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
     title: (opts.title ?? opts.content.slice(0, 120)).slice(0, 120),
     content: opts.content,
     project: opts.project,
@@ -209,6 +198,8 @@ export function propose(
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom,
     valid_to: opts.validTo,
+    due_at: opts.dueAt,
+    expires_at: opts.expiresAt,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };

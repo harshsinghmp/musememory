@@ -369,23 +369,10 @@ function makeNamedConnector(agentId: string) {
 
 export const connectClaudeCode = makeNamedConnector("claude-code");
 export const connectCursor = makeNamedConnector("cursor");
-export const connectAntigravity = makeNamedConnector("antigravity");
-export const connectWindsurf = makeNamedConnector("windsurf");
-export const connectCodex = makeNamedConnector("codex");
-export const connectGeminiCli = makeNamedConnector("gemini-cli");
 export const connectHermes = makeNamedConnector("hermes");
 export const connectOpenCode = makeNamedConnector("opencode");
 export const connectGoose = makeNamedConnector("goose");
-export const connectAider = makeNamedConnector("aider");
 export const connectOpenClaw = makeNamedConnector("openclaw");
-export const connectClawCode = makeNamedConnector("claw-code");
-export const connectPi = makeNamedConnector("pi");
-export const connectOpenHands = makeNamedConnector("openhands");
-export const connectOpenInterpreter = makeNamedConnector("open-interpreter");
-export const connectContinue = makeNamedConnector("continue");
-export const connectCrush = makeNamedConnector("crush");
-export const connectRooCode = makeNamedConnector("roo-code");
-export const connectCline = makeNamedConnector("cline");
 
 /**
  * Remove memory MCP configuration from a specific agent config.

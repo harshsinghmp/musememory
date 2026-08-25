@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { openStore, propose, confirm, supersede, get } from "../src/store.ts";
-import { search } from "../src/retrieval.ts";
+import { queryContext } from "../src/retrieval.ts";
 import { validateStore } from "../src/schema.ts";
 import { getGraphStatus } from "../src/graph.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
@@ -10,11 +10,11 @@ describe("mcp tool handlers logic", () => {
     const { root, memoryDir } = setupFixtureRoot();
     const store = openStore(memoryDir);
 
-    const ctx = search(store, memoryDir, "deploy", { type: "operation", status: "confirmed" });
+    const ctx = queryContext(store, "deploy", { type: "operation", status: "confirmed" });
     expect(ctx.results.length).toBeGreaterThan(0);
     expect(ctx.results[0].entry.id).toBe("m_1700000004000_newdeploy");
 
-    const searchRes = search(store, memoryDir, "deploy", { includeSuperseded: true });
+    const searchRes = queryContext(store, "deploy", { includeSuperseded: true });
     expect(searchRes.results.some((r) => r.entry.status === "superseded")).toBe(true);
     cleanup(root);
   });

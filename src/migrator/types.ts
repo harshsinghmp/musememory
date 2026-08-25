@@ -21,10 +21,6 @@ export interface MigratedRecord {
   tags?: string[];
   source?: string;
   verification?: Verification;
-  superseded_by?: string[];
-  related_memory_ids?: string[];
-  created_at?: string;
-  updated_at?: string;
   isConstraint?: boolean;
 }
 

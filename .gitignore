@@ -56,3 +56,12 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/extensions.json
+
+# Deepwork state (git-local)
+.slim/deepwork/
+
+# bun local state
+.bun/
+
+# local QA artifacts
+dogfood-output/

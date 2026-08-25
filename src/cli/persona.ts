@@ -2,17 +2,7 @@ import { getCurrent, setCurrent } from "../current.ts";
 import { getUserProfile, setUserProfile, initUserProfile, userFilePath, type UserArchetype } from "../user.ts";
 import { CORE_TIERS, readCore, setCore, removeCore, type CoreTier } from "../core.ts";
 import { getGlobalMemoryDir } from "../root.ts";
-import { requireRoot, type ParsedArgs } from "./shared.ts";
-
-function usageError(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 2;
-}
-
-function fail(msg: string): number {
-  console.error(`Error: ${msg}`);
-  return 1;
-}
+import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export async function handleCurrentCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);

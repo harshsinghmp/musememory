@@ -14,7 +14,6 @@ export type AgentMcpFormat =
   | "yaml-goose"
   | "continue-json"
   | "openclaw-json"
-  | "custom"
   | "manual";
 
 export interface AgentDefinition {

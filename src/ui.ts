@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Store } from "./store.ts";
-import { list, get, confirm, markStale, supersede, link, save, nowIso } from "./store.ts";
+import { list, get, confirm, markStale } from "./store.ts";
 import { getCurrent, setCurrent } from "./current.ts";
 import { validateStore } from "./schema.ts";
 import { exportSnapshot } from "./snapshot.ts";
@@ -173,7 +173,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     .search-box input { width: 100%; background: #0d1117; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; color: #fff; outline: none; font-size: 14px; }
     .search-box input:focus { border-color: var(--accent); }
     
-    .filters { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); overflow-x: auto; font-size: 12px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
     .chip { padding: 4px 8px; background: #21262d; border-radius: 4px; cursor: pointer; white-space: nowrap; color: var(--text-muted); }
     .chip.active { background: var(--accent); color: #fff; }
     
@@ -267,7 +267,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     const TYPE_COLORS = { fix: '#3fb950', decision: '#58a6ff', constraint: '#f85149', failure: '#d29922', architecture: '#bc8cff', operation: '#39c5cf', preference: '#f778ba', discovery: '#8b949e', session: '#6e7681' };
     let nodes3d = [];       // { id, title, type, status, x, y, z, degree, visible }
     let edges3d = [];       // [fromIndex, toIndex]
-    let rotX = 0.35, rotY = 0, zoom = 1;
+    let rotX = 0.35, rotY = 0, zoom = 1.4;
     let dragging = false, dragMoved = false, lastX = 0, lastY = 0;
     let hiddenClusters = new Set();
     let timelineCutoff = null; // ISO string; null = all
@@ -351,17 +351,48 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     }
 
     async function confirmMem(id) {
-      await fetch('/api/confirm', { method: 'POST', body: JSON.stringify({ id }), headers: { 'Content-Type': 'application/json' } });
-      await loadData();
-      const updated = allMemories.find(m => m.id === id);
-      if (updated) selectMemory(updated);
+      return mutateMemory(id, '/api/confirm');
     }
 
     async function staleMem(id) {
-      await fetch('/api/mark-stale', { method: 'POST', body: JSON.stringify({ id, reason: 'Marked via Web UI' }), headers: { 'Content-Type': 'application/json' } });
-      await loadData();
-      const updated = allMemories.find(m => m.id === id);
-      if (updated) selectMemory(updated);
+      return mutateMemory(id, '/api/mark-stale');
+    }
+
+    // Transient toast: surfaces mutation success/failure instead of failing silently.
+    function flash(msg, isError) {
+      let el = document.getElementById('flashMsg');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'flashMsg';
+        el.style.cssText = 'position:fixed;bottom:16px;right:16px;padding:10px 14px;border-radius:6px;font-size:13px;z-index:99;max-width:360px;display:none;';
+        document.body.appendChild(el);
+      }
+      el.style.background = isError ? '#b62324' : '#238636';
+      el.style.color = '#fff';
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    async function mutateMemory(id, endpoint) {
+      try {
+        const body = endpoint === '/api/mark-stale' ? { id, reason: 'Marked via Web UI' } : { id };
+        const res = await fetch(endpoint, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+        if (!res.ok) {
+          let msg = \`HTTP \${res.status}\`;
+          try { msg = (await res.json()).error || msg; } catch { /* empty/invalid body */ }
+          throw new Error(msg);
+        }
+        await loadData();
+        const updated = allMemories.find(m => m.id === id);
+        if (updated) selectMemory(updated);
+        flash(endpoint === '/api/mark-stale' ? 'Marked stale' : 'Confirmed');
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        flash('Action failed: ' + msg, true);
+        console.error('Mutation failed:', msg);
+      }
     }
 
     // ===================== Knowledge Graph UI v2 =====================
@@ -375,6 +406,12 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       if (hiddenClusters.has('project:' + (n.project || 'none'))) return false;
       if (hiddenClusters.has('type:' + n.type)) return false;
       if (timelineCutoff && n.updatedAt < timelineCutoff) return false;
+      // Keep the canvas in sync with the sidebar's type chip + search filters.
+      if (currentFilter !== 'all' && n.type !== currentFilter) return false;
+      if (searchQuery) {
+        const text = (n.title + ' ' + (n.content || '') + ' ' + (n.tags || []).join(' ')).toLowerCase();
+        if (!text.includes(searchQuery.toLowerCase())) return false;
+      }
       return true;
     }
 
@@ -397,12 +434,14 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           type: m.type || 'discovery',
           status: m.status,
           project: m.project,
+          content: m.content || '',
+          tags: m.tags || [],
           updatedAt: m.updated_at || '',
           degree: degreeOf.get(m.id) || 0,
           // Preserve existing positions across reloads; seed new nodes on a ring.
-          x: prev ? prev.x : Math.cos(angle) * 160,
-          y: prev ? prev.y : (Math.random() - 0.5) * 60,
-          z: prev ? prev.z : Math.sin(angle) * 160,
+          x: prev ? prev.x : Math.cos(angle) * 260,
+          y: prev ? prev.y : (Math.random() - 0.5) * 90,
+          z: prev ? prev.z : Math.sin(angle) * 260,
         };
       });
       simAlpha = 1; // re-energize layout after data changes
@@ -417,7 +456,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           const a = nodes3d[i], b = nodes3d[j];
           let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
           let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
-          const force = (900 * alpha) / dist2;
+          const force = (2400 * alpha) / dist2;
           const dist = Math.sqrt(dist2);
           dx /= dist; dy /= dist; dz /= dist;
           a.x += dx * force; a.y += dy * force; a.z += dz * force;

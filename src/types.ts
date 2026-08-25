@@ -35,11 +35,6 @@ export interface Verification {
   test_result?: string;
 }
 
-export interface Recurring {
-  interval: string;
-  next_due: string | null;
-}
-
 export interface GraphMetadata {
   provider: string;
   graph_revision?: string;
@@ -77,7 +72,10 @@ export interface MemoryEntry {
   session_id?: string;
   /** Executable verification command for the Verification Oracle (memory verify). */
   test_command?: string;
-  recurring?: Recurring;
+  /** Follow-up deadline; boosts scoring when due soon or overdue (SOW-104). */
+  due_at?: string;
+  /** Expiry timestamp; expired entries are excluded from default context retrieval (SOW-104). */
+  expires_at?: string;
   graph?: GraphMetadata;
 }
 
@@ -132,6 +130,10 @@ export interface SearchOptions {
   project?: string;
   includeSuperseded?: boolean;
   type?: MemoryType | string;
+  /** Multi-type filter (SOW-106 agent contracts). */
+  types?: string[];
+  /** Entry must carry at least one of these tags (SOW-106 agent contracts). */
+  tags?: string[];
   status?: MemoryStatus | string;
   verified?: boolean;
   tokenBudget?: number;

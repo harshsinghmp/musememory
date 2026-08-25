@@ -3,7 +3,8 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore, list } from "../src/store.ts";
-import { parseJsonlTranscript, importTranscript } from "../src/harvest.ts";
+import { parseJsonlTranscript } from "../src/transcript.ts";
+import { importTranscript } from "../src/harvest.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "transcript-test-"));

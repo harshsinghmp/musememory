@@ -45,8 +45,6 @@ export const BeadsAdapter: ProviderAdapter = {
             tags: Array.isArray(b.tags) ? b.tags.map(String) : ["beads"],
             source: "migrated:beads",
             isConstraint,
-            created_at: b.created_at || new Date().toISOString(),
-            updated_at: b.updated_at || new Date().toISOString(),
           });
         }
       } catch {
