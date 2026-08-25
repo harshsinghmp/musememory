@@ -62,3 +62,6 @@ Thumbs.db
 
 # bun local state
 .bun/
+
+# local QA artifacts
+dogfood-output/
