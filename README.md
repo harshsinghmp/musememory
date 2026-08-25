@@ -358,11 +358,11 @@ Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull req
 | ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
 | ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
 | ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
-| ☐ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
-| ☐ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
-| ☐ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
-| ☐ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
-| ☐ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
+| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
+| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
+| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
+| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
 
 ---
 
@@ -403,7 +403,9 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `import`            | `<file.json> [--overwrite] [--global]`                                                                 | Import and validate memory snapshot into local store.                                                             |
 | `list` / `ls`       | `[--status S] [--type T] [--project P] [--global]`                                                     | List memory entries with multi-field status, type, and project filtering.                                         |
 | `stats`             | `[--global]`                                                                                           | Display breakdown statistics of total memories, status distribution, and type metrics.                            |
-| `briefing`          | `[--limit N] [--global]`                                                                               | Active summary of recent entries, status counts, and recurring due items.                                         |
+| `briefing`          | `[--limit N] [--global]`                                                                               | Active summary of recent entries, status counts, and due/overdue items.                                           |
+| `nudge`             | `[--global]`                                                                                           | Proactive attention list: overdue/due-soon entries, stale-by-policy, open loops (exit code = nudge count).         |
+| `routine`           | `run <name>` / `install [name]`                                                                        | Execute `.memory/routines.yaml` steps or print crontab lines (cron-invoked, no daemon).                            |
 | `stale`             | `[--days N] [--global]`                                                                                | Audit active entries exceeding per-type staleness policies.                                                       |
 | `session`           | `start --project P [--note T]` / `end <id>`                                                            | Record session start/end timeline nodes.                                                                          |
 | `current`           | `get` / `set <text> --project P`                                                                       | Read or append hard constraints to `.memory/CURRENT.md`.                                                          |
