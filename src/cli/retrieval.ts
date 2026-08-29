@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
 import { hybridSearch } from "../vector.ts";
+import { searchTree, buildTreeIndex, loadTreeIndex } from "../retrieval/index.ts";
 import { importTranscript } from "../harvest.ts";
 import { harvestMemory } from "../commands/retrieval.ts";
 import { installGitHook, harvestAuto } from "../hook.ts";
@@ -71,6 +72,29 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
   if (positional.length === 0) return usageError("search requires a query");
   const limit = parseInt(flags["limit"] ?? "10", 10) || 10;
   const tokenBudget = flags["token-budget"] ? parseInt(flags["token-budget"], 10) : undefined;
+
+  // Tree-indexed retrieval path
+  if (flags["tree"] === "true") {
+    let index = loadTreeIndex(ctx.memoryDir);
+    if (!index) {
+      console.log("no tree index found — building tree index now");
+      index = buildTreeIndex(ctx.store, ctx.memoryDir);
+    }
+    const treeRes = searchTree(index, {
+      query: positional[0],
+      project: flags["project"],
+      type: flags["type"] as any,
+      maxNodes: limit,
+      tokenBudget,
+      disclosureDepth: (flags["depth"] as any) || "L2",
+    });
+    for (const r of treeRes.nodes) {
+      console.log(`- [score=${r.score.toFixed(3)}] ${r.node.title} (${r.node.project})`);
+      if (r.node.summary) console.log(`  ${r.node.summary}`);
+    }
+    console.log(`source=tree-index count=${treeRes.nodes.length} tokens=${treeRes.tokensUsed}`);
+    return 0;
+  }
 
   // Hybrid vector+BM25 path (requires a built index)
   if (flags["hybrid"] === "true") {

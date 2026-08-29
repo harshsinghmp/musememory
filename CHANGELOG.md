@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.4.0] - 2026-08-29
 
 ### Added
 - **MemoryStore Shim Removal**: Deleted the deprecated `MemoryStore` class from `src/store.ts`; free functions are now the sole storage surface and `openStore()` returns a plain `Store` object.
@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Knowledge Graph UI v2**: The embedded dashboard's graph is now a 3D force-directed canvas layout (repulsion + springs, perspective projection, drag-to-rotate, wheel-to-zoom) with nodes colored by type and sized by degree, a timeline slider filtering by `updated_at`, cluster filter checkboxes per project/type, and click-to-inspect in the side panel. All existing HTTP endpoints and the data shape stay backward-compatible; empty graphs render a friendly guard message.
 - **Bi-Temporal Reinforcement Feedback**: Memory entries gain optional `valid_from`/`valid_to` valid-time stamps and a `reinforcement` counter (+1 on confirm, −1 on stale/reject/supersede). Retrieval decay now uses `valid_from` (event time) when set, and reinforcement adds a bounded ±0.05×min(|n|,5) score adjustment.
 - **In-Place Core Memory Partitioning (`memory core`)**: Letta/MemGPT-style permanent operating guidelines in `.memory/CORE.md` across four tiers (`identity`, `directives`, `conventions`, `context`). CLI `memory core <tier> [--set T|--remove|--show]` plus bare listing; new `memory_core` MCP tool; CORE.md content injected into `get_context` between the USER profile and CURRENT constraints sections; Vibeguard secret scan guards writes.
+- **Tree-Indexed Retrieval Architecture (`memory search --tree`, `memory_tree_search`)**: Hierarchical partition routing by `(project, type, YYYY-MM)` with automatic depth balancing, progressive disclosure token budgeting (L1/L2/L3), greedy best-first tree traversal, and incremental memory upsert.
+- **Markdown Wiki Compilation Engine (`memory wiki [compile|list|show]`, `memory_wiki_*`)**: Compiles confirmed memory clusters into structured, Obsidian-compatible Markdown wiki pages under `.memory/wiki/` (`concepts/`, `entities/`, `index.md`, `log.md`) with bidirectional `[[slug]]` wikilinks and incremental change detection.
+- **Named Entity & Concept Extraction (`memory extract-entities`, `memory entities`, `memory_entities_*`)**: Regex-based entity recognition for 5 entity types (`person`, `product`, `organization`, `file`, `concept`), alias normalization, frequency scoring, and co-occurrence relationship building stored in `.memory/entities.json`.
+- **PageIndex Native Reasoning Engine (`memory_pageindex_*`)**: Ingests Markdown/text documents (up to 10MB) into hierarchical tree representations with Vibeguard secret inspection, reasoning-based search with explanation trails, and direct memory import conversion.
+- **Scaled Graph UI with Barnes-Hut Repulsion & Standalone Export**: 3D force-directed layout upgraded with Barnes-Hut quadtree spatial subdivision for $O(n \log n)$ repulsion scaling on large memory stores ($n > 50$), along with offline standalone HTML export via `exportStandaloneHtml()` and `/api/export-html`.
+- **Unified Global & Project Settings Module (`memory settings`, `memory_settings_*`)**: Centralized type-safe settings schema with Zod/AJV validation, directory traversal security guards (`validateSafePath`), file watcher hot-reload, version migrations, and project override scoping.
 - **3-Layer Progressive Disclosure**: `get_context` gains a `depth` tier (default L2). L1 = one line per memory (id + title), L2 = current behavior (title + content + tags), L3 = full raw entry with complete metadata block. Exposed via MCP `depth` param and CLI `memory context --depth L1|L2|L3`.
 
 ### Changed

@@ -244,6 +244,15 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 | `memory_migrate` | **Migration** | Ingest external memories with state preservation and secret scrubbing. |
 | `memory_export` / `import` | **Team Sharing** | Export/import portable JSON memory snapshots. |
 | `memory_validate` | **Integrity Check** | Verify YAML schema conformity and referential integrity. |
+| `memory_tree_search` | **Tree Retrieval** | Hierarchical reasoning search across partitioned memory shards with disclosure depths. |
+| `memory_wiki_compile` | **Wiki Compiler** | Compile confirmed memories into Obsidian-compatible markdown wiki pages. |
+| `memory_wiki_search` / `get` | **Wiki Reading** | Search and read compiled concept/entity wiki pages. |
+| `memory_entities_search` / `get` | **Entity Graph** | Search extracted named entities and inspect co-occurrence strengths. |
+| `memory_pageindex_index` | **Doc Indexing** | Ingest Markdown documents into hierarchical tree representations with secret defense. |
+| `memory_pageindex_search` | **Doc Search** | Search PageIndex document tree with reasoning explanations. |
+| `memory_pageindex_import` | **Doc Knowledge** | Import PageIndex search results into structured memory entries. |
+| `memory_disconnect_pageindex` | **Doc Cleanup** | Disconnect and clean up PageIndex document indexes. |
+| `memory_settings_get` / `set` | **Configuration** | Read and update unified global or project configuration settings. |
 | `graph_status` | **AST Graph** | Inspect CodeGraph symbol overlap provider status. |
 
 ---

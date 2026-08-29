@@ -35,6 +35,11 @@ import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
 import { detectAgents } from "./agents/detect.ts";
 import { connectAgent } from "./connect.ts";
+import { buildTreeIndex, loadTreeIndex, searchTree } from "./retrieval/index.ts";
+import { compileWiki, listWikiPages, getWikiPage } from "./wiki/index.ts";
+import { extractEntitiesFromMemories, saveEntities, loadEntities, findEntity, findRelatedEntities } from "./entities/index.ts";
+import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "./pageindex/index.ts";
+import { getSettings, setSettings, getProjectSettings, setProjectSettings } from "./settings.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export async function runMcpServer(): Promise<void> {
@@ -424,6 +429,157 @@ export async function runMcpServer(): Promise<void> {
           properties: {},
         },
       },
+      {
+        name: "memory_tree_search",
+        description: "Hierarchical tree-indexed reasoning search across partitioned memory shards",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query" },
+            project: { type: "string", description: "Filter by project" },
+            type: { type: "string", description: "Filter by memory type" },
+            token_budget: { type: "number", description: "Token budget limit" },
+            disclosure_depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Disclosure depth tier" },
+            max_nodes: { type: "number", description: "Maximum nodes to return" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "memory_wiki_get",
+        description: "Read a compiled wiki page (concept, entity, index, or log)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            slug: { type: "string", description: "Page slug (e.g. 'index', 'log', or concept slug)" },
+            type: { type: "string", enum: ["concept", "entity", "index", "log"], description: "Optional page type" },
+          },
+          required: ["slug"],
+        },
+      },
+      {
+        name: "memory_wiki_search",
+        description: "List compiled wiki pages with optional filtering",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Filter by project" },
+            type: { type: "string", enum: ["concept", "entity", "index", "log"], description: "Filter by page type" },
+          },
+        },
+      },
+      {
+        name: "memory_wiki_compile",
+        description: "Compile confirmed memories into structured wiki markdown pages",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Project to compile (omit for all)" },
+            dry_run: { type: "boolean", description: "Preview without writing to disk" },
+          },
+        },
+      },
+      {
+        name: "memory_entities_get",
+        description: "Get detailed information about an extracted entity and its relationships",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Entity ID or name" },
+            include_related: { type: "boolean", description: "Include related entities in response" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_entities_search",
+        description: "List extracted entities by type or project",
+        inputSchema: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["person", "product", "organization", "file", "concept"], description: "Filter by entity type" },
+            project: { type: "string", description: "Filter by project" },
+          },
+        },
+      },
+      {
+        name: "memory_pageindex_index",
+        description: "Build a PageIndex-style hierarchical tree index from document/text for reasoning-based retrieval",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string", description: "Document text content (max 10MB)" },
+            project: { type: "string", description: "Project to associate the index with" },
+            title: { type: "string", description: "Optional title for the index" },
+            maxDepth: { type: "number", description: "Max tree depth (default: 5)" },
+            dryRun: { type: "boolean", description: "Preview without persisting" },
+          },
+          required: ["content", "project"],
+        },
+      },
+      {
+        name: "memory_pageindex_search",
+        description: "Search a PageIndex tree index with reasoning-based retrieval",
+        inputSchema: {
+          type: "object",
+          properties: {
+            indexId: { type: "string", description: "Tree index ID to search" },
+            query: { type: "string", description: "Search query" },
+            project: { type: "string", description: "Project scope" },
+            tokenBudget: { type: "number", description: "Maximum token budget" },
+            maxDepth: { type: "number", description: "Max search depth" },
+          },
+          required: ["indexId", "query"],
+        },
+      },
+      {
+        name: "memory_pageindex_import",
+        description: "Import PageIndex search results/insights as memory entries",
+        inputSchema: {
+          type: "object",
+          properties: {
+            indexId: { type: "string", description: "Tree index ID" },
+            query: { type: "string", description: "Search query" },
+            project: { type: "string", description: "Project scope" },
+            type: { type: "string", description: "Memory type (default: discovery)" },
+            confirmed: { type: "boolean", description: "Auto-confirm imported entries" },
+          },
+          required: ["indexId", "query", "project"],
+        },
+      },
+      {
+        name: "memory_disconnect_pageindex",
+        description: "Disconnect PageIndex MCP tools and remove associated indexes",
+        inputSchema: {
+          type: "object",
+          properties: {
+            indexId: { type: "string", description: "Specific index to remove, or omit for all" },
+            project: { type: "string", description: "Project scope" },
+          },
+        },
+      },
+      {
+        name: "memory_settings_get",
+        description: "Read unified global or project configuration settings",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Optional project scope override" },
+          },
+        },
+      },
+      {
+        name: "memory_settings_set",
+        description: "Update unified global or project configuration settings",
+        inputSchema: {
+          type: "object",
+          properties: {
+            settings: { type: "object", description: "Settings object to merge" },
+            project: { type: "string", description: "Optional project scope override" },
+          },
+          required: ["settings"],
+        },
+      },
     ],
   }));
 
@@ -702,6 +858,126 @@ export async function runMcpServer(): Promise<void> {
             maxMatches: typeof a.max_matches === "number" ? a.max_matches : undefined,
           });
           return toolResult(res);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_tree_search": {
+        let index = loadTreeIndex(memoryDir);
+        if (!index) {
+          index = buildTreeIndex(store, memoryDir);
+        }
+        const res = searchTree(index, {
+          query: String(a.query),
+          project: a.project ? String(a.project) : undefined,
+          type: a.type ? (String(a.type) as any) : undefined,
+          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+          disclosureDepth: a.disclosure_depth ? (String(a.disclosure_depth) as any) : undefined,
+          maxNodes: typeof a.max_nodes === "number" ? a.max_nodes : undefined,
+        });
+        return toolResult(res);
+      }
+      case "memory_wiki_get": {
+        const page = getWikiPage(memoryDir, String(a.slug), a.type ? (String(a.type) as any) : undefined);
+        if (!page) return toolError(`Wiki page '${a.slug}' not found.`);
+        return toolResult(page);
+      }
+      case "memory_wiki_search": {
+        const pages = listWikiPages(memoryDir, {
+          project: a.project ? String(a.project) : undefined,
+          type: a.type ? (String(a.type) as any) : undefined,
+        });
+        return toolResult({ pages, count: pages.length });
+      }
+      case "memory_wiki_compile": {
+        const res = compileWiki(store, memoryDir, {
+          project: a.project ? String(a.project) : undefined,
+          dryRun: a.dry_run === true,
+        });
+        return toolResult(res);
+      }
+      case "memory_entities_get": {
+        const ent = findEntity(memoryDir, String(a.id));
+        if (!ent) return toolError(`Entity '${a.id}' not found.`);
+        if (a.include_related === true) {
+          const rel = findRelatedEntities(memoryDir, String(a.id));
+          return toolResult({ entity: ent, related: rel });
+        }
+        return toolResult(ent);
+      }
+      case "memory_entities_search": {
+        let entities = loadEntities(memoryDir);
+        if (a.type) entities = entities.filter((e) => e.type === a.type);
+        if (a.project) entities = entities.filter((e) => !e.project || e.project === a.project);
+        return toolResult({ entities, count: entities.length });
+      }
+      case "memory_pageindex_index": {
+        try {
+          const doc = buildPageIndex(String(a.content), {
+            project: String(a.project),
+            title: a.title ? String(a.title) : undefined,
+            maxDepth: typeof a.maxDepth === "number" ? a.maxDepth : undefined,
+            dryRun: a.dryRun === true,
+            memoryDir,
+          });
+          return toolResult(doc);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_pageindex_search": {
+        const project = a.project ? String(a.project) : "default";
+        const doc = loadPageIndex(memoryDir, project, String(a.indexId));
+        if (!doc) return toolError(`PageIndex '${a.indexId}' not found for project '${project}'`);
+        const res = searchPageIndex(doc, {
+          query: String(a.query),
+          maxDepth: typeof a.maxDepth === "number" ? a.maxDepth : undefined,
+          maxNodes: typeof a.maxNodes === "number" ? a.maxNodes : undefined,
+          tokenBudget: typeof a.tokenBudget === "number" ? a.tokenBudget : undefined,
+        });
+        return toolResult(res);
+      }
+      case "memory_pageindex_import": {
+        const project = String(a.project);
+        const doc = loadPageIndex(memoryDir, project, String(a.indexId));
+        if (!doc) return toolError(`PageIndex '${a.indexId}' not found for project '${project}'`);
+        const search = searchPageIndex(doc, { query: String(a.query), maxNodes: 5 });
+        const imported: MemoryEntry[] = [];
+        for (const item of search.results) {
+          const entry = proposeMemory(store, {
+            project,
+            title: item.title,
+            content: `${item.summary}\n\nPath: ${item.path}`,
+            type: a.type ? (String(a.type) as any) : "discovery",
+            confirmed: a.confirmed === true,
+          });
+          imported.push(entry);
+        }
+        return toolResult({ importedCount: imported.length, entries: imported });
+      }
+      case "memory_disconnect_pageindex": {
+        const res = deletePageIndex(
+          memoryDir,
+          a.project ? String(a.project) : undefined,
+          a.indexId ? String(a.indexId) : undefined,
+        );
+        return toolResult({ success: true, deletedIndexes: res.deletedCount });
+      }
+      case "memory_settings_get": {
+        const settings = a.project
+          ? getProjectSettings(memoryDir, String(a.project))
+          : getSettings(memoryDir);
+        return toolResult(settings);
+      }
+      case "memory_settings_set": {
+        try {
+          if (a.project) {
+            const updated = setProjectSettings(memoryDir, String(a.project), a.settings as any);
+            return toolResult(updated);
+          } else {
+            const updated = setSettings(memoryDir, a.settings as any);
+            return toolResult(updated);
+          }
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }

@@ -25,6 +25,9 @@ import {
   handleReindexCommand,
 } from "./cli/retrieval.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
+import { handleWikiCommand } from "./cli/wiki.ts";
+import { handleEntitiesCommand, handleExtractEntitiesCommand } from "./cli/entities.ts";
+import { handleSettingsCommand } from "./cli/settings.ts";
 import {
   handleProposeCommand,
   handleCaptureCommand,
@@ -88,12 +91,18 @@ Core Memory Lifecycle Commands:
 
 Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context
-  search <query> [--limit N] [--token-budget N] [--hybrid] Scored token retrieval (hybrid: offline vector+BM25 via index)
+  search <query> [--limit N] [--token-budget N] [--hybrid] [--tree] Scored token retrieval (hybrid: vector+BM25, tree: hierarchical reasoning)
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
   recall [query]                Search active/confirmed memories with filters
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
-Persona & Constraints Commands:
+Wiki & Entity Knowledge Compounding:
+  wiki [compile|list|show]      Compile memories into structured Obsidian-compatible markdown wiki pages
+  extract-entities [--dry-run]  Extract named entities (persons, products, orgs, files, concepts) from memories
+  entities [list|show|related]  Inspect extracted knowledge graph entities and co-occurrences
+
+Persona, Settings & Constraints Commands:
+  settings [get|set|reset|export|import] Manage unified global and project configuration
   user [get|init|set] [--global] Manage USER.md persona & working preferences
   current [get|set]             Manage CURRENT.md active project constraints
   core [tier] [--set T|--remove|--show] Manage CORE.md permanent partitions (identity|directives|conventions|context)
@@ -235,6 +244,14 @@ export async function main(argv: string[]): Promise<number> {
       return handleVerifyCommand(parsed);
     case "session":
       return handleSessionCommand(parsed);
+    case "wiki":
+      return handleWikiCommand(parsed);
+    case "extract-entities":
+      return handleExtractEntitiesCommand(parsed);
+    case "entities":
+      return handleEntitiesCommand(parsed);
+    case "settings":
+      return handleSettingsCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);

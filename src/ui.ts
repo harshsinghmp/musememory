@@ -95,6 +95,14 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      if (pathname === "/api/export-html" && req.method === "GET") {
+        const html = exportStandaloneHtml(opts.store);
+        res.setHeader("Content-Disposition", 'attachment; filename="musememory-graph.html"');
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+        return;
+      }
+
       // Default: Serve Embedded Single-Page Application
       if (pathname === "/" || pathname === "/index.html") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -275,8 +283,12 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 
     async function loadData() {
       try {
-        const res = await fetch('/api/memories');
-        allMemories = await res.json();
+        if (window.STANDALONE_DATA) {
+          allMemories = window.STANDALONE_DATA;
+        } else {
+          const res = await fetch('/api/memories');
+          allMemories = await res.json();
+        }
         renderList();
         initGraph();
         buildClusterFilters();
@@ -447,20 +459,96 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       simAlpha = 1; // re-energize layout after data changes
     }
 
+    function buildQuadtree(nodes) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of nodes) {
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+      }
+      const size = Math.max(maxX - minX, maxY - minY, 100);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+
+      function createQuad(x, y, s) {
+        return { x, y, size: s, mass: 0, cx: 0, cy: 0, cz: 0, body: null, children: null };
+      }
+      const root = createQuad(cx, cy, size);
+
+      function insert(tree, body) {
+        if (tree.mass === 0) {
+          tree.body = body;
+          tree.cx = body.x; tree.cy = body.y; tree.cz = body.z;
+          tree.mass = 1;
+          return;
+        }
+        if (!tree.children) {
+          const b2 = tree.body;
+          tree.body = null;
+          const hs = tree.size / 2;
+          const qs = tree.size / 4;
+          tree.children = [
+            createQuad(tree.x - qs, tree.y - qs, hs),
+            createQuad(tree.x + qs, tree.y - qs, hs),
+            createQuad(tree.x - qs, tree.y + qs, hs),
+            createQuad(tree.x + qs, tree.y + qs, hs)
+          ];
+          if (b2) insertChild(tree, b2);
+        }
+        tree.cx = (tree.cx * tree.mass + body.x) / (tree.mass + 1);
+        tree.cy = (tree.cy * tree.mass + body.y) / (tree.mass + 1);
+        tree.cz = (tree.cz * tree.mass + body.z) / (tree.mass + 1);
+        tree.mass++;
+        insertChild(tree, body);
+      }
+
+      function insertChild(tree, body) {
+        const idx = (body.x >= tree.x ? 1 : 0) + (body.y >= tree.y ? 2 : 0);
+        insert(tree.children[idx], body);
+      }
+
+      for (const n of nodes) insert(root, n);
+      return root;
+    }
+
+    function applyRepulsionBarnesHut(nodes, tree, theta, alpha) {
+      for (const a of nodes) computeForce(a, tree);
+
+      function computeForce(a, node) {
+        if (node.mass === 0 || node.body === a) return;
+        let dx = a.x - node.cx, dy = a.y - node.cy, dz = a.z - node.cz;
+        let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
+        let dist = Math.sqrt(dist2);
+        if (node.children && (node.size / dist) > theta) {
+          for (const child of node.children) computeForce(a, child);
+        } else {
+          const force = (2400 * alpha * node.mass) / dist2;
+          dx /= dist; dy /= dist; dz /= dist;
+          a.x += dx * force; a.y += dy * force; a.z += dz * force;
+        }
+      }
+    }
+
     function simulateStep() {
       if (nodes3d.length === 0) return;
       const alpha = simAlpha;
-      // Pairwise repulsion (O(n^2) — fine at memory-store scale)
-      for (let i = 0; i < nodes3d.length; i++) {
-        for (let j = i + 1; j < nodes3d.length; j++) {
-          const a = nodes3d[i], b = nodes3d[j];
-          let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-          let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
-          const force = (2400 * alpha) / dist2;
-          const dist = Math.sqrt(dist2);
-          dx /= dist; dy /= dist; dz /= dist;
-          a.x += dx * force; a.y += dy * force; a.z += dz * force;
-          b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+      if (nodes3d.length > 50) {
+        const qtree = buildQuadtree(nodes3d);
+        applyRepulsionBarnesHut(nodes3d, qtree, 0.6, alpha);
+      } else {
+        // Pairwise repulsion (O(n^2) for small graphs)
+        for (let i = 0; i < nodes3d.length; i++) {
+          for (let j = i + 1; j < nodes3d.length; j++) {
+            const a = nodes3d[i], b = nodes3d[j];
+            let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+            let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
+            const force = (2400 * alpha) / dist2;
+            const dist = Math.sqrt(dist2);
+            dx /= dist; dy /= dist; dz /= dist;
+            a.x += dx * force; a.y += dy * force; a.z += dz * force;
+            b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+          }
         }
       }
       // Springs along graph edges
@@ -664,3 +752,9 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
   </script>
 </body>
 </html>`;
+
+export function exportStandaloneHtml(store: Store): string {
+  const memories = list(store);
+  const script = `<script>window.STANDALONE_DATA = ${JSON.stringify(memories)};</script>`;
+  return EMBEDDED_HTML.replace("</head>", `${script}\n</head>`);
+}

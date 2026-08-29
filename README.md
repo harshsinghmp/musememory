@@ -6,7 +6,7 @@
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
 ![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-128%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-249%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
@@ -363,6 +363,12 @@ Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull req
 | ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
 | ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
 | ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ✅ | Tree-Indexed Partitioned Shards & Retrieval (`memory search --tree`) — SOW-107 | [#34](https://github.com/harshsinghmp/musememory/issues/34) |
+| ✅ | Markdown Wiki Compilation Engine (`memory wiki`) — SOW-108 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
+| ✅ | Named Entity & Concept Extraction (`memory extract-entities` / `entities`) — SOW-109 | [#36](https://github.com/harshsinghmp/musememory/issues/36) |
+| ✅ | PageIndex Native Reasoning Tree Engine (`memory_pageindex_*`) — SOW-110 | [#37](https://github.com/harshsinghmp/musememory/issues/37) |
+| ✅ | Scaled Graph UI with Barnes-Hut Repulsion ($O(n \log n)$) & Standalone Export — SOW-111 | [#38](https://github.com/harshsinghmp/musememory/issues/38) |
+| ✅ | Unified Global & Project Settings Module (`memory settings`) — SOW-112 | [#39](https://github.com/harshsinghmp/musememory/issues/39) |
 
 ---
 
@@ -408,6 +414,10 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `routine`           | `run <name>` / `install [name]`                                                                        | Execute `.memory/routines.yaml` steps or print crontab lines (cron-invoked, no daemon).                            |
 | `stale`             | `[--days N] [--global]`                                                                                | Audit active entries exceeding per-type staleness policies.                                                       |
 | `session`           | `start --project P [--note T]` / `end <id>`                                                            | Record session start/end timeline nodes.                                                                          |
+| `wiki`              | `compile\|list\|show <slug> [--project P] [--type T]`                                                  | Compile and browse Obsidian-compatible Markdown wiki pages (`wiki/concepts/`, `wiki/entities/`).                 |
+| `extract-entities`  | `[--project P] [--dry-run]`                                                                            | Extract named entities (persons, products, orgs, files, concepts) from confirmed memories into `entities.json`.   |
+| `entities`          | `list\|show <id>\|related <id> [--type T] [--project P]`                                               | Inspect extracted knowledge graph entities and co-occurrence relationship strengths.                              |
+| `settings`          | `get\|set\|reset\|export\|import [key] [val] [--project P]`                                            | Manage unified configuration across retrieval, wiki, PageIndex, extraction, and UI subsystems.                    |
 | `current`           | `get` / `set <text> --project P`                                                                       | Read or append hard constraints to `.memory/CURRENT.md`.                                                          |
 | `graph`             | `status`                                                                                               | Query active CodeGraph provider status.                                                                           |
 | `mcp`               | *(none)*                                                                                               | Start stdio MCP server.                                                                                           |
@@ -424,6 +434,18 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 | :-------------------------- | :--------------------------------------------------------------------------------------------------- |
 | `get_context`               | Fetches Top-$K$ ranked memories tailored for active prompt injection with optional `token_budget`.  |
 | `search`                    | Searches memory units with query, token budget, project, type, and verification filters.            |
+| `memory_tree_search`        | Hierarchical tree-indexed reasoning search across partitioned memory shards.                        |
+| `memory_wiki_compile`       | Compiles confirmed memories into structured Obsidian-compatible Markdown wiki pages.                |
+| `memory_wiki_search`        | Lists compiled wiki pages with optional project/type filtering.                                     |
+| `memory_wiki_get`           | Reads a compiled wiki page (concept, entity, index, or log).                                         |
+| `memory_entities_search`    | Lists extracted entities with type/project filtering.                                               |
+| `memory_entities_get`       | Inspects extracted entity details and related co-occurrence connections.                            |
+| `memory_pageindex_index`    | Builds a PageIndex hierarchical reasoning tree from document/text (up to 10MB).                     |
+| `memory_pageindex_search`   | Searches a PageIndex tree index with reasoning explanations and depth budgeting.                    |
+| `memory_pageindex_import`   | Imports PageIndex insights directly as memory units.                                                |
+| `memory_disconnect_pageindex`| Disconnects and cleans up PageIndex tree indexes.                                                   |
+| `memory_settings_get`       | Reads unified global or project configuration settings.                                             |
+| `memory_settings_set`       | Updates unified configuration settings with schema validation.                                      |
 | `memory_get_user_profile`   | Reads the active user persona and preferences (`USER.md`).                                          |
 | `memory_set_user_profile`   | Updates `USER.md` persona and preferences with inline secret defense.                               |
 | `memory_search_transcripts` | Full-text search over past `.jsonl` transcripts with conversation bookends and context window.      |
@@ -500,7 +522,7 @@ rm -f ~/.local/bin/memory ~/.local/bin/musememory
 
 ```bash
 bun install
-bun test          # 128 tests passing across 22 test suites
+bun test          # 249 tests passing across 43 test suites
 bunx tsc --noEmit # 0 type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```

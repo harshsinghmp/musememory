@@ -16,7 +16,9 @@ build/
 .agentmemory/
 .beads/
 .codegraph/
+.opencode/
 .jez/
+.orca/
 
 # Environment Variables & Secrets (LifeOS Vibeguard Protocol)
 .env

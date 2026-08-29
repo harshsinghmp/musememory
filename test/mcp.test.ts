@@ -109,4 +109,36 @@ describe("mcp tool handlers logic", () => {
 
     cleanup(root);
   });
+
+  test("wiki, entities, pageindex, and settings handlers logic", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    const { compileWiki, listWikiPages, getWikiPage } = await import("../src/wiki/index.ts");
+    const { extractEntitiesFromMemories, saveEntities, loadEntities, findEntity } = await import("../src/entities/index.ts");
+    const { buildPageIndex, searchPageIndex, deletePageIndex } = await import("../src/pageindex/index.ts");
+    const { getSettings, setSettings, getProjectSettings, setProjectSettings } = await import("../src/settings.ts");
+
+    // 1. Wiki
+    const wikiRes = compileWiki(store, memoryDir, { dryRun: true });
+    expect(Array.isArray(wikiRes.pagesCreated)).toBe(true);
+
+    // 2. Entities
+    const mems = (await import("../src/store.ts")).list(store);
+    const entRes = extractEntitiesFromMemories(mems);
+    expect(Array.isArray(entRes.entities)).toBe(true);
+
+    // 3. PageIndex
+    const doc = buildPageIndex("# Arch\n## Subtopic\nDetails here", { project: "test", memoryDir, dryRun: true });
+    const pSearch = searchPageIndex(doc, { query: "Subtopic" });
+    expect(pSearch.results.length).toBeGreaterThan(0);
+
+    // 4. Settings
+    const s = getSettings(memoryDir);
+    expect(s.retrieval.defaultMode).toBe("hybrid");
+    setSettings(memoryDir, { ui: { ...s.ui, theme: "dark" } });
+    expect(getSettings(memoryDir).ui.theme).toBe("dark");
+
+    cleanup(root);
+  });
 });
