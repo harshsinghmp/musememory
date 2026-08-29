@@ -232,6 +232,246 @@ Navigate to `http://localhost:2222` to access:
 
 ---
 
+<<<<<<< HEAD
+## 💻 Complete CLI Command Reference
+||||||| f9a7a44
+## ⚡ How Memory Grows, Reloads &amp; Auto-Archives
+
+```mermaid
+flowchart TD
+    subgraph HotPath["Active Conversation (Hot Path)"]
+        User["User asks question / gives task"]
+        Agent["AI Agent executes turn"]
+        Recall["1. Auto-Retrieve Top-K Context & Active Constraints"]
+        Distill["2. Auto-Distill Fixes & Decisions (Harvest)"]
+    end
+
+    subgraph DefenseGate["Self-Contained Vibeguard"]
+        Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
+    end
+
+    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.memory/)"]
+        Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
+        Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
+        Decay["6. Temporal Staleness Decay & Auto-Archiving"]
+    end
+
+    User --> Agent
+    Agent --> Recall
+    Recall --> Agent
+    Agent --> Distill
+    Distill --> Scan
+    Scan --> Atomic
+    Atomic --> Lifecycle
+    Lifecycle --> Decay
+```
+
+- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.memory/memories/`.
+- **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
+- **Smart Archiving &amp; Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
+
+---
+
+## 👤 User Persona & Preferences (`USER.md`) & Setup Wizard
+
+Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style, communication preferences, and toolchain rules.
+
+### 🎭 5 Zero-Fingerprint Role Archetypes
+
+When running `memory install`, an interactive setup wizard configures your primary archetype (or choose one manually anytime):
+
+1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
+4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
+5. **`custom`**: Clean blank template ready for personalized instructions.
+
+```bash
+# View active profile
+memory user get
+
+# Initialize with a specific archetype
+memory user init developer
+memory user init designer --global
+
+# Update user profile
+memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
+```
+
+### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
+When `get_context` or `formatPromptContext()` builds the LLM prompt context, it structures information deterministically:
+1. **`### User Profile & Preferences (USER.md)`** (Tone, role, rules)
+2. **`### Active Working Constraints (CURRENT.md)`** (Project invariants & open loops)
+3. **`### Relevant Memories & Learned Patterns`** (Top-$K$ ranked memories)
+4. **`*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`**
+
+---
+
+## 📜 Full-Text Transcript Search with Conversation Bookends
+
+Search across past `.jsonl` transcripts (Claude Code, Cursor, Antigravity, Codex) with surrounding dialogue context windows and session start/end bookends:
+
+```bash
+# Search transcript with dialogue window
+memory search-transcript "database connection pooling" session.jsonl --window 2 --max 5
+```
+
+---
+
+## 🛡️ Built-In Vibeguard Secret Defense (Zero External Dependencies)
+
+`musememory` includes a pure TypeScript, zero-dependency security scanner that protects your repositories:
+
+- **Zero-Leakage Guarantee**: Intercepts OpenAI/Anthropic keys (`sk-*`), GitHub tokens (`ghp_*`), NPM tokens, AWS access keys (`AKIA*`), private key blocks, database connection strings, and plaintext credentials before they can ever be written to disk.
+- **100% Standalone**: Does not require any external scripts or system installations.
+
+---
+
+## 🔮 Scope of Work & Roadmap
+
+Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Status: ☐ planned · ◐ in progress · ✅ done. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
+
+| Status | Item | Tracker |
+| :--- | :--- | :--- |
+| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
+| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
+| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
+| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
+| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
+| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
+| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
+| ✅ | Delete Deprecated `MemoryStore` Shim *(target: October 2026)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
+| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
+| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
+| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
+| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
+| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
+| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
+| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
+| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
+| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
+## ⚡ How Memory Grows, Reloads &amp; Auto-Archives
+
+```mermaid
+flowchart TD
+    subgraph HotPath["Active Conversation (Hot Path)"]
+        User["User asks question / gives task"]
+        Agent["AI Agent executes turn"]
+        Recall["1. Auto-Retrieve Top-K Context & Active Constraints"]
+        Distill["2. Auto-Distill Fixes & Decisions (Harvest)"]
+    end
+
+    subgraph DefenseGate["Self-Contained Vibeguard"]
+        Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
+    end
+
+    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.memory/)"]
+        Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
+        Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
+        Decay["6. Temporal Staleness Decay & Auto-Archiving"]
+    end
+
+    User --> Agent
+    Agent --> Recall
+    Recall --> Agent
+    Agent --> Distill
+    Distill --> Scan
+    Scan --> Atomic
+    Atomic --> Lifecycle
+    Lifecycle --> Decay
+```
+
+- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.memory/memories/`.
+- **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
+- **Smart Archiving &amp; Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
+
+---
+
+## 👤 User Persona & Preferences (`USER.md`) & Setup Wizard
+
+Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style, communication preferences, and toolchain rules.
+
+### 🎭 5 Zero-Fingerprint Role Archetypes
+
+When running `memory install`, an interactive setup wizard configures your primary archetype (or choose one manually anytime):
+
+1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
+4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
+5. **`custom`**: Clean blank template ready for personalized instructions.
+
+```bash
+# View active profile
+memory user get
+
+# Initialize with a specific archetype
+memory user init developer
+memory user init designer --global
+
+# Update user profile
+memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
+```
+
+### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
+When `get_context` or `formatPromptContext()` builds the LLM prompt context, it structures information deterministically:
+1. **`### User Profile & Preferences (USER.md)`** (Tone, role, rules)
+2. **`### Active Working Constraints (CURRENT.md)`** (Project invariants & open loops)
+3. **`### Relevant Memories & Learned Patterns`** (Top-$K$ ranked memories)
+4. **`*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`**
+
+---
+
+## 📜 Full-Text Transcript Search with Conversation Bookends
+
+Search across past `.jsonl` transcripts (Claude Code, Cursor, Antigravity, Codex) with surrounding dialogue context windows and session start/end bookends:
+
+```bash
+# Search transcript with dialogue window
+memory search-transcript "database connection pooling" session.jsonl --window 2 --max 5
+```
+
+---
+
+## 🛡️ Built-In Vibeguard Secret Defense (Zero External Dependencies)
+
+`musememory` includes a pure TypeScript, zero-dependency security scanner that protects your repositories:
+
+- **Zero-Leakage Guarantee**: Intercepts OpenAI/Anthropic keys (`sk-*`), GitHub tokens (`ghp_*`), NPM tokens, AWS access keys (`AKIA*`), private key blocks, database connection strings, and plaintext credentials before they can ever be written to disk.
+- **100% Standalone**: Does not require any external scripts or system installations.
+
+---
+
+## 🔮 Scope of Work & Roadmap
+
+Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Status: ☐ planned · ◐ in progress · ✅ done. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
+
+| Status | Item | Tracker |
+| :--- | :--- | :--- |
+| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
+| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
+| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
+| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
+| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
+| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
+| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
+| ✅ | Delete Deprecated `MemoryStore` Shim *(target: October 2026)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
+| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
+| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
+| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
+| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
+| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
+| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
+| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
+| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
+| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
+| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ☐ | AST Symbol Graph Integration (CodeGraph / Graphify provider) — SOW-107 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
+
+---
+
 ## 💻 Complete CLI Command Reference
 
 ```bash
