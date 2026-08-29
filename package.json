@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
@@ -23,7 +23,6 @@
     "typecheck": "tsc --noEmit",
     "validate": "bun run dist/index.js validate --dry-run",
     "start": "bun run dist/index.js mcp",
-    "postinstall": "node scripts/postinstall.js || true",
     "prepublishOnly": "bun run build && bun test"
   },
   "keywords": [
