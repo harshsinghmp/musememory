@@ -286,6 +286,10 @@ export function loadEntities(memoryDir: string): Entity[] {
   }
 }
 
+/**
+ * Finds an entity by exact ID, display name, slug, or punctuation-normalized alphanumeric match.
+ * Example: matches "nextjs", "next.js", or "next-js" reliably to the same canonical entity.
+ */
 export function findEntity(memoryDir: string, id: string): Entity | null {
   const entities = loadEntities(memoryDir);
   const cleanId = slugify(id);
