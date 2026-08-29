@@ -103,6 +103,10 @@ git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
 
+> [!NOTE]
+> ### 📊 How does Muse Memory compare to other solutions?
+> Explore our interactive, table-free **[30-System Architectural Comparison Dossier](musememory-comparison.html)** (`musememory-comparison.html`) to inspect concrete architectural differentials and one-click migration recipes against 29 external memory engines (Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, etc.).
+
 ---
 
 ## 🔄 Complete NPX Lifecycle (Install → Verify → Connect → Uninstall)
