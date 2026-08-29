@@ -11,6 +11,9 @@ export const ALL_MEMORY_TOOLS = [
   "get_context",
   "search",
   "memory_capture",
+  "memory_current",
+  "memory_get_constraints",
+  "memory_set_constraints",
   "memory_harvest",
   "memory_import_transcript",
   "memory_search_transcripts",
@@ -27,10 +30,23 @@ export const ALL_MEMORY_TOOLS = [
   "memory_detect_providers",
   "memory_migrate",
   "memory_detect_agents",
+  "memory_connect",
   "memory_export",
   "memory_import",
   "memory_validate",
   "graph_status",
+  "memory_tree_search",
+  "memory_wiki_compile",
+  "memory_wiki_search",
+  "memory_wiki_get",
+  "memory_entities_search",
+  "memory_entities_get",
+  "memory_pageindex_index",
+  "memory_pageindex_search",
+  "memory_pageindex_import",
+  "memory_disconnect_pageindex",
+  "memory_settings_get",
+  "memory_settings_set",
 ];
 
 export { ConnectOptions, ConnectReport };
@@ -331,7 +347,10 @@ export function connectAgent(
     for (const a of installed) {
       const def = AGENT_REGISTRY.find((r) => r.id === a.id);
       if (def) {
-        reports.push(wireAgentFormat(def, home, options, a.configPath));
+        const rep = wireAgentFormat(def, home, options, a.configPath);
+        if (rep.updated || rep.installed || options.force) {
+          reports.push(rep);
+        }
       }
     }
     return reports;

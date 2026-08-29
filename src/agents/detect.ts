@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { AGENT_REGISTRY } from "./registry.ts";
@@ -52,8 +52,12 @@ export function findBinary(binName: string, home: string = homedir()): string | 
   for (const dir of candidateDirs) {
     const fullPath = join(dir, binName);
     if (existsSync(fullPath)) {
-      BINARY_CACHE.set(cacheKey, fullPath);
-      return fullPath;
+      try {
+        if (statSync(fullPath).isFile()) {
+          BINARY_CACHE.set(cacheKey, fullPath);
+          return fullPath;
+        }
+      } catch {}
     }
   }
 

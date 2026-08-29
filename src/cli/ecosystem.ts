@@ -1,10 +1,44 @@
 import { join } from "node:path";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { getGlobalMemoryDir } from "../root.ts";
 import { userFilePath, initUserProfile } from "../user.ts";
 import { detectProviders, runMigration } from "../migrator/index.ts";
 import { getGraphStatus } from "../graph.ts";
 import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
+
+export const MUSE_MEMORY_DIRECTIVE = `<!-- musememory:start -->
+## 🧠 Persistent Cognitive Memory (Muse Memory)
+
+You are connected to **Muse Memory** via the \`memory\` MCP server.
+
+### 🚀 Session Start & Task Lifecycle:
+1. **Session Start / Context Loading**: At the start of a task or session, call \`get_context(query=...)\` to retrieve the active user profile (\`USER.md\`), active hard constraints (\`CURRENT.md\`), and top relevant past architecture decisions/bug fixes before answering or modifying code.
+2. **Active Working Constraints**: When hard constraints, open loops, or project invariants are established or modified, immediately record them to \`CURRENT.md\` via \`memory_capture(type="constraint")\` or updating \`CURRENT.md\`.
+3. **Learning Durable Knowledge**: Whenever you solve a non-trivial bug, make an architectural decision, discover an operational rule, or learn user preferences, immediately call \`memory_capture\` to persist it as an atomic memory unit.
+4. **Verification & Supersession**: When replacing outdated patterns or obsolete rules, call \`memory_supersede\` to link the old memory to the new confirmed memory so future sessions never hallucinate deprecated methods.
+<!-- musememory:end -->`;
+
+export function ensureProjectAgentInstructions(targetDir: string): void {
+  const agentsMdPath = join(targetDir, "AGENTS.md");
+  if (existsSync(agentsMdPath)) {
+    try {
+      const existing = readFileSync(agentsMdPath, "utf8");
+      if (existing.includes("<!-- agentmemory:start -->")) {
+        const updated = existing.replace(
+          /<!-- agentmemory:start -->[\s\S]*?<!-- agentmemory:end -->/,
+          MUSE_MEMORY_DIRECTIVE,
+        );
+        writeFileSync(agentsMdPath, updated, "utf8");
+      } else if (!existing.includes("<!-- musememory:start -->") && !existing.includes("Muse Memory")) {
+        writeFileSync(agentsMdPath, `${existing.trim()}\n\n${MUSE_MEMORY_DIRECTIVE}\n`, "utf8");
+      }
+    } catch {}
+  } else {
+    const initialContent = `# Project Guidelines & Agent Instructions\n\n${MUSE_MEMORY_DIRECTIVE}\n`;
+    writeFileSync(agentsMdPath, initialContent, "utf8");
+  }
+}
 
 export async function handleInstallCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const isGlobal = flags["global"] === "true" || flags["g"] === "true";
@@ -37,6 +71,25 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     );
     initUserProfile(globalDir, selectedArchetype);
     console.log(`[+] Initialized global USER.md profile (${globalUserPath}) with '${selectedArchetype}' archetype.`);
+  }
+
+  if (!isGlobal) {
+    ensureProjectAgentInstructions(targetDir);
+  }
+
+  // Update global ~/.agents/AGENTS.md if present
+  const globalAgentsMd = join(homedir(), ".agents", "AGENTS.md");
+  if (existsSync(globalAgentsMd)) {
+    try {
+      const existing = readFileSync(globalAgentsMd, "utf8");
+      if (existing.includes("<!-- agentmemory:start -->")) {
+        const updated = existing.replace(
+          /<!-- agentmemory:start -->[\s\S]*?<!-- agentmemory:end -->/,
+          MUSE_MEMORY_DIRECTIVE,
+        );
+        writeFileSync(globalAgentsMd, updated, "utf8");
+      }
+    } catch {}
   }
 
   console.log(`[+] Initialized Muse Memory in ${memoryDir}`);
@@ -112,6 +165,9 @@ export async function handleInitCommand({ positional, flags }: ParsedArgs): Prom
   const currentPath = join(memoryDir, "CURRENT.md");
   if (!existsSync(currentPath)) {
     writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
+  }
+  if (!isGlobal) {
+    ensureProjectAgentInstructions(targetDir);
   }
   console.log(`Initialized memory store in ${memoryDir}`);
   const detected = detectProviders(targetDir);

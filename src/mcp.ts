@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -17,6 +18,7 @@ import {
 } from "./commands/lifecycle.ts";
 import { harvestMemory } from "./commands/retrieval.ts";
 import { queryContext, formatPromptContext } from "./retrieval.ts";
+import { getCurrent, setCurrent } from "./current.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -47,9 +49,30 @@ export async function runMcpServer(): Promise<void> {
   const { root, memoryDir } = findOrCreateProjectRoot(targetDir);
   const store = openStore(memoryDir);
 
+  function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
+    const dir = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
+    if (typeof dir === "string" && dir.trim()) {
+      const resolved = findOrCreateProjectRoot(dir.trim());
+      return {
+        activeStore: openStore(resolved.memoryDir),
+        activeMemoryDir: resolved.memoryDir,
+        activeRoot: resolved.root,
+      };
+    }
+    return { activeStore: store, activeMemoryDir: memoryDir, activeRoot: root };
+  }
+
   const server = new Server(
-    { name: "musememory", version: "1.2.0" },
-    { capabilities: { tools: {} } },
+    { name: "musememory", version: "1.4.0" },
+    {
+      capabilities: { tools: {}, logging: {} },
+      instructions: `MUSE MEMORY PROTOCOL:
+You are equipped with Muse Memory, an autonomous persistent cognitive memory system.
+1. SESSION START / FIRST TURN: You MUST call 'get_context' on your very first turn in any conversation or task. This loads the user's role profile (USER.md), active working constraints (CURRENT.md), and relevant past decisions/fixes.
+2. WORKING CONSTRAINTS: When hard constraints, open loops, or project invariants are established or modified, immediately record them to CURRENT.md via 'memory_capture' (type='constraint') or 'memory_current'.
+3. CONTINUOUS KNOWLEDGE CAPTURE: Whenever you resolve a bug, make an architectural decision, or establish a project convention, immediately call 'memory_capture' to persist it.
+4. RETRIEVAL & VERIFICATION: Call 'search' or 'memory_tree_search' to inspect historical context. Call 'memory_supersede' when replacing outdated knowledge.`,
+    },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -65,12 +88,13 @@ export async function runMcpServer(): Promise<void> {
       },
       {
         name: "get_context",
-        description: "Ranked active context entries for prompt injection (with optional token budget)",
+        description: "MANDATORY ON SESSION START: Fetch Top-K relevant memories, active user profile (USER.md), and active hard constraints (CURRENT.md) for prompt injection. MUST be called on the first turn of any task or session.",
         inputSchema: {
           type: "object",
           properties: {
             query: { type: "string" },
             project: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
             limit: { type: "number" },
             token_budget: { type: "number", description: "Maximum token budget to consume for retrieved context" },
             type: { type: "string" },
@@ -87,6 +111,8 @@ export async function runMcpServer(): Promise<void> {
           type: "object",
           properties: {
             query: { type: "string" },
+            project: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
             limit: { type: "number" },
             token_budget: { type: "number", description: "Maximum token budget to consume" },
             include_superseded: { type: "boolean" },
@@ -100,18 +126,46 @@ export async function runMcpServer(): Promise<void> {
       },
       {
         name: "memory_capture",
-        description: "Create a new memory entry with inline secret scan (refuses probable secrets)",
+        description: "Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', automatically appends to CURRENT.md.",
         inputSchema: {
           type: "object",
           properties: {
             content: { type: "string" },
             project: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
             title: { type: "string" },
             tags: { type: "array", items: { type: "string" } },
             type: { type: "string" },
             confirmed: { type: "boolean" },
           },
-          required: ["content", "project"],
+          required: ["content"],
+        },
+      },
+      {
+        name: "memory_current",
+        description: "Read or append active working constraints and hard invariants in CURRENT.md for the active project",
+        inputSchema: {
+          type: "object",
+          properties: {
+            action: {
+              type: "string",
+              enum: ["get", "append"],
+              description: "Action: 'get' to read active constraints, 'append' to record a new constraint",
+            },
+            constraint: {
+              type: "string",
+              description: "The constraint text to append when action is 'append'",
+            },
+            project: {
+              type: "string",
+              description: "Project scope name (defaults to active project)",
+            },
+            dir: {
+              type: "string",
+              description: "Optional project workspace directory path",
+            },
+          },
+          required: ["action"],
         },
       },
       {
@@ -590,76 +644,100 @@ export async function runMcpServer(): Promise<void> {
     try {
       switch (name) {
         case "memory_read": {
-        const entry = get(store, String(a.id));
-        if (!entry) return toolError(`no entry with id ${a.id}`);
-        return toolResult(entry);
-      }
-      case "get_context": {
-        const formatted = formatPromptContext(store, memoryDir, String(a.query ?? ""), {
-          limit: typeof a.limit === "number" ? a.limit : 5,
-          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
-          project: a.project ? String(a.project) : undefined,
-          includeSuperseded: false,
-          type: a.type ? String(a.type) : undefined,
-          status: a.status ? String(a.status) : undefined,
-          verified: a.verified === true,
-          depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
-        });
-        return toolResult({
-          markdown: formatted.markdown,
-          entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
-          total_tokens_used: formatted.totalTokensUsed,
-          constraints: formatted.constraints,
-          user_profile: formatted.userProfile,
-        });
-      }
-      case "memory_recall":
-      case "search": {
-        if (a.hybrid === true) {
-          const hybrid = hybridSearch(store, memoryDir, String(a.query), {
-            limit: typeof a.limit === "number" ? a.limit : 10,
-          });
-          if (hybrid) {
-            return toolResult({
-              results: hybrid.map((r) => ({ ...r.entry, score: r.score, cosine: r.cosine, bm25: r.bm25 })),
-              source: "hybrid",
-              stale: false,
-              total_tokens_used: 0,
-            });
-          }
-          // fall through to live scoring when no index exists
-        }
-        const res = queryContext(store, String(a.query), {
-          limit: typeof a.limit === "number" ? a.limit : 10,
-          tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
-          includeSuperseded: a.include_superseded === true,
-          type: a.type ? String(a.type) : undefined,
-          status: a.status ? String(a.status) : undefined,
-          verified: a.verified === true,
-        });
-        return toolResult({
-          results: res.results.map((r) => ({ ...r.entry, score: r.score })),
-          source: res.source,
-          stale: res.stale,
-          total_tokens_used: res.totalTokensUsed,
-        });
-      }
-      case "propose":
-      case "memory_capture": {
-        try {
-          const entry = proposeMemory(store, {
-            content: String(a.content),
-            project: String(a.project),
-            title: a.title ? String(a.title) : undefined,
-            tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
-            type: a.type ? (String(a.type) as MemoryType) : undefined,
-            confirmed: a.confirmed === true,
-          });
+          const { activeStore } = resolveStoreForRequest(a);
+          const entry = get(activeStore, String(a.id));
+          if (!entry) return toolError(`no entry with id ${a.id}`);
           return toolResult(entry);
-        } catch (err: unknown) {
-          return toolError(err instanceof Error ? err.message : String(err));
         }
-      }
+        case "get_context": {
+          const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
+          const formatted = formatPromptContext(activeStore, activeMemoryDir, String(a.query ?? ""), {
+            limit: typeof a.limit === "number" ? a.limit : 5,
+            tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+            project: a.project ? String(a.project) : undefined,
+            includeSuperseded: false,
+            type: a.type ? String(a.type) : undefined,
+            status: a.status ? String(a.status) : undefined,
+            verified: a.verified === true,
+            depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
+          });
+          return toolResult({
+            markdown: formatted.markdown,
+            entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
+            total_tokens_used: formatted.totalTokensUsed,
+            constraints: formatted.constraints,
+            user_profile: formatted.userProfile,
+          });
+        }
+        case "memory_current":
+        case "memory_get_constraints":
+        case "memory_set_constraints": {
+          const { activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+          const action = a.action || (name === "memory_set_constraints" ? "append" : "get");
+          if (action === "append" || a.constraint) {
+            const text = String(a.constraint || a.text || "");
+            if (!text.trim()) return toolError("Missing constraint text to append");
+            const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
+            const updated = setCurrent(activeMemoryDir, text, projectName);
+            return toolResult({ success: true, updated_constraints: updated });
+          }
+          const constraints = getCurrent(activeMemoryDir);
+          return toolResult({ constraints });
+        }
+        case "memory_recall":
+        case "search": {
+          const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
+          if (a.hybrid === true) {
+            const hybrid = hybridSearch(activeStore, activeMemoryDir, String(a.query), {
+              limit: typeof a.limit === "number" ? a.limit : 10,
+            });
+            if (hybrid) {
+              return toolResult({
+                results: hybrid.map((r) => ({ ...r.entry, score: r.score, cosine: r.cosine, bm25: r.bm25 })),
+                source: "hybrid",
+                stale: false,
+                total_tokens_used: 0,
+              });
+            }
+          }
+          const res = queryContext(activeStore, String(a.query), {
+            limit: typeof a.limit === "number" ? a.limit : 10,
+            tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+            includeSuperseded: a.include_superseded === true,
+            type: a.type ? String(a.type) : undefined,
+            status: a.status ? String(a.status) : undefined,
+            verified: a.verified === true,
+          });
+          return toolResult({
+            results: res.results.map((r) => ({ ...r.entry, score: r.score })),
+            source: res.source,
+            stale: res.stale,
+            total_tokens_used: res.totalTokensUsed,
+          });
+        }
+        case "propose":
+        case "memory_capture": {
+          const { activeStore, activeRoot, activeMemoryDir } = resolveStoreForRequest(a);
+          const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
+          try {
+            const entry = proposeMemory(activeStore, {
+              content: String(a.content),
+              project: projectName,
+              title: a.title ? String(a.title) : undefined,
+              tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+              type: a.type ? (String(a.type) as MemoryType) : undefined,
+              confirmed: a.confirmed === true,
+            });
+            if (a.type === "constraint") {
+              try {
+                setCurrent(activeMemoryDir, String(a.content), projectName);
+              } catch {}
+            }
+            return toolResult(entry);
+          } catch (err: unknown) {
+            return toolError(err instanceof Error ? err.message : String(err));
+          }
+        }
       case "memory_harvest": {
         const created = harvestMemory(store, {
           text: String(a.text),

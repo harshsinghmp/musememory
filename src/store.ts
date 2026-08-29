@@ -205,6 +205,11 @@ export function propose(
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      setCurrent(store.memoryDir, entry.content, entry.project);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "propose",

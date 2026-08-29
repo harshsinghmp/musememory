@@ -141,4 +141,58 @@ describe("mcp tool handlers logic", () => {
 
     cleanup(root);
   });
+
+  test("constraint proposing auto-syncs to CURRENT.md and memory_current reads/writes", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { getCurrent, setCurrent } = await import("../src/current.ts");
+
+    // Proposing a constraint automatically updates CURRENT.md
+    const constraintEntry = propose(store, {
+      content: "All API responses must be gzip encoded",
+      project: "gateway",
+      type: "constraint",
+      confirmed: true,
+    });
+    expect(constraintEntry.type).toBe("constraint");
+
+    const lines = getCurrent(memoryDir);
+    expect(lines.some((l) => l.includes("All API responses must be gzip encoded"))).toBe(true);
+
+    // Direct setCurrent append
+    setCurrent(memoryDir, "Use strict semantic versioning", "gateway");
+    const updatedLines = getCurrent(memoryDir);
+    expect(updatedLines.some((l) => l.includes("Use strict semantic versioning"))).toBe(true);
+
+    cleanup(root);
+  });
+
+  test("ensureProjectAgentInstructions writes and updates AGENTS.md with Muse Memory directive", async () => {
+    const { ensureProjectAgentInstructions, MUSE_MEMORY_DIRECTIVE } = await import("../src/cli/ecosystem.ts");
+    const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const testDir = mkdtempSync(join(tmpdir(), "muse-inst-test-"));
+
+    // 1. Fresh directory: creates AGENTS.md
+    ensureProjectAgentInstructions(testDir);
+    const created = readFileSync(join(testDir, "AGENTS.md"), "utf8");
+    expect(created).toContain("<!-- musememory:start -->");
+    expect(created).toContain("get_context");
+
+    // 2. Existing AGENTS.md with legacy agentmemory: replaces it cleanly
+    writeFileSync(
+      join(testDir, "AGENTS.md"),
+      "# System Rules\n\n<!-- agentmemory:start -->\nOld agentmemory instructions\n<!-- agentmemory:end -->\n\n## Other rules",
+      "utf8",
+    );
+    ensureProjectAgentInstructions(testDir);
+    const replaced = readFileSync(join(testDir, "AGENTS.md"), "utf8");
+    expect(replaced).not.toContain("agentmemory:start");
+    expect(replaced).toContain("<!-- musememory:start -->");
+    expect(replaced).toContain("## Other rules");
+
+    rmSync(testDir, { recursive: true, force: true });
+  });
 });
