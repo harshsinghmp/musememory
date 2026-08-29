@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",

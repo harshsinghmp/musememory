@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-08-29
+
+### Security & Hardening
+- **Web UI Loopback & CORS CSRF Hardening**: Bound embedded dashboard server strictly to `127.0.0.1` (loopback only) and rejected untrusted third-party `Origin` headers on state-mutating POST endpoints (`HTTP 403 Forbidden`).
+- **HTTP Security Headers**: Enforced `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy` across all embedded UI responses.
+- **DoS Payload Limiter**: Enforced 1 MB request body streaming limit in `parseJsonBody`, terminating oversized streams to prevent memory exhaustion.
+- **Path Traversal Containment**: Enforced strict directory boundary validation in `fileForId` and `slugifyId` to prevent file escape attempts.
+- **Vibeguard Secret Scanner Scoping**: Corrected private key block regex precedence to eliminate false positives on technical prose while strictly intercepting actual private key blocks.
+
+### Added & Refined
+- **Asynchronous Tree Index Builder (`buildTreeIndexAsync`)**: Added non-blocking microtask-yielding hierarchical tree indexing for large stores.
+- **Dynamic Schema Cache Invalidation (`clearSchemaCache`)**: Added exported schema cache reset for dynamic testing and custom schema reloading.
+- **Punctuation-Resilient Entity Normalization**: Supported fuzzy entity lookups across punctuation variations (`next.js` $\leftrightarrow$ `nextjs`).
+- **Wiki Frontmatter Deserialization**: Implemented robust native array, number, and boolean frontmatter parsing without body duplication.
+
+---
+
+## [1.6.0] - 2026-08-29
+
+### Added
+- **MCP Multi-Root Workspace Routing**: Authoritative per-request store routing across multi-root IDE workspaces.
+- **CLI Positional Argument Alignment**: Corrected subcommand indexing for `settings` (`get`, `set`, `reset`) and `entities` (`show`, `related`).
+- **Stale Command Status Filter**: Added staleness detection for decayed `confirmed` entries past policy lifetimes.
+- **AST Symbol Overlap Provider**: Integrated CodeGraph AST symbol co-occurrence provider into the knapsack retrieval scoring engine.
+
+---
+
 ## [1.5.0] - 2026-08-29
 
 ### Added

@@ -4,10 +4,9 @@
 
 ![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=blue)
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
-![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)
+![Bun](https://img.shields.io/badge/Bun-1.4.0-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-278%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
-![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
+![CI Tests](https://img.shields.io/badge/Tests-297%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
@@ -208,7 +207,7 @@ memory migrate --provider mem0
 memory migrate --provider beads
 memory migrate --all
 ```
-> See [`musememory-comparison.html`](file:///home/harsh/Projects/github/musememory/musememory-comparison.html) for the full table-free 30-system architectural dossier.
+> See [`musememory-comparison.html`](musememory-comparison.html) for the full table-free 30-system architectural dossier.
 
 ---
 
@@ -232,247 +231,51 @@ Navigate to `http://localhost:2222` to access:
 
 ---
 
-<<<<<<< HEAD
-## 💻 Complete CLI Command Reference
-||||||| f9a7a44
-## ⚡ How Memory Grows, Reloads &amp; Auto-Archives
+## 📖 Deep Technical References & Documentation
 
-```mermaid
-flowchart TD
-    subgraph HotPath["Active Conversation (Hot Path)"]
-        User["User asks question / gives task"]
-        Agent["AI Agent executes turn"]
-        Recall["1. Auto-Retrieve Top-K Context & Active Constraints"]
-        Distill["2. Auto-Distill Fixes & Decisions (Harvest)"]
-    end
+<details>
+<summary><b>🔌 Complete MCP Tool Reference (28 Tools)</b> — <i>Click to expand</i></summary>
 
-    subgraph DefenseGate["Self-Contained Vibeguard"]
-        Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
-    end
+When registered as an MCP server, `musememory` exposes the following native tools:
 
-    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.memory/)"]
-        Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
-        Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
-        Decay["6. Temporal Staleness Decay & Auto-Archiving"]
-    end
-
-    User --> Agent
-    Agent --> Recall
-    Recall --> Agent
-    Agent --> Distill
-    Distill --> Scan
-    Scan --> Atomic
-    Atomic --> Lifecycle
-    Lifecycle --> Decay
-```
-
-- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.memory/memories/`.
-- **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
-- **Smart Archiving &amp; Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
-
----
-
-## 👤 User Persona & Preferences (`USER.md`) & Setup Wizard
-
-Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style, communication preferences, and toolchain rules.
-
-### 🎭 5 Zero-Fingerprint Role Archetypes
-
-When running `memory install`, an interactive setup wizard configures your primary archetype (or choose one manually anytime):
-
-1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
-2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
-3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
-4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
-5. **`custom`**: Clean blank template ready for personalized instructions.
-
-```bash
-# View active profile
-memory user get
-
-# Initialize with a specific archetype
-memory user init developer
-memory user init designer --global
-
-# Update user profile
-memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
-```
-
-### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
-When `get_context` or `formatPromptContext()` builds the LLM prompt context, it structures information deterministically:
-1. **`### User Profile & Preferences (USER.md)`** (Tone, role, rules)
-2. **`### Active Working Constraints (CURRENT.md)`** (Project invariants & open loops)
-3. **`### Relevant Memories & Learned Patterns`** (Top-$K$ ranked memories)
-4. **`*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`**
-
----
-
-## 📜 Full-Text Transcript Search with Conversation Bookends
-
-Search across past `.jsonl` transcripts (Claude Code, Cursor, Antigravity, Codex) with surrounding dialogue context windows and session start/end bookends:
-
-```bash
-# Search transcript with dialogue window
-memory search-transcript "database connection pooling" session.jsonl --window 2 --max 5
-```
-
----
-
-## 🛡️ Built-In Vibeguard Secret Defense (Zero External Dependencies)
-
-`musememory` includes a pure TypeScript, zero-dependency security scanner that protects your repositories:
-
-- **Zero-Leakage Guarantee**: Intercepts OpenAI/Anthropic keys (`sk-*`), GitHub tokens (`ghp_*`), NPM tokens, AWS access keys (`AKIA*`), private key blocks, database connection strings, and plaintext credentials before they can ever be written to disk.
-- **100% Standalone**: Does not require any external scripts or system installations.
-
----
-
-## 🔮 Scope of Work & Roadmap
-
-Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Status: ☐ planned · ◐ in progress · ✅ done. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
-
-| Status | Item | Tracker |
+| MCP Tool | Execution Phase | Description |
 | :--- | :--- | :--- |
-| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
-| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
-| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
-| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
-| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
-| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
-| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
-| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
-| ✅ | Delete Deprecated `MemoryStore` Shim *(target: October 2026)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
-| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
-| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
-| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
-| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
-| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
-| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
-| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
-| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
-| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
-## ⚡ How Memory Grows, Reloads &amp; Auto-Archives
+| `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, and active `CURRENT.md` constraints. |
+| `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
+| `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
+| `memory_get_user_profile` | **Context Loading** | Reads active `USER.md` persona and communication preferences. |
+| `memory_set_user_profile` | **Preferences** | Updates `USER.md` profile with inline secret defense. |
+| `memory_capture` | **During Fixes** | Saves a memory entry with inline Vibeguard secret inspection. |
+| `memory_confirm` | **Decision Approval** | Promotes candidate insight to confirmed status. |
+| `memory_supersede` | **Refactoring** | Marks outdated knowledge superseded by a confirmed replacement. |
+| `memory_link` | **Graph Building** | Connects related memories bidirectionally. |
+| `memory_mark_stale` | **Deprecation** | Flags decaying knowledge with deprecation rationale. |
+| `memory_reject` | **Hypothesis Refutation** | Marks invalidated hypotheses as rejected. |
+| `memory_delete` | **Purge** | Permanently deletes an entry and records audit ledger log. |
+| `memory_tree_search` | **Tree Retrieval** | Hierarchical reasoning search across partitioned memory shards. |
+| `memory_wiki_compile` | **Wiki Compiler** | Compiles confirmed memories into Obsidian-compatible Markdown pages. |
+| `memory_wiki_search` / `get` | **Wiki Reading** | Searches and reads compiled concept and entity wiki pages. |
+| `memory_entities_search` / `get` | **Entity Graph** | Searches extracted entities and inspects co-occurrence strengths. |
+| `memory_pageindex_index` | **Doc Indexing** | Builds a hierarchical reasoning tree from document content. |
+| `memory_pageindex_search` | **Doc Search** | Searches PageIndex document tree with reasoning explanations. |
+| `memory_pageindex_import` | **Doc Knowledge** | Imports PageIndex search insights directly into memory units. |
+| `memory_search_transcripts` | **History Search** | Full-text search over past `.jsonl` transcripts with dialogue context windows. |
+| `memory_harvest` | **Session End** | Distills conversation turns into structured fix/outcome units. |
+| `memory_import_transcript` | **Transcript Sync** | Ingests `.jsonl` transcript and auto-binds memories to session nodes. |
+| `memory_audit` | **Governance** | Queries the append-only operational audit ledger. |
+| `memory_detect_agents` | **Onboarding** | Scans workstation for 80+ coding agent installations. |
+| `memory_connect` | **Setup** | Auto-wires MCP server into detected installed agents with zero permissions. |
+| `memory_detect_providers` | **Migration** | Scans machine for 29 external memory formats. |
+| `memory_migrate` | **Migration** | Ingests external memories with state preservation and secret scrubbing. |
+| `memory_export` / `import` | **Team Sharing** | Exports and imports portable JSON memory snapshots. |
+| `memory_validate` | **Integrity Check** | Verifies database integrity and scans for credential leaks. |
+| `memory_settings_get` / `set` | **Configuration** | Reads and updates unified global or project configuration settings. |
+| `graph_status` | **AST Graph** | Inspects CodeGraph symbol overlap provider status. |
 
-```mermaid
-flowchart TD
-    subgraph HotPath["Active Conversation (Hot Path)"]
-        User["User asks question / gives task"]
-        Agent["AI Agent executes turn"]
-        Recall["1. Auto-Retrieve Top-K Context & Active Constraints"]
-        Distill["2. Auto-Distill Fixes & Decisions (Harvest)"]
-    end
+</details>
 
-    subgraph DefenseGate["Self-Contained Vibeguard"]
-        Scan["3. Zero-Leakage Secret Scan (Blocks API keys & DB URLs)"]
-    end
-
-    subgraph StoreLifecycle["Self-Organizing Knowledge Engine (.memory/)"]
-        Atomic["4. Atomic Write (m_timestamp_slug.yaml)"]
-        Lifecycle["5. Lifecycle Transitions (Candidate ➔ Confirmed ➔ Superseded)"]
-        Decay["6. Temporal Staleness Decay & Auto-Archiving"]
-    end
-
-    User --> Agent
-    Agent --> Recall
-    Recall --> Agent
-    Agent --> Distill
-    Distill --> Scan
-    Scan --> Atomic
-    Atomic --> Lifecycle
-    Lifecycle --> Decay
-```
-
-- **Incremental Auto-Growing**: Every decision, bug fix, operational rule, and session checkpoint is saved as a discrete, human-readable YAML document in `.memory/memories/`.
-- **Context Reload Continuity**: On a fresh turn or session restart, `get_context` feeds only the Top-$K$ highest-salience, verified knowledge units—reducing context tokens by **85–95%** and eliminating outdated hallucinations.
-- **Smart Archiving &amp; Controlled Forgetting**: Old approaches are marked `superseded` with explicit forward/backward links. Time-based staleness policies (e.g. 30 days for temporary discoveries, 90 days for fixes, 365 days for architecture) automatically down-weight decaying knowledge.
-
----
-
-## 👤 User Persona & Preferences (`USER.md`) & Setup Wizard
-
-Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style, communication preferences, and toolchain rules.
-
-### 🎭 5 Zero-Fingerprint Role Archetypes
-
-When running `memory install`, an interactive setup wizard configures your primary archetype (or choose one manually anytime):
-
-1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
-2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
-3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
-4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
-5. **`custom`**: Clean blank template ready for personalized instructions.
-
-```bash
-# View active profile
-memory user get
-
-# Initialize with a specific archetype
-memory user init developer
-memory user init designer --global
-
-# Update user profile
-memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
-```
-
-### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
-When `get_context` or `formatPromptContext()` builds the LLM prompt context, it structures information deterministically:
-1. **`### User Profile & Preferences (USER.md)`** (Tone, role, rules)
-2. **`### Active Working Constraints (CURRENT.md)`** (Project invariants & open loops)
-3. **`### Relevant Memories & Learned Patterns`** (Top-$K$ ranked memories)
-4. **`*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call memory_capture immediately.*`**
-
----
-
-## 📜 Full-Text Transcript Search with Conversation Bookends
-
-Search across past `.jsonl` transcripts (Claude Code, Cursor, Antigravity, Codex) with surrounding dialogue context windows and session start/end bookends:
-
-```bash
-# Search transcript with dialogue window
-memory search-transcript "database connection pooling" session.jsonl --window 2 --max 5
-```
-
----
-
-## 🛡️ Built-In Vibeguard Secret Defense (Zero External Dependencies)
-
-`musememory` includes a pure TypeScript, zero-dependency security scanner that protects your repositories:
-
-- **Zero-Leakage Guarantee**: Intercepts OpenAI/Anthropic keys (`sk-*`), GitHub tokens (`ghp_*`), NPM tokens, AWS access keys (`AKIA*`), private key blocks, database connection strings, and plaintext credentials before they can ever be written to disk.
-- **100% Standalone**: Does not require any external scripts or system installations.
-
----
-
-## 🔮 Scope of Work & Roadmap
-
-Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Status: ☐ planned · ◐ in progress · ✅ done. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
-
-| Status | Item | Tracker |
-| :--- | :--- | :--- |
-| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
-| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
-| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
-| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
-| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
-| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
-| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
-| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
-| ✅ | Delete Deprecated `MemoryStore` Shim *(target: October 2026)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
-| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
-| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
-| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
-| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
-| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
-| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
-| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
-| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
-| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
-| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
-| ☐ | AST Symbol Graph Integration (CodeGraph / Graphify provider) — SOW-107 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
-
----
-
-## 💻 Complete CLI Command Reference
+<details>
+<summary><b>💻 Full CLI Command Matrix (35 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -517,45 +320,62 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `graph` | `status` | Query active CodeGraph provider status. |
 | `mcp` | *(none)* | Start stdio MCP server (Protocol 2024-11-05). |
 
----
+</details>
 
-## 🔌 MCP Server Tool Reference
+<details>
+<summary><b>👤 5 Zero-Fingerprint Role Archetypes (`USER.md`)</b> — <i>Click to expand</i></summary>
 
-When registered as an MCP server, `musememory` exposes the following native tools:
+Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style:
 
-| MCP Tool | Execution Phase | Description |
+1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. **`marketer`**: Conversion-rate optimization (CRO), punchy benefit-driven copy, SEO clustering, audience hooks.
+4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
+5. **`custom`**: Clean blank template ready for personalized instructions.
+
+```bash
+# View active profile
+memory user get
+
+# Initialize with a specific archetype
+memory user init developer
+memory user init designer --global
+
+# Update user profile
+memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
+```
+
+</details>
+
+<details>
+<summary><b>🔮 SOW & Roadmap Issue Tracker</b> — <i>Click to expand</i></summary>
+
+Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
+
+| Status | Item | Tracker |
 | :--- | :--- | :--- |
-| `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, and active `CURRENT.md` constraints. |
-| `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
-| `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
-| `memory_get_user_profile` | **Context Loading** | Reads active `USER.md` persona and communication preferences. |
-| `memory_set_user_profile` | **Preferences** | Updates `USER.md` profile with inline secret defense. |
-| `memory_capture` | **During Fixes** | Saves a memory entry with inline Vibeguard secret inspection. |
-| `memory_confirm` | **Decision Approval** | Promotes candidate insight to confirmed status. |
-| `memory_supersede` | **Refactoring** | Marks outdated knowledge superseded by a confirmed replacement. |
-| `memory_link` | **Graph Building** | Connects related memories bidirectionally. |
-| `memory_mark_stale` | **Deprecation** | Flags decaying knowledge with deprecation rationale. |
-| `memory_reject` | **Hypothesis Refutation** | Marks invalidated hypotheses as rejected. |
-| `memory_delete` | **Purge** | Permanently deletes an entry and records audit ledger log. |
-| `memory_tree_search` | **Tree Retrieval** | Hierarchical reasoning search across partitioned memory shards. |
-| `memory_wiki_compile` | **Wiki Compiler** | Compiles confirmed memories into Obsidian-compatible Markdown pages. |
-| `memory_wiki_search` / `get` | **Wiki Reading** | Searches and reads compiled concept and entity wiki pages. |
-| `memory_entities_search` / `get` | **Entity Graph** | Searches extracted entities and inspects co-occurrence strengths. |
-| `memory_pageindex_index` | **Doc Indexing** | Builds a hierarchical reasoning tree from document content. |
-| `memory_pageindex_search` | **Doc Search** | Searches PageIndex document tree with reasoning explanations. |
-| `memory_pageindex_import` | **Doc Knowledge** | Imports PageIndex search insights directly into memory units. |
-| `memory_search_transcripts` | **History Search** | Full-text search over past `.jsonl` transcripts with dialogue context windows. |
-| `memory_harvest` | **Session End** | Distills conversation turns into structured fix/outcome units. |
-| `memory_import_transcript` | **Transcript Sync** | Ingests `.jsonl` transcript and auto-binds memories to session nodes. |
-| `memory_audit` | **Governance** | Queries the append-only operational audit ledger. |
-| `memory_detect_agents` | **Onboarding** | Scans workstation for 80+ coding agent installations. |
-| `memory_connect` | **Setup** | Auto-wires MCP server into detected installed agents with zero permissions. |
-| `memory_detect_providers` | **Migration** | Scans machine for 29 external memory formats. |
-| `memory_migrate` | **Migration** | Ingests external memories with state preservation and secret scrubbing. |
-| `memory_export` / `import` | **Team Sharing** | Exports and imports portable JSON memory snapshots. |
-| `memory_validate` | **Integrity Check** | Verifies database integrity and scans for credential leaks. |
-| `memory_settings_get` / `set` | **Configuration** | Reads and updates unified global or project configuration settings. |
-| `graph_status` | **AST Graph** | Inspects CodeGraph symbol overlap provider status. |
+| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
+| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
+| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
+| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
+| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
+| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
+| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
+| ✅ | Delete Deprecated `MemoryStore` Shim *(shipped v1.5.0)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
+| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
+| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
+| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
+| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
+| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
+| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
+| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
+| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
+| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
+| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ✅ | AST Symbol Graph Integration (CodeGraph / Graphify provider) — SOW-107 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
+
+</details>
 
 ---
 
@@ -563,7 +383,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 
 ```bash
 bun install
-bun test          # 278 passed across 50 test files (1072 assertions)
+bun test          # 297 passed across 53 test files (1163 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
