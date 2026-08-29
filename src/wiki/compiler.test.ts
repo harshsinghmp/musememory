@@ -137,8 +137,39 @@ describe("Wiki Compilation Engine", () => {
     createMemories(5);
     const result = compileWiki(store, memoryDir, { dryRun: true });
     
-    const wikiDir = join(memoryDir, "wiki");
-    // In dry-run, wiki directory should not be created
-    // (though it might be created by mkdirSync in compiler - that's OK)
+    expect(result.pagesCreated.length).toBeGreaterThan(0);
+  });
+
+  it("listWikiPages and getWikiPage support L1 detail level", async () => {
+    const { listWikiPages, getWikiPage } = await import("./compiler.ts");
+    createMemories(6);
+    // Compile and write files
+    const result = compileWiki(store, memoryDir, { dryRun: false });
+    expect(result.pagesCreated.length).toBeGreaterThan(0);
+
+    // List full detail
+    const fullPages = listWikiPages(memoryDir, { detailLevel: "full" });
+    expect(fullPages.length).toBeGreaterThan(0);
+    const conceptFull = fullPages.find((p) => p.type === "concept");
+    expect(conceptFull).toBeDefined();
+    expect((conceptFull as any).content.length).toBeGreaterThan(0);
+
+    // List L1 detail: content should be empty string
+    const l1Pages = listWikiPages(memoryDir, { detailLevel: "l1" });
+    expect(l1Pages.length).toBe(fullPages.length);
+    const conceptL1 = l1Pages.find((p) => p.type === "concept");
+    expect(conceptL1).toBeDefined();
+    expect((conceptL1 as any).content).toBe("");
+
+    // Get page L1 detail
+    const firstSlug = conceptFull!.slug;
+    const pageL1 = getWikiPage(memoryDir, firstSlug, "concept", "l1");
+    expect(pageL1).not.toBeNull();
+    expect((pageL1 as any).content).toBe("");
+
+    // Get page full detail
+    const pageFull = getWikiPage(memoryDir, firstSlug, "concept", "full");
+    expect(pageFull).not.toBeNull();
+    expect((pageFull as any).content.length).toBeGreaterThan(0);
   });
 });

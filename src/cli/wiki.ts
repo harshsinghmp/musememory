@@ -7,7 +7,7 @@ export function handleWikiCommand(parsed: ParsedArgs): number {
   const memoryDir = ctx.memoryDir;
   const store = ctx.store;
 
-  const sub = parsed.positional[1] ?? "compile";
+  const sub = parsed.positional[0] ?? "compile";
 
   if (sub === "compile") {
     const project = parsed.flags.project as string | undefined;
@@ -33,7 +33,8 @@ export function handleWikiCommand(parsed: ParsedArgs): number {
   if (sub === "list" || sub === "ls") {
     const project = parsed.flags.project as string | undefined;
     const type = parsed.flags.type as any;
-    const pages = listWikiPages(memoryDir, { project, type });
+    const detailLevel = parsed.flags["l1"] === "true" ? "l1" : "full";
+    const pages = listWikiPages(memoryDir, { project, type, detailLevel });
 
     if (pages.length === 0) {
       console.log("No wiki pages found. Run `memory wiki compile` to generate pages.");
@@ -49,7 +50,7 @@ export function handleWikiCommand(parsed: ParsedArgs): number {
   }
 
   if (sub === "show" || sub === "get") {
-    const slug = parsed.positional[2];
+    const slug = parsed.positional[1];
     if (!slug) {
       console.error("Error: please specify a page slug (e.g. `memory wiki show index` or `memory wiki show concept-name`)");
       return 2;

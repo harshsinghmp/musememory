@@ -101,7 +101,7 @@ export function dominantTopicTokens(titles: string[]): string[] {
     .map(([t]) => t);
 }
 
-function entryTokens(e: MemoryEntry): Map<string, number> {
+export function entryTokens(e: MemoryEntry): Map<string, number> {
   // Title tokens weighted 2x so titles dominate the similarity signal.
   const bag = tokenBag(e.title, 2);
   mergeBag(bag, tokenBag(e.content, 1));

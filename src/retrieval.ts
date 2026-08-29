@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 import { getCurrent } from "./current.ts";
@@ -245,6 +247,26 @@ export function formatPromptContext(
       parts.push(`- ${c}`);
     }
     parts.push("");
+  }
+
+  if (memoryDir && existsSync(join(memoryDir, "wiki"))) {
+    try {
+      const { listWikiPages } = require("./wiki/index.ts");
+      const wikiPages = listWikiPages(memoryDir, { detailLevel: "l1", project: options.project });
+      if (wikiPages.length > 0) {
+        const queryTokens = tokenize(query);
+        const relevantWiki = wikiPages
+          .filter((p: any) => p.type === "concept" && (!query || tokenize(p.title + " " + (p.summary || "")).some((t: string) => queryTokens.includes(t))))
+          .slice(0, 3);
+        if (relevantWiki.length > 0) {
+          parts.push("### Compiled Knowledge & Concepts (Wiki L1)");
+          for (const wp of relevantWiki) {
+            parts.push(`- [[${wp.slug}]]: ${wp.title}${wp.summary ? ` — ${wp.summary}` : ""}`);
+          }
+          parts.push("");
+        }
+      }
+    } catch {}
   }
 
   if (result.results.length > 0) {

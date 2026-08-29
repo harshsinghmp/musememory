@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { list, type Store } from "../store.ts";
-import { clusterByTokenOverlap, dominantTopicTokens } from "../consolidate.ts";
+import { list, slugifyId as slugify, type Store } from "../store.ts";
+import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../consolidate.ts";
+import { tokenize } from "../retrieval.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
-import type { WikiCompileOptions, CompileResult, WikiPage, ConceptPage, EntityPage, IndexPage, LogPage, LogEntry } from "./types.ts";
+import type { WikiCompileOptions, CompileResult, WikiPage, ConceptPage, EntityPage, IndexPage, LogPage, LogEntry, ListWikiPagesOptions } from "./types.ts";
 import { renderConceptPage, renderEntityPage, renderIndexPage, renderLogPage } from "./render.ts";
 
 const DEFAULT_MIN_CLUSTER_SIZE = 3;
@@ -148,13 +149,6 @@ export function compileWiki(
   }
 
   return result;
-}
-
-function entryTokens(e: MemoryEntry): Map<string, number> {
-  const bag = new Map<string, number>();
-  for (const t of tokenize(e.title)) bag.set(t, (bag.get(t) ?? 0) + 2);
-  for (const t of tokenize(e.content)) bag.set(t, (bag.get(t) ?? 0) + 1);
-  return bag;
 }
 
 function buildConceptPage(
@@ -425,14 +419,6 @@ function parseFrontmatter(content: string): any {
   return obj;
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
-
 function writeConceptPages(map: Map<string, any>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderConceptPage(page);
@@ -457,44 +443,24 @@ function writeLogPage(page: any, dir: string): void {
   writeFileSync(join(dir, "log.md"), content, "utf8");
 }
 
-function tokenBag(text: string, weight = 1): Map<string, number> {
-  const bag = new Map<string, number>();
-  for (const t of tokenize(text)) {
-    bag.set(t, (bag.get(t) ?? 0) + weight);
-  }
-  return bag;
-}
-
-function cosineSimilarity(a: Map<string, number>, b: Map<string, number>): number {
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (const v of a.values()) na += v * v;
-  for (const [t, v] of b) {
-    nb += v * v;
-    const av = a.get(t);
-    if (av) dot += av * v;
-  }
-  return na > 0 && nb > 0 ? dot / Math.sqrt(na * nb) : 0;
-}
-
-function tokenize(text: string): string[] {
-  if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
-}
-
 export function listWikiPages(
   memoryDir: string,
-  options: { project?: string; type?: "concept" | "entity" | "index" | "log" } = {},
+  options: ListWikiPagesOptions = {},
 ): WikiPage[] {
   const wikiDir = join(memoryDir, "wiki");
   const pages: WikiPage[] = [];
+  const detailLevel = options.detailLevel ?? "full";
 
   if (options.type === undefined || options.type === "concept") {
     const concepts = loadExistingConcepts(join(wikiDir, "concepts"));
     for (const page of concepts.values()) {
       if (!options.project || page.project === options.project) {
-        pages.push(page);
+        if (detailLevel === "l1") {
+          const { content, ...rest } = page;
+          pages.push({ ...rest, content: "" } as ConceptPage);
+        } else {
+          pages.push(page);
+        }
       }
     }
   }
@@ -503,7 +469,12 @@ export function listWikiPages(
     const entities = loadExistingEntities(join(wikiDir, "entities"));
     for (const page of entities.values()) {
       if (!options.project || page.project === options.project) {
-        pages.push(page);
+        if (detailLevel === "l1") {
+          const { content, ...rest } = page;
+          pages.push({ ...rest, content: "" } as EntityPage);
+        } else {
+          pages.push(page);
+        }
       }
     }
   }
@@ -514,7 +485,7 @@ export function listWikiPages(
       try {
         const raw = readFileSync(idxPath, "utf8");
         const fm = parseFrontmatter(raw);
-        pages.push({ ...fm, slug: "index", type: "index", content: raw });
+        pages.push({ ...fm, slug: "index", type: "index", content: detailLevel === "l1" ? "" : raw });
       } catch {}
     }
   }
@@ -525,7 +496,7 @@ export function listWikiPages(
       try {
         const raw = readFileSync(logPath, "utf8");
         const fm = parseFrontmatter(raw);
-        pages.push({ ...fm, slug: "log", type: "log", content: raw });
+        pages.push({ ...fm, slug: "log", type: "log", content: detailLevel === "l1" ? "" : raw });
       } catch {}
     }
   }
@@ -537,6 +508,7 @@ export function getWikiPage(
   memoryDir: string,
   slug: string,
   type?: "concept" | "entity" | "index" | "log",
+  detailLevel: "l1" | "full" = "full",
 ): WikiPage | null {
   const wikiDir = join(memoryDir, "wiki");
 
@@ -545,7 +517,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug: "index", type: "index", content: raw };
+      return { ...fm, slug: "index", type: "index", content: detailLevel === "l1" ? "" : raw };
     }
     return null;
   }
@@ -555,7 +527,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug: "log", type: "log", content: raw };
+      return { ...fm, slug: "log", type: "log", content: detailLevel === "l1" ? "" : raw };
     }
     return null;
   }
@@ -565,7 +537,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug, type: "concept", content: raw };
+      return { ...fm, slug, type: "concept", content: detailLevel === "l1" ? "" : raw };
     }
   }
 
@@ -574,7 +546,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug, type: "entity", content: raw };
+      return { ...fm, slug, type: "entity", content: detailLevel === "l1" ? "" : raw };
     }
   }
 

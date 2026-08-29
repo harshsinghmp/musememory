@@ -1,6 +1,6 @@
-# 🧠 Muse Memory (`musememory`) — System Architecture & Agent Guidelines
+# 🧠 Muse Memory (`musememory`) — System Architecture &amp; Agent Guidelines
 
-> **Project**: Muse Memory (Autonomous Persistent Cognitive Memory System for AI Agents & Agency Networks)  
+> **Project**: Muse Memory (Autonomous Persistent Cognitive Memory System for AI Agents &amp; Agency Networks)  
 > **Binary Names**: `memory` (primary), `musememory` (alias), `npx musememory` (zero-install)  
 > **Storage Locations**: Local `.memory/` (per project) and Global `~/.memory/` (user-wide)  
 > **MCP Protocol**: MCP 2024-11-05 (stdio transport)  
@@ -98,7 +98,7 @@ musememory/
 
 ---
 
-## 🔄 Memory LifeCycle State Machine & Transition Invariants
+## 🔄 Memory LifeCycle State Machine &amp; Transition Invariants
 
 All memory entries transition through a deterministic lifecycle state machine guarded by `src/store.ts`:
 
@@ -114,6 +114,7 @@ All memory entries transition through a deterministic lifecycle state machine gu
 ```
 
 ### Invariant Rules for Agents:
+
 1. **Confirmation Gate**: Only `candidate`, `disputed`, or `stale` entries can be promoted to `confirmed`.
 2. **Supersession Requirement**: When calling `supersede(old_id, new_id)`, the `new_id` entry **must already exist and have `confirmed` status**. Self-supersession (`old_id === new_id`) is strictly prohibited.
 3. **Bidirectional Graph Links**: Supersession automatically updates `superseded_by` on the old entry and `supersedes` on the replacement entry.
@@ -125,26 +126,31 @@ All memory entries transition through a deterministic lifecycle state machine gu
 
 Knowledge decays naturally based on its semantic domain:
 
-| Memory Type | Policy Lifetime | Description & Agent Guidance |
-|---|---|---|
-| `fix` | **90 days** | Bug workarounds, dependency patches, edge-case fixes. |
-| `operation` | **180 days** | Build scripts, deployment instructions, local dev commands. |
-| `architecture` | **365 days** | System architecture, database schemas, core abstractions. |
-| `discovery` | **30 days** | Ephemeral research notes, transient experiments. |
-| `preference` | **Permanent (`null`)** | User coding preferences, tone/style rules, agency stances. |
-| `constraint` | **Active** | Immediate hard constraints synced directly to `CURRENT.md`. |
-| `session` | **Permanent (`null`)** | Session start/end timeline nodes in the cognition graph. |
+
+| Memory Type    | Policy Lifetime        | Description &amp; Agent Guidance                            |
+| -------------- | ---------------------- | ----------------------------------------------------------- |
+| `fix`          | **90 days**            | Bug workarounds, dependency patches, edge-case fixes.       |
+| `operation`    | **180 days**           | Build scripts, deployment instructions, local dev commands. |
+| `architecture` | **365 days**           | System architecture, database schemas, core abstractions.   |
+| `discovery`    | **30 days**            | Ephemeral research notes, transient experiments.            |
+| `preference`   | **Permanent (`null`)** | User coding preferences, tone/style rules, agency stances.  |
+| `constraint`   | **Active**             | Immediate hard constraints synced directly to `CURRENT.md`. |
+| `session`      | **Permanent (`null`)** | Session start/end timeline nodes in the cognition graph.    |
+
 
 ---
 
-## ⚖️ Multi-Factor Scoring & Knapsack Retrieval Mechanics
+## ⚖️ Multi-Factor Scoring &amp; Knapsack Retrieval Mechanics
 
 The unified retrieval engine ([`src/retrieval.ts`](src/retrieval.ts)) scores memory entries using a calibrated multi-factor formula:
 
-$$\text{Score} = 1.0 \times \text{Applicability} + \text{StatusPenalty} + \text{VerificationBonus} + \text{GraphBonus} + \text{SalienceBonus} + 0.3 \times e^{-\frac{\Delta t}{90\text{ days}}}$$
+$$
+\text{Score} = 1.0 \times \text{Applicability} + \text{StatusPenalty} + \text{VerificationBonus} + \text{GraphBonus} + \text{SalienceBonus} + 0.3 \times e^{-\frac{\Delta t}{90\text{ days}}}
+$$
 
 ### Scoring Breakdown:
-- **Applicability ($0.0 \to 1.0$)**: Token overlap ratio across title, content, tags, project, and CodeGraph symbols.
+
+- **Applicability (**$0.0 \to 1.0$**)**: Token overlap ratio across title, content, tags, project, and CodeGraph symbols.
 - **Status Penalties / Bonuses**:
   - `confirmed`: **+0.4**
   - `active`: **0.0**
@@ -167,26 +173,31 @@ $$\text{Score} = 1.0 \times \text{Applicability} + \text{StatusPenalty} + \text{
 
 Agents must choose the correct storage scope based on knowledge generality:
 
-| Storage Scope | Filesystem Location | When AI Agents Must Use It |
-|---|---|---|
-| **Local Workspace** *(Default)* | `<project_root>/.memory/` | Repository-specific architectural decisions, bug fixes, schema rules, local `CURRENT.md` constraints, and session timeline nodes. |
-| **Global System** | `~/.memory/` (via `--global` / `-g`) | User-wide preferences, principal directives, universal prompt patterns, cross-repo coding conventions, and global tool settings. |
+
+| Storage Scope                   | Filesystem Location                  | When AI Agents Must Use It                                                                                                        |
+| ------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Local Workspace** *(Default)* | `<project_root>/.memory/`            | Repository-specific architectural decisions, bug fixes, schema rules, local `CURRENT.md` constraints, and session timeline nodes. |
+| **Global System**               | `~/.memory/` (via `--global` / `-g`) | User-wide preferences, principal directives, universal prompt patterns, cross-repo coding conventions, and global tool settings.  |
+
 
 ---
 
-## 👤 Persona & Working Preference Engine (`USER.md`)
+## 👤 Persona &amp; Working Preference Engine (`USER.md`)
 
 Muse Memory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in the user's role, communication style, and toolchain rules.
 
 ### 5 Clean Archetypes:
-1. **`developer`**: Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
-2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
-3. **`marketer`**: Conversion-rate optimization (CRO), punchy copy, SEO clustering, audience hooks.
-4. **`casual`**: Plain English, jargon-free explanations, step-by-step guidance.
-5. **`custom`**: Clean blank template for custom instructions.
 
-### 🧠 Prompt Injection Hierarchy & Proactive Self-Nudge
+1. `**developer**`: Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
+2. `**designer**`: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.
+3. `**marketer**`: Conversion-rate optimization (CRO), punchy copy, SEO clustering, audience hooks.
+4. `**casual**`: Plain English, jargon-free explanations, step-by-step guidance.
+5. `**custom**`: Clean blank template for custom instructions.
+
+### 🧠 Prompt Injection Hierarchy &amp; Proactive Self-Nudge
+
 When `get_context` or `formatPromptContext()` builds the context for the agent, it orders information deterministically:
+
 1. `### User Profile & Preferences (USER.md)`
 2. `### Active Working Constraints (CURRENT.md)`
 3. `### Relevant Memories & Learned Patterns` (Top-$K$ ranked memories)
@@ -197,6 +208,7 @@ When `get_context` or `formatPromptContext()` builds the context for the agent, 
 ## 📜 Full-Text Transcript Search with Conversation Bookends
 
 In addition to knowledge distillation, agents can perform full-text searches over raw `.jsonl` conversation transcripts using `memory_search_transcripts` or `memory search-transcript <query> [file.jsonl]`. Results include:
+
 - **Conversation Bookends**: The initial user prompt + concluding turn.
 - **Context Window**: $N$ dialogue turns immediately preceding and following every matched turn.
 
@@ -208,68 +220,95 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 
 1. **Auto-Interception**: `store.propose`, `store.save`, `setUserProfile`, `importSnapshot`, and `importTranscript` automatically scan content and throw immediately if a secret is detected.
 2. **Blocked Patterns**:
-   - OpenAI / Anthropic / AI API keys (`sk-...`, `sk-proj-...`)
-   - GitHub Personal Access Tokens (`ghp_...`, `gho_...`, `github_pat_...`)
-   - NPM tokens (`npm_...`)
-   - AWS Access Key IDs (`AKIA...`, `ASIA...`)
-   - Private Key blocks (`-----BEGIN ... PRIVATE KEY-----`)
-   - Database URIs (`postgres://[USER]:[PASS]@[HOST]:5432/[DB]`)
-   - Hardcoded password assignments (`password = ...`, `api_key = ...`)
+  - OpenAI / Anthropic / AI API keys (`sk-...`, `sk-proj-...`)
+  - GitHub Personal Access Tokens (`ghp_...`, `gho_...`, `github_pat_...`)
+  - NPM tokens (`npm_...`)
+  - AWS Access Key IDs (`AKIA...`, `ASIA...`)
+  - Private Key blocks (`-----BEGIN ... PRIVATE KEY-----`)
+  - Database URIs (`postgres://[USER]:[PASS]@[HOST]:5432/[DB]`)
+  - Hardcoded password assignments (`password = ...`, `api_key = ...`)
 3. **Agent Action**: If proposing memories from conversation transcripts, always sanitize credentials as `[REDACTED_SECRET]` before proposing.
 
 ---
 
-## 🔌 Comprehensive MCP Tool Matrix & Agent Execution Cheatsheet
+## 🔌 Comprehensive MCP Tool Matrix &amp; Agent Execution Cheatsheet
 
-| MCP Tool | Execution Phase | Agent Purpose |
-|---|---|---|
-| `get_context` | **Session Start** | Load Top-$K$ relevant memories, USER.md profile, and active constraints before writing any code. |
-| `search` | **Investigation** | Query knowledge base with token budget, status, and type filtering. |
-| `memory_get_user_profile` | **Context Loading** | Read active `USER.md` profile and preferences. |
-| `memory_set_user_profile` | **Preferences** | Update `USER.md` profile with inline secret defense. |
-| `memory_search_transcripts` | **History Search** | Search past `.jsonl` transcripts with conversation bookends and surrounding context. |
-| `memory_capture` | **During Fixes** | Propose a new memory unit with inline Vibeguard secret inspection. |
-| `memory_confirm` | **Decision Approval** | Promote candidate insight to confirmed status. |
-| `memory_supersede` | **Refactoring** | Mark outdated knowledge superseded by a confirmed replacement. |
-| `memory_link` | **Graph Building** | Link related memories bidirectionally. |
-| `memory_mark_stale` | **Deprecation** | Flag decaying knowledge with deprecation rationale. |
-| `memory_reject` | **Hypothesis Refutation**| Mark invalidated hypotheses as rejected. |
-| `memory_delete` | **Purge** | Permanently delete entry and record audit trail log. |
-| `memory_harvest` | **Session End** | Distill chat transcript into structured fix/decision memory units. |
-| `memory_import_transcript`| **Transcript Sync** | Ingest `.jsonl` transcript and auto-bind memories to session nodes. |
-| `memory_audit` | **Governance** | Query append-only audit trail. |
-| `memory_detect_agents` | **Onboarding** | Scan workstation for 80+ coding agent installations. |
-| `memory_connect` | **Setup** | Auto-wire MCP server into detected installed agents with zero permissions. |
-| `memory_detect_providers` | **Migration** | Scan machine for 24+ external memory formats. |
-| `memory_migrate` | **Migration** | Ingest external memories with state preservation and secret scrubbing. |
-| `memory_export` / `import` | **Team Sharing** | Export/import portable JSON memory snapshots. |
-| `memory_validate` | **Integrity Check** | Verify YAML schema conformity and referential integrity. |
-| `memory_tree_search` | **Tree Retrieval** | Hierarchical reasoning search across partitioned memory shards with disclosure depths. |
-| `memory_wiki_compile` | **Wiki Compiler** | Compile confirmed memories into Obsidian-compatible markdown wiki pages. |
-| `memory_wiki_search` / `get` | **Wiki Reading** | Search and read compiled concept/entity wiki pages. |
-| `memory_entities_search` / `get` | **Entity Graph** | Search extracted named entities and inspect co-occurrence strengths. |
-| `memory_pageindex_index` | **Doc Indexing** | Ingest Markdown documents into hierarchical tree representations with secret defense. |
-| `memory_pageindex_search` | **Doc Search** | Search PageIndex document tree with reasoning explanations. |
-| `memory_pageindex_import` | **Doc Knowledge** | Import PageIndex search results into structured memory entries. |
-| `memory_disconnect_pageindex` | **Doc Cleanup** | Disconnect and clean up PageIndex document indexes. |
-| `memory_settings_get` / `set` | **Configuration** | Read and update unified global or project configuration settings. |
-| `graph_status` | **AST Graph** | Inspect CodeGraph symbol overlap provider status. |
 
----
+| MCP Tool                         | Execution Phase           | Agent Purpose                                                                                    |
+| -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `get_context`                    | **Session Start**         | Load Top-$K$ relevant memories, USER.md profile, and active constraints before writing any code. |
+| `search`                         | **Investigation**         | Query knowledge base with token budget, status, and type filtering.                              |
+| `memory_get_user_profile`        | **Context Loading**       | Read active `USER.md` profile and preferences.                                                   |
+| `memory_set_user_profile`        | **Preferences**           | Update `USER.md` profile with inline secret defense.                                             |
+| `memory_search_transcripts`      | **History Search**        | Search past `.jsonl` transcripts with conversation bookends and surrounding context.             |
+| `memory_capture`                 | **During Fixes**          | Propose a new memory unit with inline Vibeguard secret inspection.                               |
+| `memory_confirm`                 | **Decision Approval**     | Promote candidate insight to confirmed status.                                                   |
+| `memory_supersede`               | **Refactoring**           | Mark outdated knowledge superseded by a confirmed replacement.                                   |
+| `memory_link`                    | **Graph Building**        | Link related memories bidirectionally.                                                           |
+| `memory_mark_stale`              | **Deprecation**           | Flag decaying knowledge with deprecation rationale.                                              |
+| `memory_reject`                  | **Hypothesis Refutation** | Mark invalidated hypotheses as rejected.                                                         |
+| `memory_delete`                  | **Purge**                 | Permanently delete entry and record audit trail log.                                             |
+| `memory_harvest`                 | **Session End**           | Distill chat transcript into structured fix/decision memory units.                               |
+| `memory_import_transcript`       | **Transcript Sync**       | Ingest `.jsonl` transcript and auto-bind memories to session nodes.                              |
+| `memory_audit`                   | **Governance**            | Query append-only audit trail.                                                                   |
+| `memory_detect_agents`           | **Onboarding**            | Scan workstation for 80+ coding agent installations.                                             |
+| `memory_connect`                 | **Setup**                 | Auto-wire MCP server into detected installed agents with zero permissions.                       |
+| `memory_detect_providers`        | **Migration**             | Scan machine for 24+ external memory formats.                                                    |
+| `memory_migrate`                 | **Migration**             | Ingest external memories with state preservation and secret scrubbing.                           |
+| `memory_export` / `import`       | **Team Sharing**          | Export/import portable JSON memory snapshots.                                                    |
+| `memory_validate`                | **Integrity Check**       | Verify YAML schema conformity and referential integrity.                                         |
+| `memory_tree_search`             | **Tree Retrieval**        | Hierarchical reasoning search across partitioned memory shards with disclosure depths.           |
+| `memory_wiki_compile`            | **Wiki Compiler**         | Compile confirmed memories into Obsidian-compatible markdown wiki pages.                         |
+| `memory_wiki_search` / `get`     | **Wiki Reading**          | Search and read compiled concept/entity wiki pages.                                              |
+| `memory_entities_search` / `get` | **Entity Graph**          | Search extracted named entities and inspect co-occurrence strengths.                             |
+| `memory_pageindex_index`         | **Doc Indexing**          | Ingest Markdown documents into hierarchical tree representations with secret defense.            |
+| `memory_pageindex_search`        | **Doc Search**            | Search PageIndex document tree with reasoning explanations.                                      |
+| `memory_pageindex_import`        | **Doc Knowledge**         | Import PageIndex search results into structured memory entries.                                  |
+| `memory_disconnect_pageindex`    | **Doc Cleanup**           | Disconnect and clean up PageIndex document indexes.                                              |
+| `memory_settings_get` / `set`    | **Configuration**         | Read and update unified global or project configuration settings.                                |
+| `graph_status`                   | **AST Graph**             | Inspect CodeGraph symbol overlap provider status.                                                |
 
-## 📋 Scope of Work Tracking & PR Workflow
-
-All Scope-of-Work items live as GitHub issues (labels: `planned` / `in-progress` / `done`) and are mirrored in the README "Scope of Work & Roadmap" table.
-
-1. **No direct-to-main feature work**: every SOW item ships via a feature branch → pull request that references its issue (`Closes #N` in the PR body).
-2. **Start every SOW as a PR immediately**: when the feature branch opens, open a **draft PR** right away (`gh pr create --draft`) referencing the issue — before any implementation. Convert to ready-for-review only when the item is complete and validated. Work is never batched onto an untracked branch.
-3. **Status transitions**: flip the issue label to `in-progress` when the branch + draft PR open, to `done` when the PR merges; update the README table marker (`☐` → `◐` → `✅`) in the same PR.
-4. **New SOW items**: open an issue with the `planned` label first, then add its row to the README table.
-5. **Registry sync is automatic**: publishing to npm happens via CI (`.github/workflows/npm-publish.yml`) whenever a `v*` tag is pushed — the same act that creates the GitHub release. Never run `npm publish` manually except as a CI-failure fallback. Version bumps in `package.json` accompany every release tag.
 
 ---
 
-## 🧪 Testing & Validation Standards
+# Git Workflow
+
+Follow this Git workflow strictly.
+
+## Branches
+
+- `master` → Production. **Never commit directly to** `master`**.**
+- `dev` → Staging/integration branch.
+- `feature/*` → Created from `dev` for individual features/tasks.
+- `release/*` → Created from `dev` when changes are ready for production; merge into `master`, then back into `dev`.
+- `hotfix/*` → Created from `master` for urgent production fixes; merge into both `master` and `dev`.
+
+## Rules
+
+- Feature branches must be created from `dev`.
+- Use descriptive branch names.
+- Every merge into `dev` or `master` requires a Pull Request and code review.
+- Do not rewrite or force-push `master` or `dev` history.
+- Prefer `rebase` within feature branches when integrating changes and keeping history linear.
+- For production bugs, use `hotfix/*` rather than merging unfinished work from `dev`.
+- Prefer a new revert commit over rewriting shared history.
+
+## Scope of Work
+
+- SOW items should be tracked as GitHub issues.
+- Feature PRs should reference the relevant issue (for example, `Closes #123`).
+- Keep PRs focused on a single feature/task where practical.
+
+## Releases
+
+- Production releases use a `release/*` branch from `dev`.
+- npm publishing is handled by CI when a `v*` tag is pushed.
+- **Never run** `npm publish` **manually** unless CI has failed and a manual fallback is explicitly required.
+- Version changes in `package.json` must accompany release tags.
+
+---
+
+## 🧪 Testing &amp; Validation Standards
 
 All modifications must pass the full test suite and TypeScript validation before committing:
 
@@ -286,4 +325,5 @@ The sandboxed bash proxy rejects several common constructs — rewrite instead o
 - **Loops** (`for`/`while`): not proxied. Write the loop to a temp script (e.g. `/tmp/opencode/x.sh`) and run `bash /tmp/opencode/x.sh`.
 - **Subshells** (`( cmd & )`): syntax error. Use bare `nohup cmd > log 2>&1 &` form instead.
 - **Command substitution in quoted args** (e.g. `git commit -m "$(cat <<'EOF' …)"`): mangles the message. Pass `-m "plain text"` directly.
-- **`pkill -f <pattern>`** can match its own wrapper shell and hang. Prefer `pgrep -fa` to list PIDs, then `kill <pid>` individually.
+- `**pkill -f <pattern>**` can match its own wrapper shell and hang. Prefer `pgrep -fa` to list PIDs, then `kill <pid>` individually.
+

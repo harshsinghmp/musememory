@@ -71,6 +71,12 @@ export interface CompileResult {
   errors: string[];
 }
 
+export interface ListWikiPagesOptions {
+  project?: string;
+  type?: "concept" | "entity" | "index" | "log";
+  detailLevel?: "l1" | "full";
+}
+
 export interface WikiPageRef {
   slug: string;
   title: string;
