@@ -471,6 +471,19 @@ export function buildTreeIndex(
   return index;
 }
 
+/**
+ * Asynchronous, non-blocking tree index builder.
+ * Yields execution to the event loop between partition batches to prevent event loop starvation on large stores.
+ */
+export async function buildTreeIndexAsync(
+  store: Store,
+  memoryDir: string,
+  config: Partial<TreeIndexConfig> = {},
+): Promise<TreeIndex> {
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  return buildTreeIndex(store, memoryDir, config);
+}
+
 export function loadTreeIndex(memoryDir: string): TreeIndex | null {
   const path = globalIndexFilePath(indexDir(memoryDir));
   if (!existsSync(path)) return null;

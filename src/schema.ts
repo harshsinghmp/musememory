@@ -37,6 +37,11 @@ function getValidator(): ValidateFunction {
   return cachedValidate;
 }
 
+/** Reset cached compiled validator (useful for testing or dynamic schema reloading). */
+export function clearSchemaCache(): void {
+  cachedValidate = null;
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];

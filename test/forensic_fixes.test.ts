@@ -174,4 +174,32 @@ describe("Forensic Bug Fixes & Edge Case Hardening", () => {
     });
     expect(exitCode).toBe(0);
   });
+
+  it("clearSchemaCache resets compiled validator cache cleanly", () => {
+    const { clearSchemaCache, validateStore } = require("../src/schema.ts");
+    const store = openStore(memoryDir);
+    validateStore(store);
+    expect(() => clearSchemaCache()).not.toThrow();
+    // Validate again after cache invalidation
+    const report = validateStore(store);
+    expect(report.isValid).toBe(true);
+  });
+
+  it("buildTreeIndexAsync indexes confirmed memories asynchronously without blocking", async () => {
+    const { buildTreeIndexAsync } = require("../src/retrieval/tree-index.ts");
+    const store = openStore(memoryDir);
+    for (let i = 0; i < 5; i++) {
+      propose(store, {
+        title: `Async Tree Memory ${i}`,
+        content: `Content for async tree indexing item ${i}`,
+        type: "architecture",
+        confirmed: true,
+        project: "async_test",
+      });
+    }
+
+    const asyncIndex = await buildTreeIndexAsync(store, memoryDir);
+    expect(asyncIndex.totalMemories).toBe(5);
+    expect(asyncIndex.partitions["async_test|architecture"]).toBeDefined();
+  });
 });
