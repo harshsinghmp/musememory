@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { list, slugifyId as slugify, type Store } from "../store.ts";
+import { list, type Store } from "../store.ts";
 import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../consolidate.ts";
 import { tokenize } from "../retrieval.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
@@ -444,6 +444,8 @@ function writeLogPage(page: any, dir: string): void {
 }
 
 export function listWikiPages(
+  memoryDir: string,
+  options: { project?: string; type?: "concept" | "entity" | "index" | "log"; detailLevel?: "l1" | "full" } = {},
   memoryDir: string,
   options: ListWikiPagesOptions = {},
 ): WikiPage[] {
