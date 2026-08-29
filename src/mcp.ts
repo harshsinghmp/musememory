@@ -30,7 +30,7 @@ import { verifyEntry } from "./verify.ts";
 import { hybridSearch } from "./vector.ts";
 import { recordSessionStart } from "./sessions.ts";
 import { validateStore } from "./schema.ts";
-import { getGraphStatus } from "./graph.ts";
+import { getGraphStatus, indexGraph } from "./graph.ts";
 import { importTranscript } from "./harvest.ts";
 import { exportSnapshot, importSnapshot } from "./snapshot.ts";
 import { searchTranscriptWithBookends } from "./transcript.ts";
@@ -500,6 +500,14 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "graph_index",
+        description: "Index AST symbols from the project's CodeGraph/Graphify provider and cache in .memory/",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
         name: "memory_tree_search",
         description: "Hierarchical tree-indexed reasoning search across partitioned memory shards",
         inputSchema: {
@@ -919,6 +927,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "graph_status": {
         const status = getGraphStatus(activeRoot);
         return toolResult(status);
+      }
+      case "graph_index": {
+        const index = indexGraph(activeRoot, activeMemoryDir);
+        return toolResult(index);
       }
       case "memory_detect_providers": {
         const detected = detectProviders(activeRoot);

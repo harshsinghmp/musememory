@@ -143,12 +143,26 @@ export function isExpired(entry: MemoryEntry, now: number): boolean {
 }
 
 /**
+ * AST Graph symbol overlap bonus (SOW-107): awards up to +0.2 bonus when query references
+ * symbols that match the memory's indexed graph symbols.
+ */
+export function graphSymbolOverlapBonus(entry: MemoryEntry, queryTokens: string[]): number {
+  const symbols = entry.graph?.symbol_names;
+  if (!symbols || symbols.length === 0 || queryTokens.length === 0) return 0;
+  const symSet = new Set(symbols.map((s) => s.toLowerCase()));
+  const matches = queryTokens.filter((t) => symSet.has(t.toLowerCase())).length;
+  if (matches === 0) return 0;
+  return Math.min(0.2, (matches / queryTokens.length) * 0.2);
+}
+
+/**
  * Multi-factor score formula:
  * score = 1.0 * applicability + statusPenalty + verificationBonus + salienceBonus
- *       + reinforcementBonus + dueDateBonus + 0.3 * exp(-daysSince(decayBase)/90)
+ *       + reinforcementBonus + dueDateBonus + graphBonus + 0.3 * exp(-daysSince(decayBase)/90)
  *
  * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
  * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
+ * AST Graph: +0.2 bonus for matching indexed symbol names.
  */
 export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: number): number {
   const app = applicability(entry, queryTokens);
@@ -159,9 +173,10 @@ export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: numbe
   const r = entry.reinforcement ?? 0;
   const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
   const dueBonus = dueDateBonus(entry, now);
+  const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
   const decayBase = entry.valid_from ?? entry.updated_at;
   const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + decay;
+  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + decay;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
