@@ -627,7 +627,7 @@ export function searchTree(
   }
 
   results.sort((a, b) => b.score - a.score);
-  const paginated = paginateResults(results, options.page ?? 1, options.pageSize ?? 10);
+  const paginated = paginateResults(results, options.page ?? 1, options.pageSize ?? options.maxNodes ?? 10);
 
   return {
     nodes: paginated,

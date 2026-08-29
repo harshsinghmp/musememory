@@ -5,6 +5,8 @@ import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
+import { autoCompileWiki } from "./wiki/compiler.ts";
+import { extractHarvestUnits } from "./harvest.ts";
 import { workspaceRootFor } from "./root.ts";
 import {
   openDatabase,
@@ -78,7 +80,6 @@ export function openStore(memoryDir: string): Store {
     syncConstraints(memoryDir, store);
   } catch {}
   try {
-    const { autoCompileWiki } = require("./wiki/index.ts");
     autoCompileWiki(store, memoryDir);
   } catch {}
   return store;
@@ -536,7 +537,6 @@ export function harvestMemories(
   store: Store,
   params: { text: string; project: string; confirmed?: boolean },
 ): MemoryEntry[] {
-  const { extractHarvestUnits } = require("./harvest.ts");
   const units = extractHarvestUnits(params.text);
   const created: MemoryEntry[] = [];
   for (const u of units) {

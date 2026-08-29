@@ -28,7 +28,10 @@ export function compileKnowledge(
   const wikiResult = compileWiki(store, memoryDir, options);
 
   // 2. Extract and persist canonical entity co-occurrence graph
-  const allMemories = list(store).filter((e) => e.status === "confirmed");
+  let allMemories = list(store).filter((e) => e.status === "confirmed");
+  if (options.project) {
+    allMemories = allMemories.filter((e) => e.project === options.project);
+  }
   const entityResult = extractEntitiesFromMemories(allMemories);
   if (!options.dryRun) {
     saveEntities(memoryDir, entityResult);

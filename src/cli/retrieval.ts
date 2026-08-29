@@ -115,6 +115,7 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
   const res = queryContext(ctx.store, positional[0], {
     limit,
     tokenBudget,
+    project: flags["project"],
     includeSuperseded: flags["include-superseded"] === "true",
     type: flags["type"],
     status: flags["status"],

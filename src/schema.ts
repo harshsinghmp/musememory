@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import Ajv, { type ValidateFunction } from "ajv";
 import type { Store } from "./store.ts";
@@ -17,8 +17,22 @@ function getValidator(): ValidateFunction {
     if (typeof value !== "string") return false;
     return !Number.isNaN(Date.parse(value));
   });
-  const schemaPath = join(import.meta.dir, "..", "schema.json");
-  const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+  const candidates = [
+    join(import.meta.dir, "..", "schema.json"),
+    join(import.meta.dir, "schema.json"),
+    join(process.cwd(), "schema.json"),
+  ];
+  let schemaContent: string | null = null;
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      schemaContent = readFileSync(p, "utf8");
+      break;
+    }
+  }
+  if (!schemaContent) {
+    throw new Error(`Cannot locate schema.json in ${candidates.join(", ")}`);
+  }
+  const schema = JSON.parse(schemaContent);
   cachedValidate = ajv.compile(schema);
   return cachedValidate;
 }

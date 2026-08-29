@@ -10,6 +10,7 @@
   },
   "files": [
     "dist",
+    "schema.json",
     "README.md",
     "LICENSE",
     "package.json"

@@ -289,7 +289,15 @@ export function loadEntities(memoryDir: string): Entity[] {
 export function findEntity(memoryDir: string, id: string): Entity | null {
   const entities = loadEntities(memoryDir);
   const cleanId = slugify(id);
-  return entities.find((e) => e.id === cleanId || e.name.toLowerCase() === id.toLowerCase()) ?? null;
+  const alphanumericId = id.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (
+    entities.find((e) => {
+      if (e.id === cleanId || e.name.toLowerCase() === id.toLowerCase()) return true;
+      if (slugify(e.name) === cleanId) return true;
+      const alphaE = e.id.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return alphaE.length > 0 && alphaE === alphanumericId;
+    }) ?? null
+  );
 }
 
 export function findRelatedEntities(

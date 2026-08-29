@@ -78,4 +78,31 @@ describe("Unified Knowledge Compounding Engine", () => {
 
     cleanup(root);
   });
+
+  test("compileKnowledge isolates entity extraction when project filter is provided", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    propose(store, {
+      title: "Alpha database schema",
+      content: "Alpha project uses PostgreSQL for structured persistence.",
+      project: "alpha",
+      type: "architecture",
+      confirmed: true,
+    });
+
+    propose(store, {
+      title: "Beta cache architecture",
+      content: "Beta project uses Redis for distributed caching.",
+      project: "beta",
+      type: "architecture",
+      confirmed: true,
+    });
+
+    const report = compileKnowledge(store, memoryDir, { project: "alpha" });
+    expect(report.entities.entities.some((e) => e.name.toLowerCase().includes("alpha") || e.name.toLowerCase().includes("postgresql"))).toBe(true);
+    expect(report.entities.entities.some((e) => e.name.toLowerCase().includes("redis"))).toBe(false);
+
+    cleanup(root);
+  });
 });
