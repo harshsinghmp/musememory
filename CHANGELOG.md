@@ -5,6 +5,19 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-30
+
+### Added
+- **Turnkey Agent Memory Skills Suite (`.agents/skills/` & `skills/`)**:
+  - **`muse-ground`**: Session start pre-flight grounding injecting `USER.md` persona profile, `CURRENT.md` hard working constraints, and Top-$K$ relevant past decisions/fixes before writing code.
+  - **`muse-capture`**: Post-fix and architectural decision distillation with empirical evidence validation, inline Vibeguard secret inspection, and automatic knowledge supersession.
+  - **`muse-current`**: Active working constraints and interruption-proof session handoffs directly synchronized to `.memory/CURRENT.md`.
+  - **`muse-graph`**: AST CodeGraph & Graphify symbol indexer and code-aware retrieval query optimizer with `+0.2` graph overlap bonus.
+  - **`muse-wiki`**: Obsidian-compatible knowledge garden compiler and named entity co-occurrence graph generator.
+  - **`muse-brief`**: Proactive daily briefing and knowledge hygiene governor tracking 90/180-day staleness policies and open loops with zero daemons.
+- **AST Symbol Graph Integration (SOW-107, Issue #35)**: Pluggable CodeGraph & Graphify symbol provider detection, `memory graph index` symbol map caching under `.memory/graph-symbols.json`, auto-stamping on capture, and `graphSymbolOverlapBonus` (+0.2) in knapsack retrieval.
+- **Complete Uninstallation & Removal Workflows**: Added comprehensive clean removal steps with dry-run safety and zero-trace agent unwiring in `README.md`.
+
 ---
 
 ## [1.6.1] - 2026-08-29
