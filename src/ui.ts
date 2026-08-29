@@ -23,10 +23,34 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
       const pathname = url.pathname;
 
-      // CORS headers
-      res.setHeader("Access-Control-Allow-Origin", "*");
+      // Security Headers
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("X-Frame-Options", "DENY");
+      res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+      res.setHeader(
+        "Content-Security-Policy",
+        "default-src 'self' 'unsafe-inline' data: https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:;",
+      );
+
+      // CORS & CSRF Defense: allow localhost / 127.0.0.1 origins
+      const origin = req.headers.origin;
+      const isLocalOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) || origin === "null";
+
+      if (origin && isLocalOrigin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      } else if (!origin) {
+        res.setHeader("Access-Control-Allow-Origin", `http://localhost:${currentPort}`);
+      }
+
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      // Reject cross-origin state mutations from untrusted origins
+      if (req.method === "POST" && !isLocalOrigin) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Forbidden: Cross-Origin Request Blocked" }));
+        return;
+      }
 
       if (req.method === "OPTIONS") {
         res.writeHead(204);
@@ -310,13 +334,13 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && !opts.port) {
         currentPort++;
-        server.listen(currentPort);
+        server.listen(currentPort, "127.0.0.1");
       } else {
         reject(err);
       }
     });
 
-    server.listen(currentPort, () => {
+    server.listen(currentPort, "127.0.0.1", () => {
       const addr = server.address();
       const actualPort = typeof addr === "object" && addr ? addr.port : currentPort;
       resolve({
@@ -327,10 +351,21 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
   });
 }
 
+const MAX_BODY_SIZE = 1024 * 1024; // 1 MB payload limit
+
 function parseJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (chunk) => (data += chunk));
+    let byteLength = 0;
+    req.on("data", (chunk: Buffer | string) => {
+      byteLength += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+      if (byteLength > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error("Payload too large: request body exceeds 1MB limit"));
+        return;
+      }
+      data += chunk;
+    });
     req.on("end", () => {
       try {
         resolve(data ? JSON.parse(data) : {});

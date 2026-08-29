@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
@@ -108,7 +109,13 @@ export function slugifyId(id: string): string {
 }
 
 export function fileForId(store: Store, id: string): string {
-  return join(store.dir, `${slugifyId(id)}.yaml`);
+  const safeFilename = `${slugifyId(id)}.yaml`;
+  const target = resolve(store.dir, safeFilename);
+  const base = resolve(store.dir);
+  if (!target.startsWith(base)) {
+    throw new Error(`Security Violation: Path traversal detected for id "${id}"`);
+  }
+  return target;
 }
 
 export function listIds(store: Store): string[] {
