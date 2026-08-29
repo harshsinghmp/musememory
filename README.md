@@ -6,7 +6,7 @@
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
 ![Bun](https://img.shields.io/badge/Bun-1.3.14-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-249%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-258%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
@@ -445,7 +445,7 @@ When registered as an MCP server, `musememory` exposes the following tools to an
 | `memory_pageindex_import`   | Imports PageIndex insights directly as memory units.                                                |
 | `memory_disconnect_pageindex`| Disconnects and cleans up PageIndex tree indexes.                                                   |
 | `memory_settings_get`       | Reads unified global or project configuration settings.                                             |
-| `memory_settings_set`       | Updates unified configuration settings with schema validation.                                      |
+| `memory_current`            | Reads or appends active project working constraints (`CURRENT.md`).                                  |
 | `memory_get_user_profile`   | Reads the active user persona and preferences (`USER.md`).                                          |
 | `memory_set_user_profile`   | Updates `USER.md` persona and preferences with inline secret defense.                               |
 | `memory_search_transcripts` | Full-text search over past `.jsonl` transcripts with conversation bookends and context window.      |
@@ -522,7 +522,7 @@ rm -f ~/.local/bin/memory ~/.local/bin/musememory
 
 ```bash
 bun install
-bun test          # 249 tests passing across 43 test suites
+bun test          # 258 tests passing across 45 test suites
 bunx tsc --noEmit # 0 type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```

@@ -238,6 +238,7 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 | -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
 | `get_context`                    | **Session Start**         | Load Top-$K$ relevant memories, USER.md profile, and active constraints before writing any code. |
 | `search`                         | **Investigation**         | Query knowledge base with token budget, status, and type filtering.                              |
+| `memory_current`                 | **Constraints**           | Read or append active working constraints and hard invariants in CURRENT.md.                      |
 | `memory_get_user_profile`        | **Context Loading**       | Read active `USER.md` profile and preferences.                                                   |
 | `memory_set_user_profile`        | **Preferences**           | Update `USER.md` profile with inline secret defense.                                             |
 | `memory_search_transcripts`      | **History Search**        | Search past `.jsonl` transcripts with conversation bookends and surrounding context.             |

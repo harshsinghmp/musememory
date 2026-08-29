@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { list, type Store } from "../store.ts";
+import { list, slugifyId as slugify, type Store } from "../store.ts";
 import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../consolidate.ts";
 import { tokenize } from "../retrieval.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
@@ -156,9 +156,9 @@ function buildConceptPage(
   topic: string[],
   slug: string,
   existing?: any,
-): any {
+): ConceptPage {
   const clusterProject = cluster[0].project;
-  const memoryIds = cluster.map((e) => e.id);
+  const memoryRefs = cluster.map((e) => e.id);
   const tags = Array.from(new Set(cluster.flatMap((e) => e.tags ?? [])));
   
   const content = cluster.map((e) => 
@@ -171,10 +171,10 @@ function buildConceptPage(
     slug,
     title: topic.length > 0 ? topic.join(" ") : (cluster[0].type ?? "concept"),
     type: "concept" as const,
-    clusterProject,
+    project: clusterProject,
     updatedAt: new Date().toISOString(),
     relatedPages: existing?.relatedPages ?? [],
-    memoryRefs: memoryIds,
+    memoryRefs,
     summary,
     content,
     tags: Array.from(new Set(cluster.flatMap((e) => e.tags ?? []))),
@@ -183,7 +183,7 @@ function buildConceptPage(
   };
 }
 
-function crossLinkConcepts(conceptMap: Map<string, any>): void {
+function crossLinkConcepts(conceptMap: Map<string, ConceptPage>): void {
   const concepts = Array.from(conceptMap.values());
   for (let i = 0; i < concepts.length; i++) {
     for (let j = i + 1; j < concepts.length; j++) {
@@ -193,7 +193,7 @@ function crossLinkConcepts(conceptMap: Map<string, any>): void {
         tokenBag(a.title + " " + a.summary + " " + a.tags.join(" ")),
         tokenBag(b.title + " " + b.summary + " " + b.tags.join(" "))
       );
-      if (similarity >= 0.3) {
+      if (similarity >= CONCEPT_OVERLAP_THRESHOLD) {
         if (!a.relatedConcepts.includes(b.slug)) a.relatedConcepts.push(b.slug);
         if (!b.relatedConcepts.includes(a.slug)) b.relatedConcepts.push(a.slug);
       }
@@ -201,8 +201,8 @@ function crossLinkConcepts(conceptMap: Map<string, any>): void {
   }
 }
 
-function extractEntities(memories: MemoryEntry[]): Map<string, any> {
-  const entityMap = new Map<string, any>();
+function extractEntities(memories: MemoryEntry[]): Map<string, EntityPage> {
+  const entityMap = new Map<string, EntityPage>();
   
   for (const memory of memories) {
     const entities = extractEntitiesFromText(memory.content, memory.id);
@@ -217,7 +217,7 @@ function extractEntities(memories: MemoryEntry[]): Map<string, any> {
           slug,
           title: entity.name,
           type: "entity" as const,
-          entityType: entity.type,
+          entityType: entity.type as "person" | "product" | "organization" | "file" | "concept",
           project: memory.project,
           updatedAt: new Date().toISOString(),
           relatedPages: [],
@@ -298,7 +298,7 @@ function extractContext(text: string, entityName: string): string {
   return "..." + text.slice(start, end) + "...";
 }
 
-function crossLinkEntities(entityMap: Map<string, any>, conceptMap: Map<string, any>): void {
+function crossLinkEntities(entityMap: Map<string, EntityPage>, conceptMap: Map<string, ConceptPage>): void {
   const entities = Array.from(entityMap.values());
   for (let i = 0; i < entities.length; i++) {
     for (let j = i + 1; j < entities.length; j++) {
@@ -320,7 +320,7 @@ function crossLinkEntities(entityMap: Map<string, any>, conceptMap: Map<string, 
         tokenBag(entity.title + " " + entity.summary),
         tokenBag(concept.title + " " + concept.summary + " " + concept.tags.join(" "))
       );
-      if (similarity >= 0.3) {
+      if (similarity >= CONCEPT_OVERLAP_THRESHOLD) {
         if (!entity.relatedConcepts.includes(concept.slug)) entity.relatedConcepts.push(concept.slug);
         if (!concept.relatedEntities.includes(entity.slug)) concept.relatedEntities.push(entity.slug);
       }
@@ -328,7 +328,7 @@ function crossLinkEntities(entityMap: Map<string, any>, conceptMap: Map<string, 
   }
 }
 
-function buildIndexPage(conceptMap: Map<string, any>, entityMap: Map<string, any>, project: string): any {
+function buildIndexPage(conceptMap: Map<string, ConceptPage>, entityMap: Map<string, EntityPage>, project: string): IndexPage {
   const concepts = Array.from(conceptMap.values());
   const entities = Array.from(entityMap.values());
   
@@ -360,7 +360,7 @@ function buildIndexPage(conceptMap: Map<string, any>, entityMap: Map<string, any
   };
 }
 
-function buildLogPage(logEntries: any[]): any {
+function buildLogPage(logEntries: LogEntry[]): LogPage {
   return {
     slug: "log",
     title: "Compilation Log",
@@ -373,8 +373,8 @@ function buildLogPage(logEntries: any[]): any {
   };
 }
 
-function loadExistingConcepts(dir: string): Map<string, any> {
-  const map = new Map<string, any>();
+function loadExistingConcepts(dir: string): Map<string, ConceptPage> {
+  const map = new Map<string, ConceptPage>();
   if (!existsSync(dir)) return map;
   for (const file of readdirSync(dir)) {
     if (!file.endsWith(".md")) continue;
@@ -382,14 +382,14 @@ function loadExistingConcepts(dir: string): Map<string, any> {
     try {
       const content = readFileSync(join(dir, file), "utf8");
       const frontmatter = parseFrontmatter(content);
-      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) });
+      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) } as ConceptPage);
     } catch {}
   }
   return map;
 }
 
-function loadExistingEntities(dir: string): Map<string, any> {
-  const map = new Map<string, any>();
+function loadExistingEntities(dir: string): Map<string, EntityPage> {
+  const map = new Map<string, EntityPage>();
   if (!existsSync(dir)) return map;
   for (const file of readdirSync(dir)) {
     if (!file.endsWith(".md")) continue;
@@ -397,7 +397,7 @@ function loadExistingEntities(dir: string): Map<string, any> {
     try {
       const content = readFileSync(join(dir, file), "utf8");
       const frontmatter = parseFrontmatter(content);
-      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) });
+      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) } as EntityPage);
     } catch {}
   }
   return map;
@@ -419,33 +419,40 @@ function parseFrontmatter(content: string): any {
   return obj;
 }
 
-function writeConceptPages(map: Map<string, any>, dir: string): void {
+function writeConceptPages(map: Map<string, ConceptPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderConceptPage(page);
     writeFileSync(join(dir, slug + ".md"), content, "utf8");
   }
 }
 
-function writeEntityPages(map: Map<string, any>, dir: string): void {
+function writeEntityPages(map: Map<string, EntityPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderEntityPage(page);
     writeFileSync(join(dir, slug + ".md"), content, "utf8");
   }
 }
 
-function writeIndexPage(page: any, dir: string): void {
+function writeIndexPage(page: IndexPage, dir: string): void {
   const content = renderIndexPage(page);
   writeFileSync(join(dir, "index.md"), content, "utf8");
 }
 
-function writeLogPage(page: any, dir: string): void {
+function writeLogPage(page: LogPage, dir: string): void {
   const content = renderLogPage(page);
   writeFileSync(join(dir, "log.md"), content, "utf8");
 }
 
+function applyDetailLevel(page: WikiPage, detailLevel: "l1" | "full"): WikiPage {
+  if (detailLevel === "l1") {
+    if (page.type === "concept" || page.type === "entity") {
+      return { ...page, content: "" };
+    }
+  }
+  return page;
+}
+
 export function listWikiPages(
-  memoryDir: string,
-  options: { project?: string; type?: "concept" | "entity" | "index" | "log"; detailLevel?: "l1" | "full" } = {},
   memoryDir: string,
   options: ListWikiPagesOptions = {},
 ): WikiPage[] {
@@ -457,12 +464,7 @@ export function listWikiPages(
     const concepts = loadExistingConcepts(join(wikiDir, "concepts"));
     for (const page of concepts.values()) {
       if (!options.project || page.project === options.project) {
-        if (detailLevel === "l1") {
-          const { content, ...rest } = page;
-          pages.push({ ...rest, content: "" } as ConceptPage);
-        } else {
-          pages.push(page);
-        }
+        pages.push(applyDetailLevel(page, detailLevel));
       }
     }
   }
@@ -471,12 +473,7 @@ export function listWikiPages(
     const entities = loadExistingEntities(join(wikiDir, "entities"));
     for (const page of entities.values()) {
       if (!options.project || page.project === options.project) {
-        if (detailLevel === "l1") {
-          const { content, ...rest } = page;
-          pages.push({ ...rest, content: "" } as EntityPage);
-        } else {
-          pages.push(page);
-        }
+        pages.push(applyDetailLevel(page, detailLevel));
       }
     }
   }
@@ -487,7 +484,7 @@ export function listWikiPages(
       try {
         const raw = readFileSync(idxPath, "utf8");
         const fm = parseFrontmatter(raw);
-        pages.push({ ...fm, slug: "index", type: "index", content: detailLevel === "l1" ? "" : raw });
+        pages.push(applyDetailLevel({ ...fm, slug: "index", type: "index", content: raw }, detailLevel));
       } catch {}
     }
   }
@@ -498,7 +495,7 @@ export function listWikiPages(
       try {
         const raw = readFileSync(logPath, "utf8");
         const fm = parseFrontmatter(raw);
-        pages.push({ ...fm, slug: "log", type: "log", content: detailLevel === "l1" ? "" : raw });
+        pages.push(applyDetailLevel({ ...fm, slug: "log", type: "log", content: raw }, detailLevel));
       } catch {}
     }
   }
@@ -519,7 +516,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug: "index", type: "index", content: detailLevel === "l1" ? "" : raw };
+      return applyDetailLevel({ ...fm, slug: "index", type: "index", content: raw }, detailLevel);
     }
     return null;
   }
@@ -529,7 +526,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug: "log", type: "log", content: detailLevel === "l1" ? "" : raw };
+      return applyDetailLevel({ ...fm, slug: "log", type: "log", content: raw }, detailLevel);
     }
     return null;
   }
@@ -539,7 +536,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug, type: "concept", content: detailLevel === "l1" ? "" : raw };
+      return applyDetailLevel({ ...fm, slug, type: "concept", content: raw }, detailLevel);
     }
   }
 
@@ -548,7 +545,7 @@ export function getWikiPage(
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
-      return { ...fm, slug, type: "entity", content: detailLevel === "l1" ? "" : raw };
+      return applyDetailLevel({ ...fm, slug, type: "entity", content: raw }, detailLevel);
     }
   }
 
