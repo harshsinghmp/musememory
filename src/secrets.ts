@@ -27,7 +27,7 @@ export const SECRET_RULES: { name: string; pattern: RegExp }[] = [
   },
   {
     name: "Private Key Block",
-    pattern: /-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP|ENCRYPTED|PRIVATE)? ?KEY|PRIVATE KEY/i,
+    pattern: /-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP|ENCRYPTED|PRIVATE)? ?(?:PRIVATE )?KEY/i,
   },
   {
     name: "Slack Token",

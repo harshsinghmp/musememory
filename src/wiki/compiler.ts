@@ -318,6 +318,12 @@ function buildLogPage(logEntries: LogEntry[]): LogPage {
   };
 }
 
+function stripFrontmatter(content: string): string {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  if (!match) return content;
+  return content.slice(match[0].length);
+}
+
 function loadExistingConcepts(dir: string): Map<string, ConceptPage> {
   const map = new Map<string, ConceptPage>();
   if (!existsSync(dir)) return map;
@@ -327,7 +333,7 @@ function loadExistingConcepts(dir: string): Map<string, ConceptPage> {
     try {
       const content = readFileSync(join(dir, file), "utf8");
       const frontmatter = parseFrontmatter(content);
-      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) } as ConceptPage);
+      map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as ConceptPage);
     } catch {}
   }
   return map;
@@ -342,23 +348,41 @@ function loadExistingEntities(dir: string): Map<string, EntityPage> {
     try {
       const content = readFileSync(join(dir, file), "utf8");
       const frontmatter = parseFrontmatter(content);
-      map.set(slug, { ...frontmatter, slug, content: content.slice(content.indexOf("\n---\n") + 5) } as EntityPage);
+      map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as EntityPage);
     } catch {}
   }
   return map;
 }
 
 function parseFrontmatter(content: string): any {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return {};
-  const lines = match[1].split("\n");
+  const lines = match[1].split(/\r?\n/);
   const obj: any = {};
   for (const line of lines) {
     const idx = line.indexOf(":");
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const value = line.slice(idx + 1).trim();
-      obj[key] = value.replace(/^["']|["']$/g, "");
+      const rawVal = line.slice(idx + 1).trim();
+      if (rawVal.startsWith("[") && rawVal.endsWith("]")) {
+        try {
+          obj[key] = JSON.parse(rawVal);
+          continue;
+        } catch {}
+      }
+      if (rawVal === "true") {
+        obj[key] = true;
+        continue;
+      }
+      if (rawVal === "false") {
+        obj[key] = false;
+        continue;
+      }
+      if (!isNaN(Number(rawVal)) && rawVal !== "") {
+        obj[key] = Number(rawVal);
+        continue;
+      }
+      obj[key] = rawVal.replace(/^["']|["']$/g, "");
     }
   }
   return obj;

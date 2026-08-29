@@ -15,11 +15,11 @@ export function handleSettingsCommand(parsed: ParsedArgs): number {
   const ctx = requireRoot(parsed.flags);
   if (!ctx) return 1;
   const memoryDir = ctx.memoryDir;
-  const sub = parsed.positional[1] ?? "get";
+  const sub = parsed.positional[0] ?? "get";
   const project = parsed.flags.project as string | undefined;
 
   if (sub === "get") {
-    const key = parsed.positional[2];
+    const key = parsed.positional[1];
     const settings = project ? getProjectSettings(memoryDir, project) : getSettings(memoryDir);
 
     if (key) {
@@ -41,8 +41,8 @@ export function handleSettingsCommand(parsed: ParsedArgs): number {
   }
 
   if (sub === "set") {
-    const key = parsed.positional[2];
-    const rawVal = parsed.positional[3];
+    const key = parsed.positional[1];
+    const rawVal = parsed.positional[2];
 
     if (!key || rawVal === undefined) {
       console.error("Error: please specify key and value (e.g. `memory settings set retrieval.defaultMode tree`)");
@@ -107,7 +107,7 @@ export function handleSettingsCommand(parsed: ParsedArgs): number {
   }
 
   if (sub === "import") {
-    const file = parsed.positional[2];
+    const file = parsed.positional[1];
     if (!file) {
       console.error("Error: please specify a JSON file to import (e.g. `memory settings import team-settings.json`)");
       return 2;

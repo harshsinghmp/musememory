@@ -2,7 +2,8 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { getCurrent, syncConstraints } from "./current.ts";
+import { getCurrent, syncConstraints, getSessionHandoff } from "./governor.ts";
+import { listWikiPages } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
 import type { MemoryEntry, SearchOptions } from "./types.ts";
@@ -38,8 +39,49 @@ export interface FormattedContext {
   userProfile?: string | null;
 }
 
-/** Per-type staleness policy in days; null = never stale. */
+/** Stopwords filtered out during tokenization */
+const STOPWORDS = new Set([
+  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
+  "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
+  "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't",
+  "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
+  "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't",
+  "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here",
+  "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i",
+  "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's",
+  "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself",
+  "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought",
+  "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she",
+  "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such",
+  "than", "that", "that's", "the", "their", "theirs", "them", "themselves",
+  "then", "there", "there's", "these", "they", "they'd", "they'll", "they're",
+  "they've", "this", "those", "through", "to", "too", "under", "until", "up",
+  "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were",
+  "weren't", "what", "what's", "when", "when's", "where", "where's", "which",
+  "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would",
+  "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours",
+  "yourself", "yourselves",
+]);
+
+/** Lowercase alphanumeric-only tokens, split on non-alphanumeric. */
+export function tokenize(text: string): string[] {
+  if (!text || typeof text !== "string") return [];
+  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+
+/** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
+export function computeApplicability(entryTokens: Set<string>, queryTokens: string[]): number {
+  if (queryTokens.length === 0) return 0.5; // neutral when no query
+  let matched = 0;
+  for (const t of queryTokens) {
+    if (entryTokens.has(t)) matched++;
+  }
+  return matched / queryTokens.length;
+}
+
+/** Staleness policy in days per memory type. null = never stale. */
 export function stalePolicyDays(type?: string): number | null {
+  if (!type) return DEFAULT_STALE_DAYS;
   switch (type) {
     case "fix":
       return 90;
@@ -54,12 +96,6 @@ export function stalePolicyDays(type?: string): number | null {
     default:
       return DEFAULT_STALE_DAYS;
   }
-}
-
-/** Lowercase alphanumeric-only tokens, split on non-alphanumeric. */
-export function tokenize(text: string): string[] {
-  if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 }
 
 /** Estimates prompt token count for a memory entry (~4 characters per token heuristic). */
@@ -134,9 +170,13 @@ export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[],
     .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now) }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      const u = Date.parse(b.entry.updated_at) - Date.parse(a.entry.updated_at);
+      const bU = Date.parse(b.entry.updated_at);
+      const aU = Date.parse(a.entry.updated_at);
+      const u = (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
       if (u !== 0) return u;
-      return Date.parse(b.entry.created_at) - Date.parse(a.entry.created_at);
+      const bC = Date.parse(b.entry.created_at);
+      const aC = Date.parse(a.entry.created_at);
+      return (Number.isNaN(bC) ? 0 : bC) - (Number.isNaN(aC) ? 0 : aC);
     });
 }
 
@@ -188,13 +228,15 @@ export function queryContext(
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
 
-  if (options.tokenBudget && options.tokenBudget > 0) {
-    for (const item of scored) {
-      if (results.length >= limit) break;
-      const tokens = estimateEntryTokens(item.entry);
-      if (totalTokensUsed + tokens <= options.tokenBudget) {
-        results.push(item);
-        totalTokensUsed += tokens;
+  if (options.tokenBudget !== undefined) {
+    if (options.tokenBudget > 0) {
+      for (const item of scored) {
+        if (results.length >= limit) break;
+        const tokens = estimateEntryTokens(item.entry);
+        if (totalTokensUsed + tokens <= options.tokenBudget) {
+          results.push(item);
+          totalTokensUsed += tokens;
+        }
       }
     }
   } else {
@@ -249,7 +291,6 @@ export function formatPromptContext(
     parts.push("");
   }
 
-  const { getSessionHandoff } = require("./current.ts");
   const handoff = memoryDir ? getSessionHandoff(memoryDir) : null;
   if (handoff && (handoff.status === "IN-PROGRESS" || handoff.task || handoff.lastQuery)) {
     parts.push("### Active In-Flight Context & Session Handoff (CURRENT.md)");
@@ -271,7 +312,6 @@ export function formatPromptContext(
 
   if (memoryDir && existsSync(join(memoryDir, "wiki"))) {
     try {
-      const { listWikiPages } = require("./wiki/index.ts");
       const wikiPages = listWikiPages(memoryDir, { detailLevel: "l1", project: options.project });
       if (wikiPages.length > 0) {
         const queryTokens = tokenize(query);
@@ -281,7 +321,8 @@ export function formatPromptContext(
         if (relevantWiki.length > 0) {
           parts.push("### Compiled Knowledge & Concepts (Wiki L1)");
           for (const wp of relevantWiki) {
-            parts.push(`- [[${wp.slug}]]: ${wp.title}${wp.summary ? ` — ${wp.summary}` : ""}`);
+            const sum = (wp as any).summary;
+            parts.push(`- [[${wp.slug}]]: ${wp.title}${sum ? ` — ${sum}` : ""}`);
           }
           parts.push("");
         }

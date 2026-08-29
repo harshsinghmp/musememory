@@ -21,7 +21,7 @@ import {
   type Store,
 } from "./store.ts";
 import { queryContext, formatPromptContext } from "./retrieval.ts";
-import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
+import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -66,7 +66,7 @@ export async function runMcpServer(): Promise<void> {
   }
 
   const server = new Server(
-    { name: "musememory", version: "1.4.0" },
+    { name: "musememory", version: "1.6.0" },
     {
       capabilities: { tools: {}, logging: {} },
       instructions: `MUSE MEMORY PROTOCOL:
@@ -656,21 +656,19 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
+    const { activeStore, activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
 
     try {
       switch (name) {
         case "memory_read": {
-          const { activeStore } = resolveStoreForRequest(a);
           const entry = get(activeStore, String(a.id));
           if (!entry) return toolError(`no entry with id ${a.id}`);
           return toolResult(entry);
         }
         case "get_context": {
-          const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
           const queryStr = String(a.query ?? "");
           if (queryStr && activeMemoryDir) {
             try {
-              const { updateSessionHandoff } = require("./current.ts");
               updateSessionHandoff(activeMemoryDir, {
                 status: "IN-PROGRESS",
                 lastQuery: queryStr,
@@ -698,9 +696,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           });
         }
         case "memory_checkpoint": {
-          const { activeMemoryDir } = resolveStoreForRequest(a);
           try {
-            const { updateSessionHandoff } = require("./current.ts");
             const handoff = updateSessionHandoff(activeMemoryDir, {
               status: (a.status ? String(a.status).toUpperCase() : "IN-PROGRESS") as any,
               task: a.task ? String(a.task) : undefined,
@@ -715,7 +711,6 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         case "memory_current":
         case "memory_get_constraints":
         case "memory_set_constraints": {
-          const { activeMemoryDir, activeRoot, activeStore } = resolveStoreForRequest(a);
           const action = a.action || (name === "memory_set_constraints" ? "append" : "get");
           if (action === "append" || a.constraint) {
             const text = String(a.constraint || a.text || "");
@@ -730,7 +725,6 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "memory_recall":
         case "search": {
-          const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
           const mode = a.hybrid === true ? "hybrid" : a.tree === true ? "tree" : "auto";
           const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
             mode,
@@ -751,7 +745,6 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "propose":
         case "memory_capture": {
-          const { activeStore, activeRoot, activeMemoryDir } = resolveStoreForRequest(a);
           const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
           try {
             const entry = propose(activeStore, {
@@ -769,7 +762,6 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             }
             if (activeMemoryDir) {
               try {
-                const { updateSessionHandoff } = require("./current.ts");
                 updateSessionHandoff(activeMemoryDir, {
                   discoveries: [String(a.title || a.content || "")],
                 });
@@ -781,7 +773,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           }
         }
       case "memory_harvest": {
-        const created = harvestMemories(store, {
+        const created = harvestMemories(activeStore, {
           text: String(a.text),
           project: String(a.project),
           confirmed: a.confirmed === true,
@@ -792,11 +784,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const transcript = String(a.transcript);
         const project = a.project ? String(a.project) : undefined;
         const isConfirmed = a.confirmed === true;
-        const res = importTranscript(store, transcript, { project, confirmed: isConfirmed });
+        const res = importTranscript(activeStore, transcript, { project, confirmed: isConfirmed });
         return toolResult(res);
       }
       case "memory_confirm": {
-        const entry = confirm(store, String(a.id));
+        const entry = confirm(activeStore, String(a.id));
         if (!entry) return toolError(`could not confirm ${a.id} (not found or invalid status transition)`);
         return toolResult(entry);
       }
@@ -804,35 +796,35 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const oldId = String(a.id);
         const newId = String(a.with ?? a.new_id ?? "");
         if (!newId) return toolError("memory_supersede requires 'with' or 'new_id' parameter");
-        const entry = supersede(store, oldId, newId);
+        const entry = supersede(activeStore, oldId, newId);
         if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
         return toolResult(entry);
       }
       case "memory_link": {
         const related = Array.isArray(a.related) ? a.related.map(String) : [];
-        const entry = link(store, String(a.id), related);
+        const entry = link(activeStore, String(a.id), related);
         if (!entry) return toolError(`could not link ${a.id} (missing id or related id)`);
         return toolResult(entry);
       }
       case "memory_mark_stale": {
-        const entry = markStale(store, String(a.id), a.reason ? String(a.reason) : undefined);
+        const entry = markStale(activeStore, String(a.id), a.reason ? String(a.reason) : undefined);
         if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
       }
       case "memory_reject": {
-        const entry = reject(store, String(a.id));
+        const entry = reject(activeStore, String(a.id));
         if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
       }
       case "memory_delete": {
         const id = String(a.id);
         const reason = a.reason ? String(a.reason) : undefined;
-        const ok = deleteEntry(store, id, reason, "mcp_agent");
+        const ok = deleteEntry(activeStore, id, reason, "mcp_agent");
         if (!ok) return toolError(`no entry found with id ${id}`);
         return toolResult({ success: true, deleted_id: id });
       }
       case "memory_audit": {
-        const trail = getAuditTrail(memoryDir, {
+        const trail = getAuditTrail(activeMemoryDir, {
           operation: a.operation ? String(a.operation) : undefined,
           entryId: a.entry_id ? String(a.entry_id) : undefined,
           limit: typeof a.limit === "number" ? a.limit : 50,
@@ -840,32 +832,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult({ total: trail.length, entries: trail });
       }
       case "memory_export": {
-        const snapshot = exportSnapshot(store);
+        const snapshot = exportSnapshot(activeStore);
         return toolResult(snapshot);
       }
       case "memory_import": {
         const entries = (a.entries ?? []) as MemoryEntry[];
-        const res = importSnapshot(store, { entries }, { overwrite: a.overwrite === true });
+        const res = importSnapshot(activeStore, { entries }, { overwrite: a.overwrite === true });
         return toolResult(res);
       }
       case "confirm_fix": {
-        const entry = get(store, String(a.id));
+        const entry = get(activeStore, String(a.id));
         if (!entry) return toolError(`no entry with id ${a.id}`);
         if (entry.status !== "disputed") return toolError(`entry ${a.id} is not disputed`);
-        const updated = confirm(store, entry.id);
+        const updated = confirm(activeStore, entry.id);
         if (!updated) return toolError(`no entry with id ${a.id}`);
         if (a.resolution) {
           updated.content = `${updated.content}\n\nResolution: ${String(a.resolution)}`;
-          save(store, updated);
+          save(activeStore, updated);
         }
         return toolResult(updated);
       }
       case "record_session": {
-        const { entry, sessionId } = recordSessionStart(store, String(a.project), a.note ? String(a.note) : undefined);
+        const { entry, sessionId } = recordSessionStart(activeStore, String(a.project), a.note ? String(a.note) : undefined);
         return toolResult({ ...entry, sessionId });
       }
       case "memory_validate": {
-        const report = validateStore(store);
+        const report = validateStore(activeStore);
         return toolResult(report);
       }
       case "memory_core": {
@@ -875,40 +867,40 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         try {
           if (tier && a.set !== undefined) {
-            const tiers = setCore(memoryDir, tier, String(a.set));
+            const tiers = setCore(activeMemoryDir, tier, String(a.set));
             return toolResult({ tier, lines: tiers[tier] });
           }
           if (tier && a.remove === true) {
-            const tiers = removeCore(memoryDir, tier);
+            const tiers = removeCore(activeMemoryDir, tier);
             return toolResult({ tier, lines: tiers[tier] });
           }
           if (tier) {
-            return toolResult({ tier, lines: readCore(memoryDir)[tier] });
+            return toolResult({ tier, lines: readCore(activeMemoryDir)[tier] });
           }
-          return toolResult(readCore(memoryDir));
+          return toolResult(readCore(activeMemoryDir));
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }
       }
       case "memory_consolidate": {
-        const report = consolidateScenes(store, {
+        const report = consolidateScenes(activeStore, {
           project: a.project ? String(a.project) : undefined,
           dryRun: a.dry_run === true,
         });
         return toolResult(report);
       }
       case "memory_trace": {
-        const node = traceGraph(store, String(a.id), typeof a.depth === "number" ? a.depth : 5);
+        const node = traceGraph(activeStore, String(a.id), typeof a.depth === "number" ? a.depth : 5);
         if (!node) return toolError(`no entry with id ${a.id}`);
         return toolResult(node);
       }
       case "memory_loops": {
-        const report = collectLoops(store, root, memoryDir);
+        const report = collectLoops(activeStore, activeRoot, activeMemoryDir);
         return toolResult(report);
       }
       case "memory_distill": {
         try {
-          const report = distillSkills(store, root, {
+          const report = distillSkills(activeStore, activeRoot, {
             minCount: typeof a.min_count === "number" ? a.min_count : undefined,
             dryRun: a.dry_run === true,
           });
@@ -918,18 +910,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
       }
       case "memory_verify": {
-        const result = await verifyEntry(store, root, memoryDir, String(a.id), {
+        const result = await verifyEntry(activeStore, activeRoot, activeMemoryDir, String(a.id), {
           timeout: typeof a.timeout === "number" ? a.timeout : undefined,
         });
         if (!result.ok) return toolError(result.message);
         return toolResult(result);
       }
       case "graph_status": {
-        const status = getGraphStatus(root);
+        const status = getGraphStatus(activeRoot);
         return toolResult(status);
       }
       case "memory_detect_providers": {
-        const detected = detectProviders(root);
+        const detected = detectProviders(activeRoot);
         return toolResult(detected);
       }
       case "memory_detect_agents": {
@@ -949,7 +941,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_migrate": {
         try {
-          const report = await runMigration(store, memoryDir, {
+          const report = await runMigration(activeStore, activeMemoryDir, {
             provider: a.provider ? String(a.provider) : undefined,
             all: Boolean(a.all),
             dryRun: Boolean(a.dry_run),
@@ -963,7 +955,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_get_user_profile": {
         const isGlobal = a.global === true;
-        const dir = isGlobal ? getGlobalMemoryDir() : memoryDir;
+        const dir = isGlobal ? getGlobalMemoryDir() : activeMemoryDir;
         const query = a.query ? String(a.query) : undefined;
         const profile = getUserProfile(dir, { query });
         return toolResult({ profile: profile ?? "No USER.md profile configured.", exists: Boolean(profile) });
@@ -971,7 +963,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "memory_set_user_profile": {
         try {
           const isGlobal = a.global === true;
-          const dir = isGlobal ? getGlobalMemoryDir() : memoryDir;
+          const dir = isGlobal ? getGlobalMemoryDir() : activeMemoryDir;
           setUserProfile(dir, String(a.content));
           return toolResult({ success: true, message: `Updated USER.md in ${dir}` });
         } catch (err: unknown) {
@@ -990,9 +982,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
       }
       case "memory_tree_search": {
-        let index = loadTreeIndex(memoryDir);
+        let index = loadTreeIndex(activeMemoryDir);
         if (!index) {
-          index = buildTreeIndex(store, memoryDir);
+          index = buildTreeIndex(activeStore, activeMemoryDir);
         }
         const res = searchTree(index, {
           query: String(a.query),
@@ -1005,35 +997,35 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(res);
       }
       case "memory_wiki_get": {
-        const page = getWikiPage(memoryDir, String(a.slug), a.type ? (String(a.type) as any) : undefined);
+        const page = getWikiPage(activeMemoryDir, String(a.slug), a.type ? (String(a.type) as any) : undefined);
         if (!page) return toolError(`Wiki page '${a.slug}' not found.`);
         return toolResult(page);
       }
       case "memory_wiki_search": {
-        const pages = listWikiPages(memoryDir, {
+        const pages = listWikiPages(activeMemoryDir, {
           project: a.project ? String(a.project) : undefined,
           type: a.type ? (String(a.type) as any) : undefined,
         });
         return toolResult({ pages, count: pages.length });
       }
       case "memory_wiki_compile": {
-        const res = compileWiki(store, memoryDir, {
+        const res = compileWiki(activeStore, activeMemoryDir, {
           project: a.project ? String(a.project) : undefined,
           dryRun: a.dry_run === true,
         });
         return toolResult(res);
       }
       case "memory_entities_get": {
-        const ent = findEntity(memoryDir, String(a.id));
+        const ent = findEntity(activeMemoryDir, String(a.id));
         if (!ent) return toolError(`Entity '${a.id}' not found.`);
         if (a.include_related === true) {
-          const rel = findRelatedEntities(memoryDir, String(a.id));
+          const rel = findRelatedEntities(activeMemoryDir, String(a.id));
           return toolResult({ entity: ent, related: rel });
         }
         return toolResult(ent);
       }
       case "memory_entities_search": {
-        let entities = loadEntities(memoryDir);
+        let entities = loadEntities(activeMemoryDir);
         if (a.type) entities = entities.filter((e) => e.type === a.type);
         if (a.project) entities = entities.filter((e) => !e.project || e.project === a.project);
         return toolResult({ entities, count: entities.length });
@@ -1045,7 +1037,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             title: a.title ? String(a.title) : undefined,
             maxDepth: typeof a.maxDepth === "number" ? a.maxDepth : undefined,
             dryRun: a.dryRun === true,
-            memoryDir,
+            memoryDir: activeMemoryDir,
           });
           return toolResult(doc);
         } catch (err: unknown) {
@@ -1054,7 +1046,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_pageindex_search": {
         const project = a.project ? String(a.project) : "default";
-        const doc = loadPageIndex(memoryDir, project, String(a.indexId));
+        const doc = loadPageIndex(activeMemoryDir, project, String(a.indexId));
         if (!doc) return toolError(`PageIndex '${a.indexId}' not found for project '${project}'`);
         const res = searchPageIndex(doc, {
           query: String(a.query),
@@ -1066,12 +1058,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_pageindex_import": {
         const project = String(a.project);
-        const doc = loadPageIndex(memoryDir, project, String(a.indexId));
+        const doc = loadPageIndex(activeMemoryDir, project, String(a.indexId));
         if (!doc) return toolError(`PageIndex '${a.indexId}' not found for project '${project}'`);
         const search = searchPageIndex(doc, { query: String(a.query), maxNodes: 5 });
         const imported: MemoryEntry[] = [];
         for (const item of search.results) {
-          const entry = propose(store, {
+          const entry = propose(activeStore, {
             project,
             title: item.title,
             content: `${item.summary}\n\nPath: ${item.path}`,
@@ -1084,7 +1076,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_disconnect_pageindex": {
         const res = deletePageIndex(
-          memoryDir,
+          activeMemoryDir,
           a.project ? String(a.project) : undefined,
           a.indexId ? String(a.indexId) : undefined,
         );
@@ -1092,17 +1084,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_settings_get": {
         const settings = a.project
-          ? getProjectSettings(memoryDir, String(a.project))
-          : getSettings(memoryDir);
+          ? getProjectSettings(activeMemoryDir, String(a.project))
+          : getSettings(activeMemoryDir);
         return toolResult(settings);
       }
       case "memory_settings_set": {
         try {
           if (a.project) {
-            const updated = setProjectSettings(memoryDir, String(a.project), a.settings as any);
+            const updated = setProjectSettings(activeMemoryDir, String(a.project), a.settings as any);
             return toolResult(updated);
           } else {
-            const updated = setSettings(memoryDir, a.settings as any);
+            const updated = setSettings(activeMemoryDir, a.settings as any);
             return toolResult(updated);
           }
         } catch (err: unknown) {

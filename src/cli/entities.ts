@@ -44,7 +44,7 @@ export function handleEntitiesCommand(parsed: ParsedArgs): number {
   const ctx = requireRoot(parsed.flags);
   if (!ctx) return 1;
   const memoryDir = ctx.memoryDir;
-  const sub = parsed.positional[1] ?? "list";
+  const sub = parsed.positional[0] ?? "list";
 
   if (sub === "list" || sub === "ls") {
     const type = parsed.flags.type as EntityType | undefined;
@@ -68,7 +68,7 @@ export function handleEntitiesCommand(parsed: ParsedArgs): number {
   }
 
   if (sub === "show" || sub === "get") {
-    const id = parsed.positional[2];
+    const id = parsed.positional[1];
     if (!id) {
       console.error("Error: please specify an entity ID or name (e.g. `memory entities show nextjs`)");
       return 2;
@@ -85,7 +85,7 @@ export function handleEntitiesCommand(parsed: ParsedArgs): number {
   }
 
   if (sub === "related") {
-    const id = parsed.positional[2];
+    const id = parsed.positional[1];
     if (!id) {
       console.error("Error: please specify an entity ID or name (e.g. `memory entities related nextjs`)");
       return 2;

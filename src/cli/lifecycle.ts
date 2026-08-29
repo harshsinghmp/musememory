@@ -328,7 +328,7 @@ export async function handleStaleCommand({ flags }: ParsedArgs): Promise<number>
   const daysOverride = flags["days"] ? parseInt(flags["days"], 10) : null;
   const now = Date.now();
   const stale = list(ctx.store).filter((e) => {
-    if (e.status !== "active") return false;
+    if (e.status !== "active" && e.status !== "confirmed") return false;
     const policy = stalePolicyDays(e.type);
     if (policy === null) return false;
     const days = daysOverride ?? policy;

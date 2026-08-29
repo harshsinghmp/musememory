@@ -38,7 +38,8 @@ export function parseFlags(args: string[]): ParsedArgs {
 
 export function requireRoot(flags: Record<string, string> = {}): { root: string; memoryDir: string; store: Store } | null {
   const isGlobal = flags["global"] === "true";
-  const { root, memoryDir } = findOrCreateProjectRoot(process.cwd(), { global: isGlobal });
+  const startDir = flags["dir"] || process.cwd();
+  const { root, memoryDir } = findOrCreateProjectRoot(startDir, { global: isGlobal });
   return { root, memoryDir, store: openStore(memoryDir) };
 }
 
