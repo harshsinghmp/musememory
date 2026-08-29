@@ -119,7 +119,7 @@ Ecosystem, Migration & Connectivity:
   export [--out file.json]      Export portable JSON memory snapshot
   import <file.json>            Import portable JSON memory snapshot
   validate [--dry-run]          Validate YAML schemas and referential integrity
-  graph status                  Inspect CodeGraph AST provider status
+  graph [status|index]          Inspect or index CodeGraph/Graphify AST provider symbols
   ui / dashboard [--port 2222]  Launch embedded visual knowledge graph UI
   daemon [--port N]             Real-time agency hub (SSE event stream + publish API, default port 7878)
   mcp                           Run stdio MCP server for agent platforms

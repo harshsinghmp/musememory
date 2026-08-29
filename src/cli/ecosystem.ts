@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { getGlobalMemoryDir } from "../root.ts";
 import { userFilePath, initUserProfile } from "../user.ts";
 import { detectProviders, runMigration } from "../migrator/index.ts";
-import { getGraphStatus } from "../graph.ts";
+import { getGraphStatus, indexGraph } from "../graph.ts";
 import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export const MUSE_MEMORY_DIRECTIVE = `<!-- musememory:start -->
@@ -391,7 +391,7 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
 export async function handleGraphCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const sub = positional[0];
+  const sub = positional[0] ?? "status";
   if (sub === "status") {
     const status = getGraphStatus(ctx.root);
     console.log(`graph provider: ${status.provider}`);
@@ -401,7 +401,13 @@ export async function handleGraphCommand({ positional, flags }: ParsedArgs): Pro
     if (status.symbolCount !== undefined) console.log(`symbols: ${status.symbolCount}`);
     return 0;
   }
-  return usageError("graph requires status");
+  if (sub === "index") {
+    const index = indexGraph(ctx.root, ctx.memoryDir);
+    console.log(`[AST Graph] Indexed ${index.symbolCount} symbols from provider "${index.provider}"`);
+    console.log(`Cached symbol index at: ${ctx.memoryDir}/graph-symbols.json`);
+    return 0;
+  }
+  return usageError("graph requires 'status' or 'index'");
 }
 
 export async function handleMcpCommand(): Promise<number> {

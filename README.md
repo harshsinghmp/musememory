@@ -6,7 +6,7 @@
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
 ![Bun](https://img.shields.io/badge/Bun-1.4.0-black?style=for-the-badge&logo=bun)
 ![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
-![CI Tests](https://img.shields.io/badge/Tests-297%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-302%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
@@ -270,7 +270,8 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `memory_export` / `import` | **Team Sharing** | Exports and imports portable JSON memory snapshots. |
 | `memory_validate` | **Integrity Check** | Verifies database integrity and scans for credential leaks. |
 | `memory_settings_get` / `set` | **Configuration** | Reads and updates unified global or project configuration settings. |
-| `graph_status` | **AST Graph** | Inspects CodeGraph symbol overlap provider status. |
+| `graph_status` | **AST Graph** | Inspects CodeGraph/Graphify symbol overlap provider status. |
+| `graph_index` | **AST Graph** | Indexes AST symbol graph and caches in `.memory/graph-symbols.json`. |
 
 </details>
 
@@ -383,7 +384,7 @@ Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull req
 
 ```bash
 bun install
-bun test          # 297 passed across 53 test files (1163 assertions)
+bun test          # 302 passed across 54 test files (1199 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```

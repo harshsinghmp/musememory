@@ -2,12 +2,13 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
+import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
+import { autoStampGraphMetadata } from "./graph.ts";
 import { workspaceRootFor } from "./root.ts";
 import {
   openDatabase,
@@ -262,6 +263,7 @@ export function propose(
     due_at?: string;
     expires_at?: string;
     test_command?: string;
+    graph?: GraphMetadata;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -302,6 +304,7 @@ export function propose(
     expires_at: opts.expiresAt ?? opts.expires_at,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
+    graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),
   };
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
