@@ -2,12 +2,21 @@
 
 <div align="center">
 
-![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=blue)
-![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=red)
-![Bun](https://img.shields.io/badge/Bun-1.4.0-black?style=for-the-badge&logo=bun)
-![MCP](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
+![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=2563EB)
+![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=CB3837)
+![Bun](https://img.shields.io/badge/Bun-v1.4.0_(Latest)-black?style=for-the-badge&logo=bun)
+![Node.js](https://img.shields.io/badge/Node.js-≥18.0.0-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+
+![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
+![SQLite Engine](https://img.shields.io/badge/SQLite-Primary_DB-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
+![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
+
 ![CI Tests](https://img.shields.io/badge/Tests-302%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
-![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
+![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
+![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
+![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
 
 **Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
 
@@ -54,13 +63,22 @@ Most AI chatbots and coding assistants have **"goldfish memory"**: every time yo
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- 👤 **Remembers You (`USER.md`)**: Configures your role (`developer`, `designer`, `marketer`, `casual`, `custom`) and communication preferences so AI models talk your language.
-- 📐 **Remembers Active Constraints (`CURRENT.md`)**: Real-time auto-synchronization ensures agents never break hard invariants or lose in-flight task context across session interruptions.
-- 💾 **Primary SQLite + Dual YAML Mirror**: Millisecond queries from `.memory/memory.db` with human-readable YAML mirrors in `.memory/memories/` for seamless Git tracking and team diffing.
-- ⚖️ **Token Knapsack Retrieval**: Multi-factor scoring and exact prompt token budgeting pack relevant memories into prompts with zero token waste.
-- 📚 **Knowledge Compounding**: Compiles memories into Obsidian-compatible Markdown wikis (`memory wiki`), named entity co-occurrence graphs (`memory entities`), and hierarchical PageIndex reasoning trees.
-- 🔌 **Zero-Permission Auto-Wiring**: Automatically scans for 80+ coding agent platforms (Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, etc.) and wires them with zero friction.
-- 🛡️ **Zero-Leakage Secret Defense (Vibeguard)**: Intercepts and rejects API keys, AWS tokens, private keys, and database passwords before they can touch disk.
+---
+
+## ✨ Key Feature Highlights
+
+- 👤 **Persona & Style Grounding (`USER.md`)**: Configures your role (`developer`, `designer`, `marketer`, `casual`, `custom`) and communication preferences so AI models write code that matches your style.
+- 📐 **Real-Time Active Constraints (`CURRENT.md`)**: Bi-temporal working constraints and invariant tracking synchronized on every mutation to eliminate amnesia during task handoffs.
+- 💾 **SQLite Primary + Dual-Persisted YAML Mirror**: Sub-millisecond queries via SQLite with transparent human-readable `.yaml` files in `.memory/memories/` for seamless Git diffs.
+- ⚖️ **Token Knapsack Retrieval**: Multi-factor scoring (applicability, verification bonus, AST graph overlap, time decay, due date urgency) tightly packed under prompt token ceilings.
+- 🌐 **Pluggable AST CodeGraph & Symbol Indexing**: Native CodeGraph & Graphify integration that indexes codebase AST symbols, auto-tags memories, and awards graph overlap bonuses.
+- 🌳 **Hierarchical Tree Retrieval & Progressive Disclosure**: Sharded tree partitions with 3-tier progressive disclosure (`L1` abstracts, `L2` summaries, `L3` full context) for massive knowledge bases.
+- 📚 **Obsidian Markdown Wiki & Entity Graph Compiler**: Dual-persistence knowledge compounding compiling linked Markdown pages (`wiki/concepts/`, `wiki/entities/`) with bidirectional `[[wikilinks]]`.
+- 🛡️ **Vibeguard Zero-Leakage Secret Scanner**: Regex-powered memory defense intercepting and rejecting API keys, AWS credentials, private keys, database URIs, and passwords before writes.
+- 🔌 **Zero-Permission Auto-Wiring (80+ Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
+- 🔄 **Universal Memory Migrator (29 Engines)**: One-click migration from Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, and more with state preservation.
+- 🎨 **Cognitive Studio Visual Dashboard (`memory ui`)**: Embedded zero-dependency web interface featuring 3D force-directed knowledge graphs, live `CURRENT.md` monitor, wiki reader, and persona editor.
+- ⏰ **Proactive Nudges & Routines Scheduler**: Cron-invoked daily briefings, staleness policy tracking, and ambient open-loop trackers with zero resident background daemons.
 
 ---
 
@@ -108,7 +126,7 @@ docker build -t musememory .
 
 ---
 
-## 🔄 Complete NPX Lifecycle (Install → Verify → Connect → Uninstall)
+## 🔄 Complete Lifecycle (Install → Verify → Connect → Uninstall)
 
 Every command works with **zero installation** via `npx musememory <cmd>` (or `bunx musememory <cmd>`). Use plain `memory <cmd>` if installed globally.
 
@@ -147,17 +165,63 @@ npx musememory connect windsurf
 npx musememory connect opencode
 ```
 
-### 4️⃣ Clean Uninstallation
+### 4️⃣ Clean Uninstallation & Removal
+
+<details>
+<summary><b>🗑️ Complete Uninstallation & System Removal Steps</b> — <i>Click to expand</i></summary>
+
+Muse Memory can be cleanly and completely removed with zero trace left on your machine.
+
+#### Step 1: Unwire Coding Agents (Zero-Trace MCP Cleanup)
+Remove the memory MCP server configuration from all 80+ detected agent config files (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
+
 ```bash
-# Preview what would be unwired
+# Preview changes before modifying any configuration
 npx musememory uninstall --dry-run
 
-# Unwire MCP from all agents (preserves .memory/ data)
+# Unwire all detected AI coding agents automatically
 npx musememory uninstall
 
-# Unwire AND purge local project .memory/ data
-npx musememory uninstall --purge
+# Or unwire a single specific agent
+npx musememory uninstall cursor
 ```
+
+#### Step 2: Purge Memory Data & Stores (Optional)
+By default, `uninstall` preserves your project `.memory/` data. To completely delete all memory files and databases:
+
+```bash
+# Unwire agents AND purge local project .memory/ directory
+npx musememory uninstall --purge
+
+# Remove global user profile and global memory store (~/.memory/)
+npx musememory uninstall --global --purge
+
+# Manual cleanup (equivalent):
+rm -rf .memory/           # Local project store
+rm -rf ~/.memory/          # Global user profile & store
+```
+
+#### Step 3: Remove Globally Installed Package
+If you installed `musememory` globally via a package manager:
+
+```bash
+# If installed via npm:
+npm uninstall -g musememory
+
+# If installed via bun:
+bun remove -g musememory
+
+# If installed via yarn / pnpm:
+pnpm remove -g musememory
+yarn global remove musememory
+```
+
+#### Step 4: Clean Git Hooks & Directives (Optional)
+If you installed the pre-commit transcript harvester hook or injected agent prompt directives:
+- **Git Hook**: Delete `.git/hooks/pre-commit` (or restore your previous hook).
+- **AGENTS.md**: Remove the `<!-- musememory:start --> ... <!-- musememory:end -->` block from your project's `AGENTS.md` file.
+
+</details>
 
 ---
 
@@ -234,7 +298,7 @@ Navigate to `http://localhost:2222` to access:
 ## 📖 Deep Technical References & Documentation
 
 <details>
-<summary><b>🔌 Complete MCP Tool Reference (28 Tools)</b> — <i>Click to expand</i></summary>
+<summary><b>🔌 Complete MCP Tool Reference (29 Tools)</b> — <i>Click to expand</i></summary>
 
 When registered as an MCP server, `musememory` exposes the following native tools:
 
@@ -318,7 +382,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `entities` | `list\|show <id>\|related <id>` | Inspect extracted knowledge graph entities and co-occurrence weights. |
 | `settings` | `get\|set\|reset\|export\|import` | Manage unified settings across retrieval, wiki, PageIndex, and UI. |
 | `current` | `get` / `set <text> --project P` | Read or append hard constraints in `.memory/CURRENT.md`. |
-| `graph` | `status` | Query active CodeGraph provider status. |
+| `graph` | `status` / `index` | Query active CodeGraph provider status or index AST symbol map. |
 | `mcp` | *(none)* | Start stdio MCP server (Protocol 2024-11-05). |
 
 </details>
