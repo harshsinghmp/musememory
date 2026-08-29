@@ -167,15 +167,15 @@ describe("Tree-Indexed Retrieval", () => {
   });
 
   it("partitions respect shard threshold", () => {
-    createMemories(15000);
-    const index = buildTreeIndex(store, memoryDir, { shardThreshold: 5000 });
+    createMemories(40);
+    const index = buildTreeIndex(store, memoryDir, { shardThreshold: 15 });
     
     const partition = index.partitions["test|fix"];
     expect(partition).toBeDefined();
     if (partition) {
       expect(partition.shards.length).toBeGreaterThan(1);
       const totalNodes = partition.shards.reduce((sum, s) => sum + s.nodes.length, 0);
-      expect(totalNodes).toBeLessThanOrEqual(5000 * partition.shards.length);
+      expect(totalNodes).toBeLessThanOrEqual(15 * partition.shards.length);
     }
   });
 });
