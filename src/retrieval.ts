@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { getCurrent } from "./current.ts";
+import { getCurrent, syncConstraints } from "./current.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
 import type { MemoryEntry, SearchOptions } from "./types.ts";
@@ -223,8 +223,8 @@ export function formatPromptContext(
   options: ContextQueryOptions = {},
 ): FormattedContext {
   const result = queryContext(store, query, options);
-  const constraints = memoryDir ? getCurrent(memoryDir) : [];
-  const userProfile = getUserProfile(memoryDir);
+  const constraints = memoryDir ? syncConstraints(memoryDir, store) : [];
+  const userProfile = getUserProfile(memoryDir, { query });
   const coreBlock = formatCoreBlock(memoryDir);
 
   const parts: string[] = [];
@@ -245,6 +245,26 @@ export function formatPromptContext(
     parts.push("### Active Working Constraints (CURRENT.md)");
     for (const c of constraints) {
       parts.push(`- ${c}`);
+    }
+    parts.push("");
+  }
+
+  const { getSessionHandoff } = require("./current.ts");
+  const handoff = memoryDir ? getSessionHandoff(memoryDir) : null;
+  if (handoff && (handoff.status === "IN-PROGRESS" || handoff.task || handoff.lastQuery)) {
+    parts.push("### Active In-Flight Context & Session Handoff (CURRENT.md)");
+    parts.push(`- **Status**: [${handoff.status}]`);
+    if (handoff.agent) parts.push(`- **Previous / Active Agent**: ${handoff.agent}`);
+    if (handoff.task) parts.push(`- **Last Active Task**: ${handoff.task}`);
+    if (handoff.lastQuery) parts.push(`- **Last Query / Instruction**: "${handoff.lastQuery}"`);
+    if (handoff.updatedAt) parts.push(`- **Last Checkpoint**: ${handoff.updatedAt}`);
+    if (handoff.progress && handoff.progress.length > 0) {
+      parts.push("- **Recent Progress**:");
+      for (const pr of handoff.progress) parts.push(`  - ${pr}`);
+    }
+    if (handoff.discoveries && handoff.discoveries.length > 0) {
+      parts.push("- **Learned Discoveries in Previous Session**:");
+      for (const disc of handoff.discoveries) parts.push(`  - ${disc}`);
     }
     parts.push("");
   }

@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { list, slugifyId as slugify, type Store } from "../store.ts";
-import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../consolidate.ts";
+import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../compounding/cluster.ts";
+import { extractEntitiesFromText } from "../entities/extractor.ts";
 import { tokenize } from "../retrieval.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
 import type { WikiCompileOptions, CompileResult, WikiPage, ConceptPage, EntityPage, IndexPage, LogPage, LogEntry, ListWikiPagesOptions } from "./types.ts";
@@ -106,8 +107,8 @@ export function compileWiki(
     const existing = existingEntities.get(slug);
     if (existing) {
       // Merge with existing
-      entity.memoryRefs = Array.from(new Set([...existing.memoryRefs, ...entity.memoryRefs]));
-      entity.mentions = [...existing.mentions, ...entity.mentions].slice(-50); // Keep last 50
+      entity.memoryRefs = Array.from(new Set([...(existing.memoryRefs ?? []), ...(entity.memoryRefs ?? [])]));
+      entity.mentions = [...(existing.mentions ?? []), ...(entity.mentions ?? [])].slice(-50); // Keep last 50
       result.pagesUpdated.push(entity);
       result.logEntries.push({
         timestamp: new Date().toISOString(),
@@ -205,7 +206,7 @@ function extractEntities(memories: MemoryEntry[]): Map<string, EntityPage> {
   const entityMap = new Map<string, EntityPage>();
   
   for (const memory of memories) {
-    const entities = extractEntitiesFromText(memory.content, memory.id);
+    const entities = extractEntitiesFromText(memory.content);
     for (const entity of entities) {
       const slug = slugify(entity.name);
       const existing = entityMap.get(slug);
@@ -232,62 +233,6 @@ function extractEntities(memories: MemoryEntry[]): Map<string, EntityPage> {
     }
   }
   return entityMap;
-}
-
-function extractEntitiesFromText(text: string, memoryId: string): { name: string; type: string }[] {
-  const entities: { name: string; type: string }[] = [];
-  
-  // Person: @mentions
-  const personMatches = text.match(/@(\w+)/g);
-  if (personMatches) {
-    for (const match of personMatches) {
-      entities.push({ name: match.slice(1), type: "person" });
-    }
-  }
-  
-  // Product: Known frameworks/tools
-  const productPatterns = [
-    /\b(?:Next\.js|React|TypeScript|Node\.js|Bun|Vercel|Anthropic|OpenAI|PostgreSQL|Redis|Docker|Kubernetes|GraphQL|REST|gRPC|WebAssembly|WASM|Tailwind|ESLint|Prettier|Jest|Vitest|Playwright|Cypress)\b/gi,
-    /\b\w+\.js\b/gi,
-  ];
-  for (const pattern of productPatterns) {
-    const matches = text.match(pattern);
-    if (matches) {
-      for (const match of matches) {
-        entities.push({ name: match, type: "product" });
-      }
-    }
-  }
-  
-  // Organization: Known companies
-  const orgPatterns = [
-    /\b(?:Vercel|Anthropic|OpenAI|Google|Microsoft|GitHub|GitLab|AWS|GCP|Azure|Meta|Facebook|Amazon|Netflix|Shopify|Stripe|Supabase|PlanetScale|Neon|Turso)\b/gi,
-  ];
-  for (const pattern of orgPatterns) {
-    const matches = text.match(pattern);
-    if (matches) {
-      for (const match of matches) {
-        entities.push({ name: match, type: "organization" });
-      }
-    }
-  }
-  
-  // File: Path references
-  const fileMatches = text.match(/(?:src|lib|test|docs|scripts)\/[\w\/\.-]+\.(?:ts|tsx|js|jsx|json|yaml|yml|md|mdx)/g);
-  if (fileMatches) {
-    for (const match of fileMatches) {
-      entities.push({ name: match, type: "file" });
-    }
-  }
-  
-  // Deduplicate
-  const seen = new Set<string>();
-  return entities.filter((e) => {
-    const key = e.name.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function extractContext(text: string, entityName: string): string {
@@ -550,4 +495,35 @@ export function getWikiPage(
   }
 
   return null;
+}
+
+/**
+ * Ensures the wiki directory structure and default index/log pages exist.
+ */
+export function ensureWikiStructure(memoryDir: string): void {
+  const wikiDir = join(memoryDir, "wiki");
+  const conceptsDir = join(wikiDir, "concepts");
+  const entitiesDir = join(wikiDir, "entities");
+  if (!existsSync(conceptsDir)) mkdirSync(conceptsDir, { recursive: true });
+  if (!existsSync(entitiesDir)) mkdirSync(entitiesDir, { recursive: true });
+
+  const indexPath = join(wikiDir, "index.md");
+  if (!existsSync(indexPath)) {
+    const defaultIndex = `# Knowledge Wiki Index\n\n> Compiled Obsidian-compatible concept and entity knowledge base.\n\n## Concepts\n*(No compiled concepts yet)*\n\n## Entities\n*(No named entities extracted yet)*\n`;
+    writeFileSync(indexPath, defaultIndex, "utf8");
+  }
+
+  const logPath = join(wikiDir, "log.md");
+  if (!existsSync(logPath)) {
+    const defaultLog = `# Wiki Compilation Log\n\n| Timestamp | Action | Page | Memories | Details |\n|---|---|---|---|---|\n`;
+    writeFileSync(logPath, defaultLog, "utf8");
+  }
+}
+
+/**
+ * Automatically compiles the wiki if confirmed memories exist, keeping it fresh.
+ */
+export function autoCompileWiki(store: Store, memoryDir: string, options: WikiCompileOptions = {}): CompileResult {
+  ensureWikiStructure(memoryDir);
+  return compileWiki(store, memoryDir, options);
 }

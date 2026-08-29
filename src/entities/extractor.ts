@@ -193,9 +193,86 @@ export function extractEntitiesFromMemories(
   };
 }
 
-export function saveEntities(memoryDir: string, entities: Entity[]): void {
+export function extractEntitiesFromText(
+  text: string,
+  config: EntityExtractionConfig = {},
+): { name: string; type: EntityType }[] {
+  const enabledTypes = new Set<EntityType>(
+    config.enabledTypes ?? ["person", "product", "organization", "file", "concept"],
+  );
+  const results: { name: string; type: EntityType }[] = [];
+  const seen = new Set<string>();
+
+  // Person
+  if (enabledTypes.has("person")) {
+    for (const pattern of DEFAULT_ENTITY_PATTERNS.person) {
+      const matches = text.matchAll(new RegExp(pattern));
+      for (const match of matches) {
+        const raw = match[1] ?? match[0];
+        const name = raw.replace(/^@/, "").trim();
+        if (name.length > 1) {
+          const key = name.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            results.push({ name, type: "person" });
+          }
+        }
+      }
+    }
+  }
+
+  // Product
+  if (enabledTypes.has("product")) {
+    for (const pattern of DEFAULT_ENTITY_PATTERNS.product) {
+      const matches = text.matchAll(new RegExp(pattern));
+      for (const match of matches) {
+        const name = match[0].trim();
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push({ name, type: "product" });
+        }
+      }
+    }
+  }
+
+  // Organization
+  if (enabledTypes.has("organization")) {
+    for (const pattern of DEFAULT_ENTITY_PATTERNS.organization) {
+      const matches = text.matchAll(new RegExp(pattern));
+      for (const match of matches) {
+        const name = match[0].trim();
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push({ name, type: "organization" });
+        }
+      }
+    }
+  }
+
+  // File
+  if (enabledTypes.has("file")) {
+    for (const pattern of DEFAULT_ENTITY_PATTERNS.file) {
+      const matches = text.matchAll(new RegExp(pattern));
+      for (const match of matches) {
+        const name = match[0].trim();
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push({ name, type: "file" });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
+export function saveEntities(memoryDir: string, data: Entity[] | EntityExtractionResult): void {
   const filePath = join(memoryDir, "entities.json");
   mkdirSync(memoryDir, { recursive: true });
+  const entities = Array.isArray(data) ? data : data.entities;
   writeFileSync(filePath, JSON.stringify(entities, null, 2), "utf8");
 }
 

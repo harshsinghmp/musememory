@@ -32,13 +32,14 @@ Muse Memory is a zero-daemon, file-backed cognitive memory engine designed to gi
 └──────────────────────────────┬──────────────────────────────┘
                                │ Atomic File I/O
 ┌──────────────────────────────▼──────────────────────────────┐
-│              Dual-Scope File Storage (.memory/)             │
+│              Dual-Scope Storage Engine (.memory/)           │
 │                                                             │
 │  .memory/                                                   │
-│  ├── CURRENT.md         # Active hard constraints & open loops│
-│  ├── USER.md            # Persona & developer preferences     │
+│  ├── memory.db          # Primary SQLite cognitive database │
+│  ├── CURRENT.md         # Active hard constraints & handoff │
+│  ├── USER.md            # Persona & developer preferences   │
 │  ├── audit.jsonl        # Append-only operational audit trail│
-│  └── memories/                                              │
+│  └── memories/          # Dual-persisted YAML export mirror │
 │      ├── m_1700000001000_auth.yaml                          │
 │      └── m_1700000002000_arch.yaml                          │
 └─────────────────────────────────────────────────────────────┘
@@ -60,9 +61,9 @@ musememory/
 │   │   ├── persona.ts      # USER.md persona profile and CURRENT.md working constraints
 │   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, import-transcript
 │   │   └── shared.ts       # Flag parsing, root detection, and entry printing
-│   ├── commands/            # Shared command core (single seam for CLI + MCP)
-│   │   ├── lifecycle.ts     # Propose, supersede, confirm, link, stale, reject, delete ops
-│   │   └── retrieval.ts     # Harvest distillation loop
+│   ├── compounding/        # Unified knowledge compounding (shared clustering core & entity extractor)
+│   │   ├── cluster.ts      # Canonical token-bag centroid clustering & cosine similarity
+│   │   └── index.ts        # Unified compileKnowledge dual-persistence entry point
 │   ├── connect.ts           # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine

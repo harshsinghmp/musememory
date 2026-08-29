@@ -6,19 +6,22 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
-import { openStore, get, confirm, save, type Store } from "./store.ts";
 import {
-  proposeMemory,
-  supersedeMemory,
-  confirmMemory,
-  linkMemory,
-  markStaleMemory,
-  rejectMemory,
-  deleteMemory,
-} from "./commands/lifecycle.ts";
-import { harvestMemory } from "./commands/retrieval.ts";
+  openStore,
+  get,
+  save,
+  propose,
+  confirm,
+  supersede,
+  link,
+  markStale,
+  reject,
+  deleteEntry,
+  harvestMemories,
+  type Store,
+} from "./store.ts";
 import { queryContext, formatPromptContext } from "./retrieval.ts";
-import { getCurrent, setCurrent } from "./current.ts";
+import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -37,7 +40,7 @@ import { getAuditTrail } from "./audit.ts";
 import { detectProviders, runMigration } from "./migrator/index.ts";
 import { detectAgents } from "./agents/detect.ts";
 import { connectAgent } from "./connect.ts";
-import { buildTreeIndex, loadTreeIndex, searchTree } from "./retrieval/index.ts";
+import { RetrievalEngine, buildTreeIndex, loadTreeIndex, searchTree } from "./retrieval/index.ts";
 import { compileWiki, listWikiPages, getWikiPage } from "./wiki/index.ts";
 import { extractEntitiesFromMemories, saveEntities, loadEntities, findEntity, findRelatedEntities } from "./entities/index.ts";
 import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "./pageindex/index.ts";
@@ -364,6 +367,19 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "memory_checkpoint",
+        description: "Record a real-time progress checkpoint or task handoff to CURRENT.md to prevent loss on interruption",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task: { type: "string", description: "Current active task description" },
+            progress: { type: "array", items: { type: "string" }, description: "Steps completed or in progress" },
+            status: { type: "string", enum: ["IN-PROGRESS", "COMPLETED", "PAUSED", "IDLE"] },
+            agent: { type: "string", description: "Agent identity or role" },
+          },
+        },
+      },
+      {
         name: "memory_validate",
         description: "Validate the memory store for schema violations, secrets, broken links, and integrity",
         inputSchema: {
@@ -651,7 +667,19 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "get_context": {
           const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
-          const formatted = formatPromptContext(activeStore, activeMemoryDir, String(a.query ?? ""), {
+          const queryStr = String(a.query ?? "");
+          if (queryStr && activeMemoryDir) {
+            try {
+              const { updateSessionHandoff } = require("./current.ts");
+              updateSessionHandoff(activeMemoryDir, {
+                status: "IN-PROGRESS",
+                lastQuery: queryStr,
+                agent: a.agent ? String(a.agent) : process.env.AGENT_NAME || "AI Assistant",
+                task: a.task ? String(a.task) : queryStr,
+              });
+            } catch {}
+          }
+          const formatted = formatPromptContext(activeStore, activeMemoryDir, queryStr, {
             limit: typeof a.limit === "number" ? a.limit : 5,
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             project: a.project ? String(a.project) : undefined,
@@ -669,38 +697,43 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             user_profile: formatted.userProfile,
           });
         }
+        case "memory_checkpoint": {
+          const { activeMemoryDir } = resolveStoreForRequest(a);
+          try {
+            const { updateSessionHandoff } = require("./current.ts");
+            const handoff = updateSessionHandoff(activeMemoryDir, {
+              status: (a.status ? String(a.status).toUpperCase() : "IN-PROGRESS") as any,
+              task: a.task ? String(a.task) : undefined,
+              agent: a.agent ? String(a.agent) : process.env.AGENT_NAME || "AI Agent",
+              progress: Array.isArray(a.progress) ? a.progress.map(String) : undefined,
+            });
+            return toolResult({ success: true, handoff });
+          } catch (err: unknown) {
+            return toolError(err instanceof Error ? err.message : String(err));
+          }
+        }
         case "memory_current":
         case "memory_get_constraints":
         case "memory_set_constraints": {
-          const { activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+          const { activeMemoryDir, activeRoot, activeStore } = resolveStoreForRequest(a);
           const action = a.action || (name === "memory_set_constraints" ? "append" : "get");
           if (action === "append" || a.constraint) {
             const text = String(a.constraint || a.text || "");
             if (!text.trim()) return toolError("Missing constraint text to append");
             const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
             const updated = setCurrent(activeMemoryDir, text, projectName);
+            syncConstraints(activeMemoryDir, activeStore);
             return toolResult({ success: true, updated_constraints: updated });
           }
-          const constraints = getCurrent(activeMemoryDir);
+          const constraints = syncConstraints(activeMemoryDir, activeStore);
           return toolResult({ constraints });
         }
         case "memory_recall":
         case "search": {
           const { activeStore, activeMemoryDir } = resolveStoreForRequest(a);
-          if (a.hybrid === true) {
-            const hybrid = hybridSearch(activeStore, activeMemoryDir, String(a.query), {
-              limit: typeof a.limit === "number" ? a.limit : 10,
-            });
-            if (hybrid) {
-              return toolResult({
-                results: hybrid.map((r) => ({ ...r.entry, score: r.score, cosine: r.cosine, bm25: r.bm25 })),
-                source: "hybrid",
-                stale: false,
-                total_tokens_used: 0,
-              });
-            }
-          }
-          const res = queryContext(activeStore, String(a.query), {
+          const mode = a.hybrid === true ? "hybrid" : a.tree === true ? "tree" : "auto";
+          const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
+            mode,
             limit: typeof a.limit === "number" ? a.limit : 10,
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             includeSuperseded: a.include_superseded === true,
@@ -710,9 +743,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           });
           return toolResult({
             results: res.results.map((r) => ({ ...r.entry, score: r.score })),
-            source: res.source,
-            stale: res.stale,
+            source: res.mode,
+            stale: false,
             total_tokens_used: res.totalTokensUsed,
+            explanation: res.explanation,
           });
         }
         case "propose":
@@ -720,7 +754,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           const { activeStore, activeRoot, activeMemoryDir } = resolveStoreForRequest(a);
           const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
           try {
-            const entry = proposeMemory(activeStore, {
+            const entry = propose(activeStore, {
               content: String(a.content),
               project: projectName,
               title: a.title ? String(a.title) : undefined,
@@ -733,13 +767,21 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 setCurrent(activeMemoryDir, String(a.content), projectName);
               } catch {}
             }
+            if (activeMemoryDir) {
+              try {
+                const { updateSessionHandoff } = require("./current.ts");
+                updateSessionHandoff(activeMemoryDir, {
+                  discoveries: [String(a.title || a.content || "")],
+                });
+              } catch {}
+            }
             return toolResult(entry);
           } catch (err: unknown) {
             return toolError(err instanceof Error ? err.message : String(err));
           }
         }
       case "memory_harvest": {
-        const created = harvestMemory(store, {
+        const created = harvestMemories(store, {
           text: String(a.text),
           project: String(a.project),
           confirmed: a.confirmed === true,
@@ -754,33 +796,39 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(res);
       }
       case "memory_confirm": {
-        const entry = confirmMemory(store, String(a.id));
+        const entry = confirm(store, String(a.id));
+        if (!entry) return toolError(`could not confirm ${a.id} (not found or invalid status transition)`);
         return toolResult(entry);
       }
       case "memory_supersede": {
         const oldId = String(a.id);
         const newId = String(a.with ?? a.new_id ?? "");
         if (!newId) return toolError("memory_supersede requires 'with' or 'new_id' parameter");
-        const entry = supersedeMemory(store, { oldId, newId });
+        const entry = supersede(store, oldId, newId);
+        if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
         return toolResult(entry);
       }
       case "memory_link": {
         const related = Array.isArray(a.related) ? a.related.map(String) : [];
-        const entry = linkMemory(store, String(a.id), related);
+        const entry = link(store, String(a.id), related);
+        if (!entry) return toolError(`could not link ${a.id} (missing id or related id)`);
         return toolResult(entry);
       }
       case "memory_mark_stale": {
-        const entry = markStaleMemory(store, String(a.id), a.reason ? String(a.reason) : undefined);
+        const entry = markStale(store, String(a.id), a.reason ? String(a.reason) : undefined);
+        if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
       }
       case "memory_reject": {
-        const entry = rejectMemory(store, String(a.id));
+        const entry = reject(store, String(a.id));
+        if (!entry) return toolError(`no entry with id ${a.id}`);
         return toolResult(entry);
       }
       case "memory_delete": {
         const id = String(a.id);
         const reason = a.reason ? String(a.reason) : undefined;
-        deleteMemory(store, id, reason, "mcp_agent");
+        const ok = deleteEntry(store, id, reason, "mcp_agent");
+        if (!ok) return toolError(`no entry found with id ${id}`);
         return toolResult({ success: true, deleted_id: id });
       }
       case "memory_audit": {
@@ -916,7 +964,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "memory_get_user_profile": {
         const isGlobal = a.global === true;
         const dir = isGlobal ? getGlobalMemoryDir() : memoryDir;
-        const profile = getUserProfile(dir);
+        const query = a.query ? String(a.query) : undefined;
+        const profile = getUserProfile(dir, { query });
         return toolResult({ profile: profile ?? "No USER.md profile configured.", exists: Boolean(profile) });
       }
       case "memory_set_user_profile": {
@@ -1022,7 +1071,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const search = searchPageIndex(doc, { query: String(a.query), maxNodes: 5 });
         const imported: MemoryEntry[] = [];
         for (const item of search.results) {
-          const entry = proposeMemory(store, {
+          const entry = propose(store, {
             project,
             title: item.title,
             content: `${item.summary}\n\nPath: ${item.path}`,

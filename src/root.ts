@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { initUserProfile, userFilePath } from "./user.ts";
+import { ensureWikiStructure } from "./wiki/index.ts";
 
 export type MarkerKind = "memory" | "git" | "global" | "env" | "auto" | null;
 
@@ -46,6 +48,16 @@ function ensureMemoryDirectory(memoryDir: string): void {
   if (!existsSync(currentPath)) {
     writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
   }
+
+  // Ensure USER.md exists (local points to global; global creates default developer template)
+  const uPath = userFilePath(memoryDir);
+  if (!existsSync(uPath)) {
+    const isGlobal = memoryDir === getGlobalMemoryDir();
+    initUserProfile(memoryDir, "developer", false, !isGlobal);
+  }
+
+  // Ensure wiki directory structure exists
+  ensureWikiStructure(memoryDir);
 }
 
 /**

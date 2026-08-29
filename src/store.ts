@@ -4,13 +4,22 @@ import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
-import { getCurrent, setCurrent } from "./current.ts";
+import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { workspaceRootFor } from "./root.ts";
+import {
+  openDatabase,
+  insertOrReplaceMemory,
+  getMemoryById,
+  listMemories,
+  deleteMemoryById,
+  type SqliteDatabase,
+} from "./sqlite.ts";
 
 export interface StorageLayout {
   root: string;
   memoryDir: string;
   memoriesDir: string;
+  dbPath: string;
   currentMd: string;
   userMd: string;
   auditJsonl: string;
@@ -21,6 +30,7 @@ export function getStorageLayout(memoryDir: string): StorageLayout {
     root: workspaceRootFor(memoryDir),
     memoryDir,
     memoriesDir: join(memoryDir, "memories"),
+    dbPath: join(memoryDir, "memory.db"),
     currentMd: join(memoryDir, "CURRENT.md"),
     userMd: join(memoryDir, "USER.md"),
     auditJsonl: join(memoryDir, "audit.jsonl"),
@@ -31,13 +41,47 @@ export interface Store {
   dir: string;
   memoryDir?: string;
   layout?: StorageLayout;
+  db?: SqliteDatabase;
 }
 
-/** Open the memories directory for a memory dir, creating it if missing. */
+/** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
 export function openStore(memoryDir: string): Store {
   const layout = getStorageLayout(memoryDir);
   mkdirSync(layout.memoriesDir, { recursive: true });
-  return { dir: layout.memoriesDir, memoryDir, layout };
+  mkdirSync(memoryDir, { recursive: true });
+
+  let db: SqliteDatabase | undefined;
+  try {
+    db = openDatabase(layout.dbPath);
+  } catch (err) {
+    // If SQLite initialization fails on unusual environment, fallback gracefully
+  }
+
+  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db };
+
+  // Sync existing YAML files into SQLite database if DB is newly initialized
+  if (db && existsSync(layout.memoriesDir)) {
+    try {
+      const yamlIds = listIds(store);
+      for (const yId of yamlIds) {
+        if (!getMemoryById(db, yId)) {
+          const entry = getFromYaml(store, yId);
+          if (entry) {
+            insertOrReplaceMemory(db, entry);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  try {
+    syncConstraints(memoryDir, store);
+  } catch {}
+  try {
+    const { autoCompileWiki } = require("./wiki/index.ts");
+    autoCompileWiki(store, memoryDir);
+  } catch {}
+  return store;
 }
 
 /** Append a working constraint to CURRENT.md and record an audit event. */
@@ -67,22 +111,57 @@ export function fileForId(store: Store, id: string): string {
 }
 
 export function listIds(store: Store): string[] {
-  if (!existsSync(store.dir)) return [];
-  return readdirSync(store.dir)
-    .filter((f) => f.endsWith(".yaml"))
-    .map((f) => f.slice(0, -5));
+  const ids = new Set<string>();
+  if (store.db) {
+    for (const e of listMemories(store.db)) {
+      ids.add(e.id);
+    }
+  }
+  if (existsSync(store.dir)) {
+    for (const f of readdirSync(store.dir)) {
+      if (f.endsWith(".yaml")) {
+        ids.add(f.slice(0, -5));
+      }
+    }
+  }
+  return [...ids];
 }
 
-export function get(store: Store, id: string): MemoryEntry | null {
+function getFromYaml(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
   if (!existsSync(file)) return null;
   try {
     const raw = readFileSync(file, "utf8");
-    // JSON_SCHEMA: keep ISO timestamps as strings (default schema resolves them to Date, breaking Ajv format checks)
-    return yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as MemoryEntry;
+    const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA });
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as MemoryEntry;
   } catch {
     return null;
   }
+}
+
+export function get(store: Store, id: string): MemoryEntry | null {
+  const file = fileForId(store, id);
+  if (existsSync(file)) {
+    const fromYaml = getFromYaml(store, id);
+    if (!fromYaml) {
+      // Corrupted or unparseable YAML file
+      return null;
+    }
+    if (store.db) {
+      const dbEntry = getMemoryById(store.db, id);
+      if (dbEntry) return dbEntry;
+      // Sync into SQLite
+      try {
+        insertOrReplaceMemory(store.db, fromYaml);
+      } catch {}
+    }
+    return fromYaml;
+  }
+  if (store.db) {
+    return getMemoryById(store.db, id);
+  }
+  return null;
 }
 
 export function list(store: Store): MemoryEntry[] {
@@ -106,7 +185,7 @@ export function extractEntryText(entry: Partial<MemoryEntry>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-/** Atomic write: temp file + rename. Validates secrets before writing. */
+/** Atomic write: SQLite primary database + dual YAML file sync. Validates secrets before writing. */
 export function save(store: Store, entry: MemoryEntry, options: { skipSecretCheck?: boolean } = {}): void {
   if (!options.skipSecretCheck) {
     const textToScan = extractEntryText(entry);
@@ -115,10 +194,19 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       throw new Error(`Secret detected during save: ${secrets.join(", ")}`);
     }
   }
-  const file = fileForId(store, entry.id);
-  const tmp = `${file}.tmp`;
-  writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
-  renameSync(tmp, file);
+
+  // 1. Primary write to SQLite database
+  if (store.db) {
+    insertOrReplaceMemory(store.db, entry);
+  }
+
+  // 2. Dual write to YAML file for exportability
+  try {
+    const file = fileForId(store, entry.id);
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
+    renameSync(tmp, file);
+  } catch {}
 }
 
 export function nowIso(): string {
@@ -161,6 +249,10 @@ export function propose(
     validTo?: string;
     dueAt?: string;
     expiresAt?: string;
+    valid_from?: string;
+    valid_to?: string;
+    due_at?: string;
+    expires_at?: string;
     test_command?: string;
   },
 ): MemoryEntry {
@@ -196,10 +288,10 @@ export function propose(
     source: opts.source ?? "manual",
     tags: opts.tags?.slice(0, 8) ?? [],
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
-    valid_from: opts.validFrom,
-    valid_to: opts.validTo,
-    due_at: opts.dueAt,
-    expires_at: opts.expiresAt,
+    valid_from: opts.validFrom ?? opts.valid_from,
+    valid_to: opts.validTo ?? opts.valid_to,
+    due_at: opts.dueAt ?? opts.due_at,
+    expires_at: opts.expiresAt ?? opts.expires_at,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
   };
@@ -207,7 +299,7 @@ export function propose(
   save(store, entry);
   if (entry.type === "constraint" && store.memoryDir) {
     try {
-      setCurrent(store.memoryDir, entry.content, entry.project);
+      syncConstraints(store.memoryDir, store);
     } catch {}
   }
   if (store.memoryDir) {
@@ -235,6 +327,11 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   entry.verification = { level: "user-confirmed", verified_at: now };
   entry.updated_at = now;
   save(store, entry);
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "confirm",
@@ -270,6 +367,11 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
 
   save(store, old);
   save(store, next);
+  if ((old.type === "constraint" || next.type === "constraint") && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "supersede",
@@ -290,6 +392,11 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "mark_stale",
@@ -314,6 +421,11 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "supersede",
@@ -368,6 +480,11 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   closeOutValidity(entry);
   entry.updated_at = nowIso();
   save(store, entry);
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "reject",
@@ -380,10 +497,20 @@ export function reject(store: Store, id: string): MemoryEntry | null {
 
 /** Delete an entry permanently from store and record audit event. */
 export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
-  const file = fileForId(store, id);
-  if (!existsSync(file)) return false;
   const entry = get(store, id);
-  unlinkSync(file);
+  if (!entry) return false;
+
+  let deleted = false;
+  if (store.db) {
+    deleted = deleteMemoryById(store.db, id) || deleted;
+  }
+
+  const file = fileForId(store, id);
+  if (existsSync(file)) {
+    unlinkSync(file);
+    deleted = true;
+  }
+
   if (store.memoryDir && entry) {
     recordAuditEvent(store.memoryDir, {
       operation: "delete",
@@ -392,7 +519,43 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
       actor: actor ?? "agent",
       reason,
     });
+    if (entry.type === "constraint") {
+      try {
+        syncConstraints(store.memoryDir, store, [entry.content]);
+      } catch {}
+    }
   }
-  return true;
+  return deleted;
+}
+
+/**
+ * Distill text into structured harvest units and propose each as a memory entry.
+ * Units that fail to propose (e.g. probable secret) are skipped; survivors returned.
+ */
+export function harvestMemories(
+  store: Store,
+  params: { text: string; project: string; confirmed?: boolean },
+): MemoryEntry[] {
+  const { extractHarvestUnits } = require("./harvest.ts");
+  const units = extractHarvestUnits(params.text);
+  const created: MemoryEntry[] = [];
+  for (const u of units) {
+    try {
+      created.push(
+        propose(store, {
+          content: u.content,
+          project: params.project,
+          title: u.title,
+          tags: u.tags,
+          type: u.type,
+          confirmed: params.confirmed === true,
+          salience: u.salience,
+        }),
+      );
+    } catch {
+      // skip units that cannot be proposed
+    }
+  }
+  return created;
 }
 

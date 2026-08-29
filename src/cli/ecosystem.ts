@@ -111,8 +111,35 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     console.log(`   -> Run 'memory migrate' to auto-import legacy memories.`);
   }
 
+  // 3. Prompt for git pre-commit hook if git repo is detected
+  if (!isGlobal) {
+    await promptOrNotifyGitHook(targetDir, flags["auto"] === "true" || flags["yes"] === "true");
+  }
+
   console.log(`\n[OK] Muse Memory is ready! Use 'memory doctor' to verify system health.`);
   return 0;
+}
+
+export async function promptOrNotifyGitHook(targetDir: string, autoInstall = false): Promise<boolean> {
+  const gitDir = join(targetDir, ".git");
+  if (!existsSync(gitDir)) return false;
+  const hookPath = join(gitDir, "hooks", "pre-commit");
+  const isInstalled = existsSync(hookPath) && readFileSync(hookPath, "utf8").includes("memory harvest-auto");
+  if (isInstalled) return true;
+
+  if (autoInstall) {
+    try {
+      const { installGitHook } = await import("../hook.ts");
+      const res = installGitHook(targetDir);
+      console.log(`\n[+] Git repository detected: auto-installed pre-commit harvester hook.`);
+      return res.installed;
+    } catch {}
+  }
+
+  console.log(`\n[!] Git repository detected at ${targetDir}`);
+  console.log(`   💡 Tip: Install the automatic transcript harvester git pre-commit hook via:`);
+  console.log(`      memory hook install --git`);
+  return false;
 }
 
 export async function handleDoctorCommand({ positional, flags }: ParsedArgs): Promise<number> {
@@ -174,6 +201,9 @@ export async function handleInitCommand({ positional, flags }: ParsedArgs): Prom
   const found = detected.filter((d) => d.detected);
   if (found.length > 0) {
     console.log(`[INFO] Detected existing memory from: ${found.map((f) => f.name).join(", ")}. Run 'memory migrate' to auto-import.`);
+  }
+  if (!isGlobal) {
+    await promptOrNotifyGitHook(targetDir, flags["auto"] === "true" || flags["yes"] === "true");
   }
   return 0;
 }
@@ -345,7 +375,7 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
 export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const port = flags["port"] ? parseInt(flags["port"], 10) : 3000;
+  const port = flags["port"] ? parseInt(flags["port"], 10) : 2222;
   const { startUiServer } = await import("../ui.ts");
   const srv = await startUiServer({
     port,

@@ -4,7 +4,7 @@ import { queryContext, formatPromptContext, type DisclosureDepth } from "../retr
 import { hybridSearch } from "../vector.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex } from "../retrieval/index.ts";
 import { importTranscript } from "../harvest.ts";
-import { harvestMemory } from "../commands/retrieval.ts";
+import { harvestMemories } from "../store.ts";
 import { installGitHook, harvestAuto } from "../hook.ts";
 import { searchTranscriptWithBookends } from "../transcript.ts";
 import { DEFAULT_CONTEXT_LIMIT } from "../types.ts";
@@ -156,7 +156,7 @@ export async function handleHarvestCommand({ positional, flags }: ParsedArgs): P
   const project = flags["project"];
   if (!project) return usageError("harvest requires --project");
   const rawText = existsSync(target) ? readFileSync(target, "utf8") : target;
-  const created = harvestMemory(ctx.store, {
+  const created = harvestMemories(ctx.store, {
     text: rawText,
     project,
     confirmed: flags["confirmed"] === "true",

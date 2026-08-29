@@ -35,6 +35,7 @@ coverage/
 .nyc_output/
 *.tmp
 *.tmp.*
+dogfood-output/
 
 # Logs & Debugging
 *.log

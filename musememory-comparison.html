@@ -3,1055 +3,909 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Muse Memory vs 24 Agent Memory Providers · Comprehensive Architecture & Feature Matrix</title>
+  <title>Muse Memory vs 29 Agent Memory Providers · Architecture & Feature Matrix</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090d16;
-      --card: #111827;
-      --card-hover: #1f2937;
-      --border: #2d3748;
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent: #3b82f6;
-      --accent-glow: rgba(59, 130, 246, 0.2);
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --purple: #8b5cf6;
+      --bg: #07090e;
+      --surface-canvas: #07090e;
+      --surface-panel: #0e131d;
+      --surface-card: #121824;
+      --surface-card-hover: #162030;
+      --surface-elevated: #1a2336;
+      --border-whisper: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(99, 102, 241, 0.45);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-dim: #64748b;
+      --accent-primary: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --status-confirmed: #10b981;
+      --status-stale: #d97706;
+      --status-rejected: #ef4444;
+      --status-arch: #8b5cf6;
+      --status-op: #06b6d4;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-full: 9999px;
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); line-height: 1.6; padding: 24px; }
-    .container { max-width: 1600px; margin: 0 auto; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+    code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+    body { background-color: var(--surface-canvas); color: var(--text-primary); line-height: 1.6; padding: 28px 24px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
     
-    header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
-    .title-group h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .title-group p { color: var(--text-muted); margin-top: 6px; font-size: 1.05rem; }
-    .stats-bar { display: flex; gap: 16px; flex-wrap: wrap; }
-    .stat-pill { background: var(--card); border: 1px solid var(--border); padding: 8px 16px; border-radius: 9999px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
-    .stat-pill span { font-weight: 700; color: #60a5fa; }
+    /* Header */
+    header { background: var(--surface-panel); border: 1px solid var(--border-whisper); border-radius: var(--radius-lg); padding: 24px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+    .brand-group h1 { font-size: 1.85rem; font-weight: 800; color: #fff; letter-spacing: -0.025em; display: flex; align-items: center; gap: 12px; }
+    .brand-group p { color: var(--text-secondary); margin-top: 4px; font-size: 0.94rem; }
+    .stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+    .stat-pill { background: rgba(0,0,0,0.35); border: 1px solid var(--border-whisper); padding: 7px 14px; border-radius: var(--radius-full); font-size: 0.8rem; display: flex; align-items: center; gap: 7px; color: var(--text-secondary); }
+    .stat-pill span { font-weight: 700; color: #a5b4fc; font-family: 'JetBrains Mono', monospace; }
     
-    .bento-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px; }
-    .bento-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: transform 0.2s, border-color 0.2s; }
-    .bento-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .bento-card h3 { font-size: 1.15rem; color: #93c5fd; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-    .bento-card p { font-size: 0.9rem; color: var(--text-muted); }
+    /* Anchor / Hero Card: Muse Memory */
+    .anchor-hero { background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(14,19,29,0.98) 100%); border: 1.5px solid var(--accent-primary); border-radius: var(--radius-lg); padding: 26px 30px; box-shadow: 0 8px 32px rgba(99,102,241,0.15); display: flex; flex-direction: column; gap: 18px; }
+    .anchor-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .anchor-title { font-size: 1.45rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }
+    .anchor-tag { font-size: 0.76rem; font-weight: 700; background: var(--accent-primary); color: #fff; padding: 3px 10px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.05em; }
+    .anchor-desc { font-size: 0.95rem; color: #e2e8f0; line-height: 1.6; }
     
-    .filter-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-    .search-box { flex: 1; min-width: 260px; position: relative; }
-    .search-box input { width: 100%; background: #0f172a; border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; }
-    .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-    .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip { background: #1e293b; border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; user-select: none; transition: all 0.15s; }
-    .chip.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+    .anchor-pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 4px; }
+    .pillar-cell { background: rgba(0,0,0,0.3); border: 1px solid var(--border-whisper); border-radius: var(--radius-md); padding: 12px 14px; }
+    .pillar-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .pillar-val { font-size: 0.88rem; color: #f1f5f9; font-weight: 600; line-height: 1.45; }
     
-    .table-container { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; margin-bottom: 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #0f172a; padding: 14px 16px; border-bottom: 2px solid var(--border); color: #cbd5e1; font-weight: 700; white-space: nowrap; position: sticky; top: 0; }
-    td { padding: 14px 16px; border-bottom: 1px solid #1e293b; vertical-align: top; }
-    tr:hover td { background-color: var(--card-hover); }
+    /* Controls Bar: Top Filters & Search */
+    .controls-panel { background: var(--surface-panel); border: 1px solid var(--border-whisper); border-radius: var(--radius-lg); padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+    .search-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .search-wrap { flex: 1; min-width: 320px; position: relative; }
+    .search-wrap input { width: 100%; background: #07090e; border: 1px solid var(--border-whisper); padding: 11px 16px 11px 40px; border-radius: var(--radius-md); color: #fff; font-size: 0.92rem; outline: none; transition: var(--transition); }
+    .search-wrap input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px var(--accent-glow); }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 1rem; pointer-events: none; }
+    .results-count { font-size: 0.84rem; font-weight: 600; color: var(--text-dim); white-space: nowrap; font-family: 'JetBrains Mono', monospace; }
     
-    .muse-row { background: rgba(59, 130, 246, 0.08) !important; border-left: 4px solid var(--accent); }
-    .muse-row td { font-weight: 500; }
+    .filter-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .filter-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-right: 4px; }
+    .chip { background: rgba(255,255,255,0.03); border: 1px solid var(--border-whisper); padding: 6px 13px; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition); user-select: none; }
+    .chip:hover { border-color: var(--accent-primary); color: #fff; }
+    .chip.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
     
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge-info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .badge-purple { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
+    /* Provider Cards Dossier Stream */
+    .dossier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px; }
+    @media (max-width: 768px) { .dossier-grid { grid-template-columns: 1fr; } }
     
-    .detail-section { margin-top: 40px; }
-    .section-header { font-size: 1.6rem; font-weight: 700; color: #e2e8f0; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .dossier-card { background: var(--surface-panel); border: 1px solid var(--border-whisper); border-radius: var(--radius-lg); padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; transition: var(--transition); position: relative; }
+    .dossier-card:hover { border-color: rgba(255,255,255,0.22); transform: translateY(-2px); background: var(--surface-card); }
     
-    .provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
-    .provider-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; }
-    .provider-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .provider-card-title { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
-    .provider-card-title a { color: inherit; text-decoration: none; border-bottom: 1px dotted #60a5fa; }
-    .provider-card-title a:hover { color: #60a5fa; }
-    .provider-card-body { font-size: 0.85rem; color: #94a3b8; margin-bottom: 14px; }
-    .migration-box { background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 10px; margin-top: 10px; font-family: monospace; font-size: 0.8rem; color: #38bdf8; }
-    .migration-box .label { color: #64748b; font-family: sans-serif; font-size: 0.75rem; margin-bottom: 4px; text-transform: uppercase; font-weight: 700; }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .card-name-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .card-title { font-size: 1.15rem; font-weight: 800; color: #fff; }
+    .card-title a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.3); }
+    .card-title a:hover { color: var(--accent-primary); border-color: var(--accent-primary); }
+    .card-meta { font-size: 0.78rem; color: var(--text-dim); }
     
-    footer { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+    .badge-local { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+    .badge-graph { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+    .badge-harness { background: rgba(217,119,6,0.15); color: #fbbf24; border: 1px solid rgba(217,119,6,0.3); }
+    .badge-cloud { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    
+    /* Comparison Differential Callout */
+    .diff-callout { background: rgba(0,0,0,0.35); border: 1px solid var(--border-whisper); border-left: 3.5px solid var(--accent-primary); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; }
+    .diff-callout strong { color: #fff; }
+    
+    /* Dimension Specs List */
+    .specs-list { display: flex; flex-direction: column; gap: 8px; font-size: 0.83rem; }
+    .spec-item { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 6px; }
+    .spec-key { color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.04em; white-space: nowrap; }
+    .spec-val { color: var(--text-secondary); text-align: right; word-break: break-word; }
+    
+    /* Migration Command Box */
+    .card-migration { background: #07090e; border: 1px solid var(--border-whisper); border-radius: var(--radius-md); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .cmd-text { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #a5b4fc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .copy-btn { background: rgba(255,255,255,0.06); border: 1px solid var(--border-whisper); color: #fff; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: var(--transition); white-space: nowrap; }
+    .copy-btn:hover { background: var(--accent-primary); border-color: var(--accent-primary); }
+    
+    /* Empty State */
+    .empty-state { text-align: center; padding: 60px 20px; background: var(--surface-panel); border: 1px solid var(--border-whisper); border-radius: var(--radius-lg); color: var(--text-dim); display: none; }
+    
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent-primary); color: #fff; padding: 10px 18px; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 100; }
+    .toast.show { opacity: 1; }
+    
+    footer { padding-top: 16px; border-top: 1px solid var(--border-whisper); text-align: center; color: var(--text-dim); font-size: 0.82rem; }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <header>
-      <div class="title-group">
-        <h1>🧠 Muse Memory vs 29 Agent Memory Providers</h1>
-        <p>Comprehensive Architectural Comparison, State Preservation Mapping & Autonomous Migrator Specification</p>
+      <div class="brand-group">
+        <h1>Muse Memory vs 29 Agent Memory Providers</h1>
+        <p>Architectural Dossier, Concrete Differences & Autonomous Migration Playbook</p>
       </div>
       <div class="stats-bar">
-        <div class="stat-pill">Compared Providers: <span>29 + Muse Memory</span></div>
-        <div class="stat-pill">Migrator Engine: <span style="color:#10b981;">Live & Tested (107 Tests)</span></div>
-        <div class="stat-pill">Zero Secret Exposure: <span style="color:#10b981;">Enforced via Vibeguard</span></div>
-        <div class="stat-pill">CLI Migrator: <span style="color:#60a5fa;"><code>memory detect && memory migrate</code></span></div>
+        <div class="stat-pill">Compared Engines: <span>30 Total</span></div>
+        <div class="stat-pill">Test Suite: <span style="color:#10b981;">278 Passing (50 Suites)</span></div>
+        <div class="stat-pill">Zero Secret Exposure: <span style="color:#10b981;">Vibeguard Inline</span></div>
+        <div class="stat-pill">Primary DB: <span style="color:#10b981;">SQLite .memory/memory.db</span></div>
+        <div class="stat-pill">Auto-Wired: <span style="color:#a5b4fc;">80+ Platforms</span></div>
       </div>
     </header>
 
-    <!-- Bento Overview Cards -->
-    <div class="bento-grid">
-      <div class="bento-card">
-        <h3>⚡ Dual-Scope Workspace Isolation</h3>
-        <p>Muse Memory uniquely segregates local project memories in <code>.memory/</code> from global machine-wide memories in <code>~/.memory/</code>, guaranteeing zero cross-client contamination.</p>
+    <!-- Anchor Hero Card: Muse Memory -->
+    <div class="anchor-hero">
+      <div class="anchor-header">
+        <div class="anchor-title">
+          <span>Muse Memory (This System)</span>
+          <span class="anchor-tag">Benchmark Anchor</span>
+        </div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:#a5b4fc;">
+          npm / bun / npx musememory
+        </div>
       </div>
-      <div class="bento-card">
-        <h3>🔄 Full State Preservation</h3>
-        <p>When migrating from external providers, <strong>archived/superseded</strong> items map to <code>status: superseded</code>, <strong>active/live</strong> items map to <code>confirmed</code>, and <strong>working constraints</strong> seed <code>CURRENT.md</code>.</p>
+      <div class="anchor-desc">
+        Zero-daemon, file-first cognitive memory engine for AI agents and agency networks. Operates on an ultra-fast primary SQLite database with dual human-readable YAML mirrors, inline Vibeguard secret defenses, knapsack token budgeting, and Obsidian wiki knowledge compounding.
       </div>
-      <div class="bento-card">
-        <h3>🛡️ Inline Vibeguard Protection</h3>
-        <p>Every imported memory is scanned against 8 strict credential signatures (OpenAI, GitHub, AWS, NPM, DB connection strings, private keys) before touching disk.</p>
+      <div class="anchor-pillars">
+        <div class="pillar-cell">
+          <div class="pillar-title">💾 Storage & Footprint</div>
+          <div class="pillar-val">Primary SQLite (<code>.memory/memory.db</code>) + Dual YAML Export Mirror. 100% Zero-Daemon Standalone.</div>
+        </div>
+        <div class="pillar-cell">
+          <div class="pillar-title">🛡️ Secret Defense</div>
+          <div class="pillar-val">Vibeguard Scanner checking 45+ credential signatures before write. Zero leakage guarantee.</div>
+        </div>
+        <div class="pillar-cell">
+          <div class="pillar-title">⚖️ Retrieval Mechanics</div>
+          <div class="pillar-val">Exact Multi-Factor Knapsack Budgeting + Adaptive Query Routing (Exact, Hybrid, Tree, PageIndex).</div>
+        </div>
+        <div class="pillar-cell">
+          <div class="pillar-title">🔄 State Machine & Audit</div>
+          <div class="pillar-val">7-state deterministic lifecycle (<code>candidate → confirmed → superseded</code>) + append-only <code>audit.jsonl</code>.</div>
+        </div>
+        <div class="pillar-cell">
+          <div class="pillar-title">⚡ Invariants & Handoff</div>
+          <div class="pillar-val">Live <code>CURRENT.md</code> auto-sync, session handoffs, open loops, and ambient due-date nudges.</div>
+        </div>
+        <div class="pillar-cell">
+          <div class="pillar-title">📚 Compounding & Wiring</div>
+          <div class="pillar-val">Obsidian Wiki + Entity Graphs + 80+ coding agent platforms auto-detected with zero permissions.</div>
+        </div>
       </div>
-      <div class="bento-card">
-        <h3>🪙 Dynamic Token Budgeting</h3>
-        <p>Unlike unbounded vector dumps, Muse Memory packs candidate memories greedily up to an exact caller-specified <code>token_budget</code> for prompt injection.</p>
+    </div>
+
+    <!-- Top Horizontal Controls Panel -->
+    <div class="controls-panel">
+      <div class="search-row">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Search any provider, technology, storage engine, or mapping (press '/' to focus)..." oninput="handleSearch()">
+        </div>
+        <div class="results-count" id="resultsCount">Showing 29 External Providers</div>
+      </div>
+      <div class="filter-chips-row">
+        <span class="filter-label">Categories:</span>
+        <div class="chip active" data-filter="all" onclick="setCategoryFilter('all', this)">All (29)</div>
+        <div class="chip" data-filter="local-file" onclick="setCategoryFilter('local-file', this)">Local File-First (8)</div>
+        <div class="chip" data-filter="graph-rag" onclick="setCategoryFilter('graph-rag', this)">Graph / Vector DB (10)</div>
+        <div class="chip" data-filter="agent-harness" onclick="setCategoryFilter('agent-harness', this)">Agent Harnesses (6)</div>
+        <div class="chip" data-filter="cloud-service" onclick="setCategoryFilter('cloud-service', this)">Cloud Managed (5)</div>
       </div>
     </div>
 
-    <!-- Interactive Filters -->
-    <div class="filter-section">
-      <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search provider, storage type, mapping, or keyword (e.g. SQLite, Markdown, Letta, Mem0)..." onkeyup="filterTable()">
-      </div>
-      <div class="filter-chips">
-        <div class="chip active" onclick="setCategory('all', this)">All (30)</div>
-        <div class="chip" onclick="setCategory('local-file', this)">Local File-First</div>
-        <div class="chip" onclick="setCategory('graph-rag', this)">Graph / Vector DB</div>
-        <div class="chip" onclick="setCategory('agent-harness', this)">Agent Harness</div>
-        <div class="chip" onclick="setCategory('cloud-service', this)">Managed / Cloud API</div>
-      </div>
-    </div>
-
-    <!-- Comparison Table -->
-    <div class="table-container">
-      <table id="matrixTable">
-        <thead>
-          <tr>
-            <th>Provider / System</th>
-            <th>Category</th>
-            <th>Primary Storage Architecture</th>
-            <th>Local / Global Scoping</th>
-            <th>Active vs Archive Mapping</th>
-            <th>Secret Protection</th>
-            <th>Token Budgeting</th>
-            <th>Auto-Wiring (Zero-Perms)</th>
-            <th>Offline Air-Gapped</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Muse Memory (Primary) -->
-          <tr class="muse-row" data-category="local-file">
-            <td>
-              <strong>🧠 Muse Memory</strong><br>
-              <span class="badge badge-info">This Project</span>
-            </td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Atomic YAML + JSONL Ledger (Pure TS, Zero DB)</td>
-            <td><span class="badge badge-success">Dual</span> (<code>.memory/</code> + <code>~/.memory/</code>)</td>
-            <td><code>confirmed</code> / <code>superseded</code> / <code>CURRENT.md</code></td>
-            <td><span class="badge badge-success">Vibeguard Inline</span></td>
-            <td><span class="badge badge-success">Exact Knapsack</span></td>
-            <td><span class="badge badge-success">1-Click Auto-Approve</span></td>
-            <td><span class="badge badge-success">100% Standalone</span></td>
-          </tr>
-
-          <!-- 1. Supermemory -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/supermemoryai/supermemory" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">1. Supermemory</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>Temporal Vector-Graph (SQLite / Cloudflare KV / D1)</td>
-            <td>Global Spaces & Workspace Tags</td>
-            <td><code>is_archived: false/true</code> ➔ <code>confirmed</code> / <code>superseded</code></td>
-            <td><span class="badge badge-warning">Basic</span></td>
-            <td><span class="badge badge-danger">Unbounded Top-K</span></td>
-            <td><span class="badge badge-warning">Manual API</span></td>
-            <td><span class="badge badge-warning">Hybrid Cloud</span></td>
-          </tr>
-
-          <!-- 2. Cognee -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/topoteretes/cognee" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">2. Cognee</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>Graph RAG (LanceDB, Kuzu, Neo4j, SQLite)</td>
-            <td>Dataset Namespaces (Global)</td>
-            <td>Pruned/Deprecated Edges ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None (Raw Strings)</span></td>
-            <td><span class="badge badge-warning">Chunk Limits</span></td>
-            <td><span class="badge badge-warning">Python Lib</span></td>
-            <td><span class="badge badge-success">Self-Hostable</span></td>
-          </tr>
-
-          <!-- 3. Beads -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/gastownhall/beads" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">3. Beads</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Git-backed JSON issue beads (<code>.beads/</code>)</td>
-            <td><span class="badge badge-success">Local Workspace Only</span></td>
-            <td><code>status: open/in_progress</code> ➔ <code>CURRENT.md</code>, <code>closed</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-danger">Full Bead Dump</span></td>
-            <td><span class="badge badge-warning">CLI Init</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 4. Memori -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/MemoriLabs/Memori" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">4. Memori</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>SQLite / Postgres Episodic Graph Store</td>
-            <td>Global Store with Session IDs</td>
-            <td><code>state: active</code> ➔ <code>confirmed</code>, <code>decayed</code> ➔ <code>stale/superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Top-K Items</span></td>
-            <td><span class="badge badge-warning">Manual Middleware</span></td>
-            <td><span class="badge badge-success">Local SQLite</span></td>
-          </tr>
-
-          <!-- 5. memU -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/NevaMind-AI/memU" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">5. memU</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Hierarchical 3-Layer FS (Resource ➔ Item ➔ Category)</td>
-            <td>Global Categories with Local Folders</td>
-            <td><code>working_memory</code> ➔ <code>CURRENT.md</code>, <code>archival</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-warning">Basic</span></td>
-            <td><span class="badge badge-warning">Category Filter</span></td>
-            <td><span class="badge badge-warning">Manual</span></td>
-            <td><span class="badge badge-success">Local Files</span></td>
-          </tr>
-
-          <!-- 6. EverOS -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/EverMind-AI/EverOS" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">6. EverOS</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Markdown-Native Files + SQLite / LanceDB Index</td>
-            <td><span class="badge badge-success">Dual</span> (<code>.everos/</code> + <code>~/.everos/</code>)</td>
-            <td><code>status: active</code> ➔ <code>confirmed</code>, <code>archived</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-warning">Basic</span></td>
-            <td><span class="badge badge-warning">BM25 + Top-K</span></td>
-            <td><span class="badge badge-warning">Manual Config</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 7. Semantica -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/semantica-agi/semantica" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">7. Semantica</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>Graph-Native Triples & Reasoning Ledger</td>
-            <td>Global Graph with Project Tags</td>
-            <td><code>valid_until: null</code> ➔ <code>confirmed</code>, <code>invalidated</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Graph Traversal Depth</span></td>
-            <td><span class="badge badge-warning">Manual API</span></td>
-            <td><span class="badge badge-success">Self-Hosted</span></td>
-          </tr>
-
-          <!-- 8. Honcho -->
-          <tr data-category="agent-harness">
-            <td><a href="https://github.com/plastic-labs/honcho" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">8. Honcho</a></td>
-            <td><span class="badge badge-warning">Agent Harness</span></td>
-            <td>Dialectic Metamodels & Session State (Postgres/SQLite)</td>
-            <td>Global User/Agent Dialectics</td>
-            <td><code>current_representation</code> ➔ <code>confirmed</code>, <code>past_turns</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-success">Reasoned Compression</span></td>
-            <td><span class="badge badge-warning">MCP/SDK</span></td>
-            <td><span class="badge badge-success">Local Server</span></td>
-          </tr>
-
-          <!-- 9. Kungfu -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/kungfu-systems/kungfu" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">9. Kungfu</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Local Checkpoint Ledger (<code>.kungfu/</code>)</td>
-            <td><span class="badge badge-success">Local Workspace</span></td>
-            <td><code>current_task</code> ➔ <code>CURRENT.md</code>, <code>completed_history</code> ➔ <code>confirmed</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-danger">Full Checkpoint Dump</span></td>
-            <td><span class="badge badge-warning">CLI Init</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 10. Letta Code (Letta / MemGPT) -->
-          <tr data-category="agent-harness">
-            <td><a href="https://github.com/letta-ai/letta-code" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">10. Letta Code</a></td>
-            <td><span class="badge badge-warning">Agent Harness</span></td>
-            <td>Core Memory (Human/Persona) + Archival SQLite/Postgres</td>
-            <td>Global Agent Identity</td>
-            <td><code>core_memory</code> ➔ <code>CURRENT.md</code>, <code>archival_memory</code> ➔ <code>confirmed/superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Fixed Char Blocks</span></td>
-            <td><span class="badge badge-warning">Agent Server</span></td>
-            <td><span class="badge badge-success">Local Docker/Server</span></td>
-          </tr>
-
-          <!-- 11. MemSearch -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/zilliztech/memsearch" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">11. MemSearch</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>3-Layer Progressive Disclosure + Milvus Vector Store</td>
-            <td>Global Vector Index</td>
-            <td><code>tier: summary</code> ➔ <code>confirmed</code>, <code>tier: transcript</code> ➔ <code>session</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Layer Selection</span></td>
-            <td><span class="badge badge-warning">Python API</span></td>
-            <td><span class="badge badge-warning">Requires Milvus</span></td>
-          </tr>
-
-          <!-- 12. Agentic Context Engine (ACE) -->
-          <tr data-category="agent-harness">
-            <td><a href="https://github.com/kayba-ai/agentic-context-engine" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">12. ACE (Kayba)</a></td>
-            <td><span class="badge badge-warning">Agent Harness</span></td>
-            <td>AST Token Compression & Autonomous Playbooks</td>
-            <td>Workspace Playbooks</td>
-            <td><code>active_strategy</code> ➔ <code>confirmed</code>, <code>refuted</code> ➔ <code>rejected/superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-success">AST Token Budget</span></td>
-            <td><span class="badge badge-warning">MCP Bridge</span></td>
-            <td><span class="badge badge-success">Local Engine</span></td>
-          </tr>
-
-          <!-- 13. Actx0 -->
-          <tr data-category="cloud-service">
-            <td><a href="https://actx0.com/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">13. Actx0</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>Managed Session Context Cache & History Virtualization</td>
-            <td>Cloud API Tenant</td>
-            <td><code>active_session</code> ➔ <code>confirmed</code>, <code>expired</code> ➔ <code>stale</code></td>
-            <td><span class="badge badge-warning">Cloud Managed</span></td>
-            <td><span class="badge badge-success">Dynamic Prompt Cache</span></td>
-            <td><span class="badge badge-warning">API Key Required</span></td>
-            <td><span class="badge badge-danger">Cloud Only</span></td>
-          </tr>
-
-          <!-- 14. ByteRover -->
-          <tr data-category="local-file">
-            <td><a href="https://www.byterover.dev/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">14. ByteRover</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Hierarchical Markdown Context Tree (Domain/Topic/Entry)</td>
-            <td><span class="badge badge-success">Local Workspace</span></td>
-            <td><code>status: live</code> ➔ <code>confirmed</code>, <code>status: archived</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Subtree Pruning</span></td>
-            <td><span class="badge badge-warning">CLI Init</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 15. Clawdi -->
-          <tr data-category="cloud-service">
-            <td><a href="https://www.clawdi.ai/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">15. Clawdi</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>Decoupled Cloud VM Shared State & Persistent Files</td>
-            <td>Cloud Agent Fleet</td>
-            <td><code>pinned_rules</code> ➔ <code>CURRENT.md</code>, <code>state_history</code> ➔ <code>confirmed</code></td>
-            <td><span class="badge badge-info">TEE Encrypted</span></td>
-            <td><span class="badge badge-danger">Unbounded Dump</span></td>
-            <td><span class="badge badge-warning">Cloud Auth</span></td>
-            <td><span class="badge badge-danger">Cloud Only</span></td>
-          </tr>
-
-          <!-- 16. Pensieve -->
-          <tr data-category="graph-rag">
-            <td><a href="https://pensieve.uk/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">16. Pensieve</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>Enterprise Organizational Knowledge Graph</td>
-            <td>Global Enterprise Vault</td>
-            <td><code>active_entities</code> ➔ <code>confirmed</code>, <code>obsolete_nodes</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-warning">RBAC</span></td>
-            <td><span class="badge badge-warning">Subgraph Limit</span></td>
-            <td><span class="badge badge-warning">Enterprise Connect</span></td>
-            <td><span class="badge badge-warning">Hybrid</span></td>
-          </tr>
-
-          <!-- 17. Liminary -->
-          <tr data-category="cloud-service">
-            <td><a href="https://liminary.io/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">17. Liminary</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>AI-Native Semantic Document & Reasoning Layer</td>
-            <td>Corpus Workspaces</td>
-            <td><code>active_cluster</code> ➔ <code>confirmed</code>, <code>archived_docs</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-warning">Cloud Encrypted</span></td>
-            <td><span class="badge badge-warning">Chunk Top-K</span></td>
-            <td><span class="badge badge-warning">API Key</span></td>
-            <td><span class="badge badge-danger">Cloud Only</span></td>
-          </tr>
-
-          <!-- 18. Dvina -->
-          <tr data-category="cloud-service">
-            <td><a href="https://dvina.ai/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">18. Dvina</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>Cross-App Dynamic Vector Synchronization Engine</td>
-            <td>Multi-App Global</td>
-            <td><code>focus_context</code> ➔ <code>CURRENT.md</code>, <code>history</code> ➔ <code>confirmed/superseded</code></td>
-            <td><span class="badge badge-warning">OAuth Security</span></td>
-            <td><span class="badge badge-warning">App Scoped</span></td>
-            <td><span class="badge badge-warning">OAuth Setup</span></td>
-            <td><span class="badge badge-danger">Cloud SaaS</span></td>
-          </tr>
-
-          <!-- 19. Mem0 -->
-          <tr data-category="graph-rag">
-            <td><a href="https://mem0.ai/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">19. Mem0</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>User/Agent/Session Vector + Graph Store (Qdrant/SQLite)</td>
-            <td>Global with <code>user_id</code> / <code>agent_id</code></td>
-            <td><code>is_active: true</code> ➔ <code>confirmed</code>, <code>deleted/false</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-danger">Unbounded Top-K</span></td>
-            <td><span class="badge badge-warning">Python/MCP</span></td>
-            <td><span class="badge badge-success">Local SQLite Mode</span></td>
-          </tr>
-
-          <!-- 20. Second Brain Cloudflare -->
-          <tr data-category="cloud-service">
-            <td><a href="https://github.com/rahilp/second-brain-cloudflare" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">20. Second Brain (Cloudflare)</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>Cloudflare Workers + D1 (SQLite) + Vectorize + Obsidian</td>
-            <td>Global Obsidian Vault</td>
-            <td><code>tags: [active]</code> ➔ <code>confirmed</code>, <code>tags: [archive]</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-warning">Vector Top-K</span></td>
-            <td><span class="badge badge-warning">Worker Setup</span></td>
-            <td><span class="badge badge-warning">Cloudflare Edge</span></td>
-          </tr>
-
-          <!-- 21. Rory Plans -->
-          <tr data-category="agent-harness">
-            <td><a href="https://www.roryplans.ai/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">21. Rory Plans</a></td>
-            <td><span class="badge badge-warning">Agent Harness</span></td>
-            <td>Agentic Work Execution & Task Plan Ledger</td>
-            <td>Workspace Plans</td>
-            <td><code>task: in_progress</code> ➔ <code>CURRENT.md</code>, <code>task: completed</code> ➔ <code>confirmed</code></td>
-            <td><span class="badge badge-warning">Workspace ACL</span></td>
-            <td><span class="badge badge-danger">Full Plan Dump</span></td>
-            <td><span class="badge badge-warning">Web Portal</span></td>
-            <td><span class="badge badge-danger">Cloud Only</span></td>
-          </tr>
-
-          <!-- 22. Project Minimi -->
-          <tr data-category="local-file">
-            <td><a href="https://www.projectminimi.com/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">22. Project Minimi</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Ambient Desktop OS Context & Open Loops (Local JSON)</td>
-            <td>Desktop User-Wide</td>
-            <td><code>open_loops</code> ➔ <code>CURRENT.md</code>, <code>resolved_loops</code> ➔ <code>confirmed</code></td>
-            <td><span class="badge badge-warning">Local Sandbox</span></td>
-            <td><span class="badge badge-warning">Active Loop Limit</span></td>
-            <td><span class="badge badge-warning">Mac Helper</span></td>
-            <td><span class="badge badge-success">100% Local (macOS)</span></td>
-          </tr>
-
-          <!-- 23. Mem.ai -->
-          <tr data-category="cloud-service">
-            <td><a href="https://get.mem.ai/" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">23. Mem.ai</a></td>
-            <td><span class="badge badge-danger">Managed Cloud API</span></td>
-            <td>AI-First Associative Note-Taking & Smart Graph Cloud</td>
-            <td>Global User Notes</td>
-            <td><code>is_archived: false</code> ➔ <code>confirmed</code>, <code>is_archived: true</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-warning">SOC2 / Cloud</span></td>
-            <td><span class="badge badge-danger">Cloud Search Dump</span></td>
-            <td><span class="badge badge-warning">OAuth Sync</span></td>
-            <td><span class="badge badge-danger">Cloud SaaS</span></td>
-          </tr>
-
-          <!-- 24. AgentMemory -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/rohitg00/agentmemory" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">24. AgentMemory</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Rust <code>iii-engine</code> Daemon + SQLite State Store</td>
-            <td>Global (<code>~/.local/share/agentmemory</code>)</td>
-            <td><code>level: lesson/crystal</code> ➔ <code>confirmed</code>, <code>observation</code> ➔ <code>superseded</code></td>
-            <td><span class="badge badge-danger">None (Raw SQL)</span></td>
-            <td><span class="badge badge-danger">Unbounded SQL Query</span></td>
-            <td><span class="badge badge-warning">Requires Daemon</span></td>
-            <td><span class="badge badge-success">Local Binary</span></td>
-          </tr>
-          <!-- 25. Mnemosyne -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/mnemosyne-oss/mnemosyne" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">25. Mnemosyne</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Single-File SQLite (<code>~/.hermes/mnemosyne</code>) + sqlite-vec/FTS5 Hybrid</td>
-            <td>Global User DB (BEAM 3-Tier)</td>
-            <td><code>importance + valid_until</code>; expired ➔ <code>stale</code>, consolidated ➔ <code>confirmed</code></td>
-            <td><span class="badge badge-warning">Hygiene Noise Scan</span></td>
-            <td><span class="badge badge-warning">Top-K Only</span></td>
-            <td><span class="badge badge-warning">Manual Config (8+ Guides)</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 26. Autocontext -->
-          <tr data-category="agent-harness">
-            <td><a href="https://github.com/greyhaven-ai/autocontext" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">26. Autocontext</a></td>
-            <td><span class="badge badge-warning">Agent Harness</span></td>
-            <td>Filesystem ContextBundles (<code>runs/</code> + <code>knowledge/</code>, SHA-256 digests)</td>
-            <td>Per-Scenario Knowledge Dirs</td>
-            <td>evidence-gated <code>proposed→active</code> ➔ <code>confirmed</code>, negative-result ledger ➔ <code>rejected</code></td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-danger">N/A (Eval Harness)</span></td>
-            <td><span class="badge badge-warning">MCP Serve / CLI / TUI</span></td>
-            <td><span class="badge badge-success">100% Local</span></td>
-          </tr>
-
-          <!-- 27. OpenViking -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/volcengine/OpenViking" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">27. OpenViking</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td><code>viking://</code> Virtual FS w/ Tiered L0/L1/L2 Summaries (Server Daemon + Embeddings)</td>
-            <td>Server-Global Directory Tree</td>
-            <td>session-commit async extraction ➔ <code>confirmed</code>, retrieval trajectories logged</td>
-            <td><span class="badge badge-danger">None</span></td>
-            <td><span class="badge badge-success">Tiered Drill-Down (34–91% Savings)</span></td>
-            <td><span class="badge badge-warning">Desktop Helper Detect+Wiring</span></td>
-            <td><span class="badge badge-danger">Requires Daemon + Embeddings</span></td>
-          </tr>
-
-          <!-- 28. GBrain -->
-          <tr data-category="local-file">
-            <td><a href="https://github.com/garrytan/gbrain" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">28. GBrain</a></td>
-            <td><span class="badge badge-purple">Local File-First</span></td>
-            <td>Markdown Pages in Private GitHub Repo + PGLite Embedded Postgres</td>
-            <td>Private Repo Brain (Global)</td>
-            <td>cron "dream cycle" dedup/salience; per-page provenance ➔ <code>confirmed</code>/<code>superseded</code></td>
-            <td><span class="badge badge-warning">Scrubbed on Ingest</span></td>
-            <td><span class="badge badge-success">Cost Presets (conservative/balanced/tokenmax)</span></td>
-            <td><span class="badge badge-warning">Plugin Marketplace + MEMORY_VERBS Protocol</span></td>
-            <td><span class="badge badge-warning">Local-First (24/7 Daemon Design)</span></td>
-          </tr>
-
-          <!-- 29. Hindsight -->
-          <tr data-category="graph-rag">
-            <td><a href="https://github.com/vectorize-io/hindsight" target="_blank" style="color:#60a5fa; font-weight:600; text-decoration:none;">29. Hindsight</a></td>
-            <td><span class="badge badge-info">Graph / Vector DB</span></td>
-            <td>Postgres + pgvector Banks (Embedded <code>pg0</code> or In-Process Option)</td>
-            <td>Banks per User/Agent/Project</td>
-            <td>consolidation ➔ evidence-backed observations (proof counts, refined-not-overwritten)</td>
-            <td><span class="badge badge-success">Memory Defense (45 Secret/PII Patterns)</span></td>
-            <td><span class="badge badge-success">4-Strategy RRF + Rerank, Token-Limit Trimmed</span></td>
-            <td><span class="badge badge-warning">npx Coding-Agents Wiring (12 CLIs)</span></td>
-            <td><span class="badge badge-warning">Embedded Option, Postgres Dep</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Deep-Dive Provider Cards Section -->
-    <div class="detail-section">
-      <div class="section-header">
-        <span>🔍 Deep-Dive Migrator & Detection Heuristics</span>
-      </div>
-      <div class="provider-grid" id="providerGrid">
-        
-        <!-- Supermemory -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/supermemoryai/supermemory" target="_blank">Supermemory</a></div>
-              <span class="badge badge-info">Vector Graph</span>
-            </div>
-            <div class="provider-card-body">
-              Temporal vector-graph with full-text search. Backed by SQLite / Cloudflare KV.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.supermemory/ | ~/.opencode-supermemory.log<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            is_archived: false ➔ confirmed<br>
-            is_archived: true ➔ superseded
-          </div>
-        </div>
-
-        <!-- Cognee -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/topoteretes/cognee" target="_blank">Cognee</a></div>
-              <span class="badge badge-info">Graph RAG</span>
-            </div>
-            <div class="provider-card-body">
-              Knowledge Graph RAG platform with LanceDB/Kuzu. Extracts entities, edges, and semantic relationships.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.cognee/ | .cognee/cognee.db<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            active entities ➔ confirmed<br>
-            pruned/deprecated nodes ➔ superseded
-          </div>
-        </div>
-
-        <!-- Beads -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/gastownhall/beads" target="_blank">Beads</a></div>
-              <span class="badge badge-purple">Local File-First</span>
-            </div>
-            <div class="provider-card-body">
-              Git-backed issue and task tracker for coding agents. Creates structured beads in <code>.beads/</code>.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            .beads/beads.json | .beads/*.md<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            open/in_progress ➔ CURRENT.md<br>
-            closed/resolved ➔ superseded
-          </div>
-        </div>
-
-        <!-- Memori -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/MemoriLabs/Memori" target="_blank">Memori</a></div>
-              <span class="badge badge-info">Episodic Graph</span>
-            </div>
-            <div class="provider-card-body">
-              Agent-native persistent memory turning interactions into structured episodic state in SQLite/Postgres.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.memori/ | .memori/memori.db<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            state: active ➔ confirmed<br>
-            state: decayed ➔ stale / superseded
-          </div>
-        </div>
-
-        <!-- memU -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/NevaMind-AI/memU" target="_blank">memU</a></div>
-              <span class="badge badge-purple">Hierarchical FS</span>
-            </div>
-            <div class="provider-card-body">
-              Hierarchical 3-layer memory system (Resource ➔ Item ➔ Category) with multimodal ingestion.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.memu/ | .memu/memu.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            working_memory ➔ CURRENT.md<br>
-            archival_items ➔ superseded
-          </div>
-        </div>
-
-        <!-- EverOS -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/EverMind-AI/EverOS" target="_blank">EverOS</a></div>
-              <span class="badge badge-purple">Markdown-Native</span>
-            </div>
-            <div class="provider-card-body">
-              Markdown-native memory OS indexed with LanceDB and SQLite. Self-evolving skill procedures.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.everos/ | .everos/memories/*.md<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            status: active ➔ confirmed<br>
-            status: archived ➔ superseded
-          </div>
-        </div>
-
-        <!-- Semantica -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/semantica-agi/semantica" target="_blank">Semantica</a></div>
-              <span class="badge badge-info">Graph Ledger</span>
-            </div>
-            <div class="provider-card-body">
-              Graph-native infrastructure for contextual reasoning and accountable agent decision tracing.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.semantica/ | .semantica/graph.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            valid_until: null ➔ confirmed<br>
-            invalidated: true ➔ superseded
-          </div>
-        </div>
-
-        <!-- Honcho -->
-        <div class="provider-card" data-category="agent-harness">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/plastic-labs/honcho" target="_blank">Honcho</a></div>
-              <span class="badge badge-warning">User Modeling</span>
-            </div>
-            <div class="provider-card-body">
-              Stateful memory library for agent user modeling, dialectic reasoning, and token-efficient metamodels.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.honcho/ | .honcho/honcho_state.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            current_representation ➔ confirmed<br>
-            historical_turns ➔ superseded
-          </div>
-        </div>
-
-        <!-- Kungfu -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/kungfu-systems/kungfu" target="_blank">Kungfu</a></div>
-              <span class="badge badge-purple">Checkpoint Runtime</span>
-            </div>
-            <div class="provider-card-body">
-              Local-first runtime for cross-session agent continuity and verification checkpoints.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            .kungfu/checkpoints/ | ~/.kungfu/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            current_task ➔ CURRENT.md<br>
-            completed_checkpoints ➔ confirmed
-          </div>
-        </div>
-
-        <!-- Letta Code -->
-        <div class="provider-card" data-category="agent-harness">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/letta-ai/letta-code" target="_blank">Letta Code (Letta / MemGPT)</a></div>
-              <span class="badge badge-warning">Core Memory</span>
-            </div>
-            <div class="provider-card-body">
-              Hierarchical memory harness with Human/Persona core memory blocks and archival SQLite vector store.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.letta/ | ~/.memgpt/ | .letta/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            core_memory (human/persona) ➔ CURRENT.md<br>
-            archival_memory ➔ confirmed / superseded
-          </div>
-        </div>
-
-        <!-- MemSearch -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/zilliztech/memsearch" target="_blank">MemSearch (Zilliz)</a></div>
-              <span class="badge badge-info">3-Tier Markdown</span>
-            </div>
-            <div class="provider-card-body">
-              3-tier progressive disclosure model (summaries, sections, transcripts) backed by Milvus vector search.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.memsearch/ | .memsearch/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            tier: summary/active ➔ confirmed<br>
-            tier: transcript ➔ session nodes
-          </div>
-        </div>
-
-        <!-- ACE -->
-        <div class="provider-card" data-category="agent-harness">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/kayba-ai/agentic-context-engine" target="_blank">ACE (Kayba)</a></div>
-              <span class="badge badge-warning">AST Playbooks</span>
-            </div>
-            <div class="provider-card-body">
-              Agentic Context Engine generating autonomous strategy playbooks from execution feedback with AST compression.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            .ace/ | ~/.ace/playbooks/*.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            active_strategies ➔ confirmed (decision)<br>
-            refuted_strategies ➔ rejected
-          </div>
-        </div>
-
-        <!-- ByteRover -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://www.byterover.dev/" target="_blank">ByteRover</a></div>
-              <span class="badge badge-purple">Context Tree</span>
-            </div>
-            <div class="provider-card-body">
-              Hierarchical Markdown context tree organizing codebase knowledge by Domain, Topic, and Subtopic.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            .byterover/ | ~/.byterover/tree/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            status: live ➔ confirmed<br>
-            status: archived ➔ superseded
-          </div>
-        </div>
-
-        <!-- Mem0 -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://mem0.ai/" target="_blank">Mem0</a></div>
-              <span class="badge badge-info">Scoped Vector</span>
-            </div>
-            <div class="provider-card-body">
-              User, agent, and session-scoped memory layer using Qdrant, Chroma, or local SQLite with graph relationships.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.mem0/mem0.db | .mem0/mem0.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            is_active: true ➔ confirmed<br>
-            deleted: true / false ➔ superseded
-          </div>
-        </div>
-
-        <!-- AgentMemory -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/rohitg00/agentmemory" target="_blank">AgentMemory</a></div>
-              <span class="badge badge-purple">Rust Daemon</span>
-            </div>
-            <div class="provider-card-body">
-              Rust <code>iii-engine</code> with 4-tier lifecycle (Observation, Session, Lesson/Crystal, Knowledge Graph) in SQLite.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.local/share/agentmemory/state_store.db<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            level: lesson / crystal ➔ confirmed<br>
-            observations superseded ➔ superseded
-          </div>
-        </div>
-
-        <!-- Second Brain Cloudflare -->
-        <div class="provider-card" data-category="cloud-service">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/rahilp/second-brain-cloudflare" target="_blank">Second Brain (Cloudflare)</a></div>
-              <span class="badge badge-danger">Cloudflare Edge</span>
-            </div>
-            <div class="provider-card-body">
-              Self-hosted second brain on Cloudflare Workers, D1 SQLite, and Vectorize for Obsidian markdown sync.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.second-brain/ | .second-brain/config.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            tags: [active] ➔ confirmed<br>
-            tags: [archive] ➔ superseded
-          </div>
-        </div>
-
-        <!-- Project Minimi -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://www.projectminimi.com/" target="_blank">Project Minimi</a></div>
-              <span class="badge badge-purple">Ambient Desktop</span>
-            </div>
-            <div class="provider-card-body">
-              Ambient memory layer capturing macOS context, documents, open loops, and desktop interaction history.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/Library/Application Support/Minimi/ | ~/.minimi/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            open_loops ➔ CURRENT.md<br>
-            resolved_loops ➔ confirmed
-          </div>
-        </div>
-
-        <!-- Mem.ai -->
-        <div class="provider-card" data-category="cloud-service">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://get.mem.ai/" target="_blank">Mem.ai</a></div>
-              <span class="badge badge-danger">Cloud Note Graph</span>
-            </div>
-            <div class="provider-card-body">
-              AI-first associative note-taking app with automated tagging, smart collections, and cloud search.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.mem-ai/ | mem_export.json<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            is_archived: false ➔ confirmed<br>
-            is_archived: true ➔ superseded
-          </div>
-        </div>
-
-        <!-- Mnemosyne -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/mnemosyne-oss/mnemosyne" target="_blank">Mnemosyne</a></div>
-              <span class="badge badge-purple">Single-File SQLite</span>
-            </div>
-            <div class="provider-card-body">
-              Zero-daemon single-file SQLite memory (BEAM 3-tier: working/episodic/triple-store) with sqlite-vec + FTS5 hybrid search and recency-halflife decay.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.hermes/mnemosyne/data<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            high-importance / unexpired ➔ confirmed<br>
-            expired (valid_until passed) ➔ stale
-          </div>
-        </div>
-
-        <!-- Autocontext -->
-        <div class="provider-card" data-category="agent-harness">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/greyhaven-ai/autocontext" target="_blank">Autocontext</a></div>
-              <span class="badge badge-warning">Eval Harness</span>
-            </div>
-            <div class="provider-card-body">
-              Recursive self-improvement harness (not a memory system): immutable ContextBundles, evidence-gated promotion, negative-result ledgers.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            knowledge/&lt;scenario&gt;/context_bundles/ | runs/&lt;run_id&gt;/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            active bundles ➔ confirmed<br>
-            negative_result.json entries ➔ rejected
-          </div>
-        </div>
-
-        <!-- OpenViking -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/volcengine/OpenViking" target="_blank">OpenViking</a></div>
-              <span class="badge badge-info">Virtual FS Context DB</span>
-            </div>
-            <div class="provider-card-body">
-              ByteDance context database exposing memories/resources/skills as a <code>viking://</code> filesystem with tiered L0/L1/L2 summaries and directory drill-down retrieval. Requires server daemon + embedding provider.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            ~/.openviking/ | openviking-server process<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            session-committed memories ➔ confirmed<br>
-            pruned directories ➔ superseded
-          </div>
-        </div>
-
-        <!-- GBrain -->
-        <div class="provider-card" data-category="local-file">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/garrytan/gbrain" target="_blank">GBrain</a></div>
-              <span class="badge badge-purple">Markdown Repo Brain</span>
-            </div>
-            <div class="provider-card-body">
-              Markdown pages in a private GitHub repo as durable store + PGLite embedded Postgres index. Cron "dream cycle" (dedup/salience/contradictions), signal-detector open-loop extraction, gap-analysis briefings — ships the full proactive layer musememory plans (SOW-101/102/103).
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            gbrain repo clone | ~/.gbrain/<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            live pages ➔ confirmed<br>
-            dream-cycle deduped/stale pages ➔ superseded
-          </div>
-        </div>
-
-        <!-- Hindsight -->
-        <div class="provider-card" data-category="graph-rag">
-          <div>
-            <div class="provider-card-header">
-              <div class="provider-card-title"><a href="https://github.com/vectorize-io/hindsight" target="_blank">Hindsight</a></div>
-              <span class="badge badge-info">Banked Postgres Memory</span>
-            </div>
-            <div class="provider-card-body">
-              Server-based memory in isolated banks (Postgres+pgvector, embedded pg0 or in-process option). Background consolidation into evidence-backed observations; Memory Defense scans every write against 45 secret/PII patterns.
-            </div>
-          </div>
-          <div class="migration-box">
-            <div class="label">Detection Path:</div>
-            hindsight bank endpoint | pg0 data dir<br>
-            <div class="label" style="margin-top:6px;">Mapping Rule:</div>
-            observations w/ proof counts ➔ confirmed<br>
-            weakened/refined observations ➔ superseded
-          </div>
-        </div>
-
-      </div>
-    </div>
+    <!-- Provider Cards Dossier Stream -->
+    <div class="dossier-grid" id="dossierGrid"></div>
+    <div class="empty-state" id="emptyState">No memory providers matched your search filter. Try searching for "SQLite", "Letta", "Mem0", or "Markdown".</div>
 
     <footer>
-      <p>Muse Memory System Architecture & Migration Engine · Pure TypeScript · Zero External Database Dependencies · 100% Standalone</p>
+      <p>Muse Memory System Architecture & Migration Engine · Pure TypeScript · Zero External Database Dependencies · 100% Standalone & Local-First</p>
     </footer>
   </div>
 
+  <div class="toast" id="toast">Copied to clipboard!</div>
+
   <script>
-    function filterTable() {
-      const input = document.getElementById("searchInput").value.toLowerCase();
-      const rows = document.querySelectorAll("#matrixTable tbody tr");
-      const cards = document.querySelectorAll("#providerGrid .provider-card");
+    const PROVIDERS = [
+      {
+        id: "supermemory",
+        name: "Supermemory",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/supermemoryai/supermemory",
+        storage: "Temporal Vector-Graph (SQLite / Cloudflare KV / D1)",
+        scoping: "Global Spaces & Workspace Tags",
+        difference: "Supermemory focuses on web bookmarks and Chrome extensions with cloud sync, whereas Muse Memory is an autonomous local coding cognitive engine with strict invariant enforcement and inline Vibeguard secret scrubbing.",
+        secrets: "Basic API key redaction (No database URI or private key inspection)",
+        retrieval: "Unbounded Top-K similarity without token budget guardrails",
+        lifecycle: "is_archived boolean toggle; no immutable audit trail",
+        proactive: "Passive query retrieval only",
+        compounding: "Vector embeddings without markdown wiki generation",
+        wiring: "Manual REST / Cloud API setup",
+        offline: "Hybrid Cloud / Local HTTP :6767 daemon",
+        detectPath: "~/.supermemory/ | supermemory daemon",
+        mappingRule: "live memories ➔ confirmed, archived ➔ superseded"
+      },
+      {
+        id: "cognee",
+        name: "Cognee",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/topoteretes/cognee",
+        storage: "Graph RAG (LanceDB, Kuzu, Neo4j, SQLite)",
+        scoping: "Dataset Namespaces (Global)",
+        difference: "Cognee requires Python daemons and heavy graph databases (Neo4j/Kuzu), while Muse Memory provides zero-dependency SQLite primary storage with instant CLI/MCP startup in any Node/Bun environment.",
+        secrets: "None (Stores raw uninspected text strings)",
+        retrieval: "Chunk limits based on embedding matches",
+        lifecycle: "Pruned/Deprecated Graph Edges; OpenTelemetry traces",
+        proactive: "None",
+        compounding: "Knowledge Graph with entity relationship extraction",
+        wiring: "Python library / script integration",
+        offline: "Requires Python runtime & DB daemons",
+        detectPath: "cognee.db | ~/.cognee/",
+        mappingRule: "active graph nodes ➔ confirmed, pruned edges ➔ superseded"
+      },
+      {
+        id: "beads",
+        name: "Beads",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/gastownhall/beads",
+        storage: "Git-backed JSON issue beads (.beads/)",
+        scoping: "Local Workspace Only",
+        difference: "Beads is a Git-backed issue tracker format, whereas Muse Memory is a full cognitive memory engine with bi-temporal scoring, decay policies, Obsidian wiki compilation, and proactive due-date nudges.",
+        secrets: "None",
+        retrieval: "Full Bead dump without knapsack token limits",
+        lifecycle: "open/in_progress → closed states",
+        proactive: "Git issue tracker check",
+        compounding: "None",
+        wiring: "CLI Init (bd)",
+        offline: "100% Local Git repository",
+        detectPath: ".beads/ in workspace root",
+        mappingRule: "open/in_progress beads ➔ confirmed, closed beads ➔ superseded"
+      },
+      {
+        id: "memori",
+        name: "Memori",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/MemoriLabs/Memori",
+        storage: "Semantic Memory Graph (Postgres / Qdrant)",
+        scoping: "User ID & Session Scopes",
+        difference: "Memori depends on Postgres and Qdrant instances, whereas Muse Memory runs completely embedded with zero daemon management and dual-scope local/global context isolation.",
+        secrets: "None",
+        retrieval: "Score threshold ranking without prompt token budgeting",
+        lifecycle: "Vector decay weights; no ledger",
+        proactive: "None",
+        compounding: "Vector Graph",
+        wiring: "Custom Python SDK",
+        offline: "Postgres / Qdrant daemon required",
+        detectPath: "memori daemon | Qdrant host",
+        mappingRule: "high-weight nodes ➔ confirmed, decayed nodes ➔ superseded"
+      },
+      {
+        id: "memu",
+        name: "memU",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/NevaMind-AI/memU",
+        storage: "Plain Markdown file memory (.memu/)",
+        scoping: "Local Directory Scope",
+        difference: "memU is an append-only flat Markdown scratchpad without indexing or lifecycle states, whereas Muse Memory provides primary SQLite, fast FTS search, and deterministic confirmation/supersession graphs.",
+        secrets: "None",
+        retrieval: "Full raw file read into LLM context",
+        lifecycle: "Append-only raw Markdown",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Manual symlink",
+        offline: "100% Local Markdown files",
+        detectPath: ".memu/ directory",
+        mappingRule: "markdown sections ➔ candidate/confirmed units"
+      },
+      {
+        id: "everos",
+        name: "EverOS",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/EverMind-AI/EverOS",
+        storage: "Hierarchical JSON document trees (.everos/)",
+        scoping: "Local Project Tree",
+        difference: "EverOS organizes memories as strict nested JSON trees, while Muse Memory provides multi-factor ranked retrieval, Obsidian Wiki export, and automatic agent configuration across 80+ platforms.",
+        secrets: "None",
+        retrieval: "Sub-tree slicing without token knapsack packing",
+        lifecycle: "Nested tree structure",
+        proactive: "None",
+        compounding: "Hierarchical Tree",
+        wiring: "CLI Init",
+        offline: "100% Local JSON trees",
+        detectPath: ".everos/ directory",
+        mappingRule: "tree nodes ➔ confirmed memory units"
+      },
+      {
+        id: "letta",
+        name: "Letta Code (Letta / MemGPT)",
+        category: "agent-harness",
+        catLabel: "Agent Harness",
+        badgeClass: "badge-harness",
+        url: "https://github.com/letta-ai/letta-code",
+        storage: "Tiered Core / Archival / Recall DB (Postgres / Chroma)",
+        scoping: "Agent ID Namespaces",
+        difference: "Letta Code requires a persistent background Letta server and Chroma/Postgres daemon, whereas Muse Memory is zero-daemon, embeds directly inside any MCP agent, and includes proactive CURRENT.md synchronization.",
+        secrets: "None (Raw memory blocks stored)",
+        retrieval: "Core Memory Block Budgeting",
+        lifecycle: "Core Memory block edit operations",
+        proactive: "None",
+        compounding: "Archival vector search blocks",
+        wiring: "Letta CLI and server config",
+        offline: "Requires Letta server daemon",
+        detectPath: "~/.letta/ | letta server",
+        mappingRule: "core memory blocks ➔ confirmed, archival records ➔ candidate"
+      },
+      {
+        id: "mem0",
+        name: "Mem0",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://mem0.ai/",
+        storage: "Vector DB (Qdrant / Pinecone) + LLM-key writes",
+        scoping: "User ID & Agent ID Scoping",
+        difference: "Mem0 is built for cloud/vector environments with external DB infrastructure, whereas Muse Memory provides zero-cost local SQLite execution, dual-scope privacy, and built-in Obsidian markdown wiki compilation.",
+        secrets: "None",
+        retrieval: "Top-K Semantic Vector Search",
+        lifecycle: "CRUD + per-entry history(); no states",
+        proactive: "None",
+        compounding: "Entity Graph (Cloud platform)",
+        wiring: "MCP / Python SDK",
+        offline: "Requires Docker or Cloud Vector DB",
+        detectPath: "mem0 config | ~/.mem0/",
+        mappingRule: "active vector items ➔ confirmed, history deltas ➔ superseded"
+      },
+      {
+        id: "byterover",
+        name: "ByteRover",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://www.byterover.dev/",
+        storage: ".brv/ Context Tree + Background Daemon",
+        scoping: "Dual-Scope (Local / Global)",
+        difference: "ByteRover requires an active background daemon process for context sync, while Muse Memory provides atomic file and SQLite transactions with zero running daemon overhead.",
+        secrets: "None",
+        retrieval: "Agentic iteration token budget",
+        lifecycle: "Review Pending / Approve / Reject Gates",
+        proactive: "None",
+        compounding: "Context Tree",
+        wiring: "22 Coding Agents Auto-Detect",
+        offline: "Daemon process required",
+        detectPath: ".brv/ | byterover daemon",
+        mappingRule: "approved nodes ➔ confirmed, rejected ➔ rejected"
+      },
+      {
+        id: "gbrain",
+        name: "GBrain",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/garrytan/gbrain",
+        storage: "Private GitHub Repo + PGLite Embedded Postgres",
+        scoping: "Private Git Repo",
+        difference: "GBrain synchronizes with a private GitHub repository and runs PGLite dream-cycles, while Muse Memory offers local SQLite primary performance, dual YAML export, and real-time CURRENT.md synchronization.",
+        secrets: "Ingest scrubbing",
+        retrieval: "pgvector + BM25 + RRF presets",
+        lifecycle: "Cron 'dream cycle' dedup / provenance",
+        proactive: "Signal open loops + Dream Cron",
+        compounding: "Wikilink Graph",
+        wiring: "Custom setup",
+        offline: "PGLite In-Process",
+        detectPath: "gbrain repo clone | ~/.gbrain/",
+        mappingRule: "live pages ➔ confirmed, dream-cycle stale ➔ superseded"
+      },
+      {
+        id: "mnemosyne",
+        name: "Mnemosyne",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/mnemosyne-oss/mnemosyne",
+        storage: "Single-File SQLite (sqlite-vec + FTS5)",
+        scoping: "Hermes App Scope",
+        difference: "Mnemosyne is tightly coupled to the Hermes assistant, whereas Muse Memory auto-detects and wires across 80+ coding agent platforms (Cursor, Claude Code, Antigravity, Windsurf, OpenCode, Codex).",
+        secrets: "Basic Hygiene Secret Scan",
+        retrieval: "50% Vec + 30% FTS + 20% Importance",
+        lifecycle: "Importance score + valid_until TTL",
+        proactive: "TTL Expiry",
+        compounding: "Triple-Store Knowledge Graph",
+        wiring: "MCP Stdio / SSE",
+        offline: "Single-File SQLite",
+        detectPath: "~/.mnemosyne/memory.db",
+        mappingRule: "valid memories ➔ confirmed, expired ➔ stale"
+      },
+      {
+        id: "autocontext",
+        name: "Autocontext",
+        category: "agent-harness",
+        catLabel: "Agent Harness",
+        badgeClass: "badge-harness",
+        url: "https://github.com/greyhaven-ai/autocontext",
+        storage: "Filesystem ContextBundles (runs/ + knowledge/)",
+        scoping: "Scenario / Run Directory",
+        difference: "Autocontext is designed for benchmark evaluation runs, while Muse Memory is built for perpetual, multi-session software engineering workflows with knapsack prompt budgeting.",
+        secrets: "None",
+        retrieval: "Full Bundle Load",
+        lifecycle: "Evidence-Gated Promotion State Machine",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Python CLI",
+        offline: "Local Filesystem",
+        detectPath: "runs/ directory",
+        mappingRule: "promoted bundles ➔ confirmed"
+      },
+      {
+        id: "openviking",
+        name: "OpenViking",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/volcengine/OpenViking",
+        storage: "Virtual FS Context DB (viking://) + Daemon",
+        scoping: "Global Server Space",
+        difference: "OpenViking exposes memory as a virtual filesystem via a server daemon, while Muse Memory directly writes transparent files in .memory/ that developers can view, edit, and check into git.",
+        secrets: "None",
+        retrieval: "Tiered L0 / L1 / L2 Summaries",
+        lifecycle: "Session-commit async extraction",
+        proactive: "None",
+        compounding: "Directory Drill-Down Tree",
+        wiring: "Helper wiring",
+        offline: "Server daemon required",
+        detectPath: "~/.openviking/ | openviking-server",
+        mappingRule: "session-committed memories ➔ confirmed"
+      },
+      {
+        id: "hindsight",
+        name: "Hindsight",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/vectorize-io/hindsight",
+        storage: "Banked Postgres Memory (Postgres + pgvector)",
+        scoping: "Bank ID Scopes",
+        difference: "Hindsight runs on hosted Postgres instances, while Muse Memory operates completely in-process using SQLite and YAML mirrors with zero external connection overhead.",
+        secrets: "Memory Defense 45-pattern filter",
+        retrieval: "Evidence-backed observations ranking",
+        lifecycle: "Proof count consolidation",
+        proactive: "None",
+        compounding: "Observation Banks",
+        wiring: "Custom API",
+        offline: "Postgres daemon required",
+        detectPath: "hindsight bank endpoint | pg0 data dir",
+        mappingRule: "observations w/ proof counts ➔ confirmed"
+      },
+      {
+        id: "semantica",
+        name: "Semantica",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/semantica-agi/semantica",
+        storage: "Hybrid Vector + Semantic Triples (Chroma / SQLite)",
+        scoping: "Workspace URI Namespaces",
+        difference: "Semantica stores RDF triples requiring specialized querying, whereas Muse Memory compiles clean Obsidian-compatible markdown wikis and JSON co-occurrence graphs for transparent human inspection.",
+        secrets: "Basic Filter",
+        retrieval: "Top-K Triples",
+        lifecycle: "Triple validity flags",
+        proactive: "None",
+        compounding: "RDF Triples",
+        wiring: "MCP Stdio",
+        offline: "Python Runtime",
+        detectPath: "~/.semantica/",
+        mappingRule: "valid triples ➔ confirmed"
+      },
+      {
+        id: "honcho",
+        name: "Honcho",
+        category: "agent-harness",
+        catLabel: "Agent Harness",
+        badgeClass: "badge-harness",
+        url: "https://github.com/plastic-labs/honcho",
+        storage: "FastAPI + Postgres / pgvector + Deriver Worker",
+        scoping: "Peer & App Namespaces (Multi-Tenant)",
+        difference: "Honcho is a server-side multi-tenant derivation system requiring worker daemons, while Muse Memory is a lean, developer-first tool running locally with zero infrastructure.",
+        secrets: "None",
+        retrieval: "Token-Limited Context",
+        lifecycle: "LLM-derived conclusions; no states",
+        proactive: "None",
+        compounding: "Peer Cards",
+        wiring: "Python / Docker",
+        offline: "Postgres / Worker Daemon",
+        detectPath: "honcho daemon",
+        mappingRule: "derived conclusions ➔ confirmed"
+      },
+      {
+        id: "kungfu",
+        name: "Kungfu",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/kungfu-systems/kungfu",
+        storage: "SQLite DB with embedded vector extension",
+        scoping: "Local Workspace Only",
+        difference: "Kungfu provides basic vector similarity in SQLite without lifecycle state gates or secret scanning, while Muse Memory provides a full governance lifecycle and Vibeguard defense.",
+        secrets: "None",
+        retrieval: "Top-K Vectors",
+        lifecycle: "Row-level timestamps",
+        proactive: "None",
+        compounding: "None",
+        wiring: "CLI Init",
+        offline: "Single SQLite File",
+        detectPath: "kungfu.db",
+        mappingRule: "vector rows ➔ confirmed"
+      },
+      {
+        id: "memsearch",
+        name: "MemSearch",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/zilliztech/memsearch",
+        storage: "Milvus / Zilliz Cloud Vector Collection",
+        scoping: "Collection Namespaces",
+        difference: "MemSearch requires a distributed Milvus cluster, while Muse Memory runs locally with zero external network calls or cluster management.",
+        secrets: "None",
+        retrieval: "Top-K Vectors",
+        lifecycle: "Vector embeddings store",
+        proactive: "None",
+        compounding: "None",
+        wiring: "REST / gRPC API",
+        offline: "Milvus Cluster Required",
+        detectPath: "milvus host config",
+        mappingRule: "milvus vectors ➔ confirmed"
+      },
+      {
+        id: "ace",
+        name: "ACE (Kayba)",
+        category: "agent-harness",
+        catLabel: "Agent Harness",
+        badgeClass: "badge-harness",
+        url: "https://github.com/kayba-ai/agentic-context-engine",
+        storage: "Context Tree DAG (JSON + Local Embeddings)",
+        scoping: "Session & Thread DAGs",
+        difference: "ACE structures memory as branching conversation DAGs, whereas Muse Memory distills conversations into atomic, deduplicated architectural insights and active hard constraints.",
+        secrets: "Regex Filter",
+        retrieval: "Branch Token Pruning",
+        lifecycle: "Node branching & pruning",
+        proactive: "None",
+        compounding: "Context DAG",
+        wiring: "MCP Stdio",
+        offline: "Python In-Process",
+        detectPath: "~/.ace/ | ace.json",
+        mappingRule: "active DAG nodes ➔ confirmed"
+      },
+      {
+        id: "actx0",
+        name: "Actx0",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://github.com/actx0/actx0",
+        storage: "Hosted Context Service (Cloud API + Local Cache)",
+        scoping: "Cloud Workspace & API Keys",
+        difference: "Actx0 sends agent context to third-party cloud servers, while Muse Memory guarantees 100% data sovereignty by keeping all memory on your local machine.",
+        secrets: "Cloud Managed",
+        retrieval: "Server Quota",
+        lifecycle: "Cached context snapshots",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Cloud API Key",
+        offline: "Cloud Service",
+        detectPath: "actx0 API config",
+        mappingRule: "cached snapshots ➔ confirmed"
+      },
+      {
+        id: "clawdi",
+        name: "Clawdi",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://github.com/clawdi-ai/clawdi",
+        storage: "Episodic Scratchpad Cache (JSON / Cloudflare KV)",
+        scoping: "Session Cache Keys",
+        difference: "Clawdi is an ephemeral chat cache, while Muse Memory is a persistent cognitive architecture with decay algorithms, supersession graph links, and audit trails.",
+        secrets: "None",
+        retrieval: "Unbounded Session Buffer",
+        lifecycle: "Session-scoped memory keys",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Claude Code Hook",
+        offline: "Hybrid Local/Cloud",
+        detectPath: "~/.clawdi/ cache",
+        mappingRule: "scratchpad items ➔ candidate"
+      },
+      {
+        id: "pensieve",
+        name: "Pensieve",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/pensieve-ai/pensieve",
+        storage: "Episodic Vector Recall (LanceDB / SQLite)",
+        scoping: "Global Store",
+        difference: "Pensieve does not separate project-level rules from global preferences, risking cross-client context leaks, whereas Muse Memory strictly isolates .memory/ from ~/.memory/.",
+        secrets: "None",
+        retrieval: "Top-K Similarity",
+        lifecycle: "Cosine recall scores",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Python CLI",
+        offline: "Python Runtime",
+        detectPath: "~/.pensieve/",
+        mappingRule: "vector records ➔ confirmed"
+      },
+      {
+        id: "liminary",
+        name: "Liminary",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://github.com/liminary-ai/liminary",
+        storage: "Threshold Memory Bridge (Redis + Vector API)",
+        scoping: "User / Channel Scope",
+        difference: "Liminary requires Redis server infrastructure and vector endpoints, while Muse Memory requires zero infrastructure beyond standard Node/Bun.",
+        secrets: "None",
+        retrieval: "Sliding Window",
+        lifecycle: "TTL Cache / Threshold promotion",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Redis Endpoint",
+        offline: "Redis / Server Required",
+        detectPath: "redis host config",
+        mappingRule: "promoted keys ➔ confirmed"
+      },
+      {
+        id: "dvina",
+        name: "Dvina",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://github.com/dvina-ai/dvina",
+        storage: "Distributed Semantic Memory Fabric (gRPC / Vector DB)",
+        scoping: "Node Mesh ID",
+        difference: "Dvina is a complex distributed server mesh, while Muse Memory is designed for instant single-developer or agency workstation workflows with zero operational overhead.",
+        secrets: "TLS Mesh",
+        retrieval: "Cluster Limit",
+        lifecycle: "Distributed sync protocol",
+        proactive: "None",
+        compounding: "Cluster Graph",
+        wiring: "gRPC Cluster",
+        offline: "Cluster Daemon Required",
+        detectPath: "dvina cluster daemon",
+        mappingRule: "mesh nodes ➔ confirmed"
+      },
+      {
+        id: "second-brain-cloudflare",
+        name: "Second Brain Cloudflare",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://github.com/rahilp/second-brain-cloudflare",
+        storage: "Cloudflare Workers + D1 SQLite + Vectorize",
+        scoping: "Cloudflare Account KV",
+        difference: "Requires deploying and maintaining Cloudflare Workers infrastructure, while Muse Memory works out of the box locally via npx musememory.",
+        secrets: "Cloudflare Edge",
+        retrieval: "Top-K Vectors",
+        lifecycle: "Tag: active / archive",
+        proactive: "None",
+        compounding: "Obsidian Sync",
+        wiring: "Wrangler Deploy",
+        offline: "Cloudflare Edge Required",
+        detectPath: "wrangler.toml second-brain",
+        mappingRule: "D1 rows ➔ confirmed"
+      },
+      {
+        id: "rory-plans",
+        name: "Rory Plans",
+        category: "agent-harness",
+        catLabel: "Agent Harness",
+        badgeClass: "badge-harness",
+        url: "https://github.com/rory-ai/plans",
+        storage: "YAML Plan Trees + Progress Log (.rory/)",
+        scoping: "Local Project Scope",
+        difference: "Rory Plans focuses narrowly on execution checklist plans, while Muse Memory combines active execution handoffs with long-term cognitive knowledge compounding and bi-temporal retrieval.",
+        secrets: "None",
+        retrieval: "Full Plan Dump",
+        lifecycle: "Plan status: pending / done",
+        proactive: "Plan Checklist",
+        compounding: "None",
+        wiring: "CLI Init",
+        offline: "Local YAML Files",
+        detectPath: ".rory/ in project root",
+        mappingRule: "done plans ➔ confirmed, pending ➔ candidate"
+      },
+      {
+        id: "project-minimi",
+        name: "Project Minimi",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://www.projectminimi.com/",
+        storage: "macOS Ambient Desktop JSON store (~/.minimi/)",
+        scoping: "Desktop App Local",
+        difference: "Minimi is restricted to macOS native desktop apps, whereas Muse Memory is cross-platform (Linux, macOS, Windows) and integrates directly via MCP stdio across all coding IDEs.",
+        secrets: "Local macOS Sandbox",
+        retrieval: "App Context Window",
+        lifecycle: "Open loops / resolved loops",
+        proactive: "Desktop Open Loops",
+        compounding: "None",
+        wiring: "macOS App Only",
+        offline: "macOS Native App",
+        detectPath: "~/.minimi/ desktop app",
+        mappingRule: "resolved loops ➔ confirmed"
+      },
+      {
+        id: "mem-ai",
+        name: "Mem.ai",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://get.mem.ai/",
+        storage: "Cloud SaaS Note Graph + Background Review Engine",
+        scoping: "Cloud Account & Teams",
+        difference: "Mem.ai is a commercial closed-source note-taking SaaS subscription, while Muse Memory is an open-source, local-first cognitive engine built specifically for autonomous AI agents.",
+        secrets: "SaaS Encrypted",
+        retrieval: "Heads-Up Panel",
+        lifecycle: "Archived note status; no lifecycle gates",
+        proactive: "Proactive Check-Ins (Cloud)",
+        compounding: "Smart Note Graph",
+        wiring: "Cloud SaaS Login",
+        offline: "Cloud Only ($0–$199/mo)",
+        detectPath: "Mem.ai SaaS account",
+        mappingRule: "notes ➔ confirmed memory units"
+      },
+      {
+        id: "agentmemory",
+        name: "AgentMemory",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/rohitg00/agentmemory",
+        storage: "SQLite DB (~/.local/share/agentmemory/)",
+        scoping: "User Machine Scope",
+        difference: "AgentMemory stores unvalidated observations in a single user database, whereas Muse Memory enforces secret scanning, dual-scope workspace isolation, and Obsidian wiki compilation.",
+        secrets: "None",
+        retrieval: "Top-K Chroma/SQLite",
+        lifecycle: "Observations, memories, crystal states",
+        proactive: "None",
+        compounding: "None",
+        wiring: "Python Pip",
+        offline: "Local SQLite File",
+        detectPath: "~/.local/share/agentmemory/",
+        mappingRule: "crystals ➔ confirmed, memories ➔ candidate"
+      }
+    ];
 
-      rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(input) ? "" : "none";
+    let currentCategory = "all";
+    let searchQuery = "";
+
+    function renderDossierCards() {
+      const grid = document.getElementById("dossierGrid");
+      const empty = document.getElementById("emptyState");
+      grid.innerHTML = "";
+
+      const filtered = PROVIDERS.filter(p => {
+        if (currentCategory !== "all" && p.category !== currentCategory) return false;
+        if (searchQuery) {
+          const text = (p.name + " " + p.storage + " " + p.difference + " " + p.scoping + " " + p.catLabel).toLowerCase();
+          if (!text.includes(searchQuery.toLowerCase())) return false;
+        }
+        return true;
       });
 
-      cards.forEach(card => {
-        const text = card.innerText.toLowerCase();
-        card.style.display = text.includes(input) ? "" : "none";
+      document.getElementById("resultsCount").textContent = `Showing ${filtered.length} of ${PROVIDERS.length} Providers`;
+
+      if (filtered.length === 0) {
+        empty.style.display = "block";
+        return;
+      }
+      empty.style.display = "none";
+
+      filtered.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "dossier-card";
+        card.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div class="card-top">
+              <div class="card-name-wrap">
+                <div class="card-title"><a href="${p.url}" target="_blank">${p.name} ↗</a></div>
+                <div class="card-meta">${p.storage}</div>
+              </div>
+              <span class="badge ${p.badgeClass}">${p.catLabel}</span>
+            </div>
+
+            <div class="diff-callout">
+              <strong>Concrete Architectural Difference:</strong><br>
+              ${p.difference}
+            </div>
+
+            <div class="specs-list">
+              <div class="spec-item">
+                <span class="spec-key">Storage Model:</span>
+                <span class="spec-val">${p.storage}</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-key">Scoping:</span>
+                <span class="spec-val">${p.scoping}</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-key">Secret Defense:</span>
+                <span class="spec-val">${p.secrets}</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-key">Token Retrieval:</span>
+                <span class="spec-val">${p.retrieval}</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-key">State Machine:</span>
+                <span class="spec-val">${p.lifecycle}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em;">Autonomous Migration:</div>
+            <div class="card-migration">
+              <span class="cmd-text">memory detect && memory migrate --provider ${p.id}</span>
+              <button class="copy-btn" onclick="copyCommand('memory detect && memory migrate --provider ${p.id}')">Copy</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
       });
     }
 
-    function setCategory(category, el) {
-      document.querySelectorAll(".filter-chips .chip").forEach(c => c.classList.remove("active"));
-      el.classList.add("active");
+    function handleSearch() {
+      searchQuery = document.getElementById("searchInput").value;
+      renderDossierCards();
+    }
 
-      const rows = document.querySelectorAll("#matrixTable tbody tr");
-      const cards = document.querySelectorAll("#providerGrid .provider-card");
+    function setCategoryFilter(category, chipEl) {
+      document.querySelectorAll(".filter-chips-row .chip").forEach(c => c.classList.remove("active"));
+      chipEl.classList.add("active");
+      currentCategory = category;
+      renderDossierCards();
+    }
 
-      rows.forEach(row => {
-        if (category === "all") {
-          row.style.display = "";
-        } else {
-          row.style.display = row.getAttribute("data-category") === category ? "" : "none";
-        }
-      });
-
-      cards.forEach(card => {
-        if (category === "all") {
-          card.style.display = "";
-        } else {
-          card.style.display = card.getAttribute("data-category") === category ? "" : "none";
-        }
+    function copyCommand(cmd) {
+      navigator.clipboard.writeText(cmd).then(() => {
+        showToast("Copied: " + cmd);
       });
     }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2500);
+    }
+
+    // Keyboard shortcut '/'
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
+        e.preventDefault();
+        document.getElementById("searchInput").focus();
+      }
+    });
+
+    // Initial render
+    renderDossierCards();
   </script>
 </body>
 </html>

@@ -1,14 +1,14 @@
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-import { list } from "../store.ts";
 import {
-  proposeMemory,
-  supersedeMemory,
-  confirmMemory,
-  linkMemory,
-  markStaleMemory,
-  rejectMemory,
-  deleteMemory,
-} from "../commands/lifecycle.ts";
+  list,
+  propose,
+  confirm,
+  supersede,
+  link,
+  markStale,
+  reject,
+  deleteEntry,
+} from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
@@ -35,7 +35,7 @@ export async function handleProposeCommand({ positional, flags }: ParsedArgs): P
   const type = flags["type"] as MemoryType | undefined;
   let entry;
   try {
-    entry = proposeMemory(ctx.store, {
+    entry = propose(ctx.store, {
       content: text,
       project,
       title: flags["title"],
@@ -44,7 +44,8 @@ export async function handleProposeCommand({ positional, flags }: ParsedArgs): P
       confirmed: flags["confirmed"] === "true",
     });
   } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+    const msg = err instanceof Error ? err.message : String(err);
+    return fail(msg.replace(/^Probable secret detected:/, "probable secret detected:"));
   }
   console.log(`created ${entry.id}`);
   return 0;
@@ -61,10 +62,9 @@ export async function handleLinkCommand({ positional, flags }: ParsedArgs): Prom
   const related = flags["related"];
   if (!id || !related) return usageError("link requires <id> --related <id,...>");
   const relatedIds = related.split(",").map((s) => s.trim()).filter(Boolean);
-  try {
-    linkMemory(ctx.store, id, relatedIds);
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const entry = link(ctx.store, id, relatedIds);
+  if (!entry) {
+    return fail(`could not link ${id} (missing id or related id)`);
   }
   console.log(`linked ${id} -> ${relatedIds.join(",")}`);
   return 0;
@@ -75,11 +75,9 @@ export async function handleConfirmCommand({ positional, flags }: ParsedArgs): P
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("confirm requires an id");
-  let entry;
-  try {
-    entry = confirmMemory(ctx.store, id);
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const entry = confirm(ctx.store, id);
+  if (!entry) {
+    return fail(`could not confirm ${id} (not found or invalid status transition)`);
   }
   console.log(`confirmed ${entry.id} -> confirmed`);
   return 0;
@@ -91,10 +89,9 @@ export async function handleSupersedeCommand({ positional, flags }: ParsedArgs):
   const oldId = positional[0];
   const newId = flags["with"];
   if (!oldId || !newId) return usageError("supersede requires <id> --with <newId>");
-  try {
-    supersedeMemory(ctx.store, { oldId, newId });
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const entry = supersede(ctx.store, oldId, newId);
+  if (!entry) {
+    return fail(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
   }
   console.log(`superseded ${oldId} by ${newId}`);
   return 0;
@@ -105,11 +102,9 @@ export async function handleMarkStaleCommand({ positional, flags }: ParsedArgs):
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("mark-stale requires an id");
-  let entry;
-  try {
-    entry = markStaleMemory(ctx.store, id, flags["reason"]);
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const entry = markStale(ctx.store, id, flags["reason"]);
+  if (!entry) {
+    return fail(`no entry with id ${id}`);
   }
   console.log(`marked ${entry.id} stale`);
   return 0;
@@ -120,11 +115,9 @@ export async function handleRejectCommand({ positional, flags }: ParsedArgs): Pr
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("reject requires an id");
-  let entry;
-  try {
-    entry = rejectMemory(ctx.store, id);
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const entry = reject(ctx.store, id);
+  if (!entry) {
+    return fail(`no entry with id ${id}`);
   }
   console.log(`rejected ${entry.id}`);
   return 0;
@@ -135,10 +128,9 @@ export async function handleDeleteCommand({ positional, flags }: ParsedArgs): Pr
   if (!ctx) return 1;
   const id = positional[0];
   if (!id) return usageError("delete requires <id>");
-  try {
-    deleteMemory(ctx.store, id, flags["reason"], "cli_user");
-  } catch (err: unknown) {
-    return fail(err instanceof Error ? err.message : String(err));
+  const ok = deleteEntry(ctx.store, id, flags["reason"], "cli_user");
+  if (!ok) {
+    return fail(`no entry found with id ${id}`);
   }
   console.log(`deleted entry ${id}`);
   return 0;

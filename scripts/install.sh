@@ -46,22 +46,16 @@ if [ -f "${INSTALL_DIR}/dist/index.js" ]; then
   ln -sf "${INSTALL_DIR}/dist/index.js" "${BIN_DIR}/musememory"
 fi
 
-# Ensure ~/.local/bin is in PATH if binaries were linked there
-case ":$PATH:" in
-  *":${BIN_DIR}:"*) ;;
-  *)
-    echo "💡 Note: Add ${BIN_DIR} to your PATH in ~/.bashrc or ~/.zshrc if not already present:"
-    echo "   export PATH=\"\${HOME}/.local/bin:\$PATH\""
-    ;;
-esac
+# 4. Auto-initialize global environment and auto-wire detected agents
+echo "→ Initializing global Muse Memory environment & auto-wiring agents..."
+"${INSTALL_DIR}/dist/index.js" install --global || true
 
 echo ""
 echo "🎉 Muse Memory installed and verified successfully!"
 echo ""
 echo "Quick Start Commands:"
-echo "  1. Run complete workspace & agent setup:  memory install --global"
-echo "  2. Verify system & agent health:           memory doctor --global"
-echo "  3. Scan 80+ coding agents on machine:      memory agents"
-echo "  4. Auto-wire installed coding agents:      memory connect --all"
-echo "  5. Launch visual knowledge graph:          memory ui --global"
+echo "  1. Verify system & agent health:           memory doctor --global"
+echo "  2. Scan 80+ coding agents on machine:      memory agents"
+echo "  3. Auto-wire installed coding agents:      memory connect --all"
+echo "  4. Launch visual knowledge graph (2222):   memory ui --global"
 echo ""
