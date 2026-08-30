@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-304%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-315%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -449,7 +449,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 304 passed across 55 test files (1248 assertions)
+bun test          # 315 passed across 56 test files (1282 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
@@ -474,22 +474,25 @@ Muse Memory features are developed in structured sprints moving across 4 determi
 - [ ] Continuous Background Memory Compaction & Pruning Cron
 - [ ] Export to Local Vector GGUF Embedding Index
 
-### 📅 Phase 2: Planned (Next Sprint: SOW-201–205)
-*Confirmed high-leverage features scheduled for the upcoming sprint:*
-- [ ] **SOW-201**: Live Runtime File & Symbol Verification Gate (instant disk re-check with `STRONG`/`WEAK`/`REBUILT`/`STALE` trust verdicts)
-- [ ] **SOW-202**: Deterministic Relevance Cutoff Gate (hard score threshold $\text{Score} \ge 0.45$ preventing token-wasting context injection)
-- [ ] **SOW-203**: Git Code-Drift Scanner CLI (`memory drift` / `memory check` detecting modified/deleted referenced symbols)
-- [ ] **SOW-204**: Gradient-Free Hebbian Co-Activation Plasticity (associative memory weight reinforcement for co-retrieved concepts)
-- [ ] **SOW-205**: Semantic Memory Prompt Compression (lossless markdown stripping reducing injected prompt tokens by 30–40%)
+### 📅 Phase 2: Planned
+*Confirmed high-leverage features scheduled for upcoming sprints:*
+- [ ] Multi-Agent Consensus Verification Protocol (cross-agent memory agreement)
+- [ ] Continuous Background Memory Compaction & Pruning Cron
+- [ ] Export to Local Vector GGUF Embedding Index
 
 ### ⚡ Phase 3: In Progress (Active Sprint / PR)
-*Currently under active development on a dedicated feature branch:*
-- *(None — Sprint backlog planned and ready for initiation)*
+*Currently under active development on dedicated feature branches:*
+- *(None — Sprint SOW-200 completed and shipped)*
 
 ### ✅ Phase 4: Done (Shipped to Production)
 *All completed, tested, and released milestones:*
 | Status | Milestone / Feature | Shipped Release / Tracker |
 | :--- | :--- | :--- |
+| ✅ | **SOW-201**: Live Runtime File & Symbol Verification Gate (`STRONG`/`WEAK`/`STALE`) | shipped v1.8.0 |
+| ✅ | **SOW-202**: Deterministic Relevance Cutoff Gate (hard score threshold $\ge 0.45$) | shipped v1.8.0 |
+| ✅ | **SOW-203**: Git Code-Drift Scanner CLI (`memory drift` / `memory check`) | shipped v1.8.0 |
+| ✅ | **SOW-204**: Gradient-Free Hebbian Co-Activation Plasticity (synaptic link reinforcement) | shipped v1.8.0 |
+| ✅ | **SOW-205**: Semantic Memory Prompt Compression (`memory compress` lossless prompt packer) | shipped v1.8.0 |
 | ✅ | Turnkey Agent Skills Suite (`muse-ground`, `muse-capture`, etc.) | shipped v1.7.0 |
 | ✅ | AST Symbol Graph Integration (CodeGraph / Graphify) | [#35](https://github.com/harshsinghmp/musememory/issues/35) / v1.7.0 |
 | ✅ | Zero-Friction Installation Lifecycle Fix | shipped v1.7.1 |

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import type { GraphMetadata } from "./types.ts";
+import { join, isAbsolute } from "node:path";
+import type { GraphMetadata, MemoryEntry } from "./types.ts";
 
 export type GraphProviderType = "codegraph" | "graphify" | "none";
 
@@ -270,4 +270,53 @@ export function autoStampGraphMetadata(
     affected_paths: extracted.affected_paths,
     graph_verified_at: new Date().toISOString(),
   };
+}
+
+export interface RuntimeVerificationVerdict {
+  verdict: "STRONG" | "WEAK" | "REBUILT" | "STALE";
+  existingPaths: string[];
+  missingPaths: string[];
+  details?: string;
+}
+
+/**
+ * Verifies referenced code paths against the live filesystem in sub-millisecond CPU time.
+ */
+export function verifyRuntimeFiles(
+  entry: MemoryEntry,
+  workspaceRoot?: string,
+): RuntimeVerificationVerdict {
+  const root = workspaceRoot || process.cwd();
+  const affected = entry.graph?.affected_paths || [];
+  if (affected.length === 0) {
+    return { verdict: "STRONG", existingPaths: [], missingPaths: [] };
+  }
+
+  const existingPaths: string[] = [];
+  const missingPaths: string[] = [];
+
+  for (const relPath of affected) {
+    const fullPath = isAbsolute(relPath) ? relPath : join(root, relPath);
+    if (existsSync(fullPath)) {
+      existingPaths.push(relPath);
+    } else {
+      missingPaths.push(relPath);
+    }
+  }
+
+  if (missingPaths.length > 0 && existingPaths.length === 0) {
+    return { verdict: "STALE", existingPaths, missingPaths, details: `Missing: ${missingPaths.join(", ")}` };
+  }
+  if (missingPaths.length > 0) {
+    return { verdict: "WEAK", existingPaths, missingPaths, details: `Partially missing: ${missingPaths.join(", ")}` };
+  }
+
+  return { verdict: "STRONG", existingPaths, missingPaths };
+}
+
+export function getRuntimeTrustVerdict(
+  entry: MemoryEntry,
+  workspaceRoot?: string,
+): "STRONG" | "WEAK" | "REBUILT" | "STALE" {
+  return verifyRuntimeFiles(entry, workspaceRoot).verdict;
 }

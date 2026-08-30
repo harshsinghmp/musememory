@@ -155,16 +155,35 @@ export function graphSymbolOverlapBonus(entry: MemoryEntry, queryTokens: string[
   return Math.min(0.2, (matches / queryTokens.length) * 0.2);
 }
 
+/** Default deterministic relevance cutoff threshold (SOW-202). Entries below this score are dropped from prompt injection. */
+export const DEFAULT_MIN_RELEVANCE_SCORE = 0.45;
+
+/**
+ * Filters scored entries by minimum relevance threshold (SOW-202).
+ */
+export function filterByRelevanceThreshold(
+  entries: ScoredEntry[],
+  minScore = DEFAULT_MIN_RELEVANCE_SCORE,
+): ScoredEntry[] {
+  return entries.filter((e) => e.score >= minScore);
+}
+
 /**
  * Multi-factor score formula:
  * score = 1.0 * applicability + statusPenalty + verificationBonus + salienceBonus
- *       + reinforcementBonus + dueDateBonus + graphBonus + 0.3 * exp(-daysSince(decayBase)/90)
+ *       + reinforcementBonus + dueDateBonus + graphBonus + trustBonus + 0.3 * exp(-daysSince(decayBase)/90)
  *
  * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
  * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
  * AST Graph: +0.2 bonus for matching indexed symbol names.
+ * Runtime Trust (SOW-201): +0.15 for verified strong disk files, -0.4 for stale missing paths.
  */
-export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: number): number {
+export function scoreEntry(
+  entry: MemoryEntry,
+  queryTokens: string[],
+  now: number = Date.now(),
+  workspaceRoot?: string,
+): number {
   const app = applicability(entry, queryTokens);
   const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
   const vLevel = entry.verification?.level ?? "unverified";
@@ -174,9 +193,23 @@ export function scoreEntry(entry: MemoryEntry, queryTokens: string[], now: numbe
   const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
   const dueBonus = dueDateBonus(entry, now);
   const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
+  
+  // Runtime trust verdict bonus/penalty (SOW-201)
+  let trustAdjustment = 0;
+  if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
+    const { verifyRuntimeFiles } = require("./graph.ts");
+    const verdict = verifyRuntimeFiles(entry, workspaceRoot);
+    if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
+    else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
+  }
+
   const decayBase = entry.valid_from ?? entry.updated_at;
   const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + decay;
+  
+  // If query tokens exist but there is zero token/graph overlap, apply a relevance penalty (SOW-202)
+  const zeroMatchPenalty = queryTokens.length > 0 && app === 0 && graphBonus === 0 ? -0.35 : 0;
+
+  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + zeroMatchPenalty;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */

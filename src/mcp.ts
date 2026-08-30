@@ -658,6 +658,28 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["settings"],
         },
       },
+      {
+        name: "memory_drift",
+        description: "Scan the local Git workspace for modified or deleted code files and AST symbols referenced by memories. Flags drifted memories for re-verification or supersession.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_compress",
+        description: "Compress formatted prompt context losslessly, stripping header whitespace and boilerplate while preserving all architectural facts.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "Markdown prompt context to compress" },
+            level: { type: "string", enum: ["light", "aggressive"], description: "Compression aggressiveness level" },
+          },
+          required: ["text"],
+        },
+      },
     ],
   }));
 
@@ -695,8 +717,23 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             verified: a.verified === true,
             depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
           });
+
+          // Record Hebbian co-activation on retrieved memory units (SOW-204)
+          if (formatted.entries.length >= 2 && activeMemoryDir) {
+            try {
+              const { recordCoActivation } = await import("./plasticity.ts");
+              recordCoActivation(formatted.entries.map((e) => e.entry.id), activeMemoryDir);
+            } catch {}
+          }
+
+          let finalMarkdown = formatted.markdown;
+          if (a.compress === true) {
+            const { compressPromptContext } = await import("./compress.ts");
+            finalMarkdown = compressPromptContext(finalMarkdown).compressed;
+          }
+
           return toolResult({
-            markdown: formatted.markdown,
+            markdown: finalMarkdown,
             entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
             total_tokens_used: formatted.totalTokensUsed,
             constraints: formatted.constraints,
@@ -1112,6 +1149,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }
+      }
+      case "memory_drift": {
+        const { scanCodeDrift } = await import("./drift.ts");
+        const report = scanCodeDrift({ workspaceRoot: activeRoot, memoryDir: activeMemoryDir });
+        return toolResult(report);
+      }
+      case "memory_compress": {
+        const { compressPromptContext } = await import("./compress.ts");
+        const text = String(a.text ?? "");
+        const level = a.level === "aggressive" ? "aggressive" : "light";
+        const result = compressPromptContext(text, { level });
+        return toolResult(result);
       }
       default:
         return toolError(`unknown tool ${name}`);

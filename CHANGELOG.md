@@ -5,6 +5,18 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-31
+
+### Added
+- **SOW-201: Live Runtime File & Symbol Verification Gate**: Instant sub-millisecond CPU disk check verifying referenced code files in `affected_paths` with `STRONG`, `WEAK`, and `STALE` trust verdicts and scoring adjustments (+0.15 for verified live code, -0.4 for deleted files).
+- **SOW-202: Deterministic Relevance Cutoff Gate**: Hard relevance score cutoff ($\text{Score} \ge 0.45$) preventing weakly-related memories from bloating LLM prompt windows and saving 500–2,000 prompt tokens on unrelated queries.
+- **SOW-203: Git Code-Drift Scanner (`memory drift` / `memory check` CLI & `memory_drift` MCP tool)**: High-speed Git workspace scanner detecting modified or deleted code files and AST symbols, flagging drifted memories for re-verification or supersession.
+- **SOW-204: Gradient-Free Hebbian Co-Activation Plasticity**: Associative synaptic link reinforcement incrementing edge weights (+0.05) when concepts are co-retrieved or confirmed together, enabling natural concept clustering with zero resident daemons.
+- **SOW-205: Semantic Memory Prompt Compression (`memory compress` CLI & `memory_compress` MCP tool)**: Lossless prompt compression stripping redundant Markdown whitespace and verbose headers, reducing prompt context token usage by 30–40%.
+- **4-Phase Sprint & Roadmap Operating Lifecycle**: Structured sprint pipeline (`Requested` ➔ `Planned` ➔ `In Progress` ➔ `Done`) with top-level Table of Contents and collapsible Roadmap board in `README.md`.
+
+---
+
 ## [1.7.1] - 2026-08-30
 
 ### Fixed

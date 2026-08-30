@@ -136,3 +136,10 @@ function ancestorChain(startDir: string): string[] {
   }
   return chain;
 }
+
+/**
+ * Convenience helper resolving active memory directory.
+ */
+export function resolveMemoryDir(options: { global?: boolean; root?: string } = {}): string {
+  return findOrCreateProjectRoot(options.root || process.cwd(), options).memoryDir;
+}
