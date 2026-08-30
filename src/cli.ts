@@ -12,6 +12,8 @@ import {
   handleGraphCommand,
   handleMcpCommand,
   handleDaemonCommand,
+  handleDriftCommand,
+  handleCompressCommand,
 } from "./cli/ecosystem.ts";
 import {
   handleContextCommand,
@@ -159,6 +161,11 @@ export async function main(argv: string[]): Promise<number> {
       return handleUiCommand(parsed);
     case "graph":
       return handleGraphCommand(parsed);
+    case "drift":
+    case "check":
+      return handleDriftCommand(parsed);
+    case "compress":
+      return handleCompressCommand(parsed);
     case "mcp":
       return handleMcpCommand();
     case "daemon":

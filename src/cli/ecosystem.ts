@@ -423,8 +423,50 @@ export async function handleDaemonCommand({ flags }: ParsedArgs): Promise<number
   const { startHub } = await import("../daemon.ts");
   const hub = await startHub(port, ctx.memoryDir);
   console.log(`Agency hub listening on ${hub.url}`);
-  console.log(`Publish events: curl -X POST http://localhost:${hub.port}/publish -d '{"type":"agent.joined","payload":{"name":"me"}}'`);
   return new Promise<number>(() => {
     // Run until terminated; SIGINT/SIGTERM default handling tears down the server.
   });
+}
+
+export async function handleDriftCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const { scanCodeDrift } = await import("../drift.ts");
+  const report = scanCodeDrift({ workspaceRoot: ctx.root, memoryDir: ctx.memoryDir });
+
+  if (flags["json"] === "true") {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+
+  console.log(`[Code-Drift Scanner] Scanned ${report.scannedFilesCount} modified/deleted files in Git workspace.`);
+  if (!report.isDrifted) {
+    console.log(`✓ 0 drifted memories. All referenced code symbols and files are intact.`);
+    return 0;
+  }
+
+  console.log(`⚠️ Detected ${report.driftCount} drifted memories:`);
+  for (const d of report.driftedMemories) {
+    console.log(`  - [${d.driftType.toUpperCase()}] ${d.memoryId}: "${d.title}" -> ${d.affectedPath} (action: ${d.suggestedAction})`);
+  }
+  return 0;
+}
+
+export async function handleCompressCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const text = positional.join(" ") || "";
+  if (!text) {
+    return usageError("compress requires text or input");
+  }
+  const { compressPromptContext } = await import("../compress.ts");
+  const level = flags["aggressive"] === "true" ? "aggressive" : "light";
+  const result = compressPromptContext(text, { level });
+
+  if (flags["json"] === "true") {
+    console.log(JSON.stringify(result, null, 2));
+    return 0;
+  }
+
+  console.log(`[Prompt Compression] Tokens: ${result.originalTokens} ➔ ${result.compressedTokens} (${result.savingsPercent}% savings)\n`);
+  console.log(result.compressed);
+  return 0;
 }
