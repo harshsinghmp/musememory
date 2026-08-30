@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Muse Memory vs 29 Agent Memory Providers · Architecture & Feature Matrix</title>
+  <title>Muse Memory vs 34 Agent Memory Providers · Architecture & Feature Matrix</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -124,11 +124,11 @@
     <!-- Header -->
     <header>
       <div class="brand-group">
-        <h1>Muse Memory vs 29 Agent Memory Providers</h1>
+        <h1>Muse Memory vs 34 Agent Memory Providers</h1>
         <p>Architectural Dossier, Concrete Differences & Autonomous Migration Playbook</p>
       </div>
       <div class="stats-bar">
-        <div class="stat-pill">Compared Engines: <span>30 Total</span></div>
+        <div class="stat-pill">Compared Engines: <span>34 Total</span></div>
         <div class="stat-pill">Test Suite: <span style="color:#10b981;">278 Passing (50 Suites)</span></div>
         <div class="stat-pill">Zero Secret Exposure: <span style="color:#10b981;">Vibeguard Inline</span></div>
         <div class="stat-pill">Primary DB: <span style="color:#10b981;">SQLite .memory/memory.db</span></div>
@@ -185,12 +185,12 @@
           <span class="search-icon">🔍</span>
           <input type="text" id="searchInput" placeholder="Search any provider, technology, storage engine, or mapping (press '/' to focus)..." oninput="handleSearch()">
         </div>
-        <div class="results-count" id="resultsCount">Showing 29 External Providers</div>
+        <div class="results-count" id="resultsCount">Showing 34 External Providers</div>
       </div>
       <div class="filter-chips-row">
         <span class="filter-label">Categories:</span>
-        <div class="chip active" data-filter="all" onclick="setCategoryFilter('all', this)">All (29)</div>
-        <div class="chip" data-filter="local-file" onclick="setCategoryFilter('local-file', this)">Local File-First (8)</div>
+        <div class="chip active" data-filter="all" onclick="setCategoryFilter('all', this)">All (34)</div>
+        <div class="chip" data-filter="local-file" onclick="setCategoryFilter('local-file', this)">Local File-First (12)</div>
         <div class="chip" data-filter="graph-rag" onclick="setCategoryFilter('graph-rag', this)">Graph / Vector DB (10)</div>
         <div class="chip" data-filter="agent-harness" onclick="setCategoryFilter('agent-harness', this)">Agent Harnesses (6)</div>
         <div class="chip" data-filter="cloud-service" onclick="setCategoryFilter('cloud-service', this)">Cloud Managed (5)</div>
@@ -789,6 +789,106 @@
         offline: "Local SQLite File",
         detectPath: "~/.local/share/agentmemory/",
         mappingRule: "crystals ➔ confirmed, memories ➔ candidate"
+      },
+      {
+        id: "heimdall",
+        name: "Heimdall",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/ArihantDeva/heimdall",
+        storage: "Tree-sitter AST + Local CPU Embeddings (~/.heimdall/)",
+        scoping: "Cross-Repo Machine-Wide Graph",
+        difference: "Heimdall uses tree-sitter AST extraction and live filesystem runtime verification (STRONG/WEAK/REBUILT/STALE) across all repositories, while Muse Memory provides dual-scope SQLite storage, progressive disclosure token budgeting, and Obsidian wiki compilation.",
+        secrets: "None (Raw file/AST chunking)",
+        retrieval: "Live-verified semantic hits with disk re-check",
+        lifecycle: "Self-healing level-triggered reconciler (REBUILT/STALE)",
+        proactive: "Passive query-time verification",
+        compounding: "Semantic code graph",
+        wiring: "CLI & daemon watcher",
+        offline: "100% Local CPU-only",
+        detectPath: "~/.heimdall/ | heimdall daemon",
+        mappingRule: "verified nodes ➔ confirmed, stale nodes ➔ stale"
+      },
+      {
+        id: "hillock",
+        name: "Hillock",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/roandejager/Hillock",
+        storage: "SQLite Triples + 10,000-D Hyperdimensional Vector (VSA/HDC)",
+        scoping: "Local Document / Knowledge Graph",
+        difference: "Hillock uses Hebbian synaptic co-activation plasticity and late-interaction MaxSim gating to hard-refuse unanswerable queries before calling LLMs, whereas Muse Memory delivers knapsack token budgeting, 80+ agent auto-wiring, and bi-temporal staleness policies.",
+        secrets: "None",
+        retrieval: "Deterministic HDC MaxSim gating (Sub-0.5ms early rejection)",
+        lifecycle: "Hebbian decay weights & SQLite SPO triples",
+        proactive: "Hard refusal gate on unknown facts",
+        compounding: "Multi-hop path reasoning via positional permutation",
+        wiring: "Python CLI / Ollama pipeline",
+        offline: "100% Local (CPU / <1.2 GB VRAM)",
+        detectPath: "hillock.db | ~/.hillock/",
+        mappingRule: "hard triples ➔ confirmed, decayed weights ➔ candidate"
+      },
+      {
+        id: "combs",
+        name: "Combs Wiki",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/combs-network",
+        storage: "Obsidian-Style Markdown Wiki + Interactive 3D/2D Graph",
+        scoping: "Domain Knowledge Base",
+        difference: "Combs is an Obsidian-style web wiki for AI concept exploration with timeline sliders, whereas Muse Memory is a zero-daemon agent cognitive engine with automated post-fix capture, Vibeguard secret scrubbing, and active CURRENT.md invariants.",
+        secrets: "None",
+        retrieval: "Wiki full-text search & graph navigation",
+        lifecycle: "Curated static concept pages",
+        proactive: "None",
+        compounding: "Bi-directional [[wikilinks]] & entity timeline",
+        wiring: "Web SPA / static markdown",
+        offline: "100% Static web & local markdown",
+        detectPath: ".combs/ | wiki/ index",
+        mappingRule: "concept pages ➔ confirmed, unlinked notes ➔ candidate"
+      },
+      {
+        id: "mex",
+        name: "Mex Memory",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/mex-memory/mex",
+        storage: "Structured Scaffold (.mex/) + Tree-sitter Code Graph",
+        scoping: "Repo-Local Project Memory",
+        difference: "Mex provides a structured repo scaffold (.mex/ARCHITECTURE.md, DECISIONS.md) with Git drift detection CLI, whereas Muse Memory pairs AST symbol graphs with dynamic knapsack token packing, 80+ agent connect, and proactive daily briefing governorship.",
+        secrets: "None",
+        retrieval: "Task-aware symbol routing",
+        lifecycle: "Git drift detection (mex check / mex drift)",
+        proactive: "Pre-commit drift warning checks",
+        compounding: "Repo-local Markdown wiki",
+        wiring: "CLI (mex) & MCP server",
+        offline: "100% Local SQLite & Markdown",
+        detectPath: ".mex/ in workspace root",
+        mappingRule: "valid decisions ➔ confirmed, drifted symbols ➔ stale"
+      },
+      {
+        id: "superlocalmemory",
+        name: "SuperLocalMemory",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/qualixar/superlocalmemory",
+        storage: "7-Layer Memory Control Plane (.slm/ & SQLite)",
+        scoping: "Multi-Scope (Personal / Shared / Global)",
+        difference: "SuperLocalMemory implements an enterprise governance control plane with SLM-Mesh and context compression, whereas Muse Memory delivers zero-daemon progressive disclosure token budgeting, inline Vibeguard secret scrubbing, and Obsidian wiki compounding.",
+        secrets: "GDPR Retention & Audit Chain",
+        retrieval: "7-layer multi-channel retrieval & slm_compress",
+        lifecycle: "Multi-stage admission & retention control",
+        proactive: "Context safety & bounded loop triggers",
+        compounding: "Entity Explorer & code graph",
+        wiring: "CLI (slm), MCP (slm_compress), IDE plugins",
+        offline: "100% Local-first (No cloud requirement)",
+        detectPath: ".slm/ | slm CLI",
+        mappingRule: "admitted memories ➔ confirmed, expired nodes ➔ stale"
       }
     ];
 

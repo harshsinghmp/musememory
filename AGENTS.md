@@ -295,11 +295,25 @@ Follow this Git workflow strictly.
 - For production bugs, use `hotfix/*` rather than merging unfinished work from `dev`.
 - Prefer a new revert commit over rewriting shared history.
 
-## Scope of Work
+## Scope of Work & Sprint Lifecycle
 
-- SOW items should be tracked as GitHub issues.
-- Feature PRs should reference the relevant issue (for example, `Closes #123`).
-- Keep PRs focused on a single feature/task where practical.
+All development moves across 4 deterministic lifecycle phases:
+
+```
+[ 📋 Requested ] ──► [ 📅 Planned ] ──► [ ⚡ In Progress ] ──► [ ✅ Done ]
+ (Issues / PRs)     (Sprint Backlog)    (Active PR / Milestone)  (Shipped to Main)
+```
+
+1. **📋 Requested**: Community proposals, PR suggestions, and ecosystem requests pending sprint triage.
+2. **📅 Planned**: Scoped SOW items selected for the upcoming sprint.
+3. **⚡ In Progress**:
+   - Feature branch created from `dev` (`feat/*`).
+   - Dedicated GitHub milestone created and draft PR opened against `dev`.
+   - Item moved to `In Progress` on the README roadmap board.
+4. **✅ Done**:
+   - Tests and static typing pass cleanly (`bun test`, `tsc --noEmit`).
+   - PR merged into `dev`, fast-forwarded to `main`, and milestone closed.
+   - Item moved to `Done` on the README roadmap board.
 
 ## Releases
 

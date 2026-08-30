@@ -24,6 +24,21 @@
 
 ---
 
+## 📑 Table of Contents
+
+- [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
+- [✨ Key Feature Highlights](#-key-feature-highlights)
+- [⚡ Quick Start & Installation](#-quick-start--installation)
+- [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
+- [👤 5 Role Archetypes (`USER.md`)](#-5-zero-fingerprint-role-archetypes-usermd)
+- [🔌 Full CLI Command Matrix](#-full-cli-command-matrix)
+- [🛡️ Vibeguard Zero-Leakage Protocol](#️-vibeguard-zero-leakage-protocol)
+- [🧪 Testing & Verification](#-testing--verification)
+- [🔮 Sprint & Roadmap Board](#-sprint--roadmap-board)
+- [📜 License](#-license)
+
+---
+
 ## 💡 What is Muse Memory? (TL;DR)
 
 Most AI chatbots and coding assistants have **"goldfish memory"**: every time you close a session, switch tasks, or start a new prompt, they forget your project invariants, coding habits, and the hard-fought bug workarounds you solved yesterday.
@@ -428,36 +443,6 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 </details>
 
-<details>
-<summary><b>🔮 SOW & Roadmap Issue Tracker</b> — <i>Click to expand</i></summary>
-
-Every Scope-of-Work item is tracked as a GitHub issue and delivered via pull request. Live status: [issue tracker](https://github.com/harshsinghmp/musememory/issues).
-
-| Status | Item | Tracker |
-| :--- | :--- | :--- |
-| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) — knapsack packing under hard token ceilings | shipped v1.1.0 |
-| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
-| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
-| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
-| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
-| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
-| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
-| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
-| ✅ | Delete Deprecated `MemoryStore` Shim *(shipped v1.5.0)* | [#8](https://github.com/harshsinghmp/musememory/issues/8) |
-| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
-| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
-| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
-| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
-| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
-| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
-| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
-| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
-| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
-| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
-| ✅ | AST Symbol Graph Integration (CodeGraph / Graphify provider) — SOW-107 | [#35](https://github.com/harshsinghmp/musememory/issues/35) |
-
-</details>
-
 ---
 
 ## 🧪 Testing & Verification
@@ -468,6 +453,67 @@ bun test          # 304 passed across 55 test files (1248 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
+
+---
+
+## 🔮 Sprint & Roadmap Board
+
+<details>
+<summary><b>🔮 Sprint & Roadmap Lifecycle (Requested ➔ Planned ➔ In Progress ➔ Done)</b> — <i>Click to expand</i></summary>
+
+Muse Memory features are developed in structured sprints moving across 4 deterministic lifecycle phases. Every sprint is delivered via PR from `dev` to `main` with associated GitHub milestones. Live tracking: [GitHub Issues & Milestones](https://github.com/harshsinghmp/musememory/issues).
+
+```
+[ 📋 Requested ] ──► [ 📅 Planned ] ──► [ ⚡ In Progress ] ──► [ ✅ Done ]
+ (Issues / PRs)     (Sprint Backlog)    (Active PR / Milestone)  (Shipped to Main)
+```
+
+### 📋 Phase 1: Requested (Backlog)
+*Incoming community proposals, agent adapters, and feature requests pending sprint triage:*
+- [ ] Multi-Agent Consensus Verification Protocol (cross-agent memory agreement)
+- [ ] Continuous Background Memory Compaction & Pruning Cron
+- [ ] Export to Local Vector GGUF Embedding Index
+
+### 📅 Phase 2: Planned (Next Sprint: SOW-201–205)
+*Confirmed high-leverage features scheduled for the upcoming sprint:*
+- [ ] **SOW-201**: Live Runtime File & Symbol Verification Gate (instant disk re-check with `STRONG`/`WEAK`/`REBUILT`/`STALE` trust verdicts)
+- [ ] **SOW-202**: Deterministic Relevance Cutoff Gate (hard score threshold $\text{Score} \ge 0.45$ preventing token-wasting context injection)
+- [ ] **SOW-203**: Git Code-Drift Scanner CLI (`memory drift` / `memory check` detecting modified/deleted referenced symbols)
+- [ ] **SOW-204**: Gradient-Free Hebbian Co-Activation Plasticity (associative memory weight reinforcement for co-retrieved concepts)
+- [ ] **SOW-205**: Semantic Memory Prompt Compression (lossless markdown stripping reducing injected prompt tokens by 30–40%)
+
+### ⚡ Phase 3: In Progress (Active Sprint / PR)
+*Currently under active development on a dedicated feature branch:*
+- *(None — Sprint backlog planned and ready for initiation)*
+
+### ✅ Phase 4: Done (Shipped to Production)
+*All completed, tested, and released milestones:*
+| Status | Milestone / Feature | Shipped Release / Tracker |
+| :--- | :--- | :--- |
+| ✅ | Turnkey Agent Skills Suite (`muse-ground`, `muse-capture`, etc.) | shipped v1.7.0 |
+| ✅ | AST Symbol Graph Integration (CodeGraph / Graphify) | [#35](https://github.com/harshsinghmp/musememory/issues/35) / v1.7.0 |
+| ✅ | Zero-Friction Installation Lifecycle Fix | shipped v1.7.1 |
+| ✅ | Proactive Nudges & Check-ins (`memory nudge`) — SOW-101 | [#28](https://github.com/harshsinghmp/musememory/issues/28) |
+| ✅ | Daily Briefing & Routines Scheduler (cron-invoked, no daemon) — SOW-102 | [#29](https://github.com/harshsinghmp/musememory/issues/29) |
+| ✅ | Open-Loop / Task Extraction from Transcripts — SOW-103 | [#30](https://github.com/harshsinghmp/musememory/issues/30) |
+| ✅ | Calendar / Time-Aware Follow-ups (`due_at` / `expires_at`) — SOW-104 | [#31](https://github.com/harshsinghmp/musememory/issues/31) |
+| ✅ | muse-agents ↔ musememory Integration Contract (`--for-agent`) — SOW-106 | [#33](https://github.com/harshsinghmp/musememory/issues/33) |
+| ✅ | Dynamic Prompt Token Budgeter (`--token-budget N`) | shipped v1.1.0 |
+| ✅ | Scene-Based Hierarchical Consolidation (`memory consolidate`) | [#1](https://github.com/harshsinghmp/musememory/issues/1) |
+| ✅ | Autonomous Verification Oracle (`memory verify <id>`) | [#2](https://github.com/harshsinghmp/musememory/issues/2) |
+| ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
+| ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
+| ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
+| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
+| ✅ | Delete Deprecated `MemoryStore` Shim | [#8](https://github.com/harshsinghmp/musememory/issues/8) / v1.5.0 |
+| ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |
+| ✅ | 3-Layer Progressive Disclosure | [#10](https://github.com/harshsinghmp/musememory/issues/10) |
+| ✅ | Bi-Temporal Reinforcement Feedback | [#11](https://github.com/harshsinghmp/musememory/issues/11) |
+| ✅ | Ambient Open-Loop Tracker | [#12](https://github.com/harshsinghmp/musememory/issues/12) |
+| ✅ | Knowledge Graph UI v2 | [#13](https://github.com/harshsinghmp/musememory/issues/13) |
+
+</details>
 
 ---
 
