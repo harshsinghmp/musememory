@@ -5,6 +5,22 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-31
+
+### Added
+- **Universal Multi-Agent Transcript Harvester & Auto-Learner (`memory learn` / `memory sync-chats`)**:
+  - Automatically probes the host machine for active AI agent session transcripts across 80+ platforms (Antigravity, Gemini CLI, Claude Code, OpenCode, Hermes, Goose, Codex, Cursor, etc.).
+  - Extracts conversational fixes, architectural decisions, hard constraints, user preferences, and open loops from natural language turns without requiring rigid markdown formatting.
+  - Incrementally indexes chats with content-hash ledgers (`.memory/harvested-transcripts.json`) to guarantee zero duplicate re-harvests.
+- **Proactive Background Auto-Sync**:
+  - `memory ui` automatically synchronizes recent agent transcripts on launch so the visual graph reflects latest conversations immediately.
+  - `get_context` in MCP automatically triggers non-blocking incremental transcript harvests on session start.
+  - `memory doctor` surfaces real-time unharvested chat counts and diagnostic remediation steps.
+- **Enhanced MCP Integration**:
+  - `memory_harvest` tool now supports `{ all: true }` and `{ auto: true }` to trigger machine-wide background harvests directly from any connected IDE/CLI agent.
+
+---
+
 ## [1.9.0] - 2026-08-31
 
 ### Added

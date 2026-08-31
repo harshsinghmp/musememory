@@ -431,6 +431,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `context` | `[query] [--token-budget N] [--limit N]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--token-budget N] [--type T]` | Ranked multi-factor token search with score breakdown. |
 | `search-transcript` | `<query> [file.jsonl] [--window N]` | Full-text search past transcripts with dialogue context windows. |
+| `learn` / `sync-chats` | `[--confirm] [--force] [--max N]` | **Universal auto-learner**: auto-discovers and distills memories from all agent chats across host machine. |
 | `harvest` | `<text\|file> --project P [--confirmed]` | Distill conversation turns into structured fix/decision memory units. |
 | `import-transcript` | `<file.jsonl> [--project P] [--confirmed]` | Ingest raw `.jsonl` session transcripts from coding agents. |
 | `capture` / `propose` | `<text> --project P [--title T] [--type T]` | Propose a memory entry with inline Vibeguard secret inspection. |

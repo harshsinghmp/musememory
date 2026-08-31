@@ -16,6 +16,7 @@ import {
   handleCompressCommand,
 } from "./cli/ecosystem.ts";
 import { handleUpgradeCommand } from "./cli/upgrade.ts";
+import { handleLearnCommand } from "./harvester.ts";
 import {
   handleContextCommand,
   handleSearchCommand,
@@ -116,6 +117,7 @@ Ecosystem, Migration & Connectivity:
   agents / detect-agents        Scan workstation for 80+ coding agent platforms
   detect                        Scan machine for 24+ external memory formats
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
+  learn / sync-chats [--confirm] Auto-discover and harvest memories from all agent chats across machine
   harvest <file|text> --project P Distill conversation transcripts into structured memory units
   harvest-auto [--from <glob>] [--project P] Harvest inbox transcripts as candidates and archive them
   hook install --git            Install the harvester as a git pre-commit hook (never clobbers)
@@ -188,6 +190,9 @@ export async function main(argv: string[]): Promise<number> {
       return handleSearchTranscriptCommand(parsed);
     case "harvest":
       return handleHarvestCommand(parsed);
+    case "learn":
+    case "sync-chats":
+      return handleLearnCommand(parsed);
     case "harvest-auto":
       return handleHarvestAutoCommand(parsed);
     case "hook":

@@ -38,6 +38,11 @@ export interface DoctorReport {
     connectedList: string[];
     unwiredList: string[];
   };
+  transcripts: {
+    discoveredCount: number;
+    harvestedCount: number;
+    unharvestedCount: number;
+  };
   runtime: {
     nodeVersion: string;
     bunVersion?: string;
@@ -130,7 +135,14 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   const connected = installed.filter((a) => a.connected);
   const unwired = installed.filter((a) => !a.connected);
 
-  // 4. Runtime & Binary checks
+  // 4. Transcripts & Auto-Learner status
+  const { discoverAgentTranscripts, getHarvestedTranscriptLedger } = await import("./harvester.ts");
+  const discoveredFiles = discoverAgentTranscripts();
+  const ledger = getHarvestedTranscriptLedger(storagePath);
+  const harvestedFiles = Object.keys(ledger);
+  const unharvestedCount = discoveredFiles.filter((f) => !ledger[f]).length;
+
+  // 5. Runtime & Binary checks
   const memBin = findBinary("memory", home) || findBinary("musememory", home);
   const bunVer = typeof (globalThis as any).Bun !== "undefined" ? (globalThis as any).Bun.version : undefined;
 
@@ -164,6 +176,11 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       unwiredCount: unwired.length,
       connectedList: connected.map((a) => a.name),
       unwiredList: unwired.map((a) => a.name),
+    },
+    transcripts: {
+      discoveredCount: discoveredFiles.length,
+      harvestedCount: harvestedFiles.length,
+      unharvestedCount,
     },
     runtime: {
       nodeVersion: process.version,
@@ -223,6 +240,17 @@ export function printDoctorReport(report: DoctorReport): void {
   if (report.agents.unwiredList.length > 0) {
     console.log(`  [!] Installed (Not Wired): ${report.agents.unwiredList.join(", ")}`);
     console.log(`     -> Run 'memory connect --all' or 'npx musememory connect --all' to wire them.`);
+  }
+
+  // Auto-Learner & Transcripts
+  console.log(`\n[AUTO-LEARNER] Agent Chat Transcripts & Distillation:`);
+  console.log(`  Discovered Transcripts on Disk: ${report.transcripts.discoveredCount}`);
+  console.log(`  Harvested / Indexed:            ${report.transcripts.harvestedCount}`);
+  if (report.transcripts.unharvestedCount > 0) {
+    console.log(`  [!] New Un-Harvested Chats:     ${report.transcripts.unharvestedCount}`);
+    console.log(`     -> Run 'memory learn' or 'memory sync-chats' to auto-distill learnings from recent AI interactions.`);
+  } else {
+    console.log(`  [OK] All discovered chat transcripts are synchronized.`);
   }
 
   // Runtime

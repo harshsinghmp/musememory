@@ -726,6 +726,14 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             } catch {}
           }
 
+          // Auto-harvest recent agent transcripts in background (non-blocking)
+          if (activeMemoryDir) {
+            try {
+              const { harvestAllAgentTranscripts } = await import("./harvester.ts");
+              harvestAllAgentTranscripts(activeStore, { memoryDir: activeMemoryDir, maxFiles: 3 });
+            } catch {}
+          }
+
           let finalMarkdown = formatted.markdown;
           if (a.compress === true) {
             const { compressPromptContext } = await import("./compress.ts");
@@ -818,9 +826,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           }
         }
       case "memory_harvest": {
+        if (a.all === true || a.auto === true || !a.text) {
+          const { harvestAllAgentTranscripts } = await import("./harvester.ts");
+          const harvestRes = harvestAllAgentTranscripts(activeStore, {
+            memoryDir: activeMemoryDir,
+            confirmed: a.confirmed === true,
+            project: a.project ? String(a.project) : undefined,
+          });
+          return toolResult(harvestRes);
+        }
         const created = harvestMemories(activeStore, {
           text: String(a.text),
-          project: String(a.project),
+          project: String(a.project || "default"),
           confirmed: a.confirmed === true,
         });
         return toolResult({ harvested_count: created.length, entries: created });
