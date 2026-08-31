@@ -295,6 +295,12 @@ Follow this Git workflow strictly.
 - For production bugs, use `hotfix/*` rather than merging unfinished work from `dev`.
 - Prefer a new revert commit over rewriting shared history.
 
+## Commit Message Standard
+
+- **Subject (≤50 chars)**: Capitalized imperative Conventional Commit (e.g., `feat(drift): Add AST symbol drift scanner`, never `Added scanner` or `Fix stuff`).
+- **Body (≤72 chars/line)**: Focus on *why* and non-obvious rationale instead of restating the diff; avoid pronouns (`I`, `we`) and meta-phrasing (`This commit/PR`).
+- **Issue References**: Link issues at the bottom (e.g., `Closes #123`, `Resolves #456`).
+
 ## Scope of Work & Sprint Lifecycle
 
 All development moves across 4 deterministic lifecycle phases:
