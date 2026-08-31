@@ -69,6 +69,7 @@ musememory/
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine
 │   ├── graph.ts            # CodeGraph AST integration adapter
 │   ├── harvest.ts          # Chat/transcript distillation (re-exports snapshot fns)
+│   ├── harvester.ts        # Universal agent transcript discovery and auto-learner engine
 │   ├── mcp.ts              # Model Context Protocol stdio server
 │   ├── prompt.ts           # Interactive terminal select prompts & wizard
 │   ├── retrieval.ts        # Unified Context & Retrieval Engine with knapsack token budgeting
@@ -250,7 +251,7 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 | `memory_mark_stale`              | **Deprecation**           | Flag decaying knowledge with deprecation rationale.                                              |
 | `memory_reject`                  | **Hypothesis Refutation** | Mark invalidated hypotheses as rejected.                                                         |
 | `memory_delete`                  | **Purge**                 | Permanently delete entry and record audit trail log.                                             |
-| `memory_harvest`                 | **Session End**           | Distill chat transcript into structured fix/decision memory units.                               |
+| `memory_harvest`                 | **Session End**           | Distill chat transcripts into memory units (supports `{ all: true }` machine-wide auto-learn).  |
 | `memory_import_transcript`       | **Transcript Sync**       | Ingest `.jsonl` transcript and auto-bind memories to session nodes.                              |
 | `memory_audit`                   | **Governance**            | Query append-only audit trail.                                                                   |
 | `memory_detect_agents`           | **Onboarding**            | Scan workstation for 80+ coding agent installations.                                             |

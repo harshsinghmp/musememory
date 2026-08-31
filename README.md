@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-319%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-322%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -24,8 +24,19 @@
 
 ---
 
+## 🚀 What's New in v1.10.0
+
+- **🤖 Universal Multi-Agent Chat Auto-Learner (`memory learn` / `memory sync-chats`)**: Automatically probes the host machine for active conversation transcripts across 80+ platforms (Antigravity, Gemini CLI, Claude Code, OpenCode, Hermes, Goose, Codex, Cursor, etc.).
+- **💬 Natural Language Semantic Distillation**: Extracts bug resolutions, architectural choices, hard invariants, preferences, and open loops directly from conversational problem-solving without requiring rigid markdown formatting.
+- **⚡ Zero-Duplicate Incremental Sync**: Built-in content-hash ledger (`.memory/harvested-transcripts.json`) guarantees sub-millisecond scans and eliminates duplicate re-ingestion.
+- **🔄 Proactive Background Sync**: `memory ui` and MCP `get_context` auto-synchronize recent agent conversations on startup.
+- **🩺 Enhanced Diagnostic Doctor**: `memory doctor` surfaces un-harvested transcript metrics with one-click remediation guidance.
+
+---
+
 ## 📑 Table of Contents
 
+- [🚀 What's New in v1.10.0](#-whats-new-in-v1100)
 - [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
 - [✨ Key Feature Highlights](#-key-feature-highlights)
 - [⚡ Quick Start & Installation](#-quick-start--installation)
