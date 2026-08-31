@@ -441,6 +441,16 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
   const port = flags["port"] ? parseInt(flags["port"], 10) : 2222;
+
+  // Auto-harvest recent un-indexed agent chat transcripts
+  try {
+    const { harvestAllAgentTranscripts } = await import("../harvester.ts");
+    const harvestRes = harvestAllAgentTranscripts(ctx.store, { memoryDir: ctx.memoryDir });
+    if (harvestRes.harvestedFilesCount > 0) {
+      console.log(`[UI Auto-Sync] Distilled ${harvestRes.memoriesImported} new memories from ${harvestRes.harvestedFilesCount} agent transcript(s).`);
+    }
+  } catch {}
+
   const { startUiServer } = await import("../ui.ts");
   const srv = await startUiServer({
     port,

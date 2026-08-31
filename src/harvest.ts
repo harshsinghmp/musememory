@@ -58,9 +58,30 @@ export function extractHarvestUnits(text: string): HarvestedUnit[] {
       "",
     );
 
+    // 1. Explicit marker match (e.g. "### Fix: ...", "Decision: ...", "Hard rule: ...")
     const typeMatch = speakerStripped.match(
-      /^(?:#{1,6}\s+|[-*]\s+)?\*{0,2}(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule)\*{0,2}\s*[:\-\u2013]\s*(.*)$/i,
+      /^(?:#{1,6}\s+|[-*]\s+)?\*{0,2}(fix|failure|decision|architecture|constraint|operation|preference|discovery|outcome|root cause|learned|rule|solution|resolution|workaround|hard rule|policy)\*{0,2}\s*[:\-\u2013]\s*(.*)$/i,
     );
+
+    // 2. Natural language cognitive insight patterns
+    let naturalType: MemoryType | null = null;
+    let naturalContent = "";
+
+    if (!typeMatch) {
+      if (/\b(?:resolved|fixed|patched|worked around)\s+(?:the\s+)?([^.\n]+)/i.test(speakerStripped)) {
+        naturalType = "fix";
+        naturalContent = speakerStripped;
+      } else if (/\b(?:decided|chose|selected|agreed)\s+to\s+([^.\n]+)/i.test(speakerStripped)) {
+        naturalType = "decision";
+        naturalContent = speakerStripped;
+      } else if (/\b(?:must\s+always|must\s+never|never\s+commit|you\s+must\s+never|do\s+not\s+allow)\s+([^.\n]+)/i.test(speakerStripped)) {
+        naturalType = "constraint";
+        naturalContent = speakerStripped;
+      } else if (/\b(?:user\s+prefers|prefers\s+using|prefers\s+to)\s+([^.\n]+)/i.test(speakerStripped)) {
+        naturalType = "preference";
+        naturalContent = speakerStripped;
+      }
+    }
 
     if (typeMatch) {
       flush();
@@ -70,6 +91,11 @@ export function extractHarvestUnits(text: string): HarvestedUnit[] {
       if (currentTitle) {
         currentBuffer.push(currentTitle);
       }
+    } else if (naturalType && naturalContent) {
+      flush();
+      currentType = naturalType;
+      currentTitle = naturalContent.slice(0, 80);
+      currentBuffer.push(naturalContent);
     } else if (trimmed.match(/^(?:user|assistant|human|system|agent|client|developer)\s*[:\-\u2013]/i)) {
       flush();
     } else if (currentType !== null) {
@@ -85,16 +111,21 @@ function normalizeHarvestType(raw: string): MemoryType {
   switch (raw) {
     case "fix":
     case "root cause":
+    case "solution":
+    case "resolution":
+    case "workaround":
       return "fix";
     case "failure":
       return "failure";
     case "decision":
     case "outcome":
     case "rule":
+    case "policy":
       return "decision";
     case "architecture":
       return "architecture";
     case "constraint":
+    case "hard rule":
       return "constraint";
     case "operation":
       return "operation";
