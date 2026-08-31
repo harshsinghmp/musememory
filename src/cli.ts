@@ -15,6 +15,7 @@ import {
   handleDriftCommand,
   handleCompressCommand,
 } from "./cli/ecosystem.ts";
+import { handleUpgradeCommand } from "./cli/upgrade.ts";
 import {
   handleContextCommand,
   handleSearchCommand,
@@ -67,6 +68,7 @@ Usage:
 
 Core Memory Lifecycle Commands:
   install [dir]                 Run interactive onboarding wizard & auto-wire installed agents
+  upgrade / update [--check]    Auto-fetch latest release, self-heal, and sync agent platforms
   doctor [dir]                  Run comprehensive ecosystem health diagnostic
   uninstall [agent] [--purge]   Disconnect agents and optionally purge .memory data
   init [dir]                    Initialize .memory/ in workspace or current dir
@@ -141,6 +143,9 @@ export async function main(argv: string[]): Promise<number> {
     // Ecosystem & Installation
     case "install":
       return handleInstallCommand(parsed);
+    case "upgrade":
+    case "update":
+      return handleUpgradeCommand(parsed);
     case "doctor":
       return handleDoctorCommand(parsed);
     case "uninstall":

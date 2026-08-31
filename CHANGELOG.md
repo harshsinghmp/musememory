@@ -5,6 +5,21 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-31
+
+### Added
+- **Autonomous Upgrade & Self-Healing Engine (`memory upgrade` / `memory update`)**:
+  - Automatically probes host environment to detect active package managers (`bun`, `npm`, `pnpm`, `yarn`).
+  - Fetches the latest published release directly from npm registry and executes seamless global upgrades.
+  - Automatically heals corrupted/missing files (`.memory/`, `CURRENT.md`, `USER.md`), auto-wires newly installed agent platforms, and re-indexes AST symbol graphs.
+  - Added `--check` flag to inspect upstream updates without applying.
+- **Gamified ASCII Level-Up & Onboarding Matrix**:
+  - Integrated 5-level animated progress loaders (`[████████████] 100%`) with Level milestones across `memory install`, `memory upgrade`, and `memory uninstall`.
+  - TTY-aware with graceful ANSI carriage return animations and clean CI logging fallbacks.
+- **Comprehensive Upgrading & Self-Healing Maintenance Guide**: Detailed cross-toolchain upgrade instructions and verification procedures in `README.md`.
+
+---
+
 ## [1.8.0] - 2026-08-31
 
 ### Added

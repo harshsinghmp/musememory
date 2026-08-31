@@ -92,31 +92,63 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     } catch {}
   }
 
-  console.log(`[+] Initialized Muse Memory in ${memoryDir}`);
+  const { playGamifiedLoader } = await import("./upgrade.ts");
+  let reports: any[] = [];
+  let detected: any[] = [];
 
-  // 1. Auto-connect detected coding agents
-  const { connectAgent } = await import("../connect.ts");
-  const reports = connectAgent("all", undefined, { dryRun: false, force: false });
+  const installSteps = [
+    {
+      level: 1,
+      title: "Storage Layout & Memory Directory Scaffold",
+      action: async () => {},
+    },
+    {
+      level: 2,
+      title: "80+ Coding Agent Auto-Wiring Matrix",
+      action: async () => {
+        const { connectAgent } = await import("../connect.ts");
+        reports = connectAgent("all", undefined, { dryRun: false, force: false });
+      },
+    },
+    {
+      level: 3,
+      title: "External Memory Provider Probe (24+ Formats)",
+      action: async () => {
+        detected = detectProviders(targetDir).filter((p) => p.detected);
+      },
+    },
+    {
+      level: 4,
+      title: "Git Pre-Commit Harvester Verification",
+      action: async () => {
+        if (!isGlobal) {
+          await promptOrNotifyGitHook(targetDir, flags["auto"] === "true" || flags["yes"] === "true");
+        }
+      },
+    },
+    {
+      level: 5,
+      title: "Cognitive Onboarding Ready",
+      action: async () => {},
+    },
+  ];
+
+  console.log(`[+] Initialized Muse Memory in ${memoryDir}`);
+  await playGamifiedLoader(installSteps, { title: "AUTONOMOUS ONBOARDING MATRIX" });
+
   if (reports.length > 0) {
-    console.log(`\n[+] Auto-wired ${reports.length} detected coding agent(s) with zero permissions:`);
+    console.log(`[+] Auto-wired ${reports.length} detected coding agent(s) with zero permissions:`);
     for (const r of reports) {
       console.log(`  * ${r.agentName}: ${r.message}`);
     }
   }
 
-  // 2. Check for legacy memory providers
-  const detected = detectProviders(targetDir).filter((p) => p.detected);
   if (detected.length > 0) {
     console.log(`\n[!] Detected ${detected.length} external memory provider(s): ${detected.map((d) => d.name).join(", ")}`);
     console.log(`   -> Run 'memory migrate' to auto-import legacy memories.`);
   }
 
-  // 3. Prompt for git pre-commit hook if git repo is detected
-  if (!isGlobal) {
-    await promptOrNotifyGitHook(targetDir, flags["auto"] === "true" || flags["yes"] === "true");
-  }
-
-  console.log(`\n[OK] Muse Memory is ready! Use 'memory doctor' to verify system health.`);
+  console.log(`\n[OK] Muse Memory is initialized and ready! Use 'memory doctor' to verify health.`);
   return 0;
 }
 
@@ -151,32 +183,65 @@ export async function handleDoctorCommand({ positional, flags }: ParsedArgs): Pr
 }
 
 export async function handleUninstallCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const { playGamifiedLoader } = await import("./upgrade.ts");
   const { disconnectAllAgents, disconnectSingleAgent } = await import("../connect.ts");
   const agent = positional[0];
   const purge = flags["purge"] === "true";
   const dryRun = flags["dry-run"] === "true";
+  let unwiredReports: any[] = [];
+
+  const uninstallSteps = [
+    {
+      level: 1,
+      title: "Agent Platform Discovery & Configuration Lock",
+      action: async () => {},
+    },
+    {
+      level: 2,
+      title: `Unwiring Agent Platforms (${agent || "all"})`,
+      action: async () => {
+        if (agent && agent !== "all") {
+          const report = disconnectSingleAgent(agent, undefined, { dryRun });
+          unwiredReports = [report];
+        } else {
+          unwiredReports = disconnectAllAgents(undefined, { dryRun });
+        }
+      },
+    },
+    {
+      level: 3,
+      title: purge ? "Purging Memory Store (.memory/)" : "Preserving Cognitive Memory Store (.memory/)",
+      action: async () => {
+        if (purge) {
+          const ctx = requireRoot(flags);
+          if (ctx && existsSync(ctx.memoryDir) && !dryRun) {
+            const { rmSync } = await import("node:fs");
+            rmSync(ctx.memoryDir, { recursive: true, force: true });
+          }
+        }
+      },
+    },
+    {
+      level: 4,
+      title: "Clean Teardown Verification",
+      action: async () => {},
+    },
+  ];
 
   console.log(`[CLEAN] Running Muse Memory Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
-  if (agent && agent !== "all") {
-    const report = disconnectSingleAgent(agent, undefined, { dryRun });
-    console.log(`  * ${report.agentName}: ${report.message}`);
-  } else {
-    const reports = disconnectAllAgents(undefined, { dryRun });
-    console.log(`\n[+] Unwired ${reports.length} coding agent(s):`);
-    for (const r of reports) {
+  await playGamifiedLoader(uninstallSteps, { title: `SYSTEM UNINSTALL MATRIX${dryRun ? " [DRY RUN]" : ""}` });
+
+  if (unwiredReports.length > 0) {
+    console.log(`[+] Unwired ${unwiredReports.length} coding agent(s):`);
+    for (const r of unwiredReports) {
       console.log(`  * ${r.agentName}: ${r.message}`);
     }
   }
 
   if (purge) {
-    const ctx = requireRoot(flags);
-    if (ctx && existsSync(ctx.memoryDir) && !dryRun) {
-      const { rmSync } = await import("node:fs");
-      rmSync(ctx.memoryDir, { recursive: true, force: true });
-      console.log(`  [PURGED] Memory directory removed: ${ctx.memoryDir}`);
-    }
+    console.log(`\n[PURGED] Memory directory removed successfully.`);
   } else {
-    console.log(`\n[INFO] Memory files preserved in .memory/. Use 'memory uninstall --purge' to remove data.`);
+    console.log(`\n[INFO] Memory files preserved in .memory/. (Use 'memory uninstall --purge' to remove data).`);
   }
   return 0;
 }

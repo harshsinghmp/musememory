@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-315%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-319%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -29,6 +29,7 @@
 - [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
 - [✨ Key Feature Highlights](#-key-feature-highlights)
 - [⚡ Quick Start & Installation](#-quick-start--installation)
+- [🔄 Upgrading & Self-Healing Maintenance](#-upgrading--self-healing-maintenance)
 - [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
 - [👤 5 Role Archetypes (`USER.md`)](#-5-zero-fingerprint-role-archetypes-usermd)
 - [🔌 Full CLI Command Matrix](#-full-cli-command-matrix)
@@ -137,7 +138,61 @@ docker build -t musememory .
 
 > [!NOTE]
 > ### 📊 How does Muse Memory compare to other solutions?
-> Explore our interactive, table-free **[30-System Architectural Comparison Dossier](musememory-comparison.html)** (`musememory-comparison.html`) to inspect concrete architectural differentials and one-click migration recipes against 29 external memory engines (Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, etc.).
+---
+
+## 🔄 Upgrading & Self-Healing Maintenance
+
+Keep Muse Memory and all your connected AI coding agents at peak cognitive performance with automated updates and self-healing environment repairs.
+
+### ⚡ 1-Command Autonomous Upgrade (`memory upgrade`)
+
+Run `memory upgrade` (or `npx musememory upgrade`) to trigger the **Gamified Level-Up Matrix**:
+
+```bash
+memory upgrade
+# or with NPX zero-install:
+npx musememory upgrade
+```
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  🧠 MUSE MEMORY · SYSTEM LEVEL-UP & RECOVERY MATRIX              │
+└──────────────────────────────────────────────────────────────────┘
+
+  [████████████████████] 100% ✓ LEVEL 1: Vibeguard Security & Credential Audit [OK]
+  [████████████████████] 100% ✓ LEVEL 2: Package Manager Sync (bun/npm) [OK]
+  [████████████████████] 100% ✓ LEVEL 3: Synaptic Storage & Schema Alignment [OK]
+  [████████████████████] 100% ✓ LEVEL 4: 80+ Agent Platforms & Skills Auto-Wiring [OK]
+  [████████████████████] 100% ✓ LEVEL 5: Cognitive Ascendance Complete [OK]
+
+🏆 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!
+```
+
+#### What `memory upgrade` automatically handles:
+1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
+2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
+3. **80+ Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
+4. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
+
+---
+
+### 📦 Manual Package Manager Upgrades
+
+| Toolchain / Runtime | Upgrade Command | Verification |
+| :--- | :--- | :--- |
+| **Bun** (Ultra-Fast) | `bun add -g musememory@latest` | `memory doctor` |
+| **NPM** (Standard Node) | `npm install -g musememory@latest` | `memory doctor` |
+| **PNPM** | `pnpm add -g musememory@latest` | `memory doctor` |
+| **Yarn** | `yarn global add musememory@latest` | `memory doctor` |
+| **NPX** (Zero-Install) | `npx musememory@latest upgrade` | `npx musememory doctor` |
+
+```bash
+# Check if updates are available without applying
+memory upgrade --check
+
+# Force re-installation and complete platform re-wiring
+memory upgrade --force
+```
 
 ---
 
@@ -449,7 +504,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 315 passed across 56 test files (1282 assertions)
+bun test          # 319 passed across 57 test files (1294 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
