@@ -312,6 +312,34 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      if (pathname === "/api/refresh" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          let harvestedCount = 0;
+          if (body.harvest === true) {
+            try {
+              const { harvestAllAgentTranscripts } = await import("./harvester.ts");
+              const h = harvestAllAgentTranscripts(opts.store, { memoryDir: opts.memoryDir });
+              harvestedCount = h.memoriesImported;
+            } catch {}
+          }
+          const memories = list(opts.store);
+          const activeState = WorkspaceGovernor.getActiveState(opts.store, opts.memoryDir);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: true,
+            totalMemories: memories.length,
+            activeConstraints: activeState.constraints.length,
+            harvestedCount,
+            timestamp: new Date().toISOString(),
+          }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+        return;
+      }
+
       if (pathname === "/api/export-html" && req.method === "GET") {
         const html = exportStandaloneHtml(opts.store);
         res.setHeader("Content-Disposition", 'attachment; filename="musememory-graph.html"');
@@ -444,6 +472,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
     .btn-icon { background: rgba(255,255,255,0.04); border: 1px solid var(--panel-border); color: var(--text-muted); padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; }
     .btn-icon:hover { background: rgba(255,255,255,0.09); color: #fff; border-color: rgba(255,255,255,0.18); }
+    .btn-refresh { background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; }
+    .btn-refresh:hover { background: rgba(99, 102, 241, 0.24); color: #fff; border-color: rgba(99, 102, 241, 0.6); }
+    .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+    .refresh-icon.spinning { display: inline-block; animation: spin 0.8s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
     .btn-primary { background: var(--accent-gradient); color: #fff; border: none; padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-glow); }
     .btn-primary:hover { opacity: 0.92; transform: translateY(-1px); }
     
@@ -585,7 +618,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     </div>
     
     <div class="header-actions">
-      <div class="status-badge"><div class="status-dot"></div>[LIVE] Port 2222 Active</div>
+      <button class="btn-icon btn-refresh" id="refreshBtn" onclick="refreshMemories()" title="Refresh and sync active constraints, handoff state, and prior memories">
+        <span class="refresh-icon" id="refreshIcon">🔄</span>
+        <span id="refreshLabel">Refresh</span>
+      </button>
+      <div class="status-badge"><div class="status-dot"></div>[LIVE] Active</div>
       <button class="btn-icon" onclick="exportDataHtml()">⬇ Export HTML</button>
     </div>
   </header>
@@ -785,6 +822,36 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     let timelineCutoff = null;
     let simAlpha = 1;
     let graphLoopStarted = false;
+
+    async function refreshMemories() {
+      const icon = document.getElementById('refreshIcon');
+      const label = document.getElementById('refreshLabel');
+      const btn = document.getElementById('refreshBtn');
+      if (icon) icon.classList.add('spinning');
+      if (label) label.textContent = 'Syncing...';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ harvest: true }),
+        });
+        const info = await res.json();
+        await loadData();
+        const memCount = info.totalMemories ?? allMemories.length;
+        const msg = info.harvestedCount > 0
+          ? '✓ Refreshed! Synced ' + info.harvestedCount + ' new + ' + memCount + ' total memories & active state.'
+          : '✓ Refreshed! Loaded ' + memCount + ' memories & active state.';
+        flash(msg);
+      } catch (err) {
+        flash('Refresh failed: ' + (err && err.message ? err.message : String(err)), true);
+      } finally {
+        if (icon) icon.classList.remove('spinning');
+        if (label) label.textContent = 'Refresh';
+        if (btn) btn.disabled = false;
+      }
+    }
 
     async function loadData() {
       try {

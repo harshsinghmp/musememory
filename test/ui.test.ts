@@ -84,5 +84,31 @@ describe("embedded web UI server", () => {
     srv.close();
     cleanup(root);
   });
+
+  test("serves Refresh button and /api/refresh endpoint", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+
+    // Check HTML contains Refresh button
+    const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
+    expect(html).toContain('id="refreshBtn"');
+    expect(html).toContain("refreshMemories()");
+
+    // Test POST /api/refresh
+    const refreshRes = await fetch(`http://localhost:${srv.port}/api/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ harvest: false }),
+    });
+    expect(refreshRes.status).toBe(200);
+    const data = await refreshRes.json();
+    expect(data.success).toBe(true);
+    expect(data.totalMemories).toBeGreaterThan(0);
+    expect(data).toHaveProperty("activeConstraints");
+
+    srv.close();
+    cleanup(root);
+  });
 });
 
