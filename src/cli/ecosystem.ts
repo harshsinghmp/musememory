@@ -441,15 +441,7 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
   const port = flags["port"] ? parseInt(flags["port"], 10) : 2222;
-
-  // Auto-harvest recent un-indexed agent chat transcripts
-  try {
-    const { harvestAllAgentTranscripts } = await import("../harvester.ts");
-    const harvestRes = harvestAllAgentTranscripts(ctx.store, { memoryDir: ctx.memoryDir });
-    if (harvestRes.harvestedFilesCount > 0) {
-      console.log(`[UI Auto-Sync] Distilled ${harvestRes.memoriesImported} new memories from ${harvestRes.harvestedFilesCount} agent transcript(s).`);
-    }
-  } catch {}
+  const sync = flags["sync"] === "true";
 
   const { startUiServer } = await import("../ui.ts");
   const srv = await startUiServer({
@@ -459,6 +451,20 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   });
   console.log(`[UI] Muse Memory Visual Dashboard running at: http://localhost:${srv.port}`);
   console.log(`Press Ctrl+C to stop.`);
+
+  // Non-blocking auto-harvest recent un-indexed agent chat transcripts in the background
+  if (sync) {
+    setTimeout(async () => {
+      try {
+        const { harvestAllAgentTranscripts } = await import("../harvester.ts");
+        const harvestRes = harvestAllAgentTranscripts(ctx.store, { memoryDir: ctx.memoryDir });
+        if (harvestRes.harvestedFilesCount > 0) {
+          console.log(`[UI Auto-Sync] Distilled ${harvestRes.memoriesImported} new memories from ${harvestRes.harvestedFilesCount} agent transcript(s).`);
+        }
+      } catch {}
+    }, 100);
+  }
+
   await new Promise<void>(() => {});
   return 0;
 }

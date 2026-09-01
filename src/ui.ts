@@ -791,13 +791,15 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         if (window.STANDALONE_DATA) {
           allMemories = window.STANDALONE_DATA;
         } else {
-          const res = await fetch('/api/memories');
-          allMemories = await res.json();
-          fetchStats();
-          fetchCurrentState();
-          fetchWikiPages();
-          fetchUserProfile();
-          loadAudit();
+          const [memRes] = await Promise.all([
+            fetch('/api/memories'),
+            fetchStats(),
+            fetchCurrentState(),
+            fetchWikiPages(),
+            fetchUserProfile(),
+            loadAudit(),
+          ]);
+          allMemories = await memRes.json();
         }
         renderList();
         initGraph();
@@ -1109,11 +1111,13 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     }
 
     function simulateStep() {
-      if (nodes3d.length === 0) return;
+      if (nodes3d.length === 0 || simAlpha <= 0.04) return;
       const alpha = simAlpha;
+      const nodeMap = new Map(nodes3d.map(n => [n.id, n]));
       for (let i = 0; i < nodes3d.length; i++) {
+        const a = nodes3d[i];
         for (let j = i + 1; j < nodes3d.length; j++) {
-          const a = nodes3d[i], b = nodes3d[j];
+          const b = nodes3d[j];
           let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
           let dist2 = dx * dx + dy * dy + dz * dz + 0.01;
           const force = (2400 * alpha) / dist2;
@@ -1124,8 +1128,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         }
       }
       for (const [fromId, toId] of edges3d) {
-        const a = nodes3d.find(n => n.id === fromId);
-        const b = nodes3d.find(n => n.id === toId);
+        const a = nodeMap.get(fromId);
+        const b = nodeMap.get(toId);
         if (!a || !b) continue;
         const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
@@ -1139,7 +1143,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         n.y *= (1 - 0.002 * alpha);
         n.z *= (1 - 0.002 * alpha);
       }
-      simAlpha = Math.max(0.05, simAlpha * 0.995);
+      simAlpha = Math.max(0.03, simAlpha * 0.985);
     }
 
     function project(x, y, z, width, height) {
