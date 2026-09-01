@@ -393,12 +393,40 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
 }
 
 /**
+ * Sanitizes ~/.bun/install/global/package.json from empty/corrupted dependency keys.
+ */
+export function healBunGlobalConfig(): void {
+  try {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    if (!home) return;
+    const globalPkgPath = join(home, ".bun", "install", "global", "package.json");
+    if (existsSync(globalPkgPath)) {
+      const raw = readFileSync(globalPkgPath, "utf-8");
+      const pkg = JSON.parse(raw);
+      let changed = false;
+      if (pkg.dependencies && typeof pkg.dependencies === "object") {
+        for (const key of Object.keys(pkg.dependencies)) {
+          if (!key || key.trim() === "") {
+            delete pkg.dependencies[key];
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        writeFileSync(globalPkgPath, JSON.stringify(pkg, null, 2), "utf-8");
+      }
+    }
+  } catch {}
+}
+
+/**
  * Executes a package manager update command.
  */
 export function executePackageUpgrade(pm: "bun" | "npm" | "pnpm" | "yarn", dryRun: boolean = false): string {
   let cmd = "";
   switch (pm) {
     case "bun":
+      healBunGlobalConfig();
       cmd = "bun add -g musememory@latest";
       break;
     case "pnpm":
@@ -422,6 +450,24 @@ export function executePackageUpgrade(pm: "bun" | "npm" | "pnpm" | "yarn", dryRu
   return cmd;
 }
 
+export function getCurrentVersion(): string {
+  try {
+    const pkgPath = join(__dirname, "..", "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const data = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      if (data.version) return data.version;
+    }
+  } catch {}
+  try {
+    const pkgPath = join(__dirname, "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const data = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      if (data.version) return data.version;
+    }
+  } catch {}
+  return "1.11.0";
+}
+
 /**
  * Main CLI handler for `memory upgrade` and `memory update`.
  */
@@ -432,7 +478,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
   const checkOnly = flags["check"] === "true";
 
   const pm = detectPackageManager();
-  const currentVersion = "1.8.0";
+  const currentVersion = getCurrentVersion();
 
   console.log(`[Upgrade] Checking for updates (detected package manager: ${pm})...`);
   const latestVersion = await getLatestNpmVersion();
