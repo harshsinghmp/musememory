@@ -1011,15 +1011,20 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       flash('Constraint added!');
     }
 
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function renderList() {
       const container = document.getElementById('memoryList');
-      container.innerHTML = '';
+      const fragment = document.createDocumentFragment();
 
+      const q = searchQuery ? searchQuery.toLowerCase() : '';
       const filtered = allMemories.filter(m => {
         if (currentFilter !== 'all' && m.type !== currentFilter) return false;
-        if (searchQuery) {
-          const text = (m.title + ' ' + m.content + ' ' + (m.tags || []).join(' ')).toLowerCase();
-          if (!text.includes(searchQuery.toLowerCase())) return false;
+        if (q) {
+          const text = (m.title + ' ' + (m.content || '') + ' ' + (m.tags || []).join(' ')).toLowerCase();
+          if (!text.includes(q)) return false;
         }
         return true;
       });
@@ -1027,25 +1032,33 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       filtered.forEach(m => {
         const card = document.createElement('div');
         card.className = 'card' + (selectedMemory && selectedMemory.id === m.id ? ' selected' : '');
+        card.dataset.id = m.id;
         card.innerHTML = \`
           <div class="card-header">
-            <div class="card-title">\${m.title}</div>
+            <div class="card-title">\${escapeHtml(m.title)}</div>
             <div class="card-type type-\${m.type || 'discovery'}">\${m.type || 'discovery'}</div>
           </div>
-          <div class="card-snippet">\${m.content}</div>
+          <div class="card-snippet">\${escapeHtml(m.content || '')}</div>
           <div class="card-meta">
             <span class="mono">\${m.id}</span>
-            <div class="card-tags">\${(m.tags || []).slice(0, 3).map(t => '<span class="card-tag">#' + t + '</span>').join('')}</div>
+            <div class="card-tags">\${(m.tags || []).slice(0, 3).map(t => '<span class="card-tag">#' + escapeHtml(t) + '</span>').join('')}</div>
           </div>
         \`;
         card.onclick = () => selectMemory(m);
-        container.appendChild(card);
+        fragment.appendChild(card);
       });
+
+      container.innerHTML = '';
+      container.appendChild(fragment);
     }
 
     function selectMemory(m) {
+      if (!m) return;
       selectedMemory = m;
-      renderList();
+      document.querySelectorAll('#memoryList .card.selected').forEach(c => c.classList.remove('selected'));
+      const activeCard = document.querySelector(\`#memoryList .card[data-id="\${m.id}"]\`);
+      if (activeCard) activeCard.classList.add('selected');
+
       const pane = document.getElementById('detailPane');
       pane.classList.add('open');
       document.getElementById('dTitle').textContent = m.title;
@@ -1146,13 +1159,16 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       return true;
     }
 
+    let needsRedraw = true;
+    function requestRedraw() {
+      needsRedraw = true;
+    }
+
     function initGraph() {
       const byId = new Map(nodes3d.map(n => [n.id, n]));
       const degreeOf = new Map();
-      edges3d = [];
       for (const m of allMemories) {
         for (const rid of (m.related_memory_ids || [])) {
-          edges3d.push([m.id, rid]);
           degreeOf.set(m.id, (degreeOf.get(m.id) || 0) + 1);
         }
       }
@@ -1174,13 +1190,24 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           z: prev ? prev.z : Math.sin(angle) * 260,
         };
       });
+
+      const nodeMap = new Map(nodes3d.map(n => [n.id, n]));
+      edges3d = [];
+      for (const m of allMemories) {
+        const a = nodeMap.get(m.id);
+        if (!a) continue;
+        for (const rid of (m.related_memory_ids || [])) {
+          const b = nodeMap.get(rid);
+          if (b) edges3d.push([a, b]);
+        }
+      }
       simAlpha = 1;
+      needsRedraw = true;
     }
 
     function simulateStep() {
-      if (nodes3d.length === 0 || simAlpha <= 0.04) return;
+      if (nodes3d.length === 0 || simAlpha <= 0.03) return;
       const alpha = simAlpha;
-      const nodeMap = new Map(nodes3d.map(n => [n.id, n]));
       for (let i = 0; i < nodes3d.length; i++) {
         const a = nodes3d[i];
         for (let j = i + 1; j < nodes3d.length; j++) {
@@ -1194,9 +1221,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
         }
       }
-      for (const [fromId, toId] of edges3d) {
-        const a = nodeMap.get(fromId);
-        const b = nodeMap.get(toId);
+      for (let i = 0; i < edges3d.length; i++) {
+        const [a, b] = edges3d[i];
         if (!a || !b) continue;
         const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
@@ -1205,12 +1231,13 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         a.x += dx * force; a.y += dy * force; a.z += dz * force;
         b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
       }
-      for (const n of nodes3d) {
+      for (let i = 0; i < nodes3d.length; i++) {
+        const n = nodes3d[i];
         n.x *= (1 - 0.002 * alpha);
         n.y *= (1 - 0.002 * alpha);
         n.z *= (1 - 0.002 * alpha);
       }
-      simAlpha = Math.max(0.03, simAlpha * 0.985);
+      simAlpha = Math.max(0.02, simAlpha * 0.985);
     }
 
     function project(x, y, z, width, height) {
@@ -1236,7 +1263,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       }
 
       const projected = new Map();
-      for (const n of nodes3d) {
+      for (let i = 0; i < nodes3d.length; i++) {
+        const n = nodes3d[i];
         n.visible = nodeVisible(n);
         if (n.visible) projected.set(n, project(n.x, n.y, n.z, canvas.width, canvas.height));
       }
@@ -1244,9 +1272,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       // Edges with glow
       ctx.strokeStyle = 'rgba(99, 102, 241, 0.25)';
       ctx.lineWidth = 1.2;
-      for (const [fromId, toId] of edges3d) {
-        const a = nodes3d.find(n => n.id === fromId);
-        const b = nodes3d.find(n => n.id === toId);
+      for (let i = 0; i < edges3d.length; i++) {
+        const [a, b] = edges3d[i];
         if (!a || !b || !a.visible || !b.visible) continue;
         const pa = projected.get(a), pb = projected.get(b);
         if (!pa || !pb) continue;
@@ -1257,7 +1284,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       }
 
       // Nodes
-      for (const n of nodes3d) {
+      for (let i = 0; i < nodes3d.length; i++) {
+        const n = nodes3d[i];
         if (!n.visible) continue;
         const p = projected.get(n);
         if (!p) continue;
@@ -1282,15 +1310,28 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     }
 
     function tick() {
-      const canvas = document.getElementById('graphCanvas');
-      if (canvas && currentTab === 'graph') {
-        const rect = canvas.parentElement.getBoundingClientRect();
-        if (rect.width > 0 && (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height))) {
-          canvas.width = Math.floor(rect.width);
-          canvas.height = Math.floor(rect.height);
+      if (currentTab === 'graph') {
+        const canvas = document.getElementById('graphCanvas');
+        if (canvas) {
+          const parent = canvas.parentElement;
+          if (parent) {
+            const w = parent.clientWidth;
+            const h = parent.clientHeight;
+            if (w > 0 && (canvas.width !== w || canvas.height !== h)) {
+              canvas.width = w;
+              canvas.height = h;
+              needsRedraw = true;
+            }
+          }
+          if (simAlpha > 0.03) {
+            simulateStep();
+            needsRedraw = true;
+          }
+          if (needsRedraw || dragging) {
+            drawGraph(canvas);
+            needsRedraw = false;
+          }
         }
-        simulateStep();
-        drawGraph(canvas);
       }
       requestAnimationFrame(tick);
     }
@@ -1309,6 +1350,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         box.onchange = () => {
           if (box.checked) hiddenClusters.delete(group + ':' + value);
           else hiddenClusters.add(group + ':' + value);
+          needsRedraw = true;
         };
         label.appendChild(box);
         label.appendChild(document.createTextNode(value));
@@ -1333,31 +1375,45 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           timelineCutoff = new Date(cutoffMs).toISOString();
           label.textContent = new Date(cutoffMs).toLocaleDateString();
         }
+        needsRedraw = true;
       };
     }
 
     function setupCanvasInteractions() {
       const canvas = document.getElementById('graphCanvas');
-      canvas.addEventListener('mousedown', (e) => { dragging = true; dragMoved = false; lastX = e.clientX; lastY = e.clientY; });
+      canvas.addEventListener('mousedown', (e) => {
+        dragging = true;
+        dragMoved = false;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        needsRedraw = true;
+      });
       window.addEventListener('mousemove', (e) => {
         if (!dragging) return;
         const dx = e.clientX - lastX, dy = e.clientY - lastY;
         if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
         rotY += dx * 0.005;
         rotX = Math.max(-1.4, Math.min(1.4, rotX + dy * 0.005));
-        lastX = e.clientX; lastY = e.clientY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        needsRedraw = true;
       });
-      window.addEventListener('mouseup', () => { dragging = false; });
+      window.addEventListener('mouseup', () => {
+        dragging = false;
+        needsRedraw = true;
+      });
       canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
         zoom = Math.max(0.3, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+        needsRedraw = true;
       }, { passive: false });
       canvas.addEventListener('click', (e) => {
         if (dragMoved) return;
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         let best = null, bestDist = Infinity;
-        for (const n of nodes3d) {
+        for (let i = 0; i < nodes3d.length; i++) {
+          const n = nodes3d[i];
           if (!nodeVisible(n)) continue;
           const p = project(n.x, n.y, n.z, canvas.width, canvas.height);
           const d = Math.hypot(p.sx - mx, p.sy - my);
@@ -1384,6 +1440,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         currentTab = tab.dataset.view;
         const panel = document.getElementById('panel-' + currentTab);
         if (panel) panel.classList.add('active');
+        if (currentTab === 'graph') needsRedraw = true;
       });
     });
 
@@ -1407,9 +1464,14 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     setupCanvasInteractions();
     setupTimeline();
 
+    let searchDebounceTimer = null;
     document.getElementById('searchInput').addEventListener('input', (e) => {
       searchQuery = e.target.value;
-      renderList();
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        renderList();
+        needsRedraw = true;
+      }, 30);
     });
 
     document.querySelectorAll('#filterBar .chip').forEach(chip => {
@@ -1418,6 +1480,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         chip.classList.add('active');
         currentFilter = chip.dataset.type;
         renderList();
+        needsRedraw = true;
       });
     });
 
