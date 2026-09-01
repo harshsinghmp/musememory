@@ -4,6 +4,8 @@ import { join } from "node:path";
 import {
   detectPackageManager,
   formatProgressBar,
+  formatPandaProgressBar,
+  playPandaLoader,
   getUpgradeMilestones,
   repairInstallation,
   type UpgradeStep,
@@ -20,6 +22,17 @@ describe("Automated Upgrade & Self-Healing Installer Engine", () => {
     try {
       rmSync(testDir, { recursive: true, force: true });
     } catch {}
+  });
+
+  it("formats dynamic single-line panda progress bars accurately", () => {
+    const bar0 = formatPandaProgressBar(0, 20);
+    expect(bar0).toBe("[ʕ•ᴥ•ʔ────────────────────] 0%");
+
+    const bar50 = formatPandaProgressBar(50, 20);
+    expect(bar50).toBe("[━━━━━━━━━━ʕ•ᴥ•ʔ──────────] 50%");
+
+    const bar100 = formatPandaProgressBar(100, 20);
+    expect(bar100).toBe("[━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100%");
   });
 
   it("formats gamified ASCII progress bars accurately", () => {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
+import { queryTieredContext, type RetrievalTier } from "../retrieval/tiered.ts";
 import { hybridSearch } from "../vector.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex } from "../retrieval/index.ts";
 import { importTranscript } from "../harvest.ts";
@@ -33,6 +34,26 @@ export async function handleContextCommand({ positional, flags }: ParsedArgs): P
   const depth = flags["depth"] as DisclosureDepth | undefined;
   if (depth && depth !== "L1" && depth !== "L2" && depth !== "L3") {
     return usageError("--depth must be one of L1|L2|L3");
+  }
+  if (flags["tier"] !== undefined) {
+    const tierNum = parseInt(flags["tier"], 10) as RetrievalTier;
+    if (tierNum !== 0 && tierNum !== 1 && tierNum !== 2) {
+      return usageError("--tier must be 0, 1, or 2");
+    }
+    const tiered = queryTieredContext(ctx.store, ctx.memoryDir, query, {
+      limit,
+      tokenBudget: tokenBudget ?? (flags["budget"] ? parseInt(flags["budget"], 10) : undefined),
+      project: flags["project"],
+      includeSuperseded: false,
+      type: flags["type"],
+      types: agentTypes,
+      tags: agentTags,
+      status: flags["status"],
+      verified: flags["verified"] === "true",
+      tier: tierNum,
+    });
+    console.log(tiered.markdown);
+    return 0;
   }
   if (depth) {
     // Progressive disclosure: render the tiered prompt-injection block

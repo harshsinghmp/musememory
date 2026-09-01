@@ -31,14 +31,21 @@ Muse Memory is a zero-daemon, file-backed cognitive memory engine designed to gi
 │ └───────────────────┘ └──────────────────┘ └──────────────┘ │
 └──────────────────────────────┬──────────────────────────────┘
                                │ Atomic File I/O
-┌──────────────────────────────▼──────────────────────────────┐
+┌──────────────────────────────▼─────────────────────────────────────────────────────────────┐
 │              Dual-Scope Storage Engine (.memory/)           │
 │                                                             │
 │  .memory/                                                   │
 │  ├── memory.db          # Primary SQLite cognitive database │
 │  ├── CURRENT.md         # Active hard constraints & handoff │
 │  ├── USER.md            # Persona & developer preferences   │
+│  ├── HOT.md             # Working memory cache (rollups)    │
+│  ├── sources.json       # Provenance Source Ledger          │
+│  ├── claims.json        # Evidence-grounded Claim Ledger    │
+│  ├── iterations.jsonl   # Gauntlet loop multi-turn ledger   │
 │  ├── audit.jsonl        # Append-only operational audit trail│
+│  ├── prompts/           # Native structured prompt templates│
+│  ├── runs/              # Frozen execution run snapshots    │
+│  ├── wiki/              # Obsidian concept/entity/rollups   │
 │  └── memories/          # Dual-persisted YAML export mirror │
 │      ├── m_1700000001000_auth.yaml                          │
 │      └── m_1700000002000_arch.yaml                          │
@@ -54,15 +61,18 @@ musememory/
 ├── bin/                    # Command-line entry points (memory.ts, musememory.ts)
 ├── src/                    # Core TypeScript source code
 │   ├── audit.ts            # Append-only compliance audit ledger
+│   ├── claims.ts           # Evidence-backed claim ledger & confidence tags
 │   ├── cli.ts              # Command router & dispatcher
 │   ├── cli/                # Modular domain command handlers
 │   │   ├── ecosystem.ts    # Install, doctor, uninstall, init, connect, agents, migrate, ui
-│   │   ├── lifecycle.ts    # Propose, capture, confirm, supersede, stale, reject, delete, list, stats
+│   │   ├── evolution.ts    # Source, claim, freeze, prompt, rollup, loop handlers
+│   │   ├── lifecycle.ts    # Propose, capture, confirm, supersede, stale, reject, delete, verify
 │   │   ├── persona.ts      # USER.md persona profile and CURRENT.md working constraints
-│   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, import-transcript
+│   │   ├── retrieval.ts    # Context, search, recall, search-transcript, harvest, reindex
 │   │   └── shared.ts       # Flag parsing, root detection, and entry printing
-│   ├── compounding/        # Unified knowledge compounding (shared clustering core & entity extractor)
+│   ├── compounding/        # Unified knowledge compounding (temporal & clustering)
 │   │   ├── cluster.ts      # Canonical token-bag centroid clustering & cosine similarity
+│   │   ├── temporal.ts     # Weekly, monthly, quarterly temporal rollups & HOT.md cache
 │   │   └── index.ts        # Unified compileKnowledge dual-persistence entry point
 │   ├── connect.ts           # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
@@ -270,6 +280,13 @@ Muse Memory includes a built-in, zero-dependency secret scanner ([`src/secrets.t
 | `memory_disconnect_pageindex`    | **Doc Cleanup**           | Disconnect and clean up PageIndex document indexes.                                              |
 | `memory_settings_get` / `set`    | **Configuration**         | Read and update unified global or project configuration settings.                                |
 | `graph_status`                   | **AST Graph**             | Inspect CodeGraph symbol overlap provider status.                                                |
+| `memory_source_add` / `list`     | **Provenance Ledger**     | Record external docs/RFC/URLs into `.memory/sources.json` and query provenance sources.          |
+| `memory_claim_record` / `list`   | **Claim Ledger**          | Record evidence-backed claims with confidence tags (`[RAW]`, `[FETCH]`, `[SEARCH]`, `[INFER]`). |
+| `memory_freeze_run` / `list`     | **Execution Snapshots**   | Freeze deterministic task snapshot with file inventory and SHA-256 memory hashes.                |
+| `memory_prompt_list` / `get` / `run` | **Prompt Templates**  | Manage and execute native structured prompt notes with live context injection.                   |
+| `memory_rollup`                  | **Temporal Compounding**  | Multi-scale weekly, monthly, and quarterly rollups and instant `.memory/HOT.md` cache compiler.  |
+| `memory_loop_record` / `status`  | **Gauntlet Loops**        | Multi-agent iteration ledger and plateau/regression detector (`.memory/iterations.jsonl`).       |
+| `memory_verify_strict`           | **Integrity Gate**        | Zero-tolerance gate: zero secrets, referential link integrity, wikilinks, claims, and candidates. |
 
 
 ---
@@ -322,12 +339,18 @@ All development moves across 4 deterministic lifecycle phases:
    - PR merged into `dev`, fast-forwarded to `main`, and milestone closed.
    - Item moved to `Done` on the README roadmap board.
 
-## Releases
+## Releases & Semantic Versioning (`vX.Y.Z`)
 
-- Production releases use a `release/*` branch from `dev`.
-- npm publishing is handled by CI when a `v*` tag is pushed.
-- **Never run** `npm publish` **manually** unless CI has failed and a manual fallback is explicitly required.
-- Version changes in `package.json` must accompany release tags.
+All releases and git tags must follow strict `vX.Y.Z` semantic versioning:
+
+- **`X` (Major)**: Breaking architectural changes, core schema shifts, or protocol overhauls (`vX.0.0`).
+- **`Y` (Feature)**: Substantive new agent capabilities, MCP tools, or CLI subcommands (`vX.Y.0`).
+- **`Z` (Minor / Hotfix / Critical Fix)**: Bug fixes, security patches, performance, and urgent hotfixes (`vX.Y.Z`).
+
+### Invariants:
+- Sync `package.json` `"version"` with the `vX.Y.Z` tag in the release commit.
+- Stage on `release/vX.Y.Z` from `dev` → merge to `master` → back-merge to `dev`.
+- CI publishes on `v*` tag push (`git tag -a vX.Y.Z -m "release: vX.Y.Z"`). Never `npm publish` manually.
 
 ---
 

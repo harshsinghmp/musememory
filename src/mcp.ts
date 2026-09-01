@@ -45,11 +45,19 @@ import { compileWiki, listWikiPages, getWikiPage } from "./wiki/index.ts";
 import { extractEntitiesFromMemories, saveEntities, loadEntities, findEntity, findRelatedEntities } from "./entities/index.ts";
 import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "./pageindex/index.ts";
 import { getSettings, setSettings, getProjectSettings, setProjectSettings } from "./settings.ts";
+import { addSource, listSources, getSource } from "./provenance.ts";
+import { recordClaim, listClaims, getClaim } from "./claims.ts";
+import { freezeExecutionSnapshot, listExecutionSnapshots } from "./snapshot.ts";
+import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
+import { rollupTemporal } from "./compounding/temporal.ts";
+import { recordIteration, detectIterationStatus } from "./iterations.ts";
+import { verifyStrictIntegrity } from "./verify.ts";
+import { queryTieredContext, type RetrievalTier } from "./retrieval/tiered.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
-export async function runMcpServer(): Promise<void> {
-  const targetDir = process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
-  const { root, memoryDir } = findOrCreateProjectRoot(targetDir);
+export function createServer(targetDir?: string): Server {
+  const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
+  const { root, memoryDir } = findOrCreateProjectRoot(resolvedTarget);
   const store = openStore(memoryDir);
 
   function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
@@ -104,6 +112,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             status: { type: "string" },
             verified: { type: "boolean" },
             depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Progressive disclosure tier: L1 = id+title lines, L2 = title+content+tags (default), L3 = full raw entry" },
+            tier: { type: "number", description: "Deterministic retrieval tier: 0 (manifest index), 1 (routing set), 2 (bounded bodies, default)" },
           },
         },
       },
@@ -680,6 +689,173 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["text"],
         },
       },
+      {
+        name: "memory_source_add",
+        description: "Record external documentation, research paper, RFC, or URL into the provenance Source Ledger",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string" },
+            title: { type: "string" },
+            source_type: { type: "string", description: "Source classification: primary | secondary | documentation | rfc | repo | article" },
+            excerpt: { type: "string", description: "Key quote or summary excerpt from source" },
+            author: { type: "string", description: "Author or organization" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["url", "title"],
+        },
+      },
+      {
+        name: "memory_source_list",
+        description: "List recorded external sources in the Source Ledger",
+        inputSchema: {
+          type: "object",
+          properties: {
+            source_type: { type: "string" },
+            query: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_claim_record",
+        description: "Record an evidence-backed claim into the Claim Ledger connected to sources and confidence tags ([RAW], [FETCH], [SEARCH], [INFER])",
+        inputSchema: {
+          type: "object",
+          properties: {
+            claim: { type: "string" },
+            confidence_tag: { type: "string", enum: ["RAW", "FETCH", "SEARCH", "INFER"], description: "Confidence level: RAW (locally verified), FETCH (authoritative URL), SEARCH (synthesized search), INFER (agent deduction)" },
+            source_ids: { type: "array", items: { type: "string" } },
+            memory_ids: { type: "array", items: { type: "string" } },
+            notes: { type: "string" },
+            verified: { type: "boolean" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["claim"],
+        },
+      },
+      {
+        name: "memory_claim_list",
+        description: "List recorded claims in the Claim Ledger",
+        inputSchema: {
+          type: "object",
+          properties: {
+            confidence_tag: { type: "string", enum: ["RAW", "FETCH", "SEARCH", "INFER"] },
+            query: { type: "string" },
+            verified: { type: "boolean" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_freeze_run",
+        description: "Capture an immutable execution snapshot (active task, file inventory, git SHA, CURRENT constraints, memory SHA-256 hashes) in .memory/runs/<run-id>/",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task: { type: "string", description: "Task description or path to task markdown file" },
+            run_id: { type: "string", description: "Optional unique run identifier" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["task"],
+        },
+      },
+      {
+        name: "memory_freeze_list",
+        description: "List recorded frozen execution snapshots in .memory/runs/",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_prompt_list",
+        description: "List available structured prompt templates in .memory/prompts/",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_prompt_get",
+        description: "Get prompt template by name",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["name"],
+        },
+      },
+      {
+        name: "memory_prompt_run",
+        description: "Render prompt template with variable substitution and live memory context injection",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            args: { type: "object", description: "Key-value pairs for prompt template variables" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["name"],
+        },
+      },
+      {
+        name: "memory_rollup",
+        description: "Multi-scale temporal compounding: aggregate atomic memories into weekly, monthly, or quarterly synthesis wiki pages and update HOT.md cache",
+        inputSchema: {
+          type: "object",
+          properties: {
+            period: { type: "string", enum: ["week", "month", "quarter"] },
+            date: { type: "string", description: "Optional target date (YYYY-MM-DD)" },
+            project: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["period"],
+        },
+      },
+      {
+        name: "memory_loop_record",
+        description: "Record an iteration round in the multi-agent Gauntlet Iteration Ledger (.memory/iterations.jsonl)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            iteration_index: { type: "number" },
+            critic_verdict: { type: "string", enum: ["pass", "fail", "regressed", "plateaued"] },
+            largest_fix_identified: { type: "string" },
+            test_results: { type: "string" },
+            diff_hash: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["iteration_index", "critic_verdict", "largest_fix_identified", "test_results"],
+        },
+      },
+      {
+        name: "memory_loop_status",
+        description: "Inspect multi-round iteration status, plateau warnings, and regression signals",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_verify_strict",
+        description: "Execute Strict Integrity & Health Gate: audits zero secrets, referential link integrity, wikilinks, orphaned candidates, and claim sources",
+        inputSchema: {
+          type: "object",
+          properties: {
+            max_candidate_days: { type: "number" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
     ],
   }));
 
@@ -707,16 +883,28 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               });
             } catch {}
           }
-          const formatted = formatPromptContext(activeStore, activeMemoryDir, queryStr, {
-            limit: typeof a.limit === "number" ? a.limit : 5,
-            tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
-            project: a.project ? String(a.project) : undefined,
-            includeSuperseded: false,
-            type: a.type ? String(a.type) : undefined,
-            status: a.status ? String(a.status) : undefined,
-            verified: a.verified === true,
-            depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
-          });
+          const tierOpt = typeof a.tier === "number" ? (a.tier as RetrievalTier) : undefined;
+          const formatted = tierOpt !== undefined
+            ? queryTieredContext(activeStore, activeMemoryDir, queryStr, {
+                limit: typeof a.limit === "number" ? a.limit : 5,
+                tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+                project: a.project ? String(a.project) : undefined,
+                includeSuperseded: false,
+                type: a.type ? String(a.type) : undefined,
+                status: a.status ? String(a.status) : undefined,
+                verified: a.verified === true,
+                tier: tierOpt,
+              })
+            : formatPromptContext(activeStore, activeMemoryDir, queryStr, {
+                limit: typeof a.limit === "number" ? a.limit : 5,
+                tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+                project: a.project ? String(a.project) : undefined,
+                includeSuperseded: false,
+                type: a.type ? String(a.type) : undefined,
+                status: a.status ? String(a.status) : undefined,
+                verified: a.verified === true,
+                depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
+              });
 
           // Record Hebbian co-activation on retrieved memory units (SOW-204)
           if (formatted.entries.length >= 2 && activeMemoryDir) {
@@ -1179,14 +1367,111 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const result = compressPromptContext(text, { level });
         return toolResult(result);
       }
+      case "memory_source_add": {
+        const source = addSource(activeMemoryDir, {
+          url: String(a.url),
+          title: String(a.title),
+          source_type: a.source_type ? String(a.source_type) : undefined,
+          excerpt: a.excerpt ? String(a.excerpt) : undefined,
+          author: a.author ? String(a.author) : undefined,
+        });
+        return toolResult(source);
+      }
+      case "memory_source_list": {
+        const sources = listSources(activeMemoryDir, {
+          query: a.query ? String(a.query) : undefined,
+          source_type: a.source_type ? String(a.source_type) : undefined,
+        });
+        return toolResult(sources);
+      }
+      case "memory_claim_record": {
+        const claim = recordClaim(activeMemoryDir, {
+          claim: String(a.claim),
+          confidence_tag: a.confidence_tag as any,
+          source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
+          memory_ids: Array.isArray(a.memory_ids) ? a.memory_ids.map(String) : undefined,
+          notes: a.notes ? String(a.notes) : undefined,
+          verified: a.verified === true,
+        });
+        return toolResult(claim);
+      }
+      case "memory_claim_list": {
+        const claims = listClaims(activeMemoryDir, {
+          confidence_tag: a.confidence_tag ? String(a.confidence_tag) : undefined,
+          query: a.query ? String(a.query) : undefined,
+          verified: typeof a.verified === "boolean" ? a.verified : undefined,
+        });
+        return toolResult(claims);
+      }
+      case "memory_freeze_run": {
+        const snapshot = freezeExecutionSnapshot({
+          workspaceRoot: activeRoot,
+          memoryDir: activeMemoryDir,
+          task: String(a.task),
+          runId: a.run_id ? String(a.run_id) : undefined,
+          store: activeStore,
+        });
+        return toolResult(snapshot);
+      }
+      case "memory_freeze_list": {
+        const snapshots = listExecutionSnapshots(activeMemoryDir);
+        return toolResult(snapshots);
+      }
+      case "memory_prompt_list": {
+        const prompts = listPrompts(activeMemoryDir);
+        return toolResult(prompts);
+      }
+      case "memory_prompt_get": {
+        const prompt = getPrompt(activeMemoryDir, String(a.name));
+        if (!prompt) return toolError(`Prompt template "${a.name}" not found`);
+        return toolResult(prompt);
+      }
+      case "memory_prompt_run": {
+        const rendered = renderPrompt(activeMemoryDir, String(a.name), (a.args as any) ?? {});
+        return toolResult({ rendered });
+      }
+      case "memory_rollup": {
+        const res = rollupTemporal(activeStore, {
+          memoryDir: activeMemoryDir,
+          period: (a.period as any) ?? "week",
+          date: a.date ? String(a.date) : undefined,
+          project: a.project ? String(a.project) : undefined,
+        });
+        return toolResult(res);
+      }
+      case "memory_loop_record": {
+        const entry = recordIteration(activeMemoryDir, {
+          iteration_index: Number(a.iteration_index) || 1,
+          critic_verdict: String(a.critic_verdict) as any,
+          largest_fix_identified: String(a.largest_fix_identified),
+          test_results: String(a.test_results),
+          diff_hash: a.diff_hash ? String(a.diff_hash) : undefined,
+        });
+        return toolResult(entry);
+      }
+      case "memory_loop_status": {
+        const status = detectIterationStatus(activeMemoryDir);
+        return toolResult(status);
+      }
+      case "memory_verify_strict": {
+        const report = verifyStrictIntegrity(activeStore, activeMemoryDir, activeRoot, {
+          maxCandidateDays: typeof a.max_candidate_days === "number" ? a.max_candidate_days : undefined,
+        });
+        return toolResult(report);
+      }
       default:
         return toolError(`unknown tool ${name}`);
     }
   } catch (err: unknown) {
     return toolError(err instanceof Error ? err.message : String(err));
   }
-});
+  });
 
+  return server;
+}
+
+export async function runMcpServer(): Promise<void> {
+  const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stdin.resume();

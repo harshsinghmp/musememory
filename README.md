@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-322%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-368%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -24,19 +24,22 @@
 
 ---
 
-## 🚀 What's New in v1.10.0
+## 🚀 What's New in v1.11.0 (Cognitive Engine Evolution & Hardening)
 
-- **🤖 Universal Multi-Agent Chat Auto-Learner (`memory learn` / `memory sync-chats`)**: Automatically probes the host machine for active conversation transcripts across 80+ platforms (Antigravity, Gemini CLI, Claude Code, OpenCode, Hermes, Goose, Codex, Cursor, etc.).
-- **💬 Natural Language Semantic Distillation**: Extracts bug resolutions, architectural choices, hard invariants, preferences, and open loops directly from conversational problem-solving without requiring rigid markdown formatting.
-- **⚡ Zero-Duplicate Incremental Sync**: Built-in content-hash ledger (`.memory/harvested-transcripts.json`) guarantees sub-millisecond scans and eliminates duplicate re-ingestion.
-- **🔄 Proactive Background Sync**: `memory ui` and MCP `get_context` auto-synchronize recent agent conversations on startup.
-- **🩺 Enhanced Diagnostic Doctor**: `memory doctor` surfaces un-harvested transcript metrics with one-click remediation guidance.
+- **📜 Provenance & Source Ledger (`.memory/sources.json` / `memory source`)**: Records all external documentation, research papers, RFCs, and authoritative URLs with retrieval timestamps, authors, and classification tags.
+- **🔍 Evidence-Grounded Claim Ledger (`.memory/claims.json` / `memory claim`)**: Connects atomic memories to verifiable claims tagged with strict confidence ratings: `[RAW]` (locally verified), `[FETCH]` (authoritative URL), `[SEARCH]` (search-synthesized), and `[INFER]` (agent deduction).
+- **⚡ Deterministic Tiered Retrieval Engine (`--tier 0|1|2`)**: Bounded 3-tier retrieval prevents context stuffing: **Tier 0 (Manifest)** index (~50 tokens), **Tier 1 (Routing Set)** (~300 tokens), and **Tier 2 (Bounded Bodies)** fitted greedily into the knapsack token budget.
+- **🧊 Frozen Execution Snapshots (`memory freeze`)**: Captures immutable run state (`.memory/runs/<run-id>/snapshot.json`) combining task specs, workspace file inventory, git SHA, active constraints, and SHA-256 memory hashes for deterministic regression replay.
+- **📝 Native Structured Prompt Registry (`memory prompt`)**: Reusable structured prompt templates with live memory context injection (includes built-in `morning-standup`, `drift-audit`, `pre-publish-audit`, `sprint-compounding`).
+- **⏳ Multi-Scale Temporal Compounding (`memory rollup`)**: Aggregates atomic session memories into weekly (`YYYY-Www.md`), monthly (`YYYY-MM.md`), and quarterly (`YYYY-QN.md`) synthesis wiki pages, and compiles the `.memory/HOT.md` instant working memory cache.
+- **🔄 Gauntlet Iteration Ledger & Plateau Detector (`memory loop`)**: Multi-agent improvement loop ledger (`.memory/iterations.jsonl`) that detects plateaus and regression signals to halt runaway token consumption.
+- **🛡️ Strict Integrity & Health Gate (`memory verify --strict`)**: Zero-tolerance audit verifying zero secret credentials, referential link integrity, wikilink resolution, orphaned candidate retention, and claim-to-source completeness.
 
 ---
 
 ## 📑 Table of Contents
 
-- [🚀 What's New in v1.10.0](#-whats-new-in-v1100)
+- [🚀 What's New in v1.11.0](#-whats-new-in-v1110-cognitive-engine-evolution--hardening)
 - [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
 - [✨ Key Feature Highlights](#-key-feature-highlights)
 - [⚡ Quick Start & Installation](#-quick-start--installation)
@@ -379,13 +382,13 @@ Navigate to `http://localhost:2222` to access:
 ## 📖 Deep Technical References & Documentation
 
 <details>
-<summary><b>🔌 Complete MCP Tool Reference (29 Tools)</b> — <i>Click to expand</i></summary>
+<summary><b>🔌 Complete MCP Tool Reference (40 Tools)</b> — <i>Click to expand</i></summary>
 
 When registered as an MCP server, `musememory` exposes the following native tools:
 
 | MCP Tool | Execution Phase | Description |
 | :--- | :--- | :--- |
-| `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, and active `CURRENT.md` constraints. |
+| `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, active `CURRENT.md` constraints, and supports `--tier 0|1|2`. |
 | `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
 | `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
 | `memory_get_user_profile` | **Context Loading** | Reads active `USER.md` persona and communication preferences. |
@@ -397,6 +400,13 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `memory_mark_stale` | **Deprecation** | Flags decaying knowledge with deprecation rationale. |
 | `memory_reject` | **Hypothesis Refutation** | Marks invalidated hypotheses as rejected. |
 | `memory_delete` | **Purge** | Permanently deletes an entry and records audit ledger log. |
+| `memory_source_add` / `list` | **Provenance** | Records external docs/RFCs/URLs into `.memory/sources.json` and queries sources. |
+| `memory_claim_record` / `list` | **Claim Ledger** | Records evidence-backed claims tagged with `[RAW]`, `[FETCH]`, `[SEARCH]`, `[INFER]`. |
+| `memory_freeze_run` / `list` | **Execution Snapshots** | Freezes immutable task snapshots with file inventory and SHA-256 memory hashes. |
+| `memory_prompt_list` / `get` / `run` | **Prompt Templates** | Manages and executes native structured prompt templates with live context injection. |
+| `memory_rollup` | **Temporal Compounding** | Aggregates atomic memories into weekly, monthly, and quarterly rollups and updates `HOT.md`. |
+| `memory_loop_record` / `status` | **Gauntlet Loops** | Multi-agent iteration ledger and plateau/regression detector (`.memory/iterations.jsonl`). |
+| `memory_verify_strict` | **Integrity Gate** | Zero-tolerance audit verifying secrets, referential links, wikilinks, claims, and candidates. |
 | `memory_tree_search` | **Tree Retrieval** | Hierarchical reasoning search across partitioned memory shards. |
 | `memory_wiki_compile` | **Wiki Compiler** | Compiles confirmed memories into Obsidian-compatible Markdown pages. |
 | `memory_wiki_search` / `get` | **Wiki Reading** | Searches and reads compiled concept and entity wiki pages. |
@@ -421,7 +431,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (35 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (41 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -439,7 +449,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
 | `ui` | `[--port N] [--global]` | Launch 6-view Cognitive Studio dashboard (default port: `2222`). |
-| `context` | `[query] [--token-budget N] [--limit N]` | Retrieve Top-$K$ ranked active context for prompt injection. |
+| `context` | `[query] [--token-budget N] [--limit N] [--tier 0\|1\|2]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--token-budget N] [--type T]` | Ranked multi-factor token search with score breakdown. |
 | `search-transcript` | `<query> [file.jsonl] [--window N]` | Full-text search past transcripts with dialogue context windows. |
 | `learn` / `sync-chats` | `[--confirm] [--force] [--max N]` | **Universal auto-learner**: auto-discovers and distills memories from all agent chats across host machine. |
@@ -452,6 +462,13 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `mark-stale` | `<id> [--reason <text>]` | Mark an entry stale with deprecation rationale. |
 | `reject` | `<id> [--global]` | Mark an entry rejected. |
 | `delete` | `<id> [--reason <text>]` | Permanently delete a memory entry and record audit event. |
+| `source` | `add\|list\|show <url> [--title T] [--type T]` | Manage external documentation and URLs in provenance Source Ledger (`.memory/sources.json`). |
+| `claim` | `record\|list\|show <text> [--confidence RAW\|FETCH\|SEARCH\|INFER]` | Record and query verifiable claims connected to sources (`.memory/claims.json`). |
+| `freeze` | `--task <task.md\|text> [--run-id R]` | Capture immutable execution snapshot with file inventory and SHA-256 memory hashes. |
+| `prompt` | `list\|show\|run <name> [--args k=v,...]` | Manage and run structured prompt templates with live context injection. |
+| `rollup` | `--period week\|month\|quarter [--date YYYY-MM-DD]` | Multi-scale temporal compounding and `.memory/HOT.md` working memory cache compiler. |
+| `loop` | `record\|status\|clear` | Multi-agent Gauntlet iteration ledger and plateau/regression detector. |
+| `verify` | `<id> [--timeout S] [--strict]` | Execute a fix entry's test command or run full strict integrity gate. |
 | `audit` | `[--operation OP] [--entry-id ID] [--limit N]` | Query append-only operational audit trail (`.memory/audit.jsonl`). |
 | `link` | `<id> --related <id1,id2>` | Synchronize bidirectional relation links between entries. |
 | `export` / `import` | `[--out <file.json>]` / `<file.json>` | Export and import portable JSON memory snapshots. |
@@ -516,7 +533,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 319 passed across 57 test files (1294 assertions)
+bun test          # 322 passed across 58 test files (1305 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
@@ -528,12 +545,17 @@ bun run build     # Clean bundled distribution build (dist/index.js)
 <details>
 <summary><b>🔮 Sprint & Roadmap Lifecycle (Requested ➔ Planned ➔ In Progress ➔ Done)</b> — <i>Click to expand</i></summary>
 
-Muse Memory features are developed in structured sprints moving across 4 deterministic lifecycle phases. Every sprint is delivered via PR from `dev` to `main` with associated GitHub milestones. Live tracking: [GitHub Issues & Milestones](https://github.com/harshsinghmp/musememory/issues).
+Muse Memory features are developed in structured sprints moving across 4 deterministic lifecycle phases following strict `vX.Y.Z` semantic versioning. Every sprint is delivered via PR from `dev` to `main` with associated GitHub milestones. Live tracking: [GitHub Issues & Milestones](https://github.com/harshsinghmp/musememory/issues).
 
 ```
 [ 📋 Requested ] ──► [ 📅 Planned ] ──► [ ⚡ In Progress ] ──► [ ✅ Done ]
  (Issues / PRs)     (Sprint Backlog)    (Active PR / Milestone)  (Shipped to Main)
 ```
+
+### 🏷️ Semantic Versioning Protocol (`vX.Y.Z`)
+- **`X` (Major)**: Breaking architectural changes, core schema shifts, or protocol overhauls (`vX.0.0`).
+- **`Y` (Feature)**: Substantive new agent capabilities, MCP tools, or CLI subcommands (`vX.Y.0`).
+- **`Z` (Minor / Hotfix / Critical Fix)**: Bug remediations, security patches, performance, and urgent hotfixes (`vX.Y.Z`).
 
 ### 📋 Phase 1: Requested (Backlog)
 *Incoming community proposals, agent adapters, and feature requests pending sprint triage:*
@@ -543,9 +565,13 @@ Muse Memory features are developed in structured sprints moving across 4 determi
 
 ### 📅 Phase 2: Planned
 *Confirmed high-leverage features scheduled for upcoming sprints:*
-- [ ] Multi-Agent Consensus Verification Protocol (cross-agent memory agreement)
-- [ ] Continuous Background Memory Compaction & Pruning Cron
-- [ ] Export to Local Vector GGUF Embedding Index
+- [ ] **Tiered Retrieval Engine**: Deterministic Tier 0 (manifest), Tier 1 (invariants), Tier 2 (bounded bodies) knapsack retrieval
+- [ ] **Provenance & Claim Ledgers**: Direct memory citations with `[RAW]`, `[FETCH]`, `[SEARCH]`, and `[INFER]` confidence tagging
+- [ ] **Frozen Context Snapshots**: Immutable SHA-256 state tracking for reproducible agent execution
+- [ ] **Native Prompt Registry**: Declarative prompt library & runner (`.memory/prompts/*.md`, `memory prompt run`)
+- [ ] **Temporal Compounding**: Multi-scale Day $\to$ Week $\to$ Quarter wiki rollups & `.memory/HOT.md` cache
+- [ ] **Gauntlet Iteration Ledger**: Multi-turn improvement loop tracking and plateau detection
+- [ ] **Strict Health Gate**: Comprehensive `memory verify --strict` referential, link, and secret validator
 
 ### ⚡ Phase 3: In Progress (Active Sprint / PR)
 *Currently under active development on dedicated feature branches:*

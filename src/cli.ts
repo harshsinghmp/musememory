@@ -58,6 +58,14 @@ import {
   handleVerifyCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
+import {
+  handleSourceCommand,
+  handleClaimCommand,
+  handleFreezeCommand,
+  handlePromptCommand,
+  handleRollupCommand,
+  handleLoopCommand,
+} from "./cli/evolution.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -91,11 +99,19 @@ Core Memory Lifecycle Commands:
   routine run <name>            Execute a routine's steps from .memory/routines.yaml
   routine install [name]        Print crontab line(s) for routines (user installs; no system mutation)
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
-  verify <id> [--timeout S]     Execute a fix entry's test_command; exit 0 promotes + independently verifies
+  verify <id> [--timeout S] [--strict] Execute test_command or run full strict integrity gate
   briefing [--limit N]          Executive summary of active and stale memories
 
+Evidence, Provenance & Cognitive Governance:
+  source [add|list|show]        Manage external documentation and URLs in provenance Source Ledger
+  claim [record|list|show]      Record verifiable claims with confidence tags ([RAW], [FETCH], [SEARCH], [INFER])
+  freeze --task <task> [--run-id R] Capture immutable execution snapshot with file inventory & sha-256 hashes
+  prompt [list|show|run <name>] Manage and run structured prompt templates with live context injection
+  rollup --period week|month|quarter Multi-scale temporal compounding & HOT.md working cache generation
+  loop [record|status|clear]    Gauntlet iteration ledger & plateau/regression detector
+
 Context & Retrieval Commands:
-  context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] Top-ranked prompt injection context
+  context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] [--tier 0|1|2] Top-ranked prompt context
   search <query> [--limit N] [--token-budget N] [--hybrid] [--tree] Scored token retrieval (hybrid: vector+BM25, tree: hierarchical reasoning)
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
   recall [query]                Search active/confirmed memories with filters
@@ -269,6 +285,24 @@ export async function main(argv: string[]): Promise<number> {
       return handleEntitiesCommand(parsed);
     case "settings":
       return handleSettingsCommand(parsed);
+
+    // Evolution V2 Commands
+    case "source":
+    case "sources":
+      return handleSourceCommand(parsed);
+    case "claim":
+    case "claims":
+      return handleClaimCommand(parsed);
+    case "freeze":
+      return handleFreezeCommand(parsed);
+    case "prompt":
+    case "prompts":
+      return handlePromptCommand(parsed);
+    case "rollup":
+      return handleRollupCommand(parsed);
+    case "loop":
+    case "iterations":
+      return handleLoopCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);

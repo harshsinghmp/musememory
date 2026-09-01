@@ -139,3 +139,51 @@ export interface SearchOptions {
   tokenBudget?: number;
 }
 
+export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;
+
+export interface SourceEntry {
+  id: string;
+  url: string;
+  title: string;
+  source_type: SourceType;
+  excerpt?: string;
+  author?: string;
+  retrieved_at: string;
+  metadata?: Record<string, any>;
+}
+
+export type ClaimConfidence = "RAW" | "FETCH" | "SEARCH" | "INFER";
+
+export interface ClaimEntry {
+  id: string;
+  claim: string;
+  confidence_tag: ClaimConfidence;
+  source_ids?: string[];
+  memory_ids?: string[];
+  notes?: string;
+  created_at: string;
+  verified?: boolean;
+}
+
+export interface PromptTemplate {
+  name: string;
+  title: string;
+  description: string;
+  template: string;
+  variables?: string[];
+  tags?: string[];
+}
+
+export type CriticVerdict = "pass" | "fail" | "regressed" | "plateaued";
+
+export interface IterationEntry {
+  iteration_index: number;
+  critic_verdict: CriticVerdict;
+  largest_fix_identified: string;
+  test_results: string;
+  diff_hash?: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+

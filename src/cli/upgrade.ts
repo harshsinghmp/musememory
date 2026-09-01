@@ -35,6 +35,73 @@ export interface RepairResult {
   memoryDir: string;
 }
 
+export interface PandaProgressOptions {
+  panda?: string | string[];
+  trailChar?: string;
+  trackChar?: string;
+  target?: string;
+  frame?: number;
+}
+
+export interface PandaLoaderOptions {
+  title?: string;
+  width?: number;
+  isTTY?: boolean;
+  stream?: NodeJS.WritableStream;
+  fps?: number;
+  target?: string;
+  panda?: string | string[];
+  trailChar?: string;
+  trackChar?: string;
+  tickIntervalMs?: number;
+}
+
+export const DEFAULT_PANDA_FRAMES = [
+  "ʕ•ᴥ•ʔ",
+  "ʕ •ᴥ•ʔ",
+  "ʕ-ᴥ-ʔ",
+  "ʕ•ᴥ•ʔﾉ",
+];
+
+/**
+ * Formats a dynamic single-line ASCII progress bar featuring a panda moving towards 100%.
+ */
+export function formatPandaProgressBar(
+  percent: number,
+  width: number = 20,
+  options: PandaProgressOptions = {},
+): string {
+  const p = Math.max(0, Math.min(100, percent));
+  const trailChar = options.trailChar ?? "━";
+  const trackChar = options.trackChar ?? "─";
+  const target = options.target;
+  const frame = options.frame ?? 0;
+
+  let pandaChar = "ʕ•ᴥ•ʔ";
+  if (Array.isArray(options.panda) && options.panda.length > 0) {
+    pandaChar = options.panda[frame % options.panda.length];
+  } else if (typeof options.panda === "string") {
+    pandaChar = options.panda;
+  }
+
+  const pos = Math.round((p / 100) * width);
+  const trail = trailChar.repeat(pos);
+
+  let empty = "";
+  if (target) {
+    if (pos >= width) {
+      empty = target;
+    } else {
+      const remaining = width - pos;
+      empty = trackChar.repeat(remaining) + target;
+    }
+  } else {
+    empty = trackChar.repeat(Math.max(0, width - pos));
+  }
+
+  return `[${trail}${pandaChar}${empty}] ${Math.round(p)}%`;
+}
+
 /**
  * Formats a clean gamified ASCII progress bar.
  */
@@ -140,44 +207,120 @@ export function getUpgradeMilestones(): UpgradeMilestone[] {
 }
 
 /**
- * Plays an animated gamified ASCII progress sequence.
+ * Plays a dynamic single-line animated ASCII panda progress loader.
  */
-export async function playGamifiedLoader(
+export async function playPandaLoader(
   steps: UpgradeStep[],
-  options: { title?: string } = {},
+  options: PandaLoaderOptions = {},
 ): Promise<void> {
-  const isTTY = process.stdout.isTTY;
+  const stream = options.stream ?? process.stdout;
+  const isTTY = options.isTTY ?? (typeof (stream as any).isTTY === "boolean" ? (stream as any).isTTY : process.stdout.isTTY ?? false);
+  const width = options.width ?? 20;
   const total = steps.length;
+  const tickIntervalMs = options.tickIntervalMs ?? 60;
+  const target = options.target;
+  const panda = options.panda ?? DEFAULT_PANDA_FRAMES;
 
-  console.log(`\n┌──────────────────────────────────────────────────────────────────┐`);
-  console.log(`│  🧠 MUSE MEMORY · ${options.title || "SYSTEM LEVEL-UP & RECOVERY MATRIX"}  │`);
-  console.log(`└──────────────────────────────────────────────────────────────────┘\n`);
+  const cleanTitle = options.title || "SYSTEM LEVEL-UP & RECOVERY MATRIX";
+  const titleLine = `\n┌──────────────────────────────────────────────────────────────────┐\n│  🧠 MUSE MEMORY · ${cleanTitle.padEnd(46)}│\n└──────────────────────────────────────────────────────────────────┘\n`;
+  stream.write(titleLine);
+
+  let frameIndex = 0;
+  let currentPercent = 0;
 
   for (let i = 0; i < total; i++) {
     const step = steps[i];
-    const percent = Math.round(((i + 1) / total) * 100);
-    const bar = formatProgressBar(percent, 24);
+    const targetPercent = Math.round(((i + 1) / total) * 100);
+    const stepStartPercent = Math.round((i / total) * 100);
+    currentPercent = stepStartPercent;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
 
     if (isTTY) {
-      process.stdout.write(`  ${bar} ⚡ LEVEL ${step.level}: ${step.title}...\r`);
+      // Dynamic single-line ticking while action is in-flight
+      timer = setInterval(() => {
+        frameIndex++;
+        if (currentPercent < targetPercent - 1) {
+          currentPercent += Math.max(0.5, (targetPercent - currentPercent) * 0.15);
+        }
+        const bar = formatPandaProgressBar(Math.round(currentPercent), width, {
+          panda,
+          frame: frameIndex,
+          target,
+          trailChar: options.trailChar,
+          trackChar: options.trackChar,
+        });
+        stream.write(`\r\x1b[K  ${bar} 🐾 [${i + 1}/${total}] ${step.title}...`);
+      }, tickIntervalMs);
+
+      // Initial render for step
+      const bar = formatPandaProgressBar(stepStartPercent, width, {
+        panda,
+        frame: frameIndex,
+        target,
+        trailChar: options.trailChar,
+        trackChar: options.trackChar,
+      });
+      stream.write(`\r\x1b[K  ${bar} 🐾 [${i + 1}/${total}] ${step.title}...`);
     } else {
-      console.log(`  ${bar} ⚡ LEVEL ${step.level}: ${step.title}`);
+      const bar = formatPandaProgressBar(targetPercent, width, {
+        panda,
+        frame: i,
+        target,
+        trailChar: options.trailChar,
+        trackChar: options.trackChar,
+      });
+      stream.write(`  ${bar} 🐾 [${i + 1}/${total}] ${step.title}\n`);
     }
 
     try {
       await step.action();
     } catch (err: any) {
-      console.log(`\n  [!] Warning during step "${step.title}": ${err.message || err}`);
+      if (timer) clearInterval(timer);
+      if (isTTY) {
+        stream.write(`\n  [!] Warning during step "${step.title}": ${err.message || err}\n`);
+      } else {
+        stream.write(`  [!] Warning during step "${step.title}": ${err.message || err}\n`);
+      }
+    } finally {
+      if (timer) clearInterval(timer);
     }
 
-    // Small micro-delay for visual satisfaction in TTY
     if (isTTY) {
-      await new Promise((r) => setTimeout(r, 60));
-      process.stdout.write(`  ${bar} ✓ LEVEL ${step.level}: ${step.title} [OK]\n`);
+      currentPercent = targetPercent;
+      frameIndex++;
+      const bar = formatPandaProgressBar(targetPercent, width, {
+        panda,
+        frame: frameIndex,
+        target,
+        trailChar: options.trailChar,
+        trackChar: options.trackChar,
+      });
+      stream.write(`\r\x1b[K  ${bar} ✓ [${i + 1}/${total}] ${step.title} [OK]`);
+      // Micro-pause for dynamic feel
+      await new Promise((r) => setTimeout(r, 40));
     }
   }
-  console.log();
+
+  const finalBar = formatPandaProgressBar(100, width, {
+    panda,
+    frame: frameIndex,
+    target: target ?? "🎋",
+    trailChar: options.trailChar,
+    trackChar: options.trackChar,
+  });
+
+  if (isTTY) {
+    stream.write(`\r\x1b[K  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+  } else {
+    stream.write(`  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+  }
 }
+
+/**
+ * Backward-compatible alias for playPandaLoader.
+ */
+export const playGamifiedLoader = playPandaLoader;
 
 /**
  * Recovers lost files, ensures CURRENT.md and USER.md exist, auto-connects agents, and indexes AST symbols.

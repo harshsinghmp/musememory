@@ -113,7 +113,7 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
   }
 
   return new Promise((resolve) => {
-    server.listen(port, () => {
+    server.listen(port, "127.0.0.1", () => {
       const address = server.address();
       const actualPort = typeof address === "object" && address ? address.port : port;
       resolve({

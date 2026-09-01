@@ -16,7 +16,7 @@ import { collectLoops, renderLoops } from "../loops.ts";
 import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
 import { loadRoutines, runRoutine, crontabLine, type Routine } from "../routines.ts";
 import { distillSkills } from "../distill.ts";
-import { verifyEntry } from "../verify.ts";
+import { verifyEntry, verifyStrictIntegrity } from "../verify.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
@@ -457,8 +457,30 @@ export async function handleDistillCommand({ flags }: ParsedArgs): Promise<numbe
 export async function handleVerifyCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
+
+  if (flags["strict"] === "true" || positional[0] === "--strict" || flags["all"] === "true") {
+    const report = verifyStrictIntegrity(ctx.store, ctx.memoryDir, ctx.root);
+    console.log(`=== Muse Memory Strict Integrity Audit ===`);
+    for (const c of report.checks) {
+      const statusIcon = c.passed ? "✓" : "✗";
+      console.log(`${statusIcon} ${c.name}: ${c.message}`);
+      if (c.errors && c.errors.length > 0) {
+        for (const err of c.errors) {
+          console.error(`  - ${err}`);
+        }
+      }
+    }
+    if (report.ok) {
+      console.log(`\n[pass] Strict Verification Passed (${report.passedChecks}/${report.totalChecks} gates clean)`);
+      return 0;
+    } else {
+      console.error(`\n[fail] Strict Verification Failed (${report.failedChecks}/${report.totalChecks} gates violated)`);
+      return 1;
+    }
+  }
+
   const id = positional[0];
-  if (!id) return usageError("verify requires <id>");
+  if (!id) return usageError("verify requires <id> or --strict");
   const timeout = flags["timeout"] ? parseInt(flags["timeout"], 10) : undefined;
   const result = await verifyEntry(ctx.store, ctx.root, ctx.memoryDir, id, { timeout });
   if (result.stdout?.trim()) console.log(result.stdout.trim());
