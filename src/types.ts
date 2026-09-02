@@ -58,6 +58,34 @@ export interface PromotionRecord {
   generalized_from?: string;
 }
 
+export type CodeAnchorKind =
+  | "repository"
+  | "file"
+  | "directory"
+  | "module"
+  | "symbol"
+  | "qualified_symbol"
+  | "route"
+  | "test"
+  | "commit"
+  | "pr";
+
+export type AnchorStatus = "valid" | "drifted" | "orphaned";
+
+export interface CodeAnchor {
+  id: string;
+  kind: CodeAnchorKind;
+  file_path: string;
+  symbol_name?: string;
+  qualified_name?: string;
+  structural_hash?: string;
+  signature?: string;
+  status?: AnchorStatus;
+  provider_metadata?: Record<string, any>;
+  created_at?: string;
+  verified_at?: string;
+}
+
 export type TemporalMode = "current" | "historical" | "timeless";
 
 export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED" | "STALE";
@@ -165,6 +193,8 @@ export interface MemoryEntry {
   archived_at?: string;
   /** Provenance record of promotion from local/project to project/global. */
   promotion?: PromotionRecord;
+  /** First-class code anchors linking this memory to files, symbols, and routes. */
+  anchors?: CodeAnchor[];
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -213,7 +243,10 @@ export type AuditOperation =
   | "negative_capture"
   | "promote"
   | "archive"
-  | "rehydrate";
+  | "rehydrate"
+  | "anchor_created"
+  | "anchor_verified"
+  | "anchor_drifted";
 
 export interface AuditEntry {
   timestamp: string;

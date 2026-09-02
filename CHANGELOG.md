@@ -5,6 +5,21 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-09-03
+
+### Added
+- **Native Code Anchors & Stable Structural Code Identity (`src/anchors/`)**:
+  - First-class code anchor entities independent of any external provider (`repository`, `file`, `directory`, `module`, `symbol`, `qualified_symbol`, `route`, `test`, `commit`, `pr`).
+  - Structural fingerprinting engine (`src/anchors/fingerprint.ts`): normalizes comments, punctuation spacing, and whitespace to generate stable, line-independent SHA-256 structural hashes.
+  - Immunity to line shifts, formatting, and documentation comments while remaining strictly sensitive to AST/logic changes.
+  - Balanced brace block extractor for functions, classes, methods, and arrow expressions.
+  - Code-aware drift and orphan verification (`src/anchors/resolver.ts`): detects deleted files/symbols (`orphaned`), code logic modifications (`drifted`), and verified matches (`valid`).
+  - Repository-wide anchor audit (`auditMemoryAnchors`): calculates store integrity score and flags degraded anchors with append-only audit trail logging.
+- **New MCP Tools for Code Anchors (`src/mcp.ts`)**:
+  - `memory_anchor_create`: Create and attach a structural code anchor to a memory entry.
+  - `memory_anchor_verify`: Verify code anchors on a memory entry against live repository files.
+  - `memory_anchor_audit`: Run repository-wide audit of all code anchors and compute integrity metrics.
+
 ## [1.17.0] - 2026-09-03
 
 ### Added
