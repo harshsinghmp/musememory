@@ -39,7 +39,24 @@ export type MemoryStatus =
   | "stale"
   | "disputed"
   | "rejected"
-  | "conflicted";
+  | "conflicted"
+  | "cold"
+  | "dormant"
+  | "archived";
+
+export type MemoryScope = "local" | "project" | "global";
+
+export interface PromotionRecord {
+  promoted_at: string;
+  from_scope: MemoryScope;
+  to_scope: MemoryScope;
+  policy: string;
+  successful_uses: number;
+  total_uses: number;
+  regressions: number;
+  confidence: string;
+  generalized_from?: string;
+}
 
 export type TemporalMode = "current" | "historical" | "timeless";
 
@@ -140,6 +157,14 @@ export interface MemoryEntry {
   canonical_id?: string;
   /** First-class negative lesson details (DO_NOT_USE / FAILED_APPROACH / BUG_PRONE_PATTERN). */
   negative?: NegativeMemoryDetails;
+  /** Memory scope: local (workspace), project (repo), global (cross-project). */
+  scope?: MemoryScope;
+  /** Reason for moving entry to cold/dormant/archived. */
+  archive_reason?: string;
+  /** ISO timestamp when entry was transitioned to cold/dormant/archived. */
+  archived_at?: string;
+  /** Provenance record of promotion from local/project to project/global. */
+  promotion?: PromotionRecord;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -151,6 +176,9 @@ export const STATUS_PENALTY: Record<MemoryStatus, number> = {
   disputed: -0.5,
   rejected: -1.0,
   conflicted: -0.8,
+  cold: -0.2,
+  dormant: -0.5,
+  archived: -0.9,
 };
 
 export const VERIFICATION_BONUS: Record<VerificationLevel, number> = {
@@ -182,7 +210,10 @@ export type AuditOperation =
   | "conflict_resolved"
   | "application_outcome"
   | "observation"
-  | "negative_capture";
+  | "negative_capture"
+  | "promote"
+  | "archive"
+  | "rehydrate";
 
 export interface AuditEntry {
   timestamp: string;
@@ -206,6 +237,8 @@ export interface SearchOptions {
   status?: MemoryStatus | string;
   verified?: boolean;
   tokenBudget?: number;
+  includeArchived?: boolean;
+  autoRehydrate?: boolean;
 }
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;

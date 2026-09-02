@@ -5,6 +5,28 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-09-03
+
+### Added
+- **Scoped Promotion & Generalization Engine (`src/promotion/`)**:
+  - 3-tier scope migration ladder: `LOCAL` (workspace/session) → `PROJECT` (repo `.memory/`) → `GLOBAL` (reusable cross-project `~/.memory/`).
+  - 5× Success Promotion Policy: enforces `>= 5` successful uses, 100% success rate, 0 regressions, 0 conflicts, and sufficient evidence before automatic global promotion.
+  - Generalization Engine (`src/promotion/generalization.ts`): scrubs specific repository file paths, line numbers, and commit hashes into universal architectural principles.
+  - Manual global promotion support bypassing 5× requirement with full provenance.
+  - Promotion audit records in `.memory/audit.jsonl` with operation `promote`.
+- **Extended Archival Lifecycle & Dynamic Rehydration (`src/promotion/archival.ts`)**:
+  - Multi-tier lifecycle: `ACTIVE` → `COLD` → `DORMANT` → `ARCHIVED`.
+  - Stale policy and utility evaluation sweeps automatically transitioning aging, unused, or superseded memories down the tier ladder.
+  - Dynamic Rehydration: automatically restores `ARCHIVED`/`DORMANT` memories to `ACTIVE`/`CONFIRMED` upon high retrieval query relevance match.
+  - Archival audit records with operations `archive` and `rehydrate`.
+- **New MCP Tools for Promotion and Lifecycle (`src/mcp.ts`)**:
+  - `memory_evaluate_promotion`: Evaluates an entry against the 3-tier promotion ladder and 5× success rule.
+  - `memory_promote`: Executes scoped promotion (local → project or project → global) with generalization.
+  - `memory_generalize`: Previews and tests content generalization.
+  - `memory_archive`: Transitions memory entries to cold, dormant, or archived tiers.
+  - `memory_rehydrate`: Restores archived memories back to active status.
+  - `memory_lifecycle_status`: Inspects store-wide lifecycle distribution and triggers optional archival sweeps.
+
 ## [1.16.0] - 2026-09-03
 
 ### Added

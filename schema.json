@@ -9,7 +9,7 @@
     "title": { "type": "string", "maxLength": 120 },
     "content": { "type": "string", "minLength": 1 },
     "project": { "type": "string", "minLength": 1 },
-    "status": { "type": "string", "enum": ["candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted"] },
+    "status": { "type": "string", "enum": ["candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted", "cold", "dormant", "archived"] },
     "type": { "type": "string", "enum": ["session", "decision", "fix", "failure", "architecture", "operation", "constraint", "preference", "discovery", "negative"] },
     "salience": { "type": "number", "minimum": 0, "maximum": 1 },
     "created_at": { "type": "string", "format": "date-time" },
@@ -98,6 +98,24 @@
         "reproduction_command": { "type": "string" },
         "evidence_snippet": { "type": "string" },
         "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] }
+      },
+      "additionalProperties": false
+    },
+    "scope": { "type": "string", "enum": ["local", "project", "global"] },
+    "archive_reason": { "type": "string" },
+    "archived_at": { "type": "string", "format": "date-time" },
+    "promotion": {
+      "type": "object",
+      "properties": {
+        "promoted_at": { "type": "string", "format": "date-time" },
+        "from_scope": { "type": "string", "enum": ["local", "project"] },
+        "to_scope": { "type": "string", "enum": ["project", "global"] },
+        "policy": { "type": "string" },
+        "successful_uses": { "type": "number" },
+        "total_uses": { "type": "number" },
+        "regressions": { "type": "number" },
+        "confidence": { "type": "string" },
+        "generalized_from": { "type": "string" }
       },
       "additionalProperties": false
     }

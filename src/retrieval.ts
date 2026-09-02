@@ -232,6 +232,8 @@ export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[],
  * Deep Context Query Engine:
  * Filters, ranks, and knapsack-packs relevant memories within token budgets.
  */
+export const searchMemories = queryContext;
+
 export function queryContext(
   store: Store,
   query: string = "",
@@ -246,6 +248,9 @@ export function queryContext(
   }
   if (!options.includeSuperseded) {
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
+  }
+  if (!options.includeArchived && options.status !== "archived") {
+    entries = entries.filter((e) => e.status !== "archived");
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
@@ -291,6 +296,18 @@ export function queryContext(
     for (const item of scored.slice(0, limit)) {
       results.push(item);
       totalTokensUsed += estimateEntryTokens(item.entry);
+    }
+  }
+
+  if (options.autoRehydrate) {
+    const { rehydrateMemory } = require("./promotion/archival.ts");
+    for (const item of results) {
+      if ((item.entry.status === "archived" || item.entry.status === "dormant" || item.entry.status === "cold") && item.score >= 0.65) {
+        try {
+          rehydrateMemory(store, item.entry.id, item.score, `Auto-rehydrated during search query '${query}'`);
+          item.entry.status = item.entry.verification?.level && item.entry.verification.level !== "unverified" ? "confirmed" : "active";
+        } catch {}
+      }
     }
   }
 
