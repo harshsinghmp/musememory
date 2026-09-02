@@ -68,7 +68,7 @@ import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
 import { verifyStrictIntegrity } from "./verify.ts";
-import { queryTieredContext, type RetrievalTier } from "./retrieval/tiered.ts";
+import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
 export function createServer(targetDir?: string): Server {
@@ -1013,6 +1013,23 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["id"],
         },
       },
+      {
+        name: "memory_ranked_retrieval",
+        description: "Multi-factor ranked retrieval fusing symbol matching, BM25, graph overlap, blast radius, recency, utility ROI, and negative warnings",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or natural language question" },
+            project: { type: "string", description: "Optional project scope filter" },
+            token_budget: { type: "number", description: "Optional token budget for knapsack packing" },
+            active_file_path: { type: "string", description: "Active file path in editor or workspace" },
+            target_symbol: { type: "string", description: "Specific symbol of interest" },
+            limit: { type: "number", description: "Max results to return (default: 10)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["query"],
+        },
+      },
     ],
   }));
 
@@ -1697,6 +1714,30 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const workspaceDir = a.dir ? String(a.dir) : activeRoot;
         const enriched = await enrichMemoryWithCodeIntel(activeStore, entry, workspaceDir);
         return toolResult(enriched);
+      }
+      case "memory_ranked_retrieval": {
+        const results = await rankAndRetrieveMemories(activeStore, String(a.query), {
+          project: a.project ? String(a.project) : undefined,
+          tokenBudget: a.token_budget ? Number(a.token_budget) : undefined,
+          activeFilePath: a.active_file_path ? String(a.active_file_path) : undefined,
+          targetSymbol: a.target_symbol ? String(a.target_symbol) : undefined,
+          limit: a.limit ? Number(a.limit) : 10,
+        });
+        return toolResult({
+          query: a.query,
+          count: results.length,
+          results: results.map((r) => ({
+            id: r.entry.id,
+            title: r.entry.title,
+            project: r.entry.project,
+            type: r.entry.type,
+            status: r.entry.status,
+            temporal_mode: r.entry.temporal_mode,
+            score: Number(r.score.toFixed(3)),
+            factors: r.factors,
+            content: r.entry.content,
+          })),
+        });
       }
       default:
         return toolError(`unknown tool ${name}`);
