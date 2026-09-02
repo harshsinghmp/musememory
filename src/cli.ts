@@ -67,6 +67,7 @@ import {
   handleLoopCommand,
 } from "./cli/evolution.ts";
 import { handleHealthCommand } from "./cli/health.ts";
+import { handleSyncCommand } from "./cli/sync.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -306,6 +307,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleLoopCommand(parsed);
     case "health":
       return handleHealthCommand(parsed);
+    case "sync":
+      return handleSyncCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);
