@@ -94,6 +94,7 @@ import {
   clusterRecurringBugsAndFriction,
   analyzeTechnicalDebt,
 } from "./cognition/index.ts";
+import { evaluateProjectHealth } from "./health/index.ts";
 import {
   resolveMuseContext,
   resolveCodeForMemory,
@@ -1395,6 +1396,16 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "muse_health",
+        description: "Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
     ];
 
     return { tools: filterToolsForProfile(allTools, activeProfile) };
@@ -2313,6 +2324,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "muse_tech_debt": {
         const report = analyzeTechnicalDebt(activeStore, activeRoot);
+        return toolResult(report);
+      }
+      case "muse_health": {
+        const report = evaluateProjectHealth(activeStore, activeRoot);
         return toolResult(report);
       }
       default:

@@ -32,6 +32,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   review: [
     "muse_context",
+    "muse_health",
     "muse_why",
     "muse_tech_debt",
     "memory_drift_audit",
@@ -43,6 +44,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   architecture: [
     "muse_context",
+    "muse_health",
     "muse_why",
     "muse_bug_clusters",
     "muse_tech_debt",
@@ -56,6 +58,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "memory_tree_index",
   ],
   maintenance: [
+    "muse_health",
     "memory_lifecycle_status",
     "memory_archive",
     "memory_rehydrate",
