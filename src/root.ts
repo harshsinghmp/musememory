@@ -33,6 +33,8 @@ export interface ResolveOptions {
  * Returns the global memory system directory (~/.memory or $MEMORY_DIR / $MUSEMEMORY_DIR).
  */
 export function getGlobalMemoryDir(): string {
+  const customGlobal = process.env.MUSEMEMORY_GLOBAL_DIR || process.env.MEMORY_GLOBAL_DIR;
+  if (customGlobal) return customGlobal;
   const custom = process.env.MEMORY_DIR || process.env.MUSEMEMORY_DIR;
   if (custom) return custom;
   const home = process.env.HOME || process.env.USERPROFILE || homedir();

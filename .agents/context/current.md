@@ -25,6 +25,7 @@
 16. **Pluggable Code Intelligence Architecture**: Pluggable provider registry with zero-crash fallback chain (CodeGraph → Graphify → LSP → Heuristic AST scanner → Safe Empty) and automated symbol evidence memory enrichment.
 17. **Multi-Factor Ranking Engine**: 11-dimension scoring model combining exact symbol matching, path proximity, FTS5 BM25, graph overlap, blast radius, recency decay, utility ROI, negative warning boosts, and knapsack token budget packing.
 18. **Context Compaction & Session Handoff Engine**: 70% context usage threshold detector, 5-invariant lockdown protocol, interruption-proof CURRENT.md checkpoint compilation, and continuous conversational knowledge harvesting.
+19. **Scoped Promotion, Generalization & Archival Lifecycle Engine**: 3-tier scope ladder (`local` → `project` → `global`), 5× repeated success policy gate, structural generalization of project specifics into universal principles, and extended archival lifecycle (`active` → `cold` → `dormant` → `archived`) with dynamic query rehydration.
 
 ---
 

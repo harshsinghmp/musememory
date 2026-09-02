@@ -69,6 +69,15 @@ import {
   generateSessionHandoff,
   harvestSessionMemories,
 } from "./compaction/index.ts";
+import {
+  evaluatePromotion,
+  promoteMemory,
+  generalizeContent,
+  evaluateArchival,
+  archiveMemory,
+  rehydrateMemory,
+  getLifecycleStats,
+} from "./promotion/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -1081,6 +1090,87 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["text", "project"],
         },
       },
+      {
+        name: "memory_evaluate_promotion",
+        description: "Evaluate a memory entry for promotion along the ladder: LOCAL -> PROJECT -> GLOBAL (5x success rule, zero regressions, zero conflicts, generalization)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to evaluate" },
+            force_manual: { type: "boolean", description: "Whether to evaluate manual promotion bypassing 5x requirement" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_promote",
+        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to promote" },
+            force_manual: { type: "boolean", description: "Manual promotion override bypassing automatic 5x threshold" },
+            generalized_content: { type: "string", description: "Optional custom generalized principle text" },
+            agent: { type: "string", description: "Optional agent or actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_generalize",
+        description: "Test and preview generalization of memory content: scrubs project-specific paths and extracts universal principles",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string", description: "Memory text to generalize" },
+            project: { type: "string", description: "Optional project name to scrub" },
+          },
+          required: ["content"],
+        },
+      },
+      {
+        name: "memory_archive",
+        description: "Transition a memory entry to cold, dormant, or archived tier with reason",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry" },
+            tier: { type: "string", enum: ["cold", "dormant", "archived"], description: "Target lifecycle tier" },
+            reason: { type: "string", description: "Reason for archiving or transitioning" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id", "tier", "reason"],
+        },
+      },
+      {
+        name: "memory_rehydrate",
+        description: "Restore an archived, dormant, or cold memory back to active/confirmed status upon relevance",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to rehydrate" },
+            score: { type: "number", description: "Relevance score that triggered rehydration (default: 1.0)" },
+            reason: { type: "string", description: "Optional rehydration rationale" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_lifecycle_status",
+        description: "Inspect store-wide memory lifecycle metrics: counts across active, cold, dormant, archived, scopes, and promotion readiness",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sweep: { type: "boolean", description: "Whether to execute an automatic archival sweep during inspection" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
     ],
   }));
 
@@ -1829,6 +1919,54 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult({
           harvestedCount: harvested.length,
           memories: harvested,
+        });
+      }
+      case "memory_evaluate_promotion": {
+        const entry = get(activeStore, String(a.id));
+        if (!entry) return toolError(`entry '${a.id}' not found`);
+        const evaluation = evaluatePromotion(entry, { forceManual: Boolean(a.force_manual) });
+        return toolResult(evaluation);
+      }
+      case "memory_promote": {
+        const result = promoteMemory(activeStore, String(a.id), {
+          forceManual: Boolean(a.force_manual),
+          customGeneralizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
+          actor: a.agent ? String(a.agent) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_generalize": {
+        const result = generalizeContent(String(a.content), {
+          projectName: a.project ? String(a.project) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_archive": {
+        const tier = String(a.tier) as "cold" | "dormant" | "archived";
+        const result = archiveMemory(activeStore, String(a.id), tier, String(a.reason), a.agent ? String(a.agent) : undefined);
+        return toolResult(result);
+      }
+      case "memory_rehydrate": {
+        const score = typeof a.score === "number" ? a.score : 1.0;
+        const result = rehydrateMemory(
+          activeStore,
+          String(a.id),
+          score,
+          a.reason ? String(a.reason) : undefined,
+          a.agent ? String(a.agent) : undefined,
+        );
+        return toolResult(result);
+      }
+      case "memory_lifecycle_status": {
+        let sweepResult = undefined;
+        if (Boolean(a.sweep)) {
+          const { autoArchiveSweep } = require("./promotion/archival.ts");
+          sweepResult = autoArchiveSweep(activeStore);
+        }
+        const stats = getLifecycleStats(activeStore);
+        return toolResult({
+          stats,
+          sweep: sweepResult,
         });
       }
       default:
