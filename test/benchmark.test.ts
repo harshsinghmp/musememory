@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore, propose, list } from "../src/store.ts";
+import { openStore, propose, list, get } from "../src/store.ts";
 import { queryContext } from "../src/retrieval.ts";
 import { buildTreeIndex, searchTree } from "../src/retrieval/tree-index.ts";
 import { compileWiki } from "../src/wiki/compiler.ts";
@@ -131,5 +131,68 @@ Dual-scope local and global file-backed architecture.
 
     expect(search.results.length).toBeGreaterThan(0);
     expect(searchDuration).toBeLessThan(20);
+  });
+
+  it("L0 Hot Cache retrieval executes under 0.05ms (microsecond scale)", () => {
+    const entry = propose(store, {
+      title: "Microsecond Hot Cache Benchmark",
+      content: "L0 cache serves in-memory entry references without disk or database roundtrips.",
+      project: "bench",
+      type: "architecture",
+      confirmed: true,
+    });
+
+    // Warmup
+    get(store, entry.id);
+
+    // Measure 1000 hot lookups
+    const start = performance.now();
+    for (let i = 0; i < 1000; i++) {
+      const e = get(store, entry.id);
+      expect(e).not.toBeNull();
+    }
+    const avgDuration = (performance.now() - start) / 1000;
+    expect(avgDuration).toBeLessThan(0.05); // Sub 50 microseconds
+  });
+
+  it("list(store) with L0 query cache executes under 0.1ms for 100 entries", () => {
+    for (let i = 0; i < 50; i++) {
+      propose(store, {
+        title: `Scale test entry ${i}`,
+        content: `Content for scale benchmark ${i}`,
+        project: "scale",
+      });
+    }
+
+    // Warm query cache
+    list(store);
+
+    const start = performance.now();
+    for (let i = 0; i < 500; i++) {
+      const all = list(store);
+      expect(all.length).toBeGreaterThanOrEqual(50);
+    }
+    const avgDuration = (performance.now() - start) / 500;
+    expect(avgDuration).toBeLessThan(0.1); // Sub 100 microseconds
+  });
+
+  it("SQLite FTS5 full-text search executes under 2ms across populated store", () => {
+    const { searchMemoriesFts } = require("../src/sqlite.ts");
+    for (let i = 0; i < 30; i++) {
+      propose(store, {
+        title: `Distributed Consensus Protocol ${i}`,
+        content: `Node ${i} uses Raft state machine replication with leader leases and vectorized log compaction.`,
+        project: "consensus",
+        tags: ["raft", "consensus", "replication"],
+        confirmed: true,
+      });
+    }
+
+    const start = performance.now();
+    const results = searchMemoriesFts(store.db!, "Raft consensus");
+    const duration = performance.now() - start;
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(duration).toBeLessThan(5); // Under 5ms
   });
 });

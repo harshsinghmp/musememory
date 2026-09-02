@@ -81,8 +81,9 @@ export async function verifyEntry(
   const nowIso = new Date(options.now ?? Date.now()).toISOString();
 
   if (result.ok) {
+    const wasCandidate = entry.status === "candidate";
     let updated: MemoryEntry | null = entry;
-    if (entry.status === "candidate") {
+    if (wasCandidate) {
       updated = confirm(store, id);
     } else {
       updated = { ...entry };
@@ -103,10 +104,10 @@ export async function verifyEntry(
         entry_id: id,
         project: entry.project,
         actor: "oracle",
-        details: { exit_code: 0, promoted: entry.status === "candidate", command: entry.test_command },
+        details: { exit_code: 0, promoted: wasCandidate, command: entry.test_command },
       });
     }
-    return { ...result, message: `verified: ${result.message}${entry.status === "candidate" ? "; promoted to confirmed" : ""}` };
+    return { ...result, message: `verified: ${result.message}${wasCandidate ? "; promoted to confirmed" : ""}` };
   }
 
   // Failure: leave status untouched, log the attempt

@@ -312,6 +312,15 @@ export function formatPromptContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): FormattedContext {
+  const cacheKey = store.cache
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}`
+    : undefined;
+
+  if (cacheKey && store.cache) {
+    const cached = store.cache.getContext(cacheKey);
+    if (cached) return cached;
+  }
+
   const result = queryContext(store, query, options);
   const constraints = memoryDir ? syncConstraints(memoryDir, store) : [];
   const userProfile = getUserProfile(memoryDir, { query });
@@ -420,11 +429,17 @@ export function formatPromptContext(
   parts.push("---");
   parts.push("*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call `memory_capture` immediately.*");
 
-  return {
+  const formatted: FormattedContext = {
     markdown: parts.join("\n").trim(),
     entries: result.results,
     totalTokensUsed: result.totalTokensUsed ?? 0,
     constraints,
     userProfile,
   };
+
+  if (cacheKey && store.cache) {
+    store.cache.setContext(cacheKey, formatted);
+  }
+
+  return formatted;
 }
