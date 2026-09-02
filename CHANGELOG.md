@@ -5,6 +5,24 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-09-03
+
+### Added
+- **Context Compaction & Interruption-Proof Session Handoff Engine (`src/compaction/`)**:
+  - Context usage evaluation enforcing the 70% threshold invariant: `"Context at 70%. Compact now or continue?"`.
+  - Canonical 5-invariant lockdown protocol:
+    1. High level goal of your build spec
+    2. Current architecture and data flow
+    3. What is already implemented and considered done
+    4. What is explicitly not done yet
+    5. The next concrete task we are working on
+  - Interruption-proof checkpoint compiler: writes structured handoffs into `.memory/CURRENT.md` with compact resumption prompt generation.
+  - Continuous Session Memory Harvester (`src/compaction/harvester.ts`): automatically extracts durable decisions, bug fixes, invariants, and negative lessons directly from conversational turns without user friction.
+- **New MCP Tools for Compaction and Harvesting (`src/mcp.ts`)**:
+  - `memory_compaction_check`: Check token usage against the 70% threshold.
+  - `memory_compact_handoff`: Lock down the 5 invariants and compile interruption-proof `CURRENT.md` handoff.
+  - `memory_harvest_turn`: Continuously harvest durable knowledge from agent turns.
+
 ## [1.15.0] - 2026-09-03
 
 ### Added
