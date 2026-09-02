@@ -5,6 +5,25 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-09-03
+
+### Added
+- **Flagship Unified Context Orchestrator (`src/orchestrator/context.ts`)**:
+  - `muse_context`: Single-call fused entry point accepting query, active file, symbol, error message, task intent, and token budget.
+  - Returns ranked memories, code anchor matches, negative anti-pattern warnings, active `CURRENT.md` constraints, and actionable next steps in one unified payload.
+  - Strict token-budget knapsack packing: prioritizes active invariants and negative lessons to prevent context overflow while preserving essential constraints.
+- **Bidirectional Code ↔ Memory Lookups (`src/orchestrator/bidirectional.ts`)**:
+  - `muse_code_for_memory`: Given a memory ID, extracts all anchored code files, symbols, and backtick references.
+  - `muse_memory_for_code`: Given a file path or symbol, returns all associated decisions, negative lessons, and constraints.
+- **Task-Focused MCP Profiles (`src/orchestrator/profiles.ts`)**:
+  - 6 dedicated profiles reducing agent context bloat: `core`, `coding`, `debugging`, `review`, `architecture`, `maintenance` (plus `full`).
+  - Filter tools dynamically via `MUSE_MCP_PROFILE` environment variable or `createServer` initialization.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `muse_context`: Flagship unified context fusion.
+  - `muse_code_for_memory`: Code reference extraction for memory entry.
+  - `muse_memory_for_code`: Associated memory search for codebase file/symbol.
+  - `muse_profile_list`: Profile inspector and tool definitions.
+
 ## [1.18.0] - 2026-09-03
 
 ### Added

@@ -84,6 +84,15 @@ import {
   attachAnchorToMemory,
   auditMemoryAnchors,
 } from "./anchors/index.ts";
+import {
+  resolveMuseContext,
+  resolveCodeForMemory,
+  resolveMemoryForCode,
+  listMcpProfiles,
+  filterToolsForProfile,
+  getActiveMcpProfile,
+  type McpProfile,
+} from "./orchestrator/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -91,7 +100,8 @@ import { verifyStrictIntegrity } from "./verify.ts";
 import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
-export function createServer(targetDir?: string): Server {
+export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
+  const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
   const { root, memoryDir } = findOrCreateProjectRoot(resolvedTarget);
   const store = openStore(memoryDir);
@@ -122,8 +132,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
     },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const allTools = [
       {
         name: "memory_read",
         description: "Read a full memory entry by id",
@@ -1220,8 +1230,64 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
-    ],
-  }));
+      {
+        name: "muse_context",
+        description: "FLAGSHIP UNIFIED CONTEXT ORCHESTRATOR: Single-call fusion of active constraints, ranked memories, code anchors, and negative lessons under a strict token budget with actionable next steps.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or task description" },
+            active_file: { type: "string", description: "Relative file path being edited" },
+            symbol: { type: "string", description: "Symbol name being edited or referenced" },
+            error_message: { type: "string", description: "Error message or stack trace if debugging" },
+            task_intent: {
+              type: "string",
+              enum: ["feature", "bugfix", "refactor", "review", "architecture", "general"],
+              description: "Intent of current task",
+            },
+            token_budget: { type: "number", description: "Maximum token budget to consume (default: 4000)" },
+            project: { type: "string", description: "Optional project filter" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "muse_code_for_memory",
+        description: "Bidirectional lookup: Given a memory ID, return all anchored code references, files, and symbols",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id"],
+        },
+      },
+      {
+        name: "muse_memory_for_code",
+        description: "Bidirectional lookup: Given a file path or symbol, return all associated memories, architectural decisions, bug fixes, constraints, and negative lessons",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Relative file path in workspace" },
+            symbol_name: { type: "string", description: "Optional symbol name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["file_path"],
+        },
+      },
+      {
+        name: "muse_profile_list",
+        description: "List all available task-focused MCP profiles (core, coding, debugging, review, architecture, maintenance, full) and their exposed tools",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+    ];
+
+    return { tools: filterToolsForProfile(allTools, activeProfile) };
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
@@ -2048,6 +2114,37 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "memory_anchor_audit": {
         const report = auditMemoryAnchors(activeStore, activeRoot);
         return toolResult(report);
+      }
+      case "muse_context": {
+        const result = await resolveMuseContext(activeStore, activeRoot, {
+          query: a.query ? String(a.query) : undefined,
+          active_file: a.active_file ? String(a.active_file) : undefined,
+          symbol: a.symbol ? String(a.symbol) : undefined,
+          error_message: a.error_message ? String(a.error_message) : undefined,
+          task_intent: a.task_intent as any,
+          token_budget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+          project: a.project ? String(a.project) : undefined,
+          dir: a.dir ? String(a.dir) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "muse_code_for_memory": {
+        const result = resolveCodeForMemory(activeStore, String(a.memory_id));
+        return toolResult(result);
+      }
+      case "muse_memory_for_code": {
+        const result = resolveMemoryForCode(activeStore, {
+          filePath: String(a.file_path),
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "muse_profile_list": {
+        const profiles = listMcpProfiles();
+        return toolResult({
+          active_profile: activeProfile,
+          profiles,
+        });
       }
       default:
         return toolError(`unknown tool ${name}`);
