@@ -1,0 +1,139 @@
+# CSS Custom Properties
+
+/* base.css — Design tokens as CSS custom properties */
+/* Import all token files, export as :root variables */
+
+:root {
+  /* Colors — Primary */
+  --color-primary: oklch(0.45 0.12 60);
+  --color-primary-light: oklch(0.55 0.10 60);
+  --color-primary-dark: oklch(0.35 0.14 60);
+
+  /* Colors — Secondary & Accent */
+  --color-secondary: oklch(0.65 0.08 150);
+  --color-accent: oklch(0.70 0.15 45);
+
+  /* Colors — Surface */
+  --color-surface: oklch(0.98 0.01 85);
+  --color-surface-elevated: oklch(1.00 0.00 0);
+
+  /* Colors — Text */
+  --color-text-primary: oklch(0.20 0.02 60);
+  --color-text-secondary: oklch(0.45 0.02 60);
+  --color-text-tertiary: oklch(0.60 0.01 60);
+
+  /* Colors — Border */
+  --color-border: oklch(0.88 0.01 85);
+  --color-border-strong: oklch(0.78 0.02 85);
+
+  /* Colors — Semantic */
+  --color-success: oklch(0.65 0.18 145);
+  --color-error: oklch(0.55 0.20 25);
+  --color-warning: oklch(0.75 0.15 80);
+  --color-info: oklch(0.65 0.12 250);
+
+  /* Typography — Font Family */
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Typography — Sizes (fluid) */
+  --text-xs: clamp(0.625rem, 0.5rem + 0.25vw, 0.75rem);
+  --text-sm: clamp(0.75rem, 0.65rem + 0.25vw, 0.875rem);
+  --text-base: clamp(0.875rem, 0.8rem + 0.2vw, 1rem);
+  --text-lg: clamp(1rem, 0.9rem + 0.3vw, 1.125rem);
+  --text-xl: clamp(1.125rem, 1rem + 0.5vw, 1.25rem);
+  --text-2xl: clamp(1.25rem, 1rem + 1vw, 1.5rem);
+  --text-3xl: clamp(1.5rem, 1.2rem + 1.5vw, 2rem);
+  --text-4xl: clamp(1.875rem, 1.5rem + 2vw, 2.5rem);
+  --text-5xl: clamp(2.25rem, 1.8rem + 2.5vw, 3rem);
+
+  /* Typography — Weight */
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Typography — Line Height */
+  --leading-tight: 1.2;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Spacing (fluid) */
+  --space-0: 0;
+  --space-1: clamp(0.25rem, 0.2rem + 0.1vw, 0.25rem);
+  --space-2: clamp(0.5rem, 0.4rem + 0.2vw, 0.5rem);
+  --space-3: clamp(0.75rem, 0.6rem + 0.3vw, 0.75rem);
+  --space-4: clamp(1rem, 0.8rem + 0.4vw, 1rem);
+  --space-5: clamp(1.25rem, 1rem + 0.5vw, 1.25rem);
+  --space-6: clamp(1.5rem, 1.2rem + 0.6vw, 1.5rem);
+  --space-8: clamp(2rem, 1.6rem + 0.8vw, 2rem);
+  --space-10: clamp(2.5rem, 2rem + 1vw, 2.5rem);
+  --space-12: clamp(3rem, 2.4rem + 1.2vw, 3rem);
+  --space-16: clamp(4rem, 3.2rem + 1.6vw, 4rem);
+  --space-20: clamp(5rem, 4rem + 2vw, 5rem);
+  --space-24: clamp(6rem, 4.8rem + 2.4vw, 6rem);
+
+  /* Radius */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.07), 0 2px 4px -2px oklch(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.08), 0 4px 6px -4px oklch(0 0 0 / 0.04);
+  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.04);
+
+  /* Motion — Duration */
+  --duration-instant: 0ms;
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 350ms;
+  --duration-slower: 500ms;
+
+  /* Motion — Easing */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --color-surface: oklch(0.15 0.01 60);
+  --color-surface-elevated: oklch(0.20 0.01 60);
+  --color-text-primary: oklch(0.95 0.01 85);
+  --color-text-secondary: oklch(0.75 0.01 85);
+  --color-text-tertiary: oklch(0.55 0.01 85);
+  --color-border: oklch(0.25 0.01 60);
+  --color-border-strong: oklch(0.35 0.01 60);
+}
+
+/* System preference fallback */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-surface: oklch(0.15 0.01 60);
+    --color-surface-elevated: oklch(0.20 0.01 60);
+    --color-text-primary: oklch(0.95 0.01 85);
+    --color-text-secondary: oklch(0.75 0.01 85);
+    --color-text-tertiary: oklch(0.55 0.01 85);
+    --color-border: oklch(0.25 0.01 60);
+    --color-border-strong: oklch(0.35 0.01 60);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

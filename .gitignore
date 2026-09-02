@@ -69,8 +69,9 @@ Thumbs.db
 # local QA artifacts
 dogfood-output/
 
-# Allow tracking of agent skills
+# Allow tracking of agent system and skills
 !.agents/
-!.agents/skills/**
+!.agents/**
 !skills/
 !skills/**
+.crush/
