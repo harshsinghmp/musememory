@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-368%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-480%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -24,16 +24,17 @@
 
 ---
 
-## 🚀 What's New in v1.11.0 (Cognitive Engine Evolution & Hardening)
+## 🚀 What's New in v2.0.0 (Autonomous Cognitive Engine Major Overhaul)
 
-- **📜 Provenance & Source Ledger (`.memory/sources.json` / `memory source`)**: Records all external documentation, research papers, RFCs, and authoritative URLs with retrieval timestamps, authors, and classification tags.
-- **🔍 Evidence-Grounded Claim Ledger (`.memory/claims.json` / `memory claim`)**: Connects atomic memories to verifiable claims tagged with strict confidence ratings: `[RAW]` (locally verified), `[FETCH]` (authoritative URL), `[SEARCH]` (search-synthesized), and `[INFER]` (agent deduction).
-- **⚡ Deterministic Tiered Retrieval Engine (`--tier 0|1|2`)**: Bounded 3-tier retrieval prevents context stuffing: **Tier 0 (Manifest)** index (~50 tokens), **Tier 1 (Routing Set)** (~300 tokens), and **Tier 2 (Bounded Bodies)** fitted greedily into the knapsack token budget.
-- **🧊 Frozen Execution Snapshots (`memory freeze`)**: Captures immutable run state (`.memory/runs/<run-id>/snapshot.json`) combining task specs, workspace file inventory, git SHA, active constraints, and SHA-256 memory hashes for deterministic regression replay.
-- **📝 Native Structured Prompt Registry (`memory prompt`)**: Reusable structured prompt templates with live memory context injection (includes built-in `morning-standup`, `drift-audit`, `pre-publish-audit`, `sprint-compounding`).
-- **⏳ Multi-Scale Temporal Compounding (`memory rollup`)**: Aggregates atomic session memories into weekly (`YYYY-Www.md`), monthly (`YYYY-MM.md`), and quarterly (`YYYY-QN.md`) synthesis wiki pages, and compiles the `.memory/HOT.md` instant working memory cache.
-- **🔄 Gauntlet Iteration Ledger & Plateau Detector (`memory loop`)**: Multi-agent improvement loop ledger (`.memory/iterations.jsonl`) that detects plateaus and regression signals to halt runaway token consumption.
-- **🛡️ Strict Integrity & Health Gate (`memory verify --strict`)**: Zero-tolerance audit verifying zero secret credentials, referential link integrity, wikilink resolution, orphaned candidate retention, and claim-to-source completeness.
+- **🏥 Unified 5-Pillar Project Health Gate (`memory health` / `muse_health`)**: Comprehensive single-call architectural and memory health audit scoring Store Integrity, Code Anchor Validity, Doc $\leftrightarrow$ Code Alignment, Negative Sentry, and Technical Debt with letter grades (A-F), PASS/WARN/FAIL status, and automated remediation checklists.
+- **🧠 Autonomous Engineering Cognition & "Why" Reasoner (`muse_why`)**: Traces code evolution backwards through past bug fixes, ADRs, accepted trade-offs, and invariants to explain *why* code was built the way it is before refactoring.
+- **🏛️ First-Class Architecture Decision Records (`memory_adr_record` / `memory_adr_list`)**: ADRs as queryable, scored, living memory units with options considered, consequences, native code anchors, and supersession lineage.
+- **🔄 Bidirectional Documentation $\leftrightarrow$ Code Drift Engine (`memory_drift_audit`)**: Continuously verifies that documented architectural invariants match live implementation and flags missing, stale, or conflicting code.
+- **🎯 Flagship Unified Context Orchestrator (`muse_context`)**: Single-call fused entry point combining search, active file, symbol, error messages, and task intent under strict knapsack token budgets.
+- **⚙️ Task-Focused MCP Profiles**: Solves agent tool bloat with role-tailored tool filtering profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`).
+- **⚓ Native Structural Code Anchors (`src/anchors/`)**: Line-independent structural hashing invariant to comment/spacing edits while strictly sensitive to AST/logic modifications.
+- **🪜 Scoped Promotion & Extended Archival Lifecycle (`src/promotion/`)**: 3-tier promotion ladder (`local` $\rightarrow$ `project` $\rightarrow$ `global`), 5× repeated success policy, universal generalization, and `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with dynamic query rehydration.
+- **⚡ Hot Query Cache & Multi-Factor Retrieval**: Microsecond caching, SQLite WAL optimization, and 11-dimension retrieval scoring.
 
 ---
 

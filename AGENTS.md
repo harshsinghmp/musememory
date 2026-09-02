@@ -45,6 +45,6 @@ Load these relative modules on-demand when relevant to your active task:
 - 📖 [Durable Context Map](./.agents/context/index.md) — Central navigation index for Muse Memory durable truth.
 - 📦 [Product Scope & Capabilities](./.agents/context/product.md) — CLI commands, binary aliases, and MCP tool matrix.
 - 🏗️ [Architecture & Storage Layout](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, and repo layout.
-- 📍 [Current Shipped State](./.agents/context/current.md) — v1.11.0 status, active test suites, and system invariants.
+- 📍 [Current Shipped State](./.agents/context/current.md) — v2.0.0 status, active test suites, and system invariants.
 - 🏛️ [Locked Architectural Decisions](./.agents/context/decisions.md) — ADRs (zero-daemon, dual persistence, MCP stdio).
 - 🗺️ [Roadmap & Backlog](./.agents/context/roadmap.md) — Active roadmap and planned milestones.

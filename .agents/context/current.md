@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v1.11.0`  
-> **Status**: Production / Published to npm (`musememory`)
+> **Version**: `v2.0.0`  
+> **Status**: Production Release (Autonomous Cognitive Engine Overhaul)
 
 ---
 
