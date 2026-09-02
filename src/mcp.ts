@@ -64,6 +64,11 @@ import {
   defaultRegistry,
   enrichMemoryWithCodeIntel,
 } from "./intelligence/index.ts";
+import {
+  evaluateContextUsage,
+  generateSessionHandoff,
+  harvestSessionMemories,
+} from "./compaction/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -1030,6 +1035,52 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["query"],
         },
       },
+      {
+        name: "memory_compaction_check",
+        description: "Evaluate context usage against the 70% threshold and prompt if compaction is needed",
+        inputSchema: {
+          type: "object",
+          properties: {
+            used_tokens: { type: "number", description: "Current estimated token usage in session" },
+            max_tokens: { type: "number", description: "Maximum model context window (default: 200000)" },
+          },
+          required: ["used_tokens"],
+        },
+      },
+      {
+        name: "memory_compact_handoff",
+        description: "Lock the 5 mandatory invariants and write an interruption-proof session handoff to CURRENT.md before context reset",
+        inputSchema: {
+          type: "object",
+          properties: {
+            high_level_goal: { type: "string", description: "1. High level goal of your build spec" },
+            current_architecture: { type: "string", description: "2. Current architecture and data flow" },
+            completed_tasks: { type: "array", items: { type: "string" }, description: "3. What is already implemented and considered done" },
+            open_tasks: { type: "array", items: { type: "string" }, description: "4. What is explicitly not done yet" },
+            next_concrete_task: { type: "string", description: "5. The next concrete task we are working on" },
+            active_constraints: { type: "array", items: { type: "string" }, description: "Optional active constraints" },
+            decisions_made: { type: "array", items: { type: "string" }, description: "Optional key decisions made" },
+            session_id: { type: "string", description: "Optional session ID" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["high_level_goal", "current_architecture", "completed_tasks", "open_tasks", "next_concrete_task"],
+        },
+      },
+      {
+        name: "memory_harvest_turn",
+        description: "Continuous conversational harvester: automatically extract architectural decisions, fixes, and negative lessons from turn text",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "Conversational turn text or reasoning" },
+            project: { type: "string", description: "Project scope name" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["text", "project"],
+        },
+      },
     ],
   }));
 
@@ -1737,6 +1788,47 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             factors: r.factors,
             content: r.entry.content,
           })),
+        });
+      }
+      case "memory_compaction_check": {
+        const evaluation = evaluateContextUsage(
+          Number(a.used_tokens),
+          a.max_tokens ? Number(a.max_tokens) : undefined,
+        );
+        return toolResult(evaluation);
+      }
+      case "memory_compact_handoff": {
+        const result = generateSessionHandoff(
+          activeMemoryDir,
+          {
+            highLevelGoal: String(a.high_level_goal),
+            currentArchitecture: String(a.current_architecture),
+            completedTasks: Array.isArray(a.completed_tasks) ? a.completed_tasks.map(String) : [],
+            openTasks: Array.isArray(a.open_tasks) ? a.open_tasks.map(String) : [],
+            nextConcreteTask: String(a.next_concrete_task),
+            activeConstraints: Array.isArray(a.active_constraints) ? a.active_constraints.map(String) : undefined,
+            decisionsMade: Array.isArray(a.decisions_made) ? a.decisions_made.map(String) : undefined,
+          },
+          {
+            agent: a.agent ? String(a.agent) : undefined,
+            sessionId: a.session_id ? String(a.session_id) : undefined,
+            project: a.project ? String(a.project) : undefined,
+          },
+        );
+        return toolResult(result);
+      }
+      case "memory_harvest_turn": {
+        const harvested = harvestSessionMemories(
+          activeStore,
+          String(a.text),
+          {
+            project: String(a.project),
+            actor: a.agent ? String(a.agent) : undefined,
+          },
+        );
+        return toolResult({
+          harvestedCount: harvested.length,
+          memories: harvested,
         });
       }
       default:
