@@ -45,6 +45,9 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb = new Database(dbPath, { create: true });
     rawDb.run("PRAGMA journal_mode = WAL;");
     rawDb.run("PRAGMA synchronous = NORMAL;");
+    rawDb.run("PRAGMA cache_size = -64000;");
+    rawDb.run("PRAGMA mmap_size = 268435456;");
+    rawDb.run("PRAGMA temp_store = MEMORY;");
 
     const db: SqliteDatabase = {
       exec(sql: string) {
@@ -82,6 +85,9 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb = new DatabaseSync(dbPath);
     rawDb.exec("PRAGMA journal_mode = WAL;");
     rawDb.exec("PRAGMA synchronous = NORMAL;");
+    rawDb.exec("PRAGMA cache_size = -64000;");
+    rawDb.exec("PRAGMA mmap_size = 268435456;");
+    rawDb.exec("PRAGMA temp_store = MEMORY;");
 
     const db: SqliteDatabase = {
       exec(sql: string) {
@@ -149,7 +155,30 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
     CREATE INDEX IF NOT EXISTS idx_memories_due_at ON memories(due_at);
     CREATE INDEX IF NOT EXISTS idx_memories_updated_at ON memories(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
+    CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+      id UNINDEXED,
+      title,
+      content,
+      tags,
+      tokenize = 'unicode61'
+    );
   `);
+
+  // Backfill FTS index if memories table has records but FTS table is empty
+  try {
+    const ftsCount = db.query<{ count: number }>(`SELECT count(*) as count FROM memories_fts`).get();
+    const memCount = db.query<{ count: number }>(`SELECT count(*) as count FROM memories`).get();
+    if ((ftsCount?.count ?? 0) === 0 && (memCount?.count ?? 0) > 0) {
+      db.exec(`
+        INSERT OR IGNORE INTO memories_fts (id, title, content, tags)
+        SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') FROM memories;
+      `);
+    }
+  } catch {}
 }
 
 export interface DbMemoryRow {
@@ -228,6 +257,15 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
     entry.created_at,
     entry.updated_at,
   ]);
+
+  // Synchronize FTS5 virtual table
+  try {
+    db.run(`DELETE FROM memories_fts WHERE id = ?`, [entry.id]);
+    db.run(
+      `INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`,
+      [entry.id, entry.title, entry.content, (entry.tags ?? []).join(" ")],
+    );
+  } catch {}
 }
 
 export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | null {
@@ -269,6 +307,66 @@ export function listMemories(
 export function deleteMemoryById(db: SqliteDatabase, id: string): boolean {
   const existing = getMemoryById(db, id);
   if (!existing) return false;
+  try {
+    db.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
+  } catch {}
   db.run(`DELETE FROM memories WHERE id = ?`, [id]);
   return true;
 }
+
+/**
+ * High-speed BM25 full-text search directly inside SQLite using FTS5.
+ */
+export function searchMemoriesFts(
+  db: SqliteDatabase,
+  query: string,
+  filters?: { project?: string; type?: string; status?: string; limit?: number },
+): { entry: MemoryEntry; rank: number }[] {
+  const cleanQuery = query.trim().replace(/['"*]/g, "");
+  if (!cleanQuery) return [];
+
+  // Match tokens with prefix search
+  const terms = cleanQuery.split(/\s+/).filter(Boolean).map((t) => `"${t}"*`).join(" OR ");
+  let sql = `
+    SELECT m.*, bm25(memories_fts) as rank
+    FROM memories_fts f
+    JOIN memories m ON f.id = m.id
+    WHERE memories_fts MATCH ?
+  `;
+  const conditions: string[] = [];
+  const params: unknown[] = [terms];
+
+  if (filters?.project) {
+    conditions.push(`m.project = ?`);
+    params.push(filters.project);
+  }
+  if (filters?.type) {
+    conditions.push(`m.type = ?`);
+    params.push(filters.type);
+  }
+  if (filters?.status) {
+    conditions.push(`m.status = ?`);
+    params.push(filters.status);
+  }
+
+  if (conditions.length > 0) {
+    sql += ` AND ` + conditions.join(` AND `);
+  }
+  sql += ` ORDER BY rank ASC`;
+
+  if (filters?.limit) {
+    sql += ` LIMIT ?`;
+    params.push(filters.limit);
+  }
+
+  try {
+    const rows = db.query<DbMemoryRow & { rank: number }>(sql).all(params);
+    return rows.map((r) => ({
+      entry: rowToMemoryEntry(r),
+      rank: r.rank,
+    }));
+  } catch {
+    return [];
+  }
+}
+

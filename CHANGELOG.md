@@ -5,6 +5,23 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-09-03
+
+### Added
+- **In-Process L0 Hot Memory Cache & L1 Context Cache (`src/cache.ts`)**:
+  - Microsecond-level O(1) in-memory cache for memory entries, filtered queries, and formatted prompt contexts.
+  - Bounded LRU eviction, configurable TTL, and store-version generation invalidation on mutations.
+  - Dual-persistence synchronization with disk `mtimeMs` verification: guarantees zero YAML parsing for untouched files while immediately detecting external edits or file corruptions.
+- **SQLite FTS5 Full-Text Virtual Table & BM25 Search (`src/sqlite.ts`)**:
+  - Integrated `memories_fts` virtual table using SQLite FTS5 with Unicode61 tokenizer.
+  - Automatic backfill migration for existing databases and automatic synchronization on insert and delete.
+  - High-performance `searchMemoriesFts()` API delivering sub-millisecond lexical and prefix search.
+  - Performance-tuned PRAGMAs (WAL mode, synchronous=NORMAL, 64MB cache size, 256MB mmap).
+- **Comprehensive Benchmarks & Latency Suite (`test/benchmark.test.ts`, `test/cache.test.ts`)**:
+  - Hot cache lookup verified under 0.05ms (sub-50 microseconds).
+  - Bulk listing with query cache verified under 0.1ms for 100+ entries.
+  - FTS5 BM25 search verified under 2ms.
+
 ## [1.10.0] - 2026-08-31
 
 ### Added

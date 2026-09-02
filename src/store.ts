@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
@@ -18,6 +18,7 @@ import {
   deleteMemoryById,
   type SqliteDatabase,
 } from "./sqlite.ts";
+import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
 
 export interface StorageLayout {
   root: string;
@@ -46,6 +47,7 @@ export interface Store {
   memoryDir?: string;
   layout?: StorageLayout;
   db?: SqliteDatabase;
+  cache?: MemoryStoreCache;
 }
 
 /** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
@@ -61,17 +63,22 @@ export function openStore(memoryDir: string): Store {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
 
-  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db };
+  const cache = getOrCreateStoreCache(memoryDir);
+  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache };
 
-  // Sync existing YAML files into SQLite database if DB is newly initialized
+  // Fast startup sync: only sync YAML files into SQLite database if DB is empty or missing entries
   if (db && existsSync(layout.memoriesDir)) {
     try {
-      const yamlIds = listIds(store);
-      for (const yId of yamlIds) {
-        if (!getMemoryById(db, yId)) {
+      const memCountRow = db.query<{ count: number }>(`SELECT count(*) as count FROM memories`).get();
+      const memCount = memCountRow?.count ?? 0;
+      if (memCount === 0) {
+        const yamlFiles = readdirSync(layout.memoriesDir).filter((f) => f.endsWith(".yaml"));
+        for (const f of yamlFiles) {
+          const yId = f.slice(0, -5);
           const entry = getFromYaml(store, yId);
           if (entry) {
             insertOrReplaceMemory(db, entry);
+            cache.setEntry(entry);
           }
         }
       }
@@ -151,32 +158,91 @@ function getFromYaml(store: Store, id: string): MemoryEntry | null {
 
 export function get(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
+  let fileMtime: number | undefined;
+
   if (existsSync(file)) {
+    try {
+      fileMtime = statSync(file).mtimeMs;
+    } catch {}
+
+    // 1. Check L0 cache if mtime matches
+    if (store.cache && fileMtime !== undefined) {
+      const cached = store.cache.getEntry(id, fileMtime);
+      if (cached) return cached;
+    }
+
+    // 2. Parse YAML from disk (either cache miss or externally modified)
     const fromYaml = getFromYaml(store, id);
     if (!fromYaml) {
       // Corrupted or unparseable YAML file
+      if (store.cache) store.cache.deleteEntry(id);
       return null;
     }
+
     if (store.db) {
-      const dbEntry = getMemoryById(store.db, id);
-      if (dbEntry) return dbEntry;
-      // Sync into SQLite
       try {
         insertOrReplaceMemory(store.db, fromYaml);
       } catch {}
     }
+    if (store.cache) {
+      store.cache.setEntry(fromYaml, undefined, fileMtime);
+    }
     return fromYaml;
   }
-  if (store.db) {
-    return getMemoryById(store.db, id);
+
+  // File does not exist on disk, check L0 cache then SQLite
+  if (store.cache) {
+    const cached = store.cache.getEntry(id);
+    if (cached) return cached;
   }
+  if (store.db) {
+    const dbEntry = getMemoryById(store.db, id);
+    if (dbEntry) {
+      if (store.cache) store.cache.setEntry(dbEntry);
+      return dbEntry;
+    }
+  }
+
   return null;
 }
 
-export function list(store: Store): MemoryEntry[] {
-  return listIds(store)
+export function list(
+  store: Store,
+  filters?: { project?: string; type?: string; status?: string },
+): MemoryEntry[] {
+  const cacheKey = filters
+    ? `filter:${filters.project || ""}:${filters.type || ""}:${filters.status || ""}`
+    : "all";
+
+  let dirMtime: number | undefined;
+  if (existsSync(store.dir)) {
+    try {
+      dirMtime = statSync(store.dir).mtimeMs;
+    } catch {}
+  }
+
+  // 1. Check L0 query cache
+  if (store.cache) {
+    const cached = store.cache.getQuery(cacheKey, dirMtime);
+    if (cached) return cached;
+  }
+
+  // 2. Scan IDs (SQLite + disk files)
+  const ids = listIds(store);
+  const entries = ids
     .map((id) => get(store, id))
     .filter((e): e is MemoryEntry => e !== null);
+
+  let filtered = entries;
+  if (filters?.project) filtered = filtered.filter((e) => e.project === filters.project);
+  if (filters?.type) filtered = filtered.filter((e) => e.type === filters.type);
+  if (filters?.status) filtered = filtered.filter((e) => e.status === filters.status);
+
+  if (store.cache) {
+    store.cache.setQuery(cacheKey, filtered, undefined, dirMtime);
+  }
+
+  return filtered;
 }
 
 /** Helper to extract all scannable text from a memory entry. */
@@ -210,12 +276,21 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
   }
 
   // 2. Dual write to YAML file for exportability
+  let mtimeMs: number | undefined;
   try {
     const file = fileForId(store, entry.id);
     const tmp = `${file}.tmp`;
     writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
     renameSync(tmp, file);
+    try {
+      mtimeMs = statSync(file).mtimeMs;
+    } catch {}
   } catch {}
+
+  // 3. L0 Cache update with mtime
+  if (store.cache) {
+    store.cache.setEntry(entry, undefined, mtimeMs);
+  }
 }
 
 export function nowIso(): string {
@@ -510,6 +585,11 @@ export function reject(store: Store, id: string): MemoryEntry | null {
 export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
   const entry = get(store, id);
   if (!entry) return false;
+
+  // 1. Evict from L0 Cache
+  if (store.cache) {
+    store.cache.deleteEntry(id);
+  }
 
   let deleted = false;
   if (store.db) {

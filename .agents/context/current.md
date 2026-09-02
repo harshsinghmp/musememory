@@ -14,6 +14,8 @@
 5. **Universal Migrator**: Imports memories from 24+ external formats (AgentMemory, Mem0, Letta, etc.).
 6. **Vibeguard Secret Defense**: Built-in regex scanner preventing credential commits to memory.
 7. **Compounding & Rollups**: Temporal rollups and token-bag centroid clustering.
+8. **In-Process L0 Hot Memory Cache & L1 Context Cache**: Sub-50 microsecond entry lookups, O(1) query caching, and mtime-synchronized dual persistence.
+9. **SQLite FTS5 BM25 Engine**: Integrated full-text search virtual tables with sub-2ms lexical search.
 
 ---
 
