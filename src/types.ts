@@ -8,7 +8,32 @@ export type MemoryType =
   | "constraint"
   | "preference"
   | "discovery"
-  | "negative";
+  | "negative"
+  | "adr";
+
+export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
+
+export interface AdrOption {
+  title: string;
+  pros?: string[];
+  cons?: string[];
+  rejected_reason?: string;
+}
+
+export interface AdrDetails {
+  adr_number: number;
+  status: AdrStatus;
+  decision: string;
+  drivers?: string[];
+  consequences?: {
+    positive?: string[];
+    negative?: string[];
+    neutral?: string[];
+  };
+  options_considered?: AdrOption[];
+  supersedes?: string;
+  superseded_by?: string;
+}
 
 export interface NegativeMemoryDetails {
   failed_approach: string;
@@ -195,6 +220,8 @@ export interface MemoryEntry {
   promotion?: PromotionRecord;
   /** First-class code anchors linking this memory to files, symbols, and routes. */
   anchors?: CodeAnchor[];
+  /** First-class Architecture Decision Record (ADR) metadata. */
+  adr?: AdrDetails;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -246,7 +273,10 @@ export type AuditOperation =
   | "rehydrate"
   | "anchor_created"
   | "anchor_verified"
-  | "anchor_drifted";
+  | "anchor_drifted"
+  | "adr_recorded"
+  | "adr_superseded"
+  | "drift_detected";
 
 export interface AuditEntry {
   timestamp: string;

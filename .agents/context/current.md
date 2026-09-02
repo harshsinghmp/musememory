@@ -28,6 +28,7 @@
 19. **Scoped Promotion, Generalization & Archival Lifecycle Engine**: 3-tier scope ladder (`local` → `project` → `global`), 5× repeated success policy gate, structural generalization of project specifics into universal principles, and extended archival lifecycle (`active` → `cold` → `dormant` → `archived`) with dynamic query rehydration.
 20. **Native Code Anchors & Stable Structural Code Identity**: First-class code anchors (`repository`, `file`, `module`, `symbol`, `route`, `test`), line-independent structural fingerprinting with comment/spacing normalization, and live drift/orphan verification (`valid`, `drifted`, `orphaned`) with repository audit scoring.
 21. **Flagship Unified Context Orchestrator & Task-Focused MCP Profiles**: Flagship `muse_context` tool fusing active constraints, code anchors, ranked memories, and negative lessons under strict token budgets with suggested next actions; bidirectional code ↔ memory lookups (`muse_code_for_memory`, `muse_memory_for_code`); and 6 task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`) preventing agent tool bloat.
+22. **First-Class Architecture Decision Records (ADRs) & Bidirectional Drift Engine**: ADRs as living memory entities (`proposed`, `accepted`, `superseded`, `rejected`) with native code anchors and supersession lineage; bidirectional documentation ↔ code drift engine classifying alignment (`DOCUMENTED`, `IMPLEMENTED`, `PARTIAL`, `CONFLICTING`, `STALE`, `MISSING`) and scoring repository health.
 
 ---
 

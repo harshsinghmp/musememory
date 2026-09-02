@@ -30,6 +30,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   review: [
     "muse_context",
+    "memory_drift_audit",
     "memory_anchor_audit",
     "memory_conflict_detect",
     "memory_tree_search",
@@ -38,6 +39,8 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   architecture: [
     "muse_context",
+    "memory_adr_record",
+    "memory_adr_list",
     "memory_evaluate_promotion",
     "memory_promote",
     "memory_generalize",

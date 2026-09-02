@@ -10,7 +10,7 @@
     "content": { "type": "string", "minLength": 1 },
     "project": { "type": "string", "minLength": 1 },
     "status": { "type": "string", "enum": ["candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted", "cold", "dormant", "archived"] },
-    "type": { "type": "string", "enum": ["session", "decision", "fix", "failure", "architecture", "operation", "constraint", "preference", "discovery", "negative"] },
+    "type": { "type": "string", "enum": ["session", "decision", "fix", "failure", "architecture", "operation", "constraint", "preference", "discovery", "negative", "adr"] },
     "salience": { "type": "number", "minimum": 0, "maximum": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
@@ -139,6 +139,39 @@
         },
         "additionalProperties": false
       }
+    },
+    "adr": {
+      "type": "object",
+      "required": ["adr_number", "status", "decision"],
+      "properties": {
+        "adr_number": { "type": "number" },
+        "status": { "type": "string", "enum": ["proposed", "accepted", "superseded", "rejected"] },
+        "drivers": { "type": "array", "items": { "type": "string" } },
+        "decision": { "type": "string" },
+        "consequences": {
+          "type": "object",
+          "properties": {
+            "positive": { "type": "array", "items": { "type": "string" } },
+            "negative": { "type": "array", "items": { "type": "string" } },
+            "neutral": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "options_considered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "pros": { "type": "array", "items": { "type": "string" } },
+              "cons": { "type": "array", "items": { "type": "string" } },
+              "rejected_reason": { "type": "string" }
+            }
+          }
+        },
+        "supersedes": { "type": "string" },
+        "superseded_by": { "type": "string" }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

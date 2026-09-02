@@ -85,6 +85,11 @@ import {
   auditMemoryAnchors,
 } from "./anchors/index.ts";
 import {
+  recordAdr,
+  listAdrs,
+  detectDocumentationCodeDrift,
+} from "./adrs/index.ts";
+import {
   resolveMuseContext,
   resolveCodeForMemory,
   resolveMemoryForCode,
@@ -1284,6 +1289,73 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           properties: {},
         },
       },
+      {
+        name: "memory_adr_record",
+        description: "Record a first-class Architecture Decision Record (ADR) as an active, queryable memory with drivers, decision, consequences, options, and code anchors",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Title of the architectural decision" },
+            context_and_drivers: {
+              type: "array",
+              items: { type: "string" },
+              description: "Key architectural context and problem drivers",
+            },
+            decision: { type: "string", description: "The architectural decision made" },
+            consequences: {
+              type: "object",
+              properties: {
+                positive: { type: "array", items: { type: "string" } },
+                negative: { type: "array", items: { type: "string" } },
+                neutral: { type: "array", items: { type: "string" } },
+              },
+              description: "Positive, negative (trade-offs), and operational consequences",
+            },
+            options_considered: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  pros: { type: "array", items: { type: "string" } },
+                  cons: { type: "array", items: { type: "string" } },
+                  rejected_reason: { type: "string" },
+                },
+              },
+              description: "Alternative options considered and why they were rejected",
+            },
+            affected_files: { type: "array", items: { type: "string" }, description: "Affected source file paths" },
+            affected_symbols: { type: "array", items: { type: "string" }, description: "Affected symbol names" },
+            supersedes: { type: "string", description: "Optional ID of superseded ADR" },
+            status: { type: "string", enum: ["proposed", "accepted", "superseded", "rejected"], description: "ADR status (default: accepted)" },
+            project: { type: "string", description: "Project name" },
+            tags: { type: "array", items: { type: "string" } },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["title", "context_and_drivers", "decision", "consequences"],
+        },
+      },
+      {
+        name: "memory_adr_list",
+        description: "List all Architecture Decision Records (ADRs) recorded in the memory store, optionally filtered by status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["proposed", "accepted", "superseded", "rejected"] },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_drift_audit",
+        description: "Run bidirectional documentation <-> code drift audit: verifies if documented decisions are implemented in code and flags missing/stale/conflicting code or docs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
     ];
 
     return { tools: filterToolsForProfile(allTools, activeProfile) };
@@ -2145,6 +2217,45 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           active_profile: activeProfile,
           profiles,
         });
+      }
+      case "memory_adr_record": {
+        const adrEntry = recordAdr(activeStore, activeRoot, {
+          title: String(a.title),
+          context_and_drivers: Array.isArray(a.context_and_drivers) ? a.context_and_drivers.map(String) : [],
+          decision: String(a.decision),
+          consequences: (a.consequences && typeof a.consequences === "object") ? a.consequences as any : {},
+          options_considered: Array.isArray(a.options_considered) ? a.options_considered as any : undefined,
+          affected_files: Array.isArray(a.affected_files) ? a.affected_files.map(String) : undefined,
+          affected_symbols: Array.isArray(a.affected_symbols) ? a.affected_symbols.map(String) : undefined,
+          supersedes: a.supersedes ? String(a.supersedes) : undefined,
+          status: a.status as any,
+          project: a.project ? String(a.project) : "architecture",
+          tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+          actor: a.agent ? String(a.agent) : undefined,
+        });
+        return toolResult({
+          adr: adrEntry,
+          adr_number: adrEntry.adr?.adr_number,
+          id: adrEntry.id,
+        });
+      }
+      case "memory_adr_list": {
+        const adrs = listAdrs(activeStore, a.status as any);
+        return toolResult({
+          total: adrs.length,
+          adrs: adrs.map((e) => ({
+            id: e.id,
+            adr_number: e.adr?.adr_number,
+            title: e.title,
+            status: e.adr?.status,
+            decision: e.adr?.decision,
+            updated_at: e.updated_at,
+          })),
+        });
+      }
+      case "memory_drift_audit": {
+        const report = detectDocumentationCodeDrift(activeStore, activeRoot);
+        return toolResult(report);
       }
       default:
         return toolError(`unknown tool ${name}`);

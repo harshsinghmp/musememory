@@ -5,6 +5,29 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-09-03
+
+### Added
+- **First-Class Architecture Decision Records (`src/adrs/engine.ts`)**:
+  - Treats ADRs as living, queryable memory entities rather than static dead files.
+  - Auto-incrementing sequential ADR numbering (`ADR-1`, `ADR-2`, etc.).
+  - Structured ADR format: status (`proposed`, `accepted`, `superseded`, `rejected`), context & drivers, decision, consequences (positive, negative trade-offs, neutral), options considered (with pros, cons, rejection reasons), and native code anchors.
+  - Native ADR supersession workflow: mutually links older ADRs to newer replacements with append-only audit tracking.
+- **Bidirectional Documentation ↔ Code Drift Engine (`src/adrs/drift.ts`)**:
+  - `detectDocumentationCodeDrift`: Compares memory/ADR claims against live filesystem ASTs and conversely scans code for undocumented exports.
+  - 6-state alignment classification:
+    - `DOCUMENTED`: Documented memory confirmed present in live codebase.
+    - `IMPLEMENTED`: ADR decision verified in source implementation.
+    - `PARTIAL`: Code signature or implementation body drifted from documented hash.
+    - `CONFLICTING`: Direct contradiction with active architectural rules.
+    - `STALE`: Outdated documentation pointing to deleted or renamed files/symbols.
+    - `MISSING`: Exported code symbols lacking any documentation or architectural record.
+  - Computes repository alignment score and provides actionable remediation suggestions.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `memory_adr_record`: Record a first-class Architecture Decision Record.
+  - `memory_adr_list`: List ADRs filtered by status.
+  - `memory_drift_audit`: Run bidirectional documentation ↔ code drift audit.
+
 ## [1.19.0] - 2026-09-03
 
 ### Added
