@@ -16,7 +16,32 @@ export type MemoryStatus =
   | "superseded"
   | "stale"
   | "disputed"
-  | "rejected";
+  | "rejected"
+  | "conflicted";
+
+export type TemporalMode = "current" | "historical" | "timeless";
+
+export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED" | "STALE";
+
+export interface EvidenceItem {
+  id: string;
+  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human";
+  source?: string;
+  timestamp: string;
+  excerpt?: string;
+  confidence?: number;
+}
+
+export interface MemoryUtility {
+  retrieval_count: number;
+  application_count: number;
+  successful_applications: number;
+  failed_applications: number;
+  regressions: number;
+  contradictions: number;
+  last_applied_at?: string;
+  reuse_success_rate?: number;
+}
 
 export type VerificationLevel =
   | "unverified"
@@ -77,6 +102,20 @@ export interface MemoryEntry {
   /** Expiry timestamp; expired entries are excluded from default context retrieval (SOW-104). */
   expires_at?: string;
   graph?: GraphMetadata;
+  /** Deterministic SHA-256 content fingerprint for deduplication. */
+  fingerprint?: string;
+  /** Temporal mode: current (active state), historical (past state before migration), timeless (immutable rule). */
+  temporal_mode?: TemporalMode;
+  /** Categorical quality tier: LOW, MEDIUM, HIGH, VERIFIED, CONFLICTED, STALE. */
+  quality?: MemoryQuality;
+  /** Utility tracking metrics: application outcomes, regressions, success rate. */
+  utility?: MemoryUtility;
+  /** Supporting evidence entries backing this memory. */
+  evidence?: EvidenceItem[];
+  /** Mutually conflicting memory IDs flagged by the Contradiction Engine. */
+  conflict_ids?: string[];
+  /** Canonical memory ID if this entry was consolidated into another. */
+  canonical_id?: string;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -87,6 +126,7 @@ export const STATUS_PENALTY: Record<MemoryStatus, number> = {
   stale: -0.3,
   disputed: -0.5,
   rejected: -1.0,
+  conflicted: -0.8,
 };
 
 export const VERIFICATION_BONUS: Record<VerificationLevel, number> = {
@@ -113,7 +153,10 @@ export type AuditOperation =
   | "link"
   | "import"
   | "transcript_import"
-  | "verify";
+  | "verify"
+  | "conflict_detected"
+  | "conflict_resolved"
+  | "application_outcome";
 
 export interface AuditEntry {
   timestamp: string;

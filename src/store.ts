@@ -19,6 +19,17 @@ import {
   type SqliteDatabase,
 } from "./sqlite.ts";
 import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
+import {
+  computeFingerprint,
+  inferTemporalMode,
+  determineQuality,
+  ensureUtility,
+  findDuplicates,
+  consolidateIntoCanonical,
+  detectConflict,
+  flagConflict,
+} from "./quality/index.ts";
+import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
 
 export interface StorageLayout {
   root: string;
@@ -297,9 +308,20 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+let lastGeneratedTs = 0;
+let generatedSeq = 0;
+
 export function makeId(slug: string): string {
   const clean = slugifyId(slug);
-  return `m_${Date.now()}_${clean}`;
+  const now = Date.now();
+  if (now <= lastGeneratedTs) {
+    generatedSeq++;
+  } else {
+    lastGeneratedTs = now;
+    generatedSeq = 0;
+  }
+  const idTimestamp = generatedSeq === 0 ? String(now) : `${now}${String(generatedSeq).padStart(3, "0")}`;
+  return `m_${idTimestamp}_${clean}`;
 }
 
 function normalizeIdArray(val: string | string[] | null | undefined): string[] {
@@ -339,6 +361,14 @@ export function propose(
     expires_at?: string;
     test_command?: string;
     graph?: GraphMetadata;
+    fingerprint?: string;
+    temporal_mode?: TemporalMode;
+    quality?: MemoryQuality;
+    utility?: MemoryUtility;
+    evidence?: EvidenceItem[];
+    conflict_ids?: string[];
+    dedup?: boolean;
+    checkConflict?: boolean;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -348,9 +378,22 @@ export function propose(
     throw new Error("Cannot propose memory entry with empty project");
   }
 
+  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
+
+  // Deduplication check: consolidate into canonical memory if exact duplicate exists
+  if (opts.dedup) {
+    const dupes = findDuplicates(store, { title, content: opts.content, project: opts.project });
+    if (dupes.exact) {
+      return consolidateIntoCanonical(store, dupes.exact.id, {
+        source: opts.source,
+        evidence: opts.evidence?.[0],
+      });
+    }
+  }
+
   const secrets = scanSecrets(
     extractEntryText({
-      title: opts.title,
+      title,
       content: opts.content,
       tags: opts.tags,
       verification: opts.verification,
@@ -361,9 +404,12 @@ export function propose(
   }
 
   const now = nowIso();
+  const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
+  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
+
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
-    title: (opts.title ?? opts.content.slice(0, 120)).slice(0, 120),
+    title,
     content: opts.content,
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
@@ -380,9 +426,38 @@ export function propose(
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
     graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),
+    fingerprint,
+    temporal_mode,
+    evidence: opts.evidence,
+    conflict_ids: opts.conflict_ids,
   };
+
+  entry.quality = opts.quality ?? determineQuality(entry);
+  entry.utility = opts.utility ?? ensureUtility(entry);
+
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
+
+  // Optional automated contradiction detection
+  if (opts.checkConflict) {
+    const conflict = detectConflict(store, {
+      title: entry.title,
+      content: entry.content,
+      project: entry.project,
+      type: entry.type,
+      id: entry.id,
+    });
+    if (conflict.conflicted && conflict.conflictingEntry) {
+      const flagged = flagConflict(
+        store,
+        conflict.conflictingEntry.id,
+        entry.id,
+        conflict.reason || "Contradiction detected",
+      );
+      return flagged.incoming;
+    }
+  }
+
   if (entry.type === "constraint" && store.memoryDir) {
     try {
       syncConstraints(store.memoryDir, store);
@@ -411,6 +486,7 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   entry.last_confirmed_at = now;
   entry.reinforcement = (entry.reinforcement ?? 0) + 1;
   entry.verification = { level: "user-confirmed", verified_at: now };
+  entry.quality = determineQuality(entry);
   entry.updated_at = now;
   save(store, entry);
   if (entry.type === "constraint" && store.memoryDir) {
@@ -439,6 +515,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
 
   old.status = "superseded";
   closeOutValidity(old);
+  old.quality = determineQuality(old);
   const prevOld = normalizeIdArray(old.superseded_by);
   if (!prevOld.includes(newId)) {
     old.superseded_by = [...prevOld, newId];
@@ -449,6 +526,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (!prevNext.includes(oldId)) {
     next.supersedes = [...prevNext, oldId];
   }
+  next.quality = determineQuality(next);
   next.updated_at = nowIso();
 
   save(store, old);
@@ -474,6 +552,7 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "stale";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
@@ -503,6 +582,7 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "superseded";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
@@ -563,6 +643,7 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "rejected";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   entry.updated_at = nowIso();
   save(store, entry);
