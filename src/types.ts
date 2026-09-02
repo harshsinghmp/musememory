@@ -7,7 +7,54 @@ export type MemoryType =
   | "operation"
   | "constraint"
   | "preference"
-  | "discovery";
+  | "discovery"
+  | "negative"
+  | "adr";
+
+export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
+
+export interface AdrOption {
+  title: string;
+  pros?: string[];
+  cons?: string[];
+  rejected_reason?: string;
+}
+
+export interface AdrDetails {
+  adr_number: number;
+  status: AdrStatus;
+  decision: string;
+  drivers?: string[];
+  consequences?: {
+    positive?: string[];
+    negative?: string[];
+    neutral?: string[];
+  };
+  options_considered?: AdrOption[];
+  supersedes?: string;
+  superseded_by?: string;
+}
+
+export interface NegativeMemoryDetails {
+  failed_approach: string;
+  failure_reason: string;
+  alternative_recommended?: string;
+  reproduction_command?: string;
+  evidence_snippet?: string;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+export interface ObservationEntry {
+  id: string;
+  timestamp: string;
+  source: "tool" | "test" | "build" | "review" | "pr" | "transcript" | "file_edit" | "manual";
+  project: string;
+  raw: string;
+  summary?: string;
+  metadata?: Record<string, any>;
+  processed: boolean;
+  extracted_candidate_id?: string;
+}
 
 export type MemoryStatus =
   | "candidate"
@@ -16,7 +63,77 @@ export type MemoryStatus =
   | "superseded"
   | "stale"
   | "disputed"
-  | "rejected";
+  | "rejected"
+  | "conflicted"
+  | "cold"
+  | "dormant"
+  | "archived";
+
+export type MemoryScope = "local" | "project" | "global";
+
+export interface PromotionRecord {
+  promoted_at: string;
+  from_scope: MemoryScope;
+  to_scope: MemoryScope;
+  policy: string;
+  successful_uses: number;
+  total_uses: number;
+  regressions: number;
+  confidence: string;
+  generalized_from?: string;
+}
+
+export type CodeAnchorKind =
+  | "repository"
+  | "file"
+  | "directory"
+  | "module"
+  | "symbol"
+  | "qualified_symbol"
+  | "route"
+  | "test"
+  | "commit"
+  | "pr";
+
+export type AnchorStatus = "valid" | "drifted" | "orphaned";
+
+export interface CodeAnchor {
+  id: string;
+  kind: CodeAnchorKind;
+  file_path: string;
+  symbol_name?: string;
+  qualified_name?: string;
+  structural_hash?: string;
+  signature?: string;
+  status?: AnchorStatus;
+  provider_metadata?: Record<string, any>;
+  created_at?: string;
+  verified_at?: string;
+}
+
+export type TemporalMode = "current" | "historical" | "timeless";
+
+export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED" | "STALE";
+
+export interface EvidenceItem {
+  id: string;
+  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";
+  source?: string;
+  timestamp: string;
+  excerpt?: string;
+  confidence?: number;
+}
+
+export interface MemoryUtility {
+  retrieval_count: number;
+  application_count: number;
+  successful_applications: number;
+  failed_applications: number;
+  regressions: number;
+  contradictions: number;
+  last_applied_at?: string;
+  reuse_success_rate?: number;
+}
 
 export type VerificationLevel =
   | "unverified"
@@ -77,6 +194,34 @@ export interface MemoryEntry {
   /** Expiry timestamp; expired entries are excluded from default context retrieval (SOW-104). */
   expires_at?: string;
   graph?: GraphMetadata;
+  /** Deterministic SHA-256 content fingerprint for deduplication. */
+  fingerprint?: string;
+  /** Temporal mode: current (active state), historical (past state before migration), timeless (immutable rule). */
+  temporal_mode?: TemporalMode;
+  /** Categorical quality tier: LOW, MEDIUM, HIGH, VERIFIED, CONFLICTED, STALE. */
+  quality?: MemoryQuality;
+  /** Utility tracking metrics: application outcomes, regressions, success rate. */
+  utility?: MemoryUtility;
+  /** Supporting evidence entries backing this memory. */
+  evidence?: EvidenceItem[];
+  /** Mutually conflicting memory IDs flagged by the Contradiction Engine. */
+  conflict_ids?: string[];
+  /** Canonical memory ID if this entry was consolidated into another. */
+  canonical_id?: string;
+  /** First-class negative lesson details (DO_NOT_USE / FAILED_APPROACH / BUG_PRONE_PATTERN). */
+  negative?: NegativeMemoryDetails;
+  /** Memory scope: local (workspace), project (repo), global (cross-project). */
+  scope?: MemoryScope;
+  /** Reason for moving entry to cold/dormant/archived. */
+  archive_reason?: string;
+  /** ISO timestamp when entry was transitioned to cold/dormant/archived. */
+  archived_at?: string;
+  /** Provenance record of promotion from local/project to project/global. */
+  promotion?: PromotionRecord;
+  /** First-class code anchors linking this memory to files, symbols, and routes. */
+  anchors?: CodeAnchor[];
+  /** First-class Architecture Decision Record (ADR) metadata. */
+  adr?: AdrDetails;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -87,6 +232,10 @@ export const STATUS_PENALTY: Record<MemoryStatus, number> = {
   stale: -0.3,
   disputed: -0.5,
   rejected: -1.0,
+  conflicted: -0.8,
+  cold: -0.2,
+  dormant: -0.5,
+  archived: -0.9,
 };
 
 export const VERIFICATION_BONUS: Record<VerificationLevel, number> = {
@@ -113,7 +262,21 @@ export type AuditOperation =
   | "link"
   | "import"
   | "transcript_import"
-  | "verify";
+  | "verify"
+  | "conflict_detected"
+  | "conflict_resolved"
+  | "application_outcome"
+  | "observation"
+  | "negative_capture"
+  | "promote"
+  | "archive"
+  | "rehydrate"
+  | "anchor_created"
+  | "anchor_verified"
+  | "anchor_drifted"
+  | "adr_recorded"
+  | "adr_superseded"
+  | "drift_detected";
 
 export interface AuditEntry {
   timestamp: string;
@@ -137,6 +300,8 @@ export interface SearchOptions {
   status?: MemoryStatus | string;
   verified?: boolean;
   tokenBudget?: number;
+  includeArchived?: boolean;
+  autoRehydrate?: boolean;
 }
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;

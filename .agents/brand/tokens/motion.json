@@ -1,0 +1,61 @@
+# Motion Tokens
+
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "motion": {
+    "duration": {
+      "instant": {
+        "$type": "duration",
+        "$value": "0ms",
+        "$description": "No animation"
+      },
+      "fast": {
+        "$type": "duration",
+        "$value": "100ms",
+        "$description": "Hover, focus, micro-interactions"
+      },
+      "normal": {
+        "$type": "duration",
+        "$value": "200ms",
+        "$description": "Transitions, reveals"
+      },
+      "slow": {
+        "$type": "duration",
+        "$value": "350ms",
+        "$description": "Modals, drawers, page transitions"
+      },
+      "slower": {
+        "$type": "duration",
+        "$value": "500ms",
+        "$description": "Complex sequences, hero animations"
+      }
+    },
+    "easing": {
+      "default": {
+        "$type": "cubicBezier",
+        "$value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "$description": "Standard easing"
+      },
+      "in": {
+        "$type": "cubicBezier",
+        "$value": "cubic-bezier(0.4, 0, 1, 1)",
+        "$description": "Accelerate"
+      },
+      "out": {
+        "$type": "cubicBezier",
+        "$value": "cubic-bezier(0, 0, 0.2, 1)",
+        "$description": "Decelerate"
+      },
+      "spring": {
+        "$type": "cubicBezier",
+        "$value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "$description": "Bouncy spring for playful elements"
+      }
+    },
+    "reducedMotion": {
+      "$type": "string",
+      "$value": "prefers-reduced-motion: reduce",
+      "$description": "All motion respects user preference"
+    }
+  }
+}

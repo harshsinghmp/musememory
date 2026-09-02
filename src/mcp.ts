@@ -48,14 +48,71 @@ import { getSettings, setSettings, getProjectSettings, setProjectSettings } from
 import { addSource, listSources, getSource } from "./provenance.ts";
 import { recordClaim, listClaims, getClaim } from "./claims.ts";
 import { freezeExecutionSnapshot, listExecutionSnapshots } from "./snapshot.ts";
+import {
+  recordApplicationOutcome,
+  resolveConflict,
+  computeMemoryRoi,
+  recordRetrievals,
+} from "./quality/index.ts";
+import {
+  recordObservation,
+  listObservations,
+  recordNegativeLesson,
+  distillObservationsToCandidates,
+} from "./learning/index.ts";
+import {
+  defaultRegistry,
+  enrichMemoryWithCodeIntel,
+} from "./intelligence/index.ts";
+import {
+  evaluateContextUsage,
+  generateSessionHandoff,
+  harvestSessionMemories,
+} from "./compaction/index.ts";
+import {
+  evaluatePromotion,
+  promoteMemory,
+  generalizeContent,
+  evaluateArchival,
+  archiveMemory,
+  rehydrateMemory,
+  getLifecycleStats,
+} from "./promotion/index.ts";
+import {
+  createCodeAnchor,
+  verifyCodeAnchor,
+  attachAnchorToMemory,
+  auditMemoryAnchors,
+} from "./anchors/index.ts";
+import {
+  recordAdr,
+  listAdrs,
+  detectDocumentationCodeDrift,
+} from "./adrs/index.ts";
+import {
+  explainWhyCodeIsTheWayItIs,
+  clusterRecurringBugsAndFriction,
+  analyzeTechnicalDebt,
+} from "./cognition/index.ts";
+import { evaluateProjectHealth } from "./health/index.ts";
+import {
+  resolveMuseContext,
+  resolveCodeForMemory,
+  resolveMemoryForCode,
+  listMcpProfiles,
+  filterToolsForProfile,
+  getActiveMcpProfile,
+  type McpProfile,
+} from "./orchestrator/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
 import { verifyStrictIntegrity } from "./verify.ts";
-import { queryTieredContext, type RetrievalTier } from "./retrieval/tiered.ts";
+import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
-export function createServer(targetDir?: string): Server {
+export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
+  const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
   const { root, memoryDir } = findOrCreateProjectRoot(resolvedTarget);
   const store = openStore(memoryDir);
@@ -86,8 +143,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
     },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const allTools = [
       {
         name: "memory_read",
         description: "Read a full memory entry by id",
@@ -856,8 +913,503 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
-    ],
-  }));
+      {
+        name: "memory_feedback",
+        description: "Record application outcome for a memory (success, failure, or regression) to train utility and calculate memory ROI",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry applied" },
+            success: { type: "boolean", description: "Whether the memory successfully solved the task" },
+            regression: { type: "boolean", description: "Whether the memory introduced a regression" },
+            notes: { type: "string", description: "Optional explanation of outcome" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id", "success"],
+        },
+      },
+      {
+        name: "memory_resolve_conflict",
+        description: "Resolve a contradiction between two memories using a deterministic strategy (supersede, historical, reject, or keep_both)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            winning_id: { type: "string", description: "ID of the winning memory to establish as valid" },
+            losing_id: { type: "string", description: "ID of the conflicting memory to update" },
+            strategy: {
+              type: "string",
+              enum: ["supersede", "historical", "reject", "keep_both"],
+              description: "Resolution strategy: 'supersede', 'historical' (preserve as past context), 'reject', or 'keep_both'",
+            },
+            reason: { type: "string", description: "Architectural or empirical reason for resolution" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["winning_id", "losing_id", "strategy", "reason"],
+        },
+      },
+      {
+        name: "memory_roi",
+        description: "Calculate memory utility, reuse success rates, and return-on-investment across the store",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Optional project name filter" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_observe",
+        description: "Ingest an ephemeral raw observation (tool output, test error, build log, review feedback) to .memory/observations.jsonl",
+        inputSchema: {
+          type: "object",
+          properties: {
+            raw: { type: "string", description: "Raw output, error message, or log snippet" },
+            source: {
+              type: "string",
+              enum: ["tool", "test", "build", "review", "pr", "transcript", "file_edit", "manual"],
+              description: "Observation source channel",
+            },
+            project: { type: "string", description: "Project scope name" },
+            summary: { type: "string", description: "Brief one-line summary" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["raw", "source", "project"],
+        },
+      },
+      {
+        name: "memory_distill_observations",
+        description: "Distill unprocessed raw observations into structured candidate memories and negative lessons",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Project scope name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["project"],
+        },
+      },
+      {
+        name: "memory_negative_capture",
+        description: "Record a first-class negative memory (DO_NOT_USE, FAILED_APPROACH, BUG_PRONE_PATTERN) to prevent recurring mistakes",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Short description of what to avoid" },
+            failed_approach: { type: "string", description: "The approach that failed or caused issues" },
+            failure_reason: { type: "string", description: "Why it failed or what went wrong" },
+            alternative_recommended: { type: "string", description: "What to use or do instead" },
+            reproduction_command: { type: "string", description: "Optional reproduction test/build command" },
+            severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
+            project: { type: "string", description: "Project scope name" },
+            tags: { type: "array", items: { type: "string" } },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["title", "failed_approach", "failure_reason", "project"],
+        },
+      },
+      {
+        name: "memory_code_intel_status",
+        description: "Inspect registered code intelligence providers and their workspace availability status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_code_intel_symbols",
+        description: "Resolve symbols (functions, classes, types) across active code intelligence providers with fallback",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Symbol name or substring query" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "memory_code_intel_blast_radius",
+        description: "Calculate ripple effect and blast radius of modifying a symbol or file",
+        inputSchema: {
+          type: "object",
+          properties: {
+            target: { type: "string", description: "Symbol name or relative file path" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["target"],
+        },
+      },
+      {
+        name: "memory_enrich",
+        description: "Enrich an existing memory entry with code intelligence symbol evidence",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Memory entry ID" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_ranked_retrieval",
+        description: "Multi-factor ranked retrieval fusing symbol matching, BM25, graph overlap, blast radius, recency, utility ROI, and negative warnings",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or natural language question" },
+            project: { type: "string", description: "Optional project scope filter" },
+            token_budget: { type: "number", description: "Optional token budget for knapsack packing" },
+            active_file_path: { type: "string", description: "Active file path in editor or workspace" },
+            target_symbol: { type: "string", description: "Specific symbol of interest" },
+            limit: { type: "number", description: "Max results to return (default: 10)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "memory_compaction_check",
+        description: "Evaluate context usage against the 70% threshold and prompt if compaction is needed",
+        inputSchema: {
+          type: "object",
+          properties: {
+            used_tokens: { type: "number", description: "Current estimated token usage in session" },
+            max_tokens: { type: "number", description: "Maximum model context window (default: 200000)" },
+          },
+          required: ["used_tokens"],
+        },
+      },
+      {
+        name: "memory_compact_handoff",
+        description: "Lock the 5 mandatory invariants and write an interruption-proof session handoff to CURRENT.md before context reset",
+        inputSchema: {
+          type: "object",
+          properties: {
+            high_level_goal: { type: "string", description: "1. High level goal of your build spec" },
+            current_architecture: { type: "string", description: "2. Current architecture and data flow" },
+            completed_tasks: { type: "array", items: { type: "string" }, description: "3. What is already implemented and considered done" },
+            open_tasks: { type: "array", items: { type: "string" }, description: "4. What is explicitly not done yet" },
+            next_concrete_task: { type: "string", description: "5. The next concrete task we are working on" },
+            active_constraints: { type: "array", items: { type: "string" }, description: "Optional active constraints" },
+            decisions_made: { type: "array", items: { type: "string" }, description: "Optional key decisions made" },
+            session_id: { type: "string", description: "Optional session ID" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["high_level_goal", "current_architecture", "completed_tasks", "open_tasks", "next_concrete_task"],
+        },
+      },
+      {
+        name: "memory_harvest_turn",
+        description: "Continuous conversational harvester: automatically extract architectural decisions, fixes, and negative lessons from turn text",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "Conversational turn text or reasoning" },
+            project: { type: "string", description: "Project scope name" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["text", "project"],
+        },
+      },
+      {
+        name: "memory_evaluate_promotion",
+        description: "Evaluate a memory entry for promotion along the ladder: LOCAL -> PROJECT -> GLOBAL (5x success rule, zero regressions, zero conflicts, generalization)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to evaluate" },
+            force_manual: { type: "boolean", description: "Whether to evaluate manual promotion bypassing 5x requirement" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_promote",
+        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to promote" },
+            force_manual: { type: "boolean", description: "Manual promotion override bypassing automatic 5x threshold" },
+            generalized_content: { type: "string", description: "Optional custom generalized principle text" },
+            agent: { type: "string", description: "Optional agent or actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_generalize",
+        description: "Test and preview generalization of memory content: scrubs project-specific paths and extracts universal principles",
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string", description: "Memory text to generalize" },
+            project: { type: "string", description: "Optional project name to scrub" },
+          },
+          required: ["content"],
+        },
+      },
+      {
+        name: "memory_archive",
+        description: "Transition a memory entry to cold, dormant, or archived tier with reason",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry" },
+            tier: { type: "string", enum: ["cold", "dormant", "archived"], description: "Target lifecycle tier" },
+            reason: { type: "string", description: "Reason for archiving or transitioning" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id", "tier", "reason"],
+        },
+      },
+      {
+        name: "memory_rehydrate",
+        description: "Restore an archived, dormant, or cold memory back to active/confirmed status upon relevance",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to rehydrate" },
+            score: { type: "number", description: "Relevance score that triggered rehydration (default: 1.0)" },
+            reason: { type: "string", description: "Optional rehydration rationale" },
+            agent: { type: "string", description: "Optional agent name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_lifecycle_status",
+        description: "Inspect store-wide memory lifecycle metrics: counts across active, cold, dormant, archived, scopes, and promotion readiness",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sweep: { type: "boolean", description: "Whether to execute an automatic archival sweep during inspection" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_anchor_create",
+        description: "Create and attach a line-independent structural code anchor to a memory entry (repository, file, module, symbol, route, test)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry" },
+            file_path: { type: "string", description: "Relative file path in workspace" },
+            kind: {
+              type: "string",
+              enum: ["repository", "file", "directory", "module", "symbol", "qualified_symbol", "route", "test", "commit", "pr"],
+              description: "Anchor kind (default: symbol if symbol_name provided, else file)",
+            },
+            symbol_name: { type: "string", description: "Optional symbol name (function, class, interface, method)" },
+            qualified_name: { type: "string", description: "Optional qualified symbol name (e.g. Service.method)" },
+            provider_metadata: { type: "object", description: "Optional provider external IDs (e.g. CodeGraph node ID)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id", "file_path"],
+        },
+      },
+      {
+        name: "memory_anchor_verify",
+        description: "Verify all code anchors attached to a memory entry against the live codebase to detect drift or orphaned references",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry to verify" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id"],
+        },
+      },
+      {
+        name: "memory_anchor_audit",
+        description: "Run repository-wide audit of all code anchors across all memories: reports integrity score, valid, drifted, and orphaned counts",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "muse_context",
+        description: "FLAGSHIP UNIFIED CONTEXT ORCHESTRATOR: Single-call fusion of active constraints, ranked memories, code anchors, and negative lessons under a strict token budget with actionable next steps.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or task description" },
+            active_file: { type: "string", description: "Relative file path being edited" },
+            symbol: { type: "string", description: "Symbol name being edited or referenced" },
+            error_message: { type: "string", description: "Error message or stack trace if debugging" },
+            task_intent: {
+              type: "string",
+              enum: ["feature", "bugfix", "refactor", "review", "architecture", "general"],
+              description: "Intent of current task",
+            },
+            token_budget: { type: "number", description: "Maximum token budget to consume (default: 4000)" },
+            project: { type: "string", description: "Optional project filter" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "muse_code_for_memory",
+        description: "Bidirectional lookup: Given a memory ID, return all anchored code references, files, and symbols",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id"],
+        },
+      },
+      {
+        name: "muse_memory_for_code",
+        description: "Bidirectional lookup: Given a file path or symbol, return all associated memories, architectural decisions, bug fixes, constraints, and negative lessons",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Relative file path in workspace" },
+            symbol_name: { type: "string", description: "Optional symbol name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["file_path"],
+        },
+      },
+      {
+        name: "muse_profile_list",
+        description: "List all available task-focused MCP profiles (core, coding, debugging, review, architecture, maintenance, full) and their exposed tools",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "memory_adr_record",
+        description: "Record a first-class Architecture Decision Record (ADR) as an active, queryable memory with drivers, decision, consequences, options, and code anchors",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Title of the architectural decision" },
+            context_and_drivers: {
+              type: "array",
+              items: { type: "string" },
+              description: "Key architectural context and problem drivers",
+            },
+            decision: { type: "string", description: "The architectural decision made" },
+            consequences: {
+              type: "object",
+              properties: {
+                positive: { type: "array", items: { type: "string" } },
+                negative: { type: "array", items: { type: "string" } },
+                neutral: { type: "array", items: { type: "string" } },
+              },
+              description: "Positive, negative (trade-offs), and operational consequences",
+            },
+            options_considered: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  pros: { type: "array", items: { type: "string" } },
+                  cons: { type: "array", items: { type: "string" } },
+                  rejected_reason: { type: "string" },
+                },
+              },
+              description: "Alternative options considered and why they were rejected",
+            },
+            affected_files: { type: "array", items: { type: "string" }, description: "Affected source file paths" },
+            affected_symbols: { type: "array", items: { type: "string" }, description: "Affected symbol names" },
+            supersedes: { type: "string", description: "Optional ID of superseded ADR" },
+            status: { type: "string", enum: ["proposed", "accepted", "superseded", "rejected"], description: "ADR status (default: accepted)" },
+            project: { type: "string", description: "Project name" },
+            tags: { type: "array", items: { type: "string" } },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["title", "context_and_drivers", "decision", "consequences"],
+        },
+      },
+      {
+        name: "memory_adr_list",
+        description: "List all Architecture Decision Records (ADRs) recorded in the memory store, optionally filtered by status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["proposed", "accepted", "superseded", "rejected"] },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_drift_audit",
+        description: "Run bidirectional documentation <-> code drift audit: verifies if documented decisions are implemented in code and flags missing/stale/conflicting code or docs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "muse_why",
+        description: "Autonomous Engineering Cognition: Explain WHY code was designed or modified the way it is by tracing historical bug fixes, ADRs, trade-offs, and invariants",
+        inputSchema: {
+          type: "object",
+          properties: {
+            target: { type: "string", description: "Target concept, component, file name, or symbol" },
+            file_path: { type: "string", description: "Optional specific file path" },
+            symbol_name: { type: "string", description: "Optional specific symbol name" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+          required: ["target"],
+        },
+      },
+      {
+        name: "muse_bug_clusters",
+        description: "Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_tech_debt",
+        description: "Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_health",
+        description: "Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+    ];
+
+    return { tools: filterToolsForProfile(allTools, activeProfile) };
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
@@ -1457,6 +2009,325 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const report = verifyStrictIntegrity(activeStore, activeMemoryDir, activeRoot, {
           maxCandidateDays: typeof a.max_candidate_days === "number" ? a.max_candidate_days : undefined,
         });
+        return toolResult(report);
+      }
+      case "memory_feedback": {
+        const updated = recordApplicationOutcome(activeStore, {
+          memoryId: String(a.memory_id),
+          success: Boolean(a.success),
+          regression: a.regression === true,
+          notes: a.notes ? String(a.notes) : undefined,
+          actor: a.agent ? String(a.agent) : "agent",
+        });
+        return toolResult(updated);
+      }
+      case "memory_resolve_conflict": {
+        const result = resolveConflict(activeStore, {
+          winningId: String(a.winning_id),
+          losingId: String(a.losing_id),
+          strategy: a.strategy as "supersede" | "historical" | "reject" | "keep_both",
+          reason: String(a.reason),
+          actor: a.agent ? String(a.agent) : "user",
+        });
+        return toolResult(result);
+      }
+      case "memory_roi": {
+        const report = computeMemoryRoi(activeStore, {
+          project: a.project ? String(a.project) : undefined,
+        });
+        return toolResult(report);
+      }
+      case "memory_observe": {
+        const obs = recordObservation(activeStore, {
+          source: String(a.source) as any,
+          project: String(a.project),
+          raw: String(a.raw),
+          summary: a.summary ? String(a.summary) : undefined,
+          metadata: a.metadata ? (a.metadata as Record<string, any>) : undefined,
+        });
+        return toolResult(obs);
+      }
+      case "memory_distill_observations": {
+        const result = distillObservationsToCandidates(activeStore, String(a.project));
+        return toolResult(result);
+      }
+      case "memory_negative_capture": {
+        const entry = recordNegativeLesson(activeStore, {
+          project: String(a.project),
+          title: String(a.title),
+          failed_approach: String(a.failed_approach),
+          failure_reason: String(a.failure_reason),
+          alternative_recommended: a.alternative_recommended ? String(a.alternative_recommended) : undefined,
+          reproduction_command: a.reproduction_command ? String(a.reproduction_command) : undefined,
+          severity: a.severity as any,
+          tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+          source: a.agent ? String(a.agent) : "agent",
+        });
+        return toolResult(entry);
+      }
+      case "memory_code_intel_status": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const available = await defaultRegistry.getAvailableProviders(workspaceDir);
+        return toolResult({
+          workspaceDir,
+          availableProviders: available.map((p) => ({
+            name: p.name,
+            capabilities: p.getCapabilities(),
+          })),
+        });
+      }
+      case "memory_code_intel_symbols": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const symbols = await defaultRegistry.resolveSymbolsWithFallback(String(a.query), workspaceDir);
+        return toolResult({ query: a.query, count: symbols.length, symbols });
+      }
+      case "memory_code_intel_blast_radius": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const blast = await defaultRegistry.getBlastRadiusWithFallback(String(a.target), workspaceDir);
+        return toolResult(blast);
+      }
+      case "memory_enrich": {
+        const entry = get(activeStore, String(a.id));
+        if (!entry) return toolError(`memory ${a.id} not found`);
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const enriched = await enrichMemoryWithCodeIntel(activeStore, entry, workspaceDir);
+        return toolResult(enriched);
+      }
+      case "memory_ranked_retrieval": {
+        const results = await rankAndRetrieveMemories(activeStore, String(a.query), {
+          project: a.project ? String(a.project) : undefined,
+          tokenBudget: a.token_budget ? Number(a.token_budget) : undefined,
+          activeFilePath: a.active_file_path ? String(a.active_file_path) : undefined,
+          targetSymbol: a.target_symbol ? String(a.target_symbol) : undefined,
+          limit: a.limit ? Number(a.limit) : 10,
+        });
+        return toolResult({
+          query: a.query,
+          count: results.length,
+          results: results.map((r) => ({
+            id: r.entry.id,
+            title: r.entry.title,
+            project: r.entry.project,
+            type: r.entry.type,
+            status: r.entry.status,
+            temporal_mode: r.entry.temporal_mode,
+            score: Number(r.score.toFixed(3)),
+            factors: r.factors,
+            content: r.entry.content,
+          })),
+        });
+      }
+      case "memory_compaction_check": {
+        const evaluation = evaluateContextUsage(
+          Number(a.used_tokens),
+          a.max_tokens ? Number(a.max_tokens) : undefined,
+        );
+        return toolResult(evaluation);
+      }
+      case "memory_compact_handoff": {
+        const result = generateSessionHandoff(
+          activeMemoryDir,
+          {
+            highLevelGoal: String(a.high_level_goal),
+            currentArchitecture: String(a.current_architecture),
+            completedTasks: Array.isArray(a.completed_tasks) ? a.completed_tasks.map(String) : [],
+            openTasks: Array.isArray(a.open_tasks) ? a.open_tasks.map(String) : [],
+            nextConcreteTask: String(a.next_concrete_task),
+            activeConstraints: Array.isArray(a.active_constraints) ? a.active_constraints.map(String) : undefined,
+            decisionsMade: Array.isArray(a.decisions_made) ? a.decisions_made.map(String) : undefined,
+          },
+          {
+            agent: a.agent ? String(a.agent) : undefined,
+            sessionId: a.session_id ? String(a.session_id) : undefined,
+            project: a.project ? String(a.project) : undefined,
+          },
+        );
+        return toolResult(result);
+      }
+      case "memory_harvest_turn": {
+        const harvested = harvestSessionMemories(
+          activeStore,
+          String(a.text),
+          {
+            project: String(a.project),
+            actor: a.agent ? String(a.agent) : undefined,
+          },
+        );
+        return toolResult({
+          harvestedCount: harvested.length,
+          memories: harvested,
+        });
+      }
+      case "memory_evaluate_promotion": {
+        const entry = get(activeStore, String(a.id));
+        if (!entry) return toolError(`entry '${a.id}' not found`);
+        const evaluation = evaluatePromotion(entry, { forceManual: Boolean(a.force_manual) });
+        return toolResult(evaluation);
+      }
+      case "memory_promote": {
+        const result = promoteMemory(activeStore, String(a.id), {
+          forceManual: Boolean(a.force_manual),
+          customGeneralizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
+          actor: a.agent ? String(a.agent) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_generalize": {
+        const result = generalizeContent(String(a.content), {
+          projectName: a.project ? String(a.project) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_archive": {
+        const tier = String(a.tier) as "cold" | "dormant" | "archived";
+        const result = archiveMemory(activeStore, String(a.id), tier, String(a.reason), a.agent ? String(a.agent) : undefined);
+        return toolResult(result);
+      }
+      case "memory_rehydrate": {
+        const score = typeof a.score === "number" ? a.score : 1.0;
+        const result = rehydrateMemory(
+          activeStore,
+          String(a.id),
+          score,
+          a.reason ? String(a.reason) : undefined,
+          a.agent ? String(a.agent) : undefined,
+        );
+        return toolResult(result);
+      }
+      case "memory_lifecycle_status": {
+        let sweepResult = undefined;
+        if (Boolean(a.sweep)) {
+          const { autoArchiveSweep } = require("./promotion/archival.ts");
+          sweepResult = autoArchiveSweep(activeStore);
+        }
+        const stats = getLifecycleStats(activeStore);
+        return toolResult({
+          stats,
+          sweep: sweepResult,
+        });
+      }
+      case "memory_anchor_create": {
+        const kind = (a.kind ? String(a.kind) : (a.symbol_name ? "symbol" : "file")) as any;
+        const anchor = createCodeAnchor(activeRoot, {
+          kind,
+          filePath: String(a.file_path),
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+          qualifiedName: a.qualified_name ? String(a.qualified_name) : undefined,
+          providerMetadata: (a.provider_metadata && typeof a.provider_metadata === "object") ? a.provider_metadata as Record<string, any> : undefined,
+        });
+        const updatedEntry = attachAnchorToMemory(activeStore, String(a.memory_id), anchor, a.agent ? String(a.agent) : undefined);
+        return toolResult({
+          anchor,
+          entry_id: updatedEntry.id,
+          total_anchors: updatedEntry.anchors?.length || 0,
+        });
+      }
+      case "memory_anchor_verify": {
+        const entry = get(activeStore, String(a.memory_id));
+        if (!entry) return toolError(`entry '${a.memory_id}' not found`);
+        const anchors = entry.anchors || [];
+        const results = anchors.map((anc) => verifyCodeAnchor(activeRoot, anc));
+        return toolResult({
+          entry_id: entry.id,
+          anchors_count: anchors.length,
+          verification: results,
+        });
+      }
+      case "memory_anchor_audit": {
+        const report = auditMemoryAnchors(activeStore, activeRoot);
+        return toolResult(report);
+      }
+      case "muse_context": {
+        const result = await resolveMuseContext(activeStore, activeRoot, {
+          query: a.query ? String(a.query) : undefined,
+          active_file: a.active_file ? String(a.active_file) : undefined,
+          symbol: a.symbol ? String(a.symbol) : undefined,
+          error_message: a.error_message ? String(a.error_message) : undefined,
+          task_intent: a.task_intent as any,
+          token_budget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+          project: a.project ? String(a.project) : undefined,
+          dir: a.dir ? String(a.dir) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "muse_code_for_memory": {
+        const result = resolveCodeForMemory(activeStore, String(a.memory_id));
+        return toolResult(result);
+      }
+      case "muse_memory_for_code": {
+        const result = resolveMemoryForCode(activeStore, {
+          filePath: String(a.file_path),
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "muse_profile_list": {
+        const profiles = listMcpProfiles();
+        return toolResult({
+          active_profile: activeProfile,
+          profiles,
+        });
+      }
+      case "memory_adr_record": {
+        const adrEntry = recordAdr(activeStore, activeRoot, {
+          title: String(a.title),
+          context_and_drivers: Array.isArray(a.context_and_drivers) ? a.context_and_drivers.map(String) : [],
+          decision: String(a.decision),
+          consequences: (a.consequences && typeof a.consequences === "object") ? a.consequences as any : {},
+          options_considered: Array.isArray(a.options_considered) ? a.options_considered as any : undefined,
+          affected_files: Array.isArray(a.affected_files) ? a.affected_files.map(String) : undefined,
+          affected_symbols: Array.isArray(a.affected_symbols) ? a.affected_symbols.map(String) : undefined,
+          supersedes: a.supersedes ? String(a.supersedes) : undefined,
+          status: a.status as any,
+          project: a.project ? String(a.project) : "architecture",
+          tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+          actor: a.agent ? String(a.agent) : undefined,
+        });
+        return toolResult({
+          adr: adrEntry,
+          adr_number: adrEntry.adr?.adr_number,
+          id: adrEntry.id,
+        });
+      }
+      case "memory_adr_list": {
+        const adrs = listAdrs(activeStore, a.status as any);
+        return toolResult({
+          total: adrs.length,
+          adrs: adrs.map((e) => ({
+            id: e.id,
+            adr_number: e.adr?.adr_number,
+            title: e.title,
+            status: e.adr?.status,
+            decision: e.adr?.decision,
+            updated_at: e.updated_at,
+          })),
+        });
+      }
+      case "memory_drift_audit": {
+        const report = detectDocumentationCodeDrift(activeStore, activeRoot);
+        return toolResult(report);
+      }
+      case "muse_why": {
+        const explanation = explainWhyCodeIsTheWayItIs(activeStore, {
+          target: String(a.target),
+          filePath: a.file_path ? String(a.file_path) : undefined,
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+        });
+        return toolResult(explanation);
+      }
+      case "muse_bug_clusters": {
+        const clusters = clusterRecurringBugsAndFriction(activeStore);
+        return toolResult({
+          total_clusters: clusters.length,
+          clusters,
+        });
+      }
+      case "muse_tech_debt": {
+        const report = analyzeTechnicalDebt(activeStore, activeRoot);
+        return toolResult(report);
+      }
+      case "muse_health": {
+        const report = evaluateProjectHealth(activeStore, activeRoot);
         return toolResult(report);
       }
       default:

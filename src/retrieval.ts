@@ -232,6 +232,8 @@ export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[],
  * Deep Context Query Engine:
  * Filters, ranks, and knapsack-packs relevant memories within token budgets.
  */
+export const searchMemories = queryContext;
+
 export function queryContext(
   store: Store,
   query: string = "",
@@ -246,6 +248,9 @@ export function queryContext(
   }
   if (!options.includeSuperseded) {
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
+  }
+  if (!options.includeArchived && options.status !== "archived") {
+    entries = entries.filter((e) => e.status !== "archived");
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
@@ -294,6 +299,18 @@ export function queryContext(
     }
   }
 
+  if (options.autoRehydrate) {
+    const { rehydrateMemory } = require("./promotion/archival.ts");
+    for (const item of results) {
+      if ((item.entry.status === "archived" || item.entry.status === "dormant" || item.entry.status === "cold") && item.score >= 0.65) {
+        try {
+          rehydrateMemory(store, item.entry.id, item.score, `Auto-rehydrated during search query '${query}'`);
+          item.entry.status = item.entry.verification?.level && item.entry.verification.level !== "unverified" ? "confirmed" : "active";
+        } catch {}
+      }
+    }
+  }
+
   return {
     results,
     source: "live",
@@ -312,6 +329,15 @@ export function formatPromptContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): FormattedContext {
+  const cacheKey = store.cache
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}`
+    : undefined;
+
+  if (cacheKey && store.cache) {
+    const cached = store.cache.getContext(cacheKey);
+    if (cached) return cached;
+  }
+
   const result = queryContext(store, query, options);
   const constraints = memoryDir ? syncConstraints(memoryDir, store) : [];
   const userProfile = getUserProfile(memoryDir, { query });
@@ -420,11 +446,17 @@ export function formatPromptContext(
   parts.push("---");
   parts.push("*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call `memory_capture` immediately.*");
 
-  return {
+  const formatted: FormattedContext = {
     markdown: parts.join("\n").trim(),
     entries: result.results,
     totalTokensUsed: result.totalTokensUsed ?? 0,
     constraints,
     userProfile,
   };
+
+  if (cacheKey && store.cache) {
+    store.cache.setContext(cacheKey, formatted);
+  }
+
+  return formatted;
 }

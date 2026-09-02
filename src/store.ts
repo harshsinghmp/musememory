@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
@@ -18,6 +18,18 @@ import {
   deleteMemoryById,
   type SqliteDatabase,
 } from "./sqlite.ts";
+import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
+import {
+  computeFingerprint,
+  inferTemporalMode,
+  determineQuality,
+  ensureUtility,
+  findDuplicates,
+  consolidateIntoCanonical,
+  detectConflict,
+  flagConflict,
+} from "./quality/index.ts";
+import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
 
 export interface StorageLayout {
   root: string;
@@ -46,6 +58,7 @@ export interface Store {
   memoryDir?: string;
   layout?: StorageLayout;
   db?: SqliteDatabase;
+  cache?: MemoryStoreCache;
 }
 
 /** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
@@ -61,17 +74,22 @@ export function openStore(memoryDir: string): Store {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
 
-  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db };
+  const cache = getOrCreateStoreCache(memoryDir);
+  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache };
 
-  // Sync existing YAML files into SQLite database if DB is newly initialized
+  // Fast startup sync: only sync YAML files into SQLite database if DB is empty or missing entries
   if (db && existsSync(layout.memoriesDir)) {
     try {
-      const yamlIds = listIds(store);
-      for (const yId of yamlIds) {
-        if (!getMemoryById(db, yId)) {
+      const memCountRow = db.query<{ count: number }>(`SELECT count(*) as count FROM memories`).get();
+      const memCount = memCountRow?.count ?? 0;
+      if (memCount === 0) {
+        const yamlFiles = readdirSync(layout.memoriesDir).filter((f) => f.endsWith(".yaml"));
+        for (const f of yamlFiles) {
+          const yId = f.slice(0, -5);
           const entry = getFromYaml(store, yId);
           if (entry) {
             insertOrReplaceMemory(db, entry);
+            cache.setEntry(entry);
           }
         }
       }
@@ -151,32 +169,91 @@ function getFromYaml(store: Store, id: string): MemoryEntry | null {
 
 export function get(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
+  let fileMtime: number | undefined;
+
   if (existsSync(file)) {
+    try {
+      fileMtime = statSync(file).mtimeMs;
+    } catch {}
+
+    // 1. Check L0 cache if mtime matches
+    if (store.cache && fileMtime !== undefined) {
+      const cached = store.cache.getEntry(id, fileMtime);
+      if (cached) return cached;
+    }
+
+    // 2. Parse YAML from disk (either cache miss or externally modified)
     const fromYaml = getFromYaml(store, id);
     if (!fromYaml) {
       // Corrupted or unparseable YAML file
+      if (store.cache) store.cache.deleteEntry(id);
       return null;
     }
+
     if (store.db) {
-      const dbEntry = getMemoryById(store.db, id);
-      if (dbEntry) return dbEntry;
-      // Sync into SQLite
       try {
         insertOrReplaceMemory(store.db, fromYaml);
       } catch {}
     }
+    if (store.cache) {
+      store.cache.setEntry(fromYaml, undefined, fileMtime);
+    }
     return fromYaml;
   }
-  if (store.db) {
-    return getMemoryById(store.db, id);
+
+  // File does not exist on disk, check L0 cache then SQLite
+  if (store.cache) {
+    const cached = store.cache.getEntry(id);
+    if (cached) return cached;
   }
+  if (store.db) {
+    const dbEntry = getMemoryById(store.db, id);
+    if (dbEntry) {
+      if (store.cache) store.cache.setEntry(dbEntry);
+      return dbEntry;
+    }
+  }
+
   return null;
 }
 
-export function list(store: Store): MemoryEntry[] {
-  return listIds(store)
+export function list(
+  store: Store,
+  filters?: { project?: string; type?: string; status?: string },
+): MemoryEntry[] {
+  const cacheKey = filters
+    ? `filter:${filters.project || ""}:${filters.type || ""}:${filters.status || ""}`
+    : "all";
+
+  let dirMtime: number | undefined;
+  if (existsSync(store.dir)) {
+    try {
+      dirMtime = statSync(store.dir).mtimeMs;
+    } catch {}
+  }
+
+  // 1. Check L0 query cache
+  if (store.cache) {
+    const cached = store.cache.getQuery(cacheKey, dirMtime);
+    if (cached) return cached;
+  }
+
+  // 2. Scan IDs (SQLite + disk files)
+  const ids = listIds(store);
+  const entries = ids
     .map((id) => get(store, id))
     .filter((e): e is MemoryEntry => e !== null);
+
+  let filtered = entries;
+  if (filters?.project) filtered = filtered.filter((e) => e.project === filters.project);
+  if (filters?.type) filtered = filtered.filter((e) => e.type === filters.type);
+  if (filters?.status) filtered = filtered.filter((e) => e.status === filters.status);
+
+  if (store.cache) {
+    store.cache.setQuery(cacheKey, filtered, undefined, dirMtime);
+  }
+
+  return filtered;
 }
 
 /** Helper to extract all scannable text from a memory entry. */
@@ -210,21 +287,41 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
   }
 
   // 2. Dual write to YAML file for exportability
+  let mtimeMs: number | undefined;
   try {
     const file = fileForId(store, entry.id);
     const tmp = `${file}.tmp`;
     writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
     renameSync(tmp, file);
+    try {
+      mtimeMs = statSync(file).mtimeMs;
+    } catch {}
   } catch {}
+
+  // 3. L0 Cache update with mtime
+  if (store.cache) {
+    store.cache.setEntry(entry, undefined, mtimeMs);
+  }
 }
 
 export function nowIso(): string {
   return new Date().toISOString();
 }
 
+let lastGeneratedTs = 0;
+let generatedSeq = 0;
+
 export function makeId(slug: string): string {
   const clean = slugifyId(slug);
-  return `m_${Date.now()}_${clean}`;
+  const now = Date.now();
+  if (now <= lastGeneratedTs) {
+    generatedSeq++;
+  } else {
+    lastGeneratedTs = now;
+    generatedSeq = 0;
+  }
+  const idTimestamp = generatedSeq === 0 ? String(now) : `${now}${String(generatedSeq).padStart(3, "0")}`;
+  return `m_${idTimestamp}_${clean}`;
 }
 
 function normalizeIdArray(val: string | string[] | null | undefined): string[] {
@@ -264,6 +361,14 @@ export function propose(
     expires_at?: string;
     test_command?: string;
     graph?: GraphMetadata;
+    fingerprint?: string;
+    temporal_mode?: TemporalMode;
+    quality?: MemoryQuality;
+    utility?: MemoryUtility;
+    evidence?: EvidenceItem[];
+    conflict_ids?: string[];
+    dedup?: boolean;
+    checkConflict?: boolean;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -273,9 +378,22 @@ export function propose(
     throw new Error("Cannot propose memory entry with empty project");
   }
 
+  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
+
+  // Deduplication check: consolidate into canonical memory if exact duplicate exists
+  if (opts.dedup) {
+    const dupes = findDuplicates(store, { title, content: opts.content, project: opts.project });
+    if (dupes.exact) {
+      return consolidateIntoCanonical(store, dupes.exact.id, {
+        source: opts.source,
+        evidence: opts.evidence?.[0],
+      });
+    }
+  }
+
   const secrets = scanSecrets(
     extractEntryText({
-      title: opts.title,
+      title,
       content: opts.content,
       tags: opts.tags,
       verification: opts.verification,
@@ -286,9 +404,12 @@ export function propose(
   }
 
   const now = nowIso();
+  const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
+  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
+
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
-    title: (opts.title ?? opts.content.slice(0, 120)).slice(0, 120),
+    title,
     content: opts.content,
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
@@ -305,9 +426,38 @@ export function propose(
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
     graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),
+    fingerprint,
+    temporal_mode,
+    evidence: opts.evidence,
+    conflict_ids: opts.conflict_ids,
   };
+
+  entry.quality = opts.quality ?? determineQuality(entry);
+  entry.utility = opts.utility ?? ensureUtility(entry);
+
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
+
+  // Optional automated contradiction detection
+  if (opts.checkConflict) {
+    const conflict = detectConflict(store, {
+      title: entry.title,
+      content: entry.content,
+      project: entry.project,
+      type: entry.type,
+      id: entry.id,
+    });
+    if (conflict.conflicted && conflict.conflictingEntry) {
+      const flagged = flagConflict(
+        store,
+        conflict.conflictingEntry.id,
+        entry.id,
+        conflict.reason || "Contradiction detected",
+      );
+      return flagged.incoming;
+    }
+  }
+
   if (entry.type === "constraint" && store.memoryDir) {
     try {
       syncConstraints(store.memoryDir, store);
@@ -336,6 +486,7 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   entry.last_confirmed_at = now;
   entry.reinforcement = (entry.reinforcement ?? 0) + 1;
   entry.verification = { level: "user-confirmed", verified_at: now };
+  entry.quality = determineQuality(entry);
   entry.updated_at = now;
   save(store, entry);
   if (entry.type === "constraint" && store.memoryDir) {
@@ -364,6 +515,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
 
   old.status = "superseded";
   closeOutValidity(old);
+  old.quality = determineQuality(old);
   const prevOld = normalizeIdArray(old.superseded_by);
   if (!prevOld.includes(newId)) {
     old.superseded_by = [...prevOld, newId];
@@ -374,6 +526,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (!prevNext.includes(oldId)) {
     next.supersedes = [...prevNext, oldId];
   }
+  next.quality = determineQuality(next);
   next.updated_at = nowIso();
 
   save(store, old);
@@ -399,6 +552,7 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "stale";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
@@ -428,6 +582,7 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "superseded";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
@@ -488,6 +643,7 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "rejected";
+  entry.quality = determineQuality(entry);
   closeOutValidity(entry);
   entry.updated_at = nowIso();
   save(store, entry);
@@ -510,6 +666,11 @@ export function reject(store: Store, id: string): MemoryEntry | null {
 export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
   const entry = get(store, id);
   if (!entry) return false;
+
+  // 1. Evict from L0 Cache
+  if (store.cache) {
+    store.cache.deleteEntry(id);
+  }
 
   let deleted = false;
   if (store.db) {

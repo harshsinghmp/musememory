@@ -5,6 +5,242 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-03 — Autonomous Cognitive Engine Major Overhaul
+
+### Summary
+Major architectural milestone evolving Muse Memory from an episodic store into an autonomous, self-correcting, evidence-aware cognitive engine with native code anchors, first-class ADRs, bidirectional drift auditing, "Why" reasoning, and a 5-pillar health gate.
+
+## [1.22.0] - 2026-09-03
+
+### Added
+- **Unified 5-Pillar Project Health Gate (`src/health/gate.ts`)**:
+  - Comprehensive single-call architectural and memory health evaluation across 5 critical pillars:
+    1. *Memory Store Integrity*: Contradictions, unverified/expired memories, timeless constraints.
+    2. *Native Code Anchor Validity*: Live AST structural verification, drift detection, orphaned anchors.
+    3. *Documentation ↔ Code Alignment*: Bi-directional drift, undocumented exports, stale references.
+    4. *Negative Lessons & Anti-Pattern Sentry*: Saliency and defense against known traps.
+    5. *Technical Debt & Friction*: TODO/FIXME/HACK markers, `as any` type bypasses, recurring bug clusters.
+  - Generates composite score ($0 \dots 100$), letter grade (`A`, `B`, `C`, `D`, `F`), and gate status (`PASS`, `WARN`, `FAIL`).
+  - Produces an automated, prioritized Actionable Remediation Checklist.
+- **CLI Health Command (`src/cli/health.ts`)**:
+  - `musememory health`: Rich terminal dashboard with ANSI styling, pillar scorecards, and remediation lists.
+  - Supports `--json` flag for CI/CD gates and exit code 1 on `FAIL` status.
+- **New MCP Tool (`src/mcp.ts`)**:
+  - `muse_health`: Exposes the 5-pillar health audit to AI coding agents with profile integration across `review`, `architecture`, and `maintenance`.
+
+## [1.21.0] - 2026-09-03
+
+### Added
+- **Autonomous Engineering Cognition & "Why" Reasoner (`src/cognition/why.ts`)**:
+  - `explainWhyCodeIsTheWayItIs`: Synthesizes the historical rationale behind a piece of code, symbol, or constraint.
+  - Chronological timeline reconstructing initial architectural decisions, hardening bug fixes, accepted trade-offs, negative warnings, and timeless invariants.
+  - Generates evidence-backed confidence scores ($0.0 \dots 1.0$) based on authoritative verifications and native code anchors.
+- **Recurring Bug & Friction Clustering (`src/cognition/clustering.ts`)**:
+  - `clusterRecurringBugsAndFriction`: Automatically clusters bug fixes, negative lessons, and failure records into architectural fragility hotspots.
+  - 5 root-cause categories: race conditions, type drift, missing boundary guards, resource leaks, and architecture flaws.
+  - Computes fragility scores per subsystem and formulates root-cause hypotheses with preventative recommendations.
+- **Technical Debt & Workaround Registry (`src/cognition/tech-debt.ts`)**:
+  - `analyzeTechnicalDebt`: Scans repository files and memory store for debt markers (`// TODO:`, `// FIXME:`, `// HACK:`, `// WORKAROUND:`), dangerous `as any` type assertions, and drifted code anchors.
+  - Calculates composite technical debt score ($0 \dots 100$) and surfaces top hotspot files.
+  - Generates prioritized, memory-grounded refactoring recommendations.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `muse_why`: Autonomous "Why" code explanation engine.
+  - `muse_bug_clusters`: Recurring bug hotspot clustering and fragility analysis.
+  - `muse_tech_debt`: Technical debt and workaround scanner.
+
+## [1.20.0] - 2026-09-03
+
+### Added
+- **First-Class Architecture Decision Records (`src/adrs/engine.ts`)**:
+  - Treats ADRs as living, queryable memory entities rather than static dead files.
+  - Auto-incrementing sequential ADR numbering (`ADR-1`, `ADR-2`, etc.).
+  - Structured ADR format: status (`proposed`, `accepted`, `superseded`, `rejected`), context & drivers, decision, consequences (positive, negative trade-offs, neutral), options considered (with pros, cons, rejection reasons), and native code anchors.
+  - Native ADR supersession workflow: mutually links older ADRs to newer replacements with append-only audit tracking.
+- **Bidirectional Documentation ↔ Code Drift Engine (`src/adrs/drift.ts`)**:
+  - `detectDocumentationCodeDrift`: Compares memory/ADR claims against live filesystem ASTs and conversely scans code for undocumented exports.
+  - 6-state alignment classification:
+    - `DOCUMENTED`: Documented memory confirmed present in live codebase.
+    - `IMPLEMENTED`: ADR decision verified in source implementation.
+    - `PARTIAL`: Code signature or implementation body drifted from documented hash.
+    - `CONFLICTING`: Direct contradiction with active architectural rules.
+    - `STALE`: Outdated documentation pointing to deleted or renamed files/symbols.
+    - `MISSING`: Exported code symbols lacking any documentation or architectural record.
+  - Computes repository alignment score and provides actionable remediation suggestions.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `memory_adr_record`: Record a first-class Architecture Decision Record.
+  - `memory_adr_list`: List ADRs filtered by status.
+  - `memory_drift_audit`: Run bidirectional documentation ↔ code drift audit.
+
+## [1.19.0] - 2026-09-03
+
+### Added
+- **Flagship Unified Context Orchestrator (`src/orchestrator/context.ts`)**:
+  - `muse_context`: Single-call fused entry point accepting query, active file, symbol, error message, task intent, and token budget.
+  - Returns ranked memories, code anchor matches, negative anti-pattern warnings, active `CURRENT.md` constraints, and actionable next steps in one unified payload.
+  - Strict token-budget knapsack packing: prioritizes active invariants and negative lessons to prevent context overflow while preserving essential constraints.
+- **Bidirectional Code ↔ Memory Lookups (`src/orchestrator/bidirectional.ts`)**:
+  - `muse_code_for_memory`: Given a memory ID, extracts all anchored code files, symbols, and backtick references.
+  - `muse_memory_for_code`: Given a file path or symbol, returns all associated decisions, negative lessons, and constraints.
+- **Task-Focused MCP Profiles (`src/orchestrator/profiles.ts`)**:
+  - 6 dedicated profiles reducing agent context bloat: `core`, `coding`, `debugging`, `review`, `architecture`, `maintenance` (plus `full`).
+  - Filter tools dynamically via `MUSE_MCP_PROFILE` environment variable or `createServer` initialization.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `muse_context`: Flagship unified context fusion.
+  - `muse_code_for_memory`: Code reference extraction for memory entry.
+  - `muse_memory_for_code`: Associated memory search for codebase file/symbol.
+  - `muse_profile_list`: Profile inspector and tool definitions.
+
+## [1.18.0] - 2026-09-03
+
+### Added
+- **Native Code Anchors & Stable Structural Code Identity (`src/anchors/`)**:
+  - First-class code anchor entities independent of any external provider (`repository`, `file`, `directory`, `module`, `symbol`, `qualified_symbol`, `route`, `test`, `commit`, `pr`).
+  - Structural fingerprinting engine (`src/anchors/fingerprint.ts`): normalizes comments, punctuation spacing, and whitespace to generate stable, line-independent SHA-256 structural hashes.
+  - Immunity to line shifts, formatting, and documentation comments while remaining strictly sensitive to AST/logic changes.
+  - Balanced brace block extractor for functions, classes, methods, and arrow expressions.
+  - Code-aware drift and orphan verification (`src/anchors/resolver.ts`): detects deleted files/symbols (`orphaned`), code logic modifications (`drifted`), and verified matches (`valid`).
+  - Repository-wide anchor audit (`auditMemoryAnchors`): calculates store integrity score and flags degraded anchors with append-only audit trail logging.
+- **New MCP Tools for Code Anchors (`src/mcp.ts`)**:
+  - `memory_anchor_create`: Create and attach a structural code anchor to a memory entry.
+  - `memory_anchor_verify`: Verify code anchors on a memory entry against live repository files.
+  - `memory_anchor_audit`: Run repository-wide audit of all code anchors and compute integrity metrics.
+
+## [1.17.0] - 2026-09-03
+
+### Added
+- **Scoped Promotion & Generalization Engine (`src/promotion/`)**:
+  - 3-tier scope migration ladder: `LOCAL` (workspace/session) → `PROJECT` (repo `.memory/`) → `GLOBAL` (reusable cross-project `~/.memory/`).
+  - 5× Success Promotion Policy: enforces `>= 5` successful uses, 100% success rate, 0 regressions, 0 conflicts, and sufficient evidence before automatic global promotion.
+  - Generalization Engine (`src/promotion/generalization.ts`): scrubs specific repository file paths, line numbers, and commit hashes into universal architectural principles.
+  - Manual global promotion support bypassing 5× requirement with full provenance.
+  - Promotion audit records in `.memory/audit.jsonl` with operation `promote`.
+- **Extended Archival Lifecycle & Dynamic Rehydration (`src/promotion/archival.ts`)**:
+  - Multi-tier lifecycle: `ACTIVE` → `COLD` → `DORMANT` → `ARCHIVED`.
+  - Stale policy and utility evaluation sweeps automatically transitioning aging, unused, or superseded memories down the tier ladder.
+  - Dynamic Rehydration: automatically restores `ARCHIVED`/`DORMANT` memories to `ACTIVE`/`CONFIRMED` upon high retrieval query relevance match.
+  - Archival audit records with operations `archive` and `rehydrate`.
+- **New MCP Tools for Promotion and Lifecycle (`src/mcp.ts`)**:
+  - `memory_evaluate_promotion`: Evaluates an entry against the 3-tier promotion ladder and 5× success rule.
+  - `memory_promote`: Executes scoped promotion (local → project or project → global) with generalization.
+  - `memory_generalize`: Previews and tests content generalization.
+  - `memory_archive`: Transitions memory entries to cold, dormant, or archived tiers.
+  - `memory_rehydrate`: Restores archived memories back to active status.
+  - `memory_lifecycle_status`: Inspects store-wide lifecycle distribution and triggers optional archival sweeps.
+
+## [1.16.0] - 2026-09-03
+
+### Added
+- **Context Compaction & Interruption-Proof Session Handoff Engine (`src/compaction/`)**:
+  - Context usage evaluation enforcing the 70% threshold invariant: `"Context at 70%. Compact now or continue?"`.
+  - Canonical 5-invariant lockdown protocol:
+    1. High level goal of your build spec
+    2. Current architecture and data flow
+    3. What is already implemented and considered done
+    4. What is explicitly not done yet
+    5. The next concrete task we are working on
+  - Interruption-proof checkpoint compiler: writes structured handoffs into `.memory/CURRENT.md` with compact resumption prompt generation.
+  - Continuous Session Memory Harvester (`src/compaction/harvester.ts`): automatically extracts durable decisions, bug fixes, invariants, and negative lessons directly from conversational turns without user friction.
+- **New MCP Tools for Compaction and Harvesting (`src/mcp.ts`)**:
+  - `memory_compaction_check`: Check token usage against the 70% threshold.
+  - `memory_compact_handoff`: Lock down the 5 invariants and compile interruption-proof `CURRENT.md` handoff.
+  - `memory_harvest_turn`: Continuously harvest durable knowledge from agent turns.
+
+## [1.15.0] - 2026-09-03
+
+### Added
+- **Multi-Factor Ranking Engine (`src/retrieval/ranking.ts`)**:
+  - Replaces naive retrieval with an 11-dimension scoring model:
+    - Exact symbol match: +1.0
+    - Path / directory match: +0.4
+    - Lexical BM25 match via SQLite FTS5: +0.3
+    - Graph / call-graph overlap: +0.3
+    - Blast-radius relevance: +0.25
+    - Recency decay: -0.05 per 30 days untouched (timeless constraints immune)
+    - Utility / reuse success-rate bonus: +0.25 for verified high-utility memories
+    - Negative lesson warning bonus: +0.3 for anti-patterns matching query/paths
+    - Invariant / timeless boost: +0.2 for constraints
+    - Status penalties: -0.8 conflicted, -0.5 stale/superseded
+  - Priority-based knapsack token budget packing: ensures critical project invariants and constraints fit first without overflowing token budgets.
+- **New MCP Tool for Multi-Factor Ranked Retrieval (`src/mcp.ts`)**:
+  - `memory_ranked_retrieval`: Queries memories with full 11-factor scoring breakdowns and knapsack token packing.
+
+## [1.14.0] - 2026-09-03
+
+### Added
+- **Pluggable Code Intelligence Provider Architecture (`src/intelligence/`)**:
+  - Standardized `CodeIntelligenceProvider` interface specifying `resolveSymbols`, `getCallers`, `getCallees`, `getRelatedFiles`, `getBlastRadius`, and `extractGraphContext`.
+  - Dynamic `ProviderRegistry` with automatic capability detection and zero-crash fault isolation.
+  - Multi-tier fallback chain: CodeGraph → Graphify → LSP → Heuristic Fallback → Safe Empty.
+  - Zero mandatory external dependencies: pure autonomous operation if no external intelligence engines are present.
+- **Optional Provider Adapters (`src/intelligence/adapters/`)**:
+  - `CodeGraphProvider`: Integrates with `.codegraph` indexes or CLI when available.
+  - `GraphifyProvider`: Ingests graph networks and dependencies from `.graphify/graph.json`.
+  - `LspProvider`: Hooks into language server protocols or agent-lsp when active.
+  - `HeuristicFallbackProvider`: Built-in zero-dependency AST/regex file scanner providing baseline symbol and relationship resolution across workspace files.
+- **Code Intelligence Memory Enrichment (`src/intelligence/enrichment.ts`)**:
+  - Enriches memory entries with code intelligence evidence (symbol kinds, definition lines, source files) without modifying core content.
+- **New MCP Tools for Code Intelligence (`src/mcp.ts`)**:
+  - `memory_code_intel_status`: Query active providers and capabilities.
+  - `memory_code_intel_symbols`: Resolve symbols across active providers with fallback.
+  - `memory_code_intel_blast_radius`: Calculate ripple effects and blast radius for files and symbols.
+  - `memory_enrich`: Enrich memories with code intelligence evidence.
+
+## [1.13.0] - 2026-09-03
+
+### Added
+- **Ephemeral Observation Tier (`src/learning/observation.ts`)**:
+  - Append-only `.memory/observations.jsonl` ledger for raw event streams (tool outputs, test outputs, build failures, code review comments, file edits).
+  - Built-in Vibeguard secret defense preventing credential leakage into raw observation streams.
+  - State tracking linking observations to extracted candidate memories.
+- **First-Class Negative Memories (`src/learning/negative.ts`)**:
+  - Dedicated `negative` memory type capturing `DO_NOT_USE`, `FAILED_APPROACH`, and `BUG_PRONE_PATTERN` lessons.
+  - Structured fields: `failed_approach`, `failure_reason`, `alternative_recommended`, `reproduction_command`, and `severity`.
+  - Enforced `timeless` temporal mode and elevated baseline salience (`0.85`) to safeguard future agent turns against known traps.
+- **Autonomous Distillation Pipeline (`src/learning/distill.ts`)**:
+  - Distills raw observation streams into structured candidate bug fixes (`fix`), architectural conventions (`architecture`), and anti-patterns (`negative`).
+- **Session Outcome Feedback & Reinforcement Loop (`src/learning/feedback.ts`)**:
+  - Automatically evaluates test and command exit codes against memories applied during the session.
+  - Grants positive reinforcement on success and flags regressions with failure logs on command errors.
+- **New MCP Tools for Autonomous Learning (`src/mcp.ts`)**:
+  - `memory_observe`: Ingest ephemeral raw observation events.
+  - `memory_distill_observations`: Trigger autonomous distillation of raw observations into candidates.
+  - `memory_negative_capture`: Explicitly record negative patterns and failed approaches.
+
+## [1.12.0] - 2026-09-03
+
+### Added
+- **Memory Quality, Deduplication & Canonical Consolidation (`src/quality/dedup.ts`)**:
+  - Deterministic SHA-256 content fingerprinting on normalized markdown text.
+  - Word-level Jaccard similarity and exact fingerprint duplicate detection.
+  - Canonical memory consolidation: duplicate observations merge into existing canonical memories with supporting evidence arrays and reinforcement bonuses.
+  - Temporal mode inference: distinguishes `current` facts, `historical` past architectures/migrations, and `timeless` constraints.
+  - Categorical quality model: classifies entries into `LOW`, `MEDIUM`, `HIGH`, `VERIFIED`, `CONFLICTED`, `STALE`.
+- **Contradiction Engine & Conflict Resolution (`src/quality/contradiction.ts`)**:
+  - Semantic conflict detection flagging opposing polarities, technological clashes, and direct negations without silent overwrites.
+  - First-class `conflicted` status with mutual `conflict_ids` linking opposing memories.
+  - Deterministic resolution protocols: `supersede`, `historical` (preserves obsolete memory as historical context), `reject`, or `keep_both`.
+- **Utility Tracking & Memory ROI Calculator (`src/quality/utility.ts`)**:
+  - First-class memory utility tracking: `retrieval_count`, `application_count`, `successful_applications`, `failed_applications`, `regressions`, `reuse_success_rate`.
+  - Automated safety threshold: flags memories as `disputed` when 3+ consecutive regressions occur.
+  - Full Memory ROI report: overall reuse success rate, high-performing memories, and harmful regressions.
+- **New MCP Tools for Quality and Feedback (`src/mcp.ts`)**:
+  - `memory_feedback`: Agent outcome feedback loop to report task success, failure, or regression.
+  - `memory_resolve_conflict`: Programmatic conflict resolution across competing memories.
+  - `memory_roi`: Store-wide utility and return-on-investment telemetry.
+- **In-Process L0 Hot Memory Cache & L1 Context Cache (`src/cache.ts`)**:
+  - Microsecond-level O(1) in-memory cache for memory entries, filtered queries, and formatted prompt contexts.
+  - Bounded LRU eviction, configurable TTL, and store-version generation invalidation on mutations.
+  - Dual-persistence synchronization with disk `mtimeMs` verification: guarantees zero YAML parsing for untouched files while immediately detecting external edits or file corruptions.
+- **SQLite FTS5 Full-Text Virtual Table & BM25 Search (`src/sqlite.ts`)**:
+  - Integrated `memories_fts` virtual table using SQLite FTS5 with Unicode61 tokenizer.
+  - Automatic backfill migration for existing databases and automatic synchronization on insert and delete.
+  - High-performance `searchMemoriesFts()` API delivering sub-millisecond lexical and prefix search.
+  - Performance-tuned PRAGMAs (WAL mode, synchronous=NORMAL, 64MB cache size, 256MB mmap).
+- **Comprehensive Benchmarks & Latency Suite (`test/benchmark.test.ts`, `test/cache.test.ts`)**:
+  - Hot cache lookup verified under 0.05ms (sub-50 microseconds).
+  - Bulk listing with query cache verified under 0.1ms for 100+ entries.
+  - FTS5 BM25 search verified under 2ms.
+
 ## [1.10.0] - 2026-08-31
 
 ### Added
