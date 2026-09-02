@@ -60,6 +60,10 @@ import {
   recordNegativeLesson,
   distillObservationsToCandidates,
 } from "./learning/index.ts";
+import {
+  defaultRegistry,
+  enrichMemoryWithCodeIntel,
+} from "./intelligence/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -963,6 +967,52 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["title", "failed_approach", "failure_reason", "project"],
         },
       },
+      {
+        name: "memory_code_intel_status",
+        description: "Inspect registered code intelligence providers and their workspace availability status",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_code_intel_symbols",
+        description: "Resolve symbols (functions, classes, types) across active code intelligence providers with fallback",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Symbol name or substring query" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "memory_code_intel_blast_radius",
+        description: "Calculate ripple effect and blast radius of modifying a symbol or file",
+        inputSchema: {
+          type: "object",
+          properties: {
+            target: { type: "string", description: "Symbol name or relative file path" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["target"],
+        },
+      },
+      {
+        name: "memory_enrich",
+        description: "Enrich an existing memory entry with code intelligence symbol evidence",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Memory entry ID" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
     ],
   }));
 
@@ -1619,6 +1669,34 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           source: a.agent ? String(a.agent) : "agent",
         });
         return toolResult(entry);
+      }
+      case "memory_code_intel_status": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const available = await defaultRegistry.getAvailableProviders(workspaceDir);
+        return toolResult({
+          workspaceDir,
+          availableProviders: available.map((p) => ({
+            name: p.name,
+            capabilities: p.getCapabilities(),
+          })),
+        });
+      }
+      case "memory_code_intel_symbols": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const symbols = await defaultRegistry.resolveSymbolsWithFallback(String(a.query), workspaceDir);
+        return toolResult({ query: a.query, count: symbols.length, symbols });
+      }
+      case "memory_code_intel_blast_radius": {
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const blast = await defaultRegistry.getBlastRadiusWithFallback(String(a.target), workspaceDir);
+        return toolResult(blast);
+      }
+      case "memory_enrich": {
+        const entry = get(activeStore, String(a.id));
+        if (!entry) return toolError(`memory ${a.id} not found`);
+        const workspaceDir = a.dir ? String(a.dir) : activeRoot;
+        const enriched = await enrichMemoryWithCodeIntel(activeStore, entry, workspaceDir);
+        return toolResult(enriched);
       }
       default:
         return toolError(`unknown tool ${name}`);
