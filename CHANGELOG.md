@@ -5,6 +5,25 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-09-03
+
+### Added
+- **Multi-Factor Ranking Engine (`src/retrieval/ranking.ts`)**:
+  - Replaces naive retrieval with an 11-dimension scoring model:
+    - Exact symbol match: +1.0
+    - Path / directory match: +0.4
+    - Lexical BM25 match via SQLite FTS5: +0.3
+    - Graph / call-graph overlap: +0.3
+    - Blast-radius relevance: +0.25
+    - Recency decay: -0.05 per 30 days untouched (timeless constraints immune)
+    - Utility / reuse success-rate bonus: +0.25 for verified high-utility memories
+    - Negative lesson warning bonus: +0.3 for anti-patterns matching query/paths
+    - Invariant / timeless boost: +0.2 for constraints
+    - Status penalties: -0.8 conflicted, -0.5 stale/superseded
+  - Priority-based knapsack token budget packing: ensures critical project invariants and constraints fit first without overflowing token budgets.
+- **New MCP Tool for Multi-Factor Ranked Retrieval (`src/mcp.ts`)**:
+  - `memory_ranked_retrieval`: Queries memories with full 11-factor scoring breakdowns and knapsack token packing.
+
 ## [1.14.0] - 2026-09-03
 
 ### Added

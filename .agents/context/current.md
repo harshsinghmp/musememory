@@ -23,6 +23,7 @@
 14. **First-Class Negative Memories**: Explicit capture of `DO_NOT_USE`, `FAILED_APPROACH`, and `BUG_PRONE_PATTERN` with reproduction commands and timeless salience.
 15. **Autonomous Distillation & Outcome Feedback Loop**: Distills raw observation streams into candidate fixes/architecture, coupled with automatic session command evaluation and memory reinforcement.
 16. **Pluggable Code Intelligence Architecture**: Pluggable provider registry with zero-crash fallback chain (CodeGraph → Graphify → LSP → Heuristic AST scanner → Safe Empty) and automated symbol evidence memory enrichment.
+17. **Multi-Factor Ranking Engine**: 11-dimension scoring model combining exact symbol matching, path proximity, FTS5 BM25, graph overlap, blast radius, recency decay, utility ROI, negative warning boosts, and knapsack token budget packing.
 
 ---
 
