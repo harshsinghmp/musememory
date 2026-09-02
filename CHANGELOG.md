@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.12.0] - 2026-09-03
 
 ### Added
+- **Memory Quality, Deduplication & Canonical Consolidation (`src/quality/dedup.ts`)**:
+  - Deterministic SHA-256 content fingerprinting on normalized markdown text.
+  - Word-level Jaccard similarity and exact fingerprint duplicate detection.
+  - Canonical memory consolidation: duplicate observations merge into existing canonical memories with supporting evidence arrays and reinforcement bonuses.
+  - Temporal mode inference: distinguishes `current` facts, `historical` past architectures/migrations, and `timeless` constraints.
+  - Categorical quality model: classifies entries into `LOW`, `MEDIUM`, `HIGH`, `VERIFIED`, `CONFLICTED`, `STALE`.
+- **Contradiction Engine & Conflict Resolution (`src/quality/contradiction.ts`)**:
+  - Semantic conflict detection flagging opposing polarities, technological clashes, and direct negations without silent overwrites.
+  - First-class `conflicted` status with mutual `conflict_ids` linking opposing memories.
+  - Deterministic resolution protocols: `supersede`, `historical` (preserves obsolete memory as historical context), `reject`, or `keep_both`.
+- **Utility Tracking & Memory ROI Calculator (`src/quality/utility.ts`)**:
+  - First-class memory utility tracking: `retrieval_count`, `application_count`, `successful_applications`, `failed_applications`, `regressions`, `reuse_success_rate`.
+  - Automated safety threshold: flags memories as `disputed` when 3+ consecutive regressions occur.
+  - Full Memory ROI report: overall reuse success rate, high-performing memories, and harmful regressions.
+- **New MCP Tools for Quality and Feedback (`src/mcp.ts`)**:
+  - `memory_feedback`: Agent outcome feedback loop to report task success, failure, or regression.
+  - `memory_resolve_conflict`: Programmatic conflict resolution across competing memories.
+  - `memory_roi`: Store-wide utility and return-on-investment telemetry.
 - **In-Process L0 Hot Memory Cache & L1 Context Cache (`src/cache.ts`)**:
   - Microsecond-level O(1) in-memory cache for memory entries, filtered queries, and formatted prompt contexts.
   - Bounded LRU eviction, configurable TTL, and store-version generation invalidation on mutations.

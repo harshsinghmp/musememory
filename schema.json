@@ -9,7 +9,7 @@
     "title": { "type": "string", "maxLength": 120 },
     "content": { "type": "string", "minLength": 1 },
     "project": { "type": "string", "minLength": 1 },
-    "status": { "type": "string", "enum": ["candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected"] },
+    "status": { "type": "string", "enum": ["candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted"] },
     "type": { "type": "string", "enum": ["session", "decision", "fix", "failure", "architecture", "operation", "constraint", "preference", "discovery"] },
     "salience": { "type": "number", "minimum": 0, "maximum": 1 },
     "created_at": { "type": "string", "format": "date-time" },
@@ -54,7 +54,40 @@
         "graph_verified_at": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
-    }
+    },
+    "fingerprint": { "type": "string" },
+    "temporal_mode": { "type": "string", "enum": ["current", "historical", "timeless"] },
+    "quality": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "VERIFIED", "CONFLICTED", "STALE"] },
+    "utility": {
+      "type": "object",
+      "properties": {
+        "retrieval_count": { "type": "number" },
+        "application_count": { "type": "number" },
+        "successful_applications": { "type": "number" },
+        "failed_applications": { "type": "number" },
+        "regressions": { "type": "number" },
+        "contradictions": { "type": "number" },
+        "last_applied_at": { "type": "string" },
+        "reuse_success_rate": { "type": "number" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "timestamp"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "source": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "excerpt": { "type": "string" },
+          "confidence": { "type": "number" }
+        }
+      }
+    },
+    "conflict_ids": { "type": "array", "items": { "type": "string" } },
+    "canonical_id": { "type": "string" }
   },
   "additionalProperties": false
 }

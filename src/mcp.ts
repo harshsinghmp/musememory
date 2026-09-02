@@ -48,6 +48,12 @@ import { getSettings, setSettings, getProjectSettings, setProjectSettings } from
 import { addSource, listSources, getSource } from "./provenance.ts";
 import { recordClaim, listClaims, getClaim } from "./claims.ts";
 import { freezeExecutionSnapshot, listExecutionSnapshots } from "./snapshot.ts";
+import {
+  recordApplicationOutcome,
+  resolveConflict,
+  computeMemoryRoi,
+  recordRetrievals,
+} from "./quality/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -856,6 +862,51 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "memory_feedback",
+        description: "Record application outcome for a memory (success, failure, or regression) to train utility and calculate memory ROI",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry applied" },
+            success: { type: "boolean", description: "Whether the memory successfully solved the task" },
+            regression: { type: "boolean", description: "Whether the memory introduced a regression" },
+            notes: { type: "string", description: "Optional explanation of outcome" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id", "success"],
+        },
+      },
+      {
+        name: "memory_resolve_conflict",
+        description: "Resolve a contradiction between two memories using a deterministic strategy (supersede, historical, reject, or keep_both)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            winning_id: { type: "string", description: "ID of the winning memory to establish as valid" },
+            losing_id: { type: "string", description: "ID of the conflicting memory to update" },
+            strategy: {
+              type: "string",
+              enum: ["supersede", "historical", "reject", "keep_both"],
+              description: "Resolution strategy: 'supersede', 'historical' (preserve as past context), 'reject', or 'keep_both'",
+            },
+            reason: { type: "string", description: "Architectural or empirical reason for resolution" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["winning_id", "losing_id", "strategy", "reason"],
+        },
+      },
+      {
+        name: "memory_roi",
+        description: "Calculate memory utility, reuse success rates, and return-on-investment across the store",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Optional project name filter" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
     ],
   }));
 
@@ -1456,6 +1507,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "memory_verify_strict": {
         const report = verifyStrictIntegrity(activeStore, activeMemoryDir, activeRoot, {
           maxCandidateDays: typeof a.max_candidate_days === "number" ? a.max_candidate_days : undefined,
+        });
+        return toolResult(report);
+      }
+      case "memory_feedback": {
+        const updated = recordApplicationOutcome(activeStore, {
+          memoryId: String(a.memory_id),
+          success: Boolean(a.success),
+          regression: a.regression === true,
+          notes: a.notes ? String(a.notes) : undefined,
+          actor: a.agent ? String(a.agent) : "agent",
+        });
+        return toolResult(updated);
+      }
+      case "memory_resolve_conflict": {
+        const result = resolveConflict(activeStore, {
+          winningId: String(a.winning_id),
+          losingId: String(a.losing_id),
+          strategy: a.strategy as "supersede" | "historical" | "reject" | "keep_both",
+          reason: String(a.reason),
+          actor: a.agent ? String(a.agent) : "user",
+        });
+        return toolResult(result);
+      }
+      case "memory_roi": {
+        const report = computeMemoryRoi(activeStore, {
+          project: a.project ? String(a.project) : undefined,
         });
         return toolResult(report);
       }
