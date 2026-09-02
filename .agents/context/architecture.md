@@ -48,18 +48,28 @@
 musememory/
 ├── bin/                    # Command-line entry points (memory.ts, musememory.ts)
 ├── src/                    # Core TypeScript source code
+│   ├── adrs/               # Living Architecture Decision Records & Drift Engine
+│   ├── anchors/            # Native structural code anchors & live drift verification
 │   ├── audit.ts            # Append-only compliance audit ledger
+│   ├── cache.ts            # L0 hot cache, query cache, & SQLite WAL tuning
 │   ├── claims.ts           # Evidence-backed claim ledger & confidence tags
 │   ├── cli.ts              # Command router & dispatcher
-│   ├── cli/                # Modular domain command handlers
+│   ├── cli/                # Modular domain command handlers (health, wiki, etc.)
+│   ├── cognition/          # Autonomous "Why" reasoner, bug clustering, tech debt
+│   ├── compaction/         # 70% context compaction engine & session handoffs
 │   ├── compounding/        # Unified knowledge compounding (temporal & clustering)
 │   ├── connect.ts          # Declarative zero-permission auto-wiring across 80+ agent platforms
 │   ├── current.ts          # CURRENT.md read/append constraints engine
 │   ├── doctor.ts           # Ecosystem diagnostic & health check engine
-│   ├── graph.ts            # CodeGraph AST integration adapter
+│   ├── health/             # Unified 5-Pillar Project Health Gate engine
 │   ├── harvester.ts        # Universal agent transcript discovery and auto-learner engine
-│   ├── mcp.ts              # Model Context Protocol stdio server
-│   ├── retrieval.ts        # Unified Retrieval Engine with knapsack token budgeting
+│   ├── intelligence/       # Pluggable code intelligence providers (CodeGraph, Graphify, LSP, AST)
+│   ├── learning/           # Observation, candidate distillation, negative anti-patterns
+│   ├── mcp.ts              # Model Context Protocol stdio server (61 tools with profiles)
+│   ├── orchestrator/       # Flagship muse_context fusion, bidirectional lookups, MCP profiles
+│   ├── promotion/          # 3-tier promotion ladder, 5x success rule, archival lifecycle
+│   ├── quality/            # Deduplication, semantic contradiction engine, utility & ROI
+│   ├── retrieval/          # 11-dimension multi-factor scoring & token knapsack packing
 │   ├── root.ts             # Hierarchical root detection & auto-bootstrap
 │   ├── schema.ts           # JSON Schema & store referential validator
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
@@ -69,8 +79,8 @@ musememory/
 │   ├── user.ts             # Persona & working preference engine
 │   ├── agents/             # Workstation coding agents detection & registry (80+ platforms)
 │   └── migrator/           # Multi-provider auto-detection & migration engine (24+ formats)
-├── test/                   # Automated Vitest/Bun test suites
-├── package.json            # Package metadata & dependencies
+├── test/                   # Automated Vitest/Bun test suites (480 tests across 79 suites)
+├── package.json            # Package metadata & dependencies (v2.0.0)
 └── dist/                   # Compiled Node/Bun bundle
 ```
 
@@ -79,20 +89,26 @@ musememory/
 ## 🔄 Memory LifeCycle State Machine
 
 ```
-  [propose] ──► candidate ──► confirm() ──► confirmed ──► supersede() ──► superseded
-                    │                           │
-                    ├──► markStale() ───────────┤
-                    │         │                 │
-                    │         ▼                 ▼
-                    └──►    stale            rejected
-                              │
-                              └──► delete() ──► [Purged from Disk + audit.jsonl logged]
+  [propose] ──► candidate ──► confirm() ──► active / confirmed ──► supersede() ──► superseded
+                    │                             │                      │
+                    ├──► markStale() ─────────────┤                      ├──► cold ──► dormant ──► archived
+                    │         │                   │                      │                           │
+                    │         ▼                   ▼                      └────────◄── rehydrate() ───┘
+                    └──►    stale             conflicted
+                              │                   │
+                              └──► delete() ◄─────┘
+                                      │
+                                      ▼
+                           [Purged from SQLite/YAML + audit.jsonl logged]
 ```
 
 ### Invariant Rules:
 1. **Confirmation Gate**: Only `candidate`, `disputed`, or `stale` entries can be promoted to `confirmed`.
 2. **Supersession Requirement**: When calling `supersede(old_id, new_id)`, the `new_id` entry must already exist and have `confirmed` status. Self-supersession (`old_id === new_id`) is strictly prohibited.
-3. **Audit Ledger Logging**: Every mutation automatically writes an immutable log record to `.memory/audit.jsonl`.
+3. **Contradiction Management**: Contradictory evidence creates explicit `conflicted` status with mutual `conflict_ids` instead of silently clobbering truth.
+4. **Scoped Promotion Ladder**: Promotions move `local` $\rightarrow$ `project` $\rightarrow$ `global` following the 5× repeated success policy and universal generalization (stripping local paths and project-specific artifacts).
+5. **Archival Rehydration**: Cold and archived memories dynamically rehydrate to `active` upon high-relevance queries.
+6. **Audit Ledger Logging**: Every mutation automatically writes an immutable log record to `.memory/audit.jsonl`.
 
 ---
 

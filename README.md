@@ -40,7 +40,7 @@
 
 ## 📑 Table of Contents
 
-- [🚀 What's New in v1.11.0](#-whats-new-in-v1110-cognitive-engine-evolution--hardening)
+- [🚀 What's New in v2.0.0](#-whats-new-in-v200-autonomous-cognitive-engine-major-overhaul)
 - [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
 - [✨ Key Feature Highlights](#-key-feature-highlights)
 - [⚡ Quick Start & Installation](#-quick-start--installation)
@@ -383,12 +383,27 @@ Navigate to `http://localhost:2222` to access:
 ## 📖 Deep Technical References & Documentation
 
 <details>
-<summary><b>🔌 Complete MCP Tool Reference (40 Tools)</b> — <i>Click to expand</i></summary>
+<summary><b>🔌 Complete MCP Tool Reference (61 Tools across 6 Profiles)</b> — <i>Click to expand</i></summary>
 
-When registered as an MCP server, `musememory` exposes the following native tools:
+When registered as an MCP server, `musememory` exposes the following native tools (filtered dynamically into role-tailored profiles to eliminate tool bloat):
 
 | MCP Tool | Execution Phase | Description |
 | :--- | :--- | :--- |
+| `muse_context` | **Flagship Fusion** | Single-call fused orchestrator combining search, active file, symbol, error messages, and task intent under strict knapsack token budgets. |
+| `muse_health` | **Quality Gate** | 5-Pillar Project Health Gate: audits store integrity, code anchors, doc/code alignment, anti-pattern sentry, and technical debt with A-F grading and pass/fail status. |
+| `muse_why` | **Cognition / "Why"** | Explains *why* code was designed the way it is by reconstructing past ADRs, bug fixes, trade-offs, and timeless rules. |
+| `muse_bug_clusters` | **Fragility Hotspots** | Categorizes recurring bugs into 5 root causes with subsystem fragility scoring. |
+| `muse_tech_debt` | **Technical Debt** | Scans code and memory for TODO/FIXME markers, unsafe `as any` casts, and drifted anchors. |
+| `muse_memory_for_code`| **Code-to-Memory** | Queries all memories, ADRs, constraints, and bugs associated with a code file and symbol. |
+| `muse_code_for_memory`| **Memory-to-Code** | Resolves all native code anchors and affected source files for a given memory entry. |
+| `memory_adr_record` / `list` | **Architecture Decisions** | Records and queries first-class Architecture Decision Records with native code anchors and options considered. |
+| `memory_drift_audit` | **Drift Engine** | Audits bi-directional documentation $\longleftrightarrow$ code drift across 6 alignment states (`DOCUMENTED`, `IMPLEMENTED`, `PARTIAL`, `CONFLICTING`, `STALE`, `MISSING`). |
+| `memory_capture_negative` | **Negative Sentry** | Records failed approaches, anti-patterns, and reproduction commands to prevent repeating mistakes. |
+| `memory_promote_scope` | **Scoped Promotion** | Promotes memory along 3-tier ladder (`local` $\rightarrow$ `project` $\rightarrow$ `global`) with 5× repeated success policy and universal generalization. |
+| `memory_archive` / `rehydrate` | **Archival Lifecycle** | Evaluates and manages `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with query rehydration. |
+| `memory_lifecycle_stats` / `sweep` | **Lifecycle Sweeper** | Reports store-wide lifecycle statistics and executes sweep transitions for aging memories. |
+| `anchor_create` / `verify` / `audit` | **Code Identity** | Creates, verifies, and audits line-independent structural code anchors. |
+| `profile_list` / `profile_switch` | **Tool Management** | Lists and switches task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
 | `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, active `CURRENT.md` constraints, and supports `--tier 0|1|2`. |
 | `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
 | `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
@@ -432,7 +447,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (41 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (42 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -440,6 +455,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
+| `health` | `[--json] [--global]` | **Unified 5-Pillar Project Health Gate**: audits Store Integrity, Code Anchors, Drift, Sentry, and Tech Debt with A-F grading and pass/fail gate. |
 | `install` | `[path] [--global]` | **One-line complete setup**: initializes `.memory/`, `USER.md`, and auto-wires coding agents. |
 | `doctor` | `[path] [--global]` | **System diagnostic**: checks SQLite primary, schemas, secrets, and MCP connections. |
 | `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configs (and optionally purges `.memory/`). |
