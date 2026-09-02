@@ -90,6 +90,11 @@ import {
   detectDocumentationCodeDrift,
 } from "./adrs/index.ts";
 import {
+  explainWhyCodeIsTheWayItIs,
+  clusterRecurringBugsAndFriction,
+  analyzeTechnicalDebt,
+} from "./cognition/index.ts";
+import {
   resolveMuseContext,
   resolveCodeForMemory,
   resolveMemoryForCode,
@@ -1356,6 +1361,40 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "muse_why",
+        description: "Autonomous Engineering Cognition: Explain WHY code was designed or modified the way it is by tracing historical bug fixes, ADRs, trade-offs, and invariants",
+        inputSchema: {
+          type: "object",
+          properties: {
+            target: { type: "string", description: "Target concept, component, file name, or symbol" },
+            file_path: { type: "string", description: "Optional specific file path" },
+            symbol_name: { type: "string", description: "Optional specific symbol name" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+          required: ["target"],
+        },
+      },
+      {
+        name: "muse_bug_clusters",
+        description: "Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_tech_debt",
+        description: "Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
     ];
 
     return { tools: filterToolsForProfile(allTools, activeProfile) };
@@ -2255,6 +2294,25 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_drift_audit": {
         const report = detectDocumentationCodeDrift(activeStore, activeRoot);
+        return toolResult(report);
+      }
+      case "muse_why": {
+        const explanation = explainWhyCodeIsTheWayItIs(activeStore, {
+          target: String(a.target),
+          filePath: a.file_path ? String(a.file_path) : undefined,
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+        });
+        return toolResult(explanation);
+      }
+      case "muse_bug_clusters": {
+        const clusters = clusterRecurringBugsAndFriction(activeStore);
+        return toolResult({
+          total_clusters: clusters.length,
+          clusters,
+        });
+      }
+      case "muse_tech_debt": {
+        const report = analyzeTechnicalDebt(activeStore, activeRoot);
         return toolResult(report);
       }
       default:

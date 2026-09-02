@@ -20,6 +20,8 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   debugging: [
     "muse_context",
+    "muse_why",
+    "muse_bug_clusters",
     "memory_record_observation",
     "memory_capture_negative",
     "memory_distill",
@@ -30,6 +32,8 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   review: [
     "muse_context",
+    "muse_why",
+    "muse_tech_debt",
     "memory_drift_audit",
     "memory_anchor_audit",
     "memory_conflict_detect",
@@ -39,6 +43,9 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   architecture: [
     "muse_context",
+    "muse_why",
+    "muse_bug_clusters",
+    "muse_tech_debt",
     "memory_adr_record",
     "memory_adr_list",
     "memory_evaluate_promotion",
