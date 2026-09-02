@@ -56,6 +56,10 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "memory_wiki_compile",
     "memory_wiki_page",
     "memory_tree_index",
+    "muse_sync_broadcast",
+    "muse_sync_ingest",
+    "muse_sync_status",
+    "muse_sync_pool",
   ],
   maintenance: [
     "muse_health",
@@ -65,6 +69,10 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "memory_dedup",
     "memory_anchor_audit",
     "memory_audit_query",
+    "muse_sync_broadcast",
+    "muse_sync_ingest",
+    "muse_sync_status",
+    "muse_sync_pool",
   ],
   full: [], // empty list means include all registered tools
 };
