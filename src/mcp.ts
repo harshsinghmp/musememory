@@ -54,6 +54,12 @@ import {
   computeMemoryRoi,
   recordRetrievals,
 } from "./quality/index.ts";
+import {
+  recordObservation,
+  listObservations,
+  recordNegativeLesson,
+  distillObservationsToCandidates,
+} from "./learning/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -907,6 +913,56 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "memory_observe",
+        description: "Ingest an ephemeral raw observation (tool output, test error, build log, review feedback) to .memory/observations.jsonl",
+        inputSchema: {
+          type: "object",
+          properties: {
+            raw: { type: "string", description: "Raw output, error message, or log snippet" },
+            source: {
+              type: "string",
+              enum: ["tool", "test", "build", "review", "pr", "transcript", "file_edit", "manual"],
+              description: "Observation source channel",
+            },
+            project: { type: "string", description: "Project scope name" },
+            summary: { type: "string", description: "Brief one-line summary" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["raw", "source", "project"],
+        },
+      },
+      {
+        name: "memory_distill_observations",
+        description: "Distill unprocessed raw observations into structured candidate memories and negative lessons",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Project scope name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["project"],
+        },
+      },
+      {
+        name: "memory_negative_capture",
+        description: "Record a first-class negative memory (DO_NOT_USE, FAILED_APPROACH, BUG_PRONE_PATTERN) to prevent recurring mistakes",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Short description of what to avoid" },
+            failed_approach: { type: "string", description: "The approach that failed or caused issues" },
+            failure_reason: { type: "string", description: "Why it failed or what went wrong" },
+            alternative_recommended: { type: "string", description: "What to use or do instead" },
+            reproduction_command: { type: "string", description: "Optional reproduction test/build command" },
+            severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
+            project: { type: "string", description: "Project scope name" },
+            tags: { type: "array", items: { type: "string" } },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["title", "failed_approach", "failure_reason", "project"],
+        },
+      },
     ],
   }));
 
@@ -1535,6 +1591,34 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: a.project ? String(a.project) : undefined,
         });
         return toolResult(report);
+      }
+      case "memory_observe": {
+        const obs = recordObservation(activeStore, {
+          source: String(a.source) as any,
+          project: String(a.project),
+          raw: String(a.raw),
+          summary: a.summary ? String(a.summary) : undefined,
+          metadata: a.metadata ? (a.metadata as Record<string, any>) : undefined,
+        });
+        return toolResult(obs);
+      }
+      case "memory_distill_observations": {
+        const result = distillObservationsToCandidates(activeStore, String(a.project));
+        return toolResult(result);
+      }
+      case "memory_negative_capture": {
+        const entry = recordNegativeLesson(activeStore, {
+          project: String(a.project),
+          title: String(a.title),
+          failed_approach: String(a.failed_approach),
+          failure_reason: String(a.failure_reason),
+          alternative_recommended: a.alternative_recommended ? String(a.alternative_recommended) : undefined,
+          reproduction_command: a.reproduction_command ? String(a.reproduction_command) : undefined,
+          severity: a.severity as any,
+          tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
+          source: a.agent ? String(a.agent) : "agent",
+        });
+        return toolResult(entry);
       }
       default:
         return toolError(`unknown tool ${name}`);
