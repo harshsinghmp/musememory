@@ -5,6 +5,27 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-09-03
+
+### Added
+- **Pluggable Code Intelligence Provider Architecture (`src/intelligence/`)**:
+  - Standardized `CodeIntelligenceProvider` interface specifying `resolveSymbols`, `getCallers`, `getCallees`, `getRelatedFiles`, `getBlastRadius`, and `extractGraphContext`.
+  - Dynamic `ProviderRegistry` with automatic capability detection and zero-crash fault isolation.
+  - Multi-tier fallback chain: CodeGraph → Graphify → LSP → Heuristic Fallback → Safe Empty.
+  - Zero mandatory external dependencies: pure autonomous operation if no external intelligence engines are present.
+- **Optional Provider Adapters (`src/intelligence/adapters/`)**:
+  - `CodeGraphProvider`: Integrates with `.codegraph` indexes or CLI when available.
+  - `GraphifyProvider`: Ingests graph networks and dependencies from `.graphify/graph.json`.
+  - `LspProvider`: Hooks into language server protocols or agent-lsp when active.
+  - `HeuristicFallbackProvider`: Built-in zero-dependency AST/regex file scanner providing baseline symbol and relationship resolution across workspace files.
+- **Code Intelligence Memory Enrichment (`src/intelligence/enrichment.ts`)**:
+  - Enriches memory entries with code intelligence evidence (symbol kinds, definition lines, source files) without modifying core content.
+- **New MCP Tools for Code Intelligence (`src/mcp.ts`)**:
+  - `memory_code_intel_status`: Query active providers and capabilities.
+  - `memory_code_intel_symbols`: Resolve symbols across active providers with fallback.
+  - `memory_code_intel_blast_radius`: Calculate ripple effects and blast radius for files and symbols.
+  - `memory_enrich`: Enrich memories with code intelligence evidence.
+
 ## [1.13.0] - 2026-09-03
 
 ### Added

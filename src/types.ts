@@ -47,7 +47,7 @@ export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED
 
 export interface EvidenceItem {
   id: string;
-  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human";
+  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";
   source?: string;
   timestamp: string;
   excerpt?: string;
