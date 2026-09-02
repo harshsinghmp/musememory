@@ -78,6 +78,12 @@ import {
   rehydrateMemory,
   getLifecycleStats,
 } from "./promotion/index.ts";
+import {
+  createCodeAnchor,
+  verifyCodeAnchor,
+  attachAnchorToMemory,
+  auditMemoryAnchors,
+} from "./anchors/index.ts";
 import { listPrompts, getPrompt, renderPrompt } from "./prompts.ts";
 import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
@@ -1171,6 +1177,49 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "memory_anchor_create",
+        description: "Create and attach a line-independent structural code anchor to a memory entry (repository, file, module, symbol, route, test)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry" },
+            file_path: { type: "string", description: "Relative file path in workspace" },
+            kind: {
+              type: "string",
+              enum: ["repository", "file", "directory", "module", "symbol", "qualified_symbol", "route", "test", "commit", "pr"],
+              description: "Anchor kind (default: symbol if symbol_name provided, else file)",
+            },
+            symbol_name: { type: "string", description: "Optional symbol name (function, class, interface, method)" },
+            qualified_name: { type: "string", description: "Optional qualified symbol name (e.g. Service.method)" },
+            provider_metadata: { type: "object", description: "Optional provider external IDs (e.g. CodeGraph node ID)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id", "file_path"],
+        },
+      },
+      {
+        name: "memory_anchor_verify",
+        description: "Verify all code anchors attached to a memory entry against the live codebase to detect drift or orphaned references",
+        inputSchema: {
+          type: "object",
+          properties: {
+            memory_id: { type: "string", description: "ID of the memory entry to verify" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["memory_id"],
+        },
+      },
+      {
+        name: "memory_anchor_audit",
+        description: "Run repository-wide audit of all code anchors across all memories: reports integrity score, valid, drifted, and orphaned counts",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
     ],
   }));
 
@@ -1968,6 +2017,37 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           stats,
           sweep: sweepResult,
         });
+      }
+      case "memory_anchor_create": {
+        const kind = (a.kind ? String(a.kind) : (a.symbol_name ? "symbol" : "file")) as any;
+        const anchor = createCodeAnchor(activeRoot, {
+          kind,
+          filePath: String(a.file_path),
+          symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
+          qualifiedName: a.qualified_name ? String(a.qualified_name) : undefined,
+          providerMetadata: (a.provider_metadata && typeof a.provider_metadata === "object") ? a.provider_metadata as Record<string, any> : undefined,
+        });
+        const updatedEntry = attachAnchorToMemory(activeStore, String(a.memory_id), anchor, a.agent ? String(a.agent) : undefined);
+        return toolResult({
+          anchor,
+          entry_id: updatedEntry.id,
+          total_anchors: updatedEntry.anchors?.length || 0,
+        });
+      }
+      case "memory_anchor_verify": {
+        const entry = get(activeStore, String(a.memory_id));
+        if (!entry) return toolError(`entry '${a.memory_id}' not found`);
+        const anchors = entry.anchors || [];
+        const results = anchors.map((anc) => verifyCodeAnchor(activeRoot, anc));
+        return toolResult({
+          entry_id: entry.id,
+          anchors_count: anchors.length,
+          verification: results,
+        });
+      }
+      case "memory_anchor_audit": {
+        const report = auditMemoryAnchors(activeStore, activeRoot);
+        return toolResult(report);
       }
       default:
         return toolError(`unknown tool ${name}`);
