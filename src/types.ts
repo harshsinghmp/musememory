@@ -7,7 +7,29 @@ export type MemoryType =
   | "operation"
   | "constraint"
   | "preference"
-  | "discovery";
+  | "discovery"
+  | "negative";
+
+export interface NegativeMemoryDetails {
+  failed_approach: string;
+  failure_reason: string;
+  alternative_recommended?: string;
+  reproduction_command?: string;
+  evidence_snippet?: string;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+export interface ObservationEntry {
+  id: string;
+  timestamp: string;
+  source: "tool" | "test" | "build" | "review" | "pr" | "transcript" | "file_edit" | "manual";
+  project: string;
+  raw: string;
+  summary?: string;
+  metadata?: Record<string, any>;
+  processed: boolean;
+  extracted_candidate_id?: string;
+}
 
 export type MemoryStatus =
   | "candidate"
@@ -116,6 +138,8 @@ export interface MemoryEntry {
   conflict_ids?: string[];
   /** Canonical memory ID if this entry was consolidated into another. */
   canonical_id?: string;
+  /** First-class negative lesson details (DO_NOT_USE / FAILED_APPROACH / BUG_PRONE_PATTERN). */
+  negative?: NegativeMemoryDetails;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -156,7 +180,9 @@ export type AuditOperation =
   | "verify"
   | "conflict_detected"
   | "conflict_resolved"
-  | "application_outcome";
+  | "application_outcome"
+  | "observation"
+  | "negative_capture";
 
 export interface AuditEntry {
   timestamp: string;

@@ -19,6 +19,9 @@
 10. **Memory Quality & Deduplication**: Deterministic SHA-256 content fingerprinting, canonical memory consolidation with supporting evidence arrays, and temporal mode inference (`current`, `historical`, `timeless`).
 11. **Contradiction Engine**: Semantic conflict detection, first-class `conflicted` state machine with mutual `conflict_ids`, and multi-strategy resolution (`supersede`, `historical`, `reject`, `keep_both`).
 12. **Utility Tracking & Memory ROI**: Operational feedback loop tracking `application_count`, `successful_applications`, `regressions`, `reuse_success_rate`, and automated dispute escalation.
+13. **Ephemeral Observation Tier**: Structured append-only event logging in `.memory/observations.jsonl` from tool results, test outputs, build errors, and review comments.
+14. **First-Class Negative Memories**: Explicit capture of `DO_NOT_USE`, `FAILED_APPROACH`, and `BUG_PRONE_PATTERN` with reproduction commands and timeless salience.
+15. **Autonomous Distillation & Outcome Feedback Loop**: Distills raw observation streams into candidate fixes/architecture, coupled with automatic session command evaluation and memory reinforcement.
 
 ---
 

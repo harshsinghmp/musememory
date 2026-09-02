@@ -5,6 +5,27 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-09-03
+
+### Added
+- **Ephemeral Observation Tier (`src/learning/observation.ts`)**:
+  - Append-only `.memory/observations.jsonl` ledger for raw event streams (tool outputs, test outputs, build failures, code review comments, file edits).
+  - Built-in Vibeguard secret defense preventing credential leakage into raw observation streams.
+  - State tracking linking observations to extracted candidate memories.
+- **First-Class Negative Memories (`src/learning/negative.ts`)**:
+  - Dedicated `negative` memory type capturing `DO_NOT_USE`, `FAILED_APPROACH`, and `BUG_PRONE_PATTERN` lessons.
+  - Structured fields: `failed_approach`, `failure_reason`, `alternative_recommended`, `reproduction_command`, and `severity`.
+  - Enforced `timeless` temporal mode and elevated baseline salience (`0.85`) to safeguard future agent turns against known traps.
+- **Autonomous Distillation Pipeline (`src/learning/distill.ts`)**:
+  - Distills raw observation streams into structured candidate bug fixes (`fix`), architectural conventions (`architecture`), and anti-patterns (`negative`).
+- **Session Outcome Feedback & Reinforcement Loop (`src/learning/feedback.ts`)**:
+  - Automatically evaluates test and command exit codes against memories applied during the session.
+  - Grants positive reinforcement on success and flags regressions with failure logs on command errors.
+- **New MCP Tools for Autonomous Learning (`src/mcp.ts`)**:
+  - `memory_observe`: Ingest ephemeral raw observation events.
+  - `memory_distill_observations`: Trigger autonomous distillation of raw observations into candidates.
+  - `memory_negative_capture`: Explicitly record negative patterns and failed approaches.
+
 ## [1.12.0] - 2026-09-03
 
 ### Added
