@@ -5,6 +5,24 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-09-03
+
+### Added
+- **Unified 5-Pillar Project Health Gate (`src/health/gate.ts`)**:
+  - Comprehensive single-call architectural and memory health evaluation across 5 critical pillars:
+    1. *Memory Store Integrity*: Contradictions, unverified/expired memories, timeless constraints.
+    2. *Native Code Anchor Validity*: Live AST structural verification, drift detection, orphaned anchors.
+    3. *Documentation ↔ Code Alignment*: Bi-directional drift, undocumented exports, stale references.
+    4. *Negative Lessons & Anti-Pattern Sentry*: Saliency and defense against known traps.
+    5. *Technical Debt & Friction*: TODO/FIXME/HACK markers, `as any` type bypasses, recurring bug clusters.
+  - Generates composite score ($0 \dots 100$), letter grade (`A`, `B`, `C`, `D`, `F`), and gate status (`PASS`, `WARN`, `FAIL`).
+  - Produces an automated, prioritized Actionable Remediation Checklist.
+- **CLI Health Command (`src/cli/health.ts`)**:
+  - `musememory health`: Rich terminal dashboard with ANSI styling, pillar scorecards, and remediation lists.
+  - Supports `--json` flag for CI/CD gates and exit code 1 on `FAIL` status.
+- **New MCP Tool (`src/mcp.ts`)**:
+  - `muse_health`: Exposes the 5-pillar health audit to AI coding agents with profile integration across `review`, `architecture`, and `maintenance`.
+
 ## [1.21.0] - 2026-09-03
 
 ### Added
