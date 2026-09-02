@@ -29,6 +29,7 @@
 20. **Native Code Anchors & Stable Structural Code Identity**: First-class code anchors (`repository`, `file`, `module`, `symbol`, `route`, `test`), line-independent structural fingerprinting with comment/spacing normalization, and live drift/orphan verification (`valid`, `drifted`, `orphaned`) with repository audit scoring.
 21. **Flagship Unified Context Orchestrator & Task-Focused MCP Profiles**: Flagship `muse_context` tool fusing active constraints, code anchors, ranked memories, and negative lessons under strict token budgets with suggested next actions; bidirectional code ↔ memory lookups (`muse_code_for_memory`, `muse_memory_for_code`); and 6 task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`) preventing agent tool bloat.
 22. **First-Class Architecture Decision Records (ADRs) & Bidirectional Drift Engine**: ADRs as living memory entities (`proposed`, `accepted`, `superseded`, `rejected`) with native code anchors and supersession lineage; bidirectional documentation ↔ code drift engine classifying alignment (`DOCUMENTED`, `IMPLEMENTED`, `PARTIAL`, `CONFLICTING`, `STALE`, `MISSING`) and scoring repository health.
+23. **Autonomous Engineering Cognition & "Why" Reasoner**: Historical "Why" explanation engine synthesizing ADRs, bug fixes, trade-offs, and invariants; recurring bug and fragility clustering across 5 root causes; and technical debt scanner detecting TODOs/FIXMEs, `as any` type bypasses, and drifted anchors.
 
 ---
 

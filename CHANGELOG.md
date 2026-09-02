@@ -5,6 +5,26 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-09-03
+
+### Added
+- **Autonomous Engineering Cognition & "Why" Reasoner (`src/cognition/why.ts`)**:
+  - `explainWhyCodeIsTheWayItIs`: Synthesizes the historical rationale behind a piece of code, symbol, or constraint.
+  - Chronological timeline reconstructing initial architectural decisions, hardening bug fixes, accepted trade-offs, negative warnings, and timeless invariants.
+  - Generates evidence-backed confidence scores ($0.0 \dots 1.0$) based on authoritative verifications and native code anchors.
+- **Recurring Bug & Friction Clustering (`src/cognition/clustering.ts`)**:
+  - `clusterRecurringBugsAndFriction`: Automatically clusters bug fixes, negative lessons, and failure records into architectural fragility hotspots.
+  - 5 root-cause categories: race conditions, type drift, missing boundary guards, resource leaks, and architecture flaws.
+  - Computes fragility scores per subsystem and formulates root-cause hypotheses with preventative recommendations.
+- **Technical Debt & Workaround Registry (`src/cognition/tech-debt.ts`)**:
+  - `analyzeTechnicalDebt`: Scans repository files and memory store for debt markers (`// TODO:`, `// FIXME:`, `// HACK:`, `// WORKAROUND:`), dangerous `as any` type assertions, and drifted code anchors.
+  - Calculates composite technical debt score ($0 \dots 100$) and surfaces top hotspot files.
+  - Generates prioritized, memory-grounded refactoring recommendations.
+- **New MCP Tools (`src/mcp.ts`)**:
+  - `muse_why`: Autonomous "Why" code explanation engine.
+  - `muse_bug_clusters`: Recurring bug hotspot clustering and fragility analysis.
+  - `muse_tech_debt`: Technical debt and workaround scanner.
+
 ## [1.20.0] - 2026-09-03
 
 ### Added
