@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { Store } from "../store.ts";
@@ -31,23 +31,34 @@ export async function generatePrContext(
   options: PrContextOptions = {}
 ): Promise<PrContextResult> {
   const root = options.workspaceRoot || store.dir || process.cwd();
-  const base = options.baseBranch || "main";
+  const rawBase = options.baseBranch || "main";
+  // Validate git ref characters to prevent argument or command injection
+  const safeBase = /^[a-zA-Z0-9._\/-]+$/.test(rawBase) ? rawBase : "main";
 
   let changedFiles: string[] = [];
   try {
-    const diffCmd = `git diff --name-only ${base}...HEAD`;
-    const stdout = execSync(diffCmd, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const stdout = execFileSync("git", ["diff", "--name-only", `${safeBase}...HEAD`], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
     changedFiles = stdout.split("\n").map((f) => f.trim()).filter(Boolean);
   } catch {
     try {
       // Fallback: diff against HEAD~1 or uncommitted changes
-      const diffCmd = `git diff --name-only HEAD~1`;
-      const stdout = execSync(diffCmd, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const stdout = execFileSync("git", ["diff", "--name-only", "HEAD~1"], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
       changedFiles = stdout.split("\n").map((f) => f.trim()).filter(Boolean);
     } catch {
       try {
-        const diffCmd = `git status --porcelain`;
-        const stdout = execSync(diffCmd, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        const stdout = execFileSync("git", ["status", "--porcelain"], {
+          cwd: root,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        });
         changedFiles = stdout
           .split("\n")
           .map((l) => l.slice(3).trim())
@@ -177,7 +188,7 @@ export async function generatePrContext(
   return {
     title: prTitle,
     bodyMarkdown: md,
-    baseBranch: base,
+    baseBranch: safeBase,
     changedFiles,
     anchorsTouched: totalAnchorsTouched,
     adrsInvolved,

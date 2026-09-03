@@ -138,15 +138,28 @@ export async function analyzeMemoryCodeImpact(
   const allAdrs = listAdrs(store);
   const matchedAdrs: Array<{ id: string; title: string; status: string; consequences?: string[] }> = [];
 
+  const normTarget = targetFile.toLowerCase().replace(/^[./\\]+/, "");
   const fileBase = basename(targetFile).toLowerCase();
-  for (const adr of allAdrs) {
-    const text = `${adr.title} ${adr.content}`.toLowerCase();
-    const hasAnchor = adr.anchors?.some((a) =>
-      a.file_path.toLowerCase().includes(fileBase) ||
-      (targetSymbol && a.symbol_name?.toLowerCase() === targetSymbol.toLowerCase())
-    );
+  const symbolRegex = targetSymbol && targetSymbol.length > 2
+    ? new RegExp(`\\b${targetSymbol.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "i")
+    : null;
+  const pathRegex = fileBase.length > 3 && fileBase !== "index.ts" && fileBase !== "index.js"
+    ? new RegExp(`\\b${fileBase.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "i")
+    : null;
 
-    if (hasAnchor || text.includes(fileBase) || (targetSymbol && text.includes(targetSymbol.toLowerCase()))) {
+  for (const adr of allAdrs) {
+    const text = `${adr.title} ${adr.content}`;
+    const hasAnchor = adr.anchors?.some((a) => {
+      const aPath = a.file_path.toLowerCase().replace(/^[./\\]+/, "");
+      return aPath === normTarget ||
+        aPath.endsWith("/" + fileBase) ||
+        (targetSymbol && a.symbol_name?.toLowerCase() === targetSymbol.toLowerCase());
+    });
+
+    const matchesSymbol = symbolRegex ? symbolRegex.test(text) : false;
+    const matchesPath = pathRegex ? pathRegex.test(text) : false;
+
+    if (hasAnchor || matchesSymbol || matchesPath) {
       matchedAdrs.push({
         id: adr.id,
         title: adr.title,

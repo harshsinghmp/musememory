@@ -60,10 +60,17 @@ export async function reconcileCodeAnchors(
   let staleEntriesCount = 0;
 
   const details: ReconcileDetail[] = [];
+  const inTx = !dryRun && !!store.db;
+  if (inTx) {
+    try {
+      store.db!.exec("BEGIN TRANSACTION;");
+    } catch {}
+  }
 
-  for (const entry of entries) {
-    if (!entry.anchors || entry.anchors.length === 0) continue;
-    totalAuditedEntries++;
+  try {
+    for (const entry of entries) {
+      if (!entry.anchors || entry.anchors.length === 0) continue;
+      totalAuditedEntries++;
 
     const survivingAnchors: CodeAnchor[] = [];
     const entryOrphaned: string[] = [];
@@ -142,6 +149,19 @@ export async function reconcileCodeAnchors(
       });
     }
   }
+  if (inTx) {
+    try {
+      store.db!.exec("COMMIT;");
+    } catch {}
+  }
+} catch (err) {
+  if (inTx) {
+    try {
+      store.db!.exec("ROLLBACK;");
+    } catch {}
+  }
+  throw err;
+}
 
   if (!dryRun && store.memoryDir && (prunedAnchorsCount > 0 || staleEntriesCount > 0)) {
     recordAuditEvent(store.memoryDir, {

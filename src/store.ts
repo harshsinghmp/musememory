@@ -238,22 +238,53 @@ export function list(
     if (cached) return cached;
   }
 
-  // 2. Scan IDs (SQLite + disk files)
-  const ids = listIds(store);
-  const entries = ids
-    .map((id) => get(store, id))
-    .filter((e): e is MemoryEntry => e !== null);
+  // 2. High-speed path: SQLite indexed table (avoids O(N) filesystem stat storm)
+  let entries: MemoryEntry[] = [];
+  if (store.db) {
+    entries = listMemories(store.db, filters);
+    // Check if new external YAML files were dropped on disk that are not yet in SQLite
+    if (existsSync(store.dir)) {
+      const dbIds = new Set(entries.map((e) => e.id));
+      const diskFiles = readdirSync(store.dir);
+      for (const f of diskFiles) {
+        if (f.endsWith(".yaml")) {
+          const diskId = f.slice(0, -5);
+          if (!dbIds.has(diskId)) {
+            const externalEntry = get(store, diskId);
+            if (externalEntry) {
+              try {
+                insertOrReplaceMemory(store.db, externalEntry);
+              } catch {}
+              let matches = true;
+              if (filters?.project && externalEntry.project !== filters.project) matches = false;
+              if (filters?.type && externalEntry.type !== filters.type) matches = false;
+              if (filters?.status && externalEntry.status !== filters.status) matches = false;
+              if (matches) entries.push(externalEntry);
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Fallback: file scan if SQLite is unavailable
+    const ids = listIds(store);
+    entries = ids
+      .map((id) => get(store, id))
+      .filter((e): e is MemoryEntry => e !== null);
 
-  let filtered = entries;
-  if (filters?.project) filtered = filtered.filter((e) => e.project === filters.project);
-  if (filters?.type) filtered = filtered.filter((e) => e.type === filters.type);
-  if (filters?.status) filtered = filtered.filter((e) => e.status === filters.status);
-
-  if (store.cache) {
-    store.cache.setQuery(cacheKey, filtered, undefined, dirMtime);
+    if (filters?.project) entries = entries.filter((e) => e.project === filters.project);
+    if (filters?.type) entries = entries.filter((e) => e.type === filters.type);
+    if (filters?.status) entries = entries.filter((e) => e.status === filters.status);
   }
 
-  return filtered;
+  if (store.cache) {
+    store.cache.setQuery(cacheKey, entries, undefined, dirMtime);
+    for (const e of entries) {
+      store.cache.setEntry(e);
+    }
+  }
+
+  return entries;
 }
 
 /** Helper to extract all scannable text from a memory entry. */
@@ -296,7 +327,9 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
     try {
       mtimeMs = statSync(file).mtimeMs;
     } catch {}
-  } catch {}
+  } catch (err: unknown) {
+    console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+  }
 
   // 3. L0 Cache update with mtime
   if (store.cache) {

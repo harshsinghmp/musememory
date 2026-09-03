@@ -45,6 +45,8 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb = new Database(dbPath, { create: true });
     rawDb.run("PRAGMA journal_mode = WAL;");
     rawDb.run("PRAGMA synchronous = NORMAL;");
+    rawDb.run("PRAGMA busy_timeout = 5000;");
+    rawDb.run("PRAGMA foreign_keys = ON;");
     rawDb.run("PRAGMA cache_size = -64000;");
     rawDb.run("PRAGMA mmap_size = 268435456;");
     rawDb.run("PRAGMA temp_store = MEMORY;");
@@ -85,6 +87,8 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb = new DatabaseSync(dbPath);
     rawDb.exec("PRAGMA journal_mode = WAL;");
     rawDb.exec("PRAGMA synchronous = NORMAL;");
+    rawDb.exec("PRAGMA busy_timeout = 5000;");
+    rawDb.exec("PRAGMA foreign_keys = ON;");
     rawDb.exec("PRAGMA cache_size = -64000;");
     rawDb.exec("PRAGMA mmap_size = 268435456;");
     rawDb.exec("PRAGMA temp_store = MEMORY;");

@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import type { Store } from "../store.ts";
-import { list, get } from "../store.ts";
+import { list, get, openStore } from "../store.ts";
 import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
 import { resolveMuseContext } from "../orchestrator/context.ts";
 import { computeMemoryRoi } from "../quality/utility.ts";
@@ -74,10 +74,11 @@ export async function runMemoryBenchmark(
   const iterations = options.iterations || 30;
   const testQuery = options.query || "authentication architecture security";
   const tokenBudget = options.tokenBudget || 1500;
-  const allEntries = list(store);
 
-  // 1. Measure Cold Startup Latency
+  // 1. Measure Cold Startup Latency (opening unprimed store and querying entries)
   const coldStartT0 = performance.now();
+  const coldStore = openStore(store.memoryDir || store.dir);
+  const allEntries = list(coldStore);
   const entriesCount = allEntries.length;
   const cold_startup_ms = Math.round((performance.now() - coldStartT0) * 100) / 100;
 

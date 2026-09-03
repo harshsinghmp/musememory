@@ -73,10 +73,11 @@ export async function handleReconcileCommand(parsed: ParsedArgs): Promise<number
   }
   const { root, store } = ctx;
 
-  const prune = parsed.flags["prune"] === "true" || parsed.flags["p"] === "true";
-  const markStale = parsed.flags["mark-stale"] === "true" || parsed.flags["stale"] === "true";
-  const updateHashes = parsed.flags["update-hashes"] === "true";
-  const dryRun = parsed.flags["dry-run"] === "true" || (!prune && !markStale && !updateHashes);
+  const isTrue = (val: unknown) => val === true || val === "true" || val === "";
+  const prune = isTrue(parsed.flags["prune"]) || isTrue(parsed.flags["p"]);
+  const markStale = isTrue(parsed.flags["mark-stale"]) || isTrue(parsed.flags["stale"]);
+  const updateHashes = isTrue(parsed.flags["update-hashes"]);
+  const dryRun = isTrue(parsed.flags["dry-run"]) || (!prune && !markStale && !updateHashes);
 
   const { reconcileCodeAnchors, formatReconcileReport } = await import("../health/index.ts");
   const report = await reconcileCodeAnchors(store, {

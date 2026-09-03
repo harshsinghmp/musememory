@@ -5,6 +5,41 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-09-03
+
+### Fixed
+- **Command Injection Hardening**: Replaced shell string invocation in `generatePrContext` (`src/compaction/pr-context.ts`) with direct argument array execution via `execFileSync("git", ...)` and validated git reference names against strict identifier patterns.
+- **SQLite Concurrency & Lock Contention**: Configured `PRAGMA busy_timeout = 5000;` and `PRAGMA foreign_keys = ON;` in both Bun and Node SQLite database drivers (`src/sqlite.ts`), preventing immediate `SQLITE_BUSY` crashes in multi-agent and concurrent workflows.
+- **Store Listing O(N) Stat Storm**: Optimized `list(store)` (`src/store.ts`) to query indexed SQLite records directly and discover external YAML files via single-pass `readdirSync`, eliminating thousands of redundant synchronous filesystem `statSync` calls.
+- **Accurate Benchmark Cold Startup**: Corrected cold startup latency measurement in `runMemoryBenchmark` (`src/benchmark/suite.ts`) to benchmark actual unprimed store opening and initialization instead of in-memory array property access.
+- **Dual-Write Persistence Observability**: Replaced silent error swallowing in `save(store, entry)` (`src/store.ts`) with structured warning logs when YAML filesystem persistence fails.
+- **Impact Analysis Precision**: Tightened ADR matching in `analyzeMemoryCodeImpact` (`src/intelligence/impact.ts`) with normalized path checks, exact code anchor matching, and regex word boundaries, eliminating false-positive risk inflation on common filenames.
+- **Atomic Reconciler Transactions**: Wrapped anchor reconciliation writes in `reconcileCodeAnchors` (`src/health/reconcile.ts`) inside an atomic SQLite transaction (`BEGIN TRANSACTION` ... `COMMIT`).
+
+## [2.2.0] - 2026-09-03
+
+### Summary
+Feature release introducing Unified Code & Memory Impact Analysis, PR Context Generator, Interactive Code Anchor Reconciler, Latency & Quality Benchmark Suite, and 5 turnkey Agent Skills.
+
+### Added
+- **Unified Code & Memory Impact Analysis (`src/intelligence/impact.ts`)**:
+  - Pre-flight blast radius analysis evaluating AST callers, test suites, governing ADRs, negative warnings, and risk levels.
+  - CLI command: `memory code-impact <file> [--symbol <name>]`.
+  - MCP tool: `muse_code_impact`.
+- **PR & Change Context Generator (`src/compaction/pr-context.ts`)**:
+  - Automatically turns git diffs into rich, memory-grounded GitHub PR descriptions linking touched anchors and active constraints.
+  - CLI command: `memory pr-context [--base <branch>] [--out <file>]`.
+  - MCP tool: `muse_pr_context`.
+- **Interactive Code Anchor Reconciler (`src/health/reconcile.ts`)**:
+  - Audits and repairs code anchors across memories, pruning dead references and updating structural hashes.
+  - CLI command: `memory reconcile [--prune] [--mark-stale] [--update-hashes] [--dry-run]`.
+  - MCP tool: `muse_reconcile_anchors`.
+- **Latency & Quality Telemetry Suite (`src/benchmark/suite.ts`)**:
+  - Benchmarks microsecond hot caches, FTS5 BM25 search, knapsack token packing, and ROI in a clean ASCII scoreboard.
+  - CLI command: `memory benchmark [--iterations N] [--budget N]`.
+- **Agent Skills Roster**:
+  - Shipped 5 turnkey skills: `.agents/skills/muse-health`, `muse-drift`, `muse-why`, `muse-sync`, and `muse-mesh`.
+
 ## [2.1.0] - 2026-09-03
 
 ### Summary

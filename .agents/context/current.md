@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.1.0`  
-> **Status**: Production Release (P2P Sync, Studio, and Monorepo Mesh)
+> **Version**: `v2.2.1`  
+> **Status**: Production Release (Hardened v2.2 with Linus-Style Code Review Bug Fixes)
 
 ---
 
@@ -34,6 +34,11 @@
 25. **Cross-Agent Knowledge Sync & P2P Gossip Protocol (R14)**: Portable sealed `SyncPacket` with SHA-256 integrity, vector clock causal ordering, bidirectional shared pool drop-directory gossip exchange, deduplication, Vibeguard secret scrubbing, and semantic contradiction tagging with mutual `conflict_ids`.
 26. **Full Web Observability Studio & Interactive Visual Dashboard (R15)**: Integrated web studio served over local HTTP (`memory studio`), featuring a 5-pillar health scorecard, overall letter grade, prioritized remediation action checklist, ADR registry with code-to-doc drift inspector, autonomous "Why" reasoner, bug friction clusters heatmap, debt hotspots, and live P2P mesh topology visualizer.
 27. **Multi-Repo & Monorepo Cross-Project Mesh (R16)**: Automatic workspace detection across pnpm, npm, bun, lerna, and multi-repo sibling groups; cross-project memory querying with origin package provenance; cross-package contract and entrypoint export auditing; explicit mesh linking (`mesh_links.json`); and shared invariant propagation across the entire mesh.
+28. **Unified Code & Memory Impact Analysis**: Pre-flight blast radius analysis evaluating AST callers, test suites, governing ADRs, negative warnings, and risk levels (`memory code-impact` / `muse_code_impact`).
+29. **PR & Change Context Generator**: Automatically turns git diffs into rich, memory-grounded GitHub PR descriptions linking touched anchors and active constraints (`memory pr-context` / `muse_pr_context`).
+30. **Interactive Code Anchor Reconciler**: Audits and repairs code anchors across memories, pruning dead references and updating structural hashes (`memory reconcile` / `muse_reconcile_anchors`).
+31. **Latency & Quality Telemetry Suite**: Benchmarks microsecond hot caches, FTS5 BM25 search, knapsack token packing, and ROI in a clean ASCII scoreboard (`memory benchmark`).
+32. **Linus-Style Architectural Hardening (v2.2.1)**: Elimination of shell command injection via `execFileSync`, concurrency-safe `PRAGMA busy_timeout = 5000` on SQLite WAL mode, O(N) stat storm elimination in `list(store)`, structured warnings on YAML dual-write failures, and tightened word-boundary/code-anchor ADR matching.
 
 ---
 
