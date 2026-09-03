@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.0.0`  
-> **Status**: Production Release (Autonomous Cognitive Engine Overhaul)
+> **Version**: `v2.1.0`  
+> **Status**: Production Release (P2P Sync, Studio, and Monorepo Mesh)
 
 ---
 
