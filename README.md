@@ -1,6 +1,13 @@
-# <h1> 🧠 Muse Memory</h1>
-
 <div align="center">
+
+<a href="#-what-is-muse-memory-tldr">
+  <img src="./assets/banner.svg" alt="Muse Memory — Autonomous Cognitive Memory Engine for AI Agents" width="100%" />
+</a>
+
+<br />
+<br />
+
+# 🧠 Muse Memory
 
 ![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=2563EB)
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=CB3837)
