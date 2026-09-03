@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-480%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-498%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -24,23 +24,43 @@
 
 ---
 
-## 🚀 What's New in v2.0.0 (Autonomous Cognitive Engine Major Overhaul)
+## 🚀 What's New in v2.1.0 & v2.0.0 (Autonomous Cognitive Engine, P2P Sync & Monorepo Mesh)
 
-- **🏥 Unified 5-Pillar Project Health Gate (`memory health` / `muse_health`)**: Comprehensive single-call architectural and memory health audit scoring Store Integrity, Code Anchor Validity, Doc $\leftrightarrow$ Code Alignment, Negative Sentry, and Technical Debt with letter grades (A-F), PASS/WARN/FAIL status, and automated remediation checklists.
-- **🧠 Autonomous Engineering Cognition & "Why" Reasoner (`muse_why`)**: Traces code evolution backwards through past bug fixes, ADRs, accepted trade-offs, and invariants to explain *why* code was built the way it is before refactoring.
-- **🏛️ First-Class Architecture Decision Records (`memory_adr_record` / `memory_adr_list`)**: ADRs as queryable, scored, living memory units with options considered, consequences, native code anchors, and supersession lineage.
-- **🔄 Bidirectional Documentation $\leftrightarrow$ Code Drift Engine (`memory_drift_audit`)**: Continuously verifies that documented architectural invariants match live implementation and flags missing, stale, or conflicting code.
-- **🎯 Flagship Unified Context Orchestrator (`muse_context`)**: Single-call fused entry point combining search, active file, symbol, error messages, and task intent under strict knapsack token budgets.
-- **⚙️ Task-Focused MCP Profiles**: Solves agent tool bloat with role-tailored tool filtering profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`).
-- **⚓ Native Structural Code Anchors (`src/anchors/`)**: Line-independent structural hashing invariant to comment/spacing edits while strictly sensitive to AST/logic modifications.
-- **🪜 Scoped Promotion & Extended Archival Lifecycle (`src/promotion/`)**: 3-tier promotion ladder (`local` $\rightarrow$ `project` $\rightarrow$ `global`), 5× repeated success policy, universal generalization, and `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with dynamic query rehydration.
-- **⚡ Hot Query Cache & Multi-Factor Retrieval**: Microsecond caching, SQLite WAL optimization, and 11-dimension retrieval scoring.
+### 🌟 v2.1.0 Flagship Additions: Multi-Agent & Mesh Orchestration
+- **🤝 Cross-Agent Knowledge Sync & P2P Gossip Protocol (R14)**:
+  - Cryptographically sealed, portable `SyncPacket` engine with whole-packet SHA-256 integrity verification and vector clock causal ordering.
+  - Zero-daemon shared filesystem gossip pool (`.memory/sync_pool/`) allowing autonomous subagent teams (frontend, backend, test) to exchange insights asynchronously.
+  - Ingestion deduplication, inline Vibeguard secret scrubbing, and semantic contradiction tagging with mutual `conflict_ids`.
+  - CLI `memory sync` command suite & 4 MCP tools (`muse_sync_broadcast`, `muse_sync_ingest`, `muse_sync_status`, `muse_sync_pool`).
+- **🌐 Full Web Observability Studio (`memory studio`) (R15)**:
+  - Embedded zero-dependency visual web dashboard (`memory studio` or `memory ui`) with interactive control plane.
+  - Live 5-pillar health scorecard (A–F letter grade, PASS/WARN/FAIL gate status, and prioritized remediation checklist).
+  - Interactive ADR registry and bidirectional documentation $\longleftrightarrow$ code drift inspector.
+  - Historical "Why" reasoner query interface, recurring bug friction heatmap, and debt scanner.
+  - Real-time P2P gossip mesh status and interactive broadcast/shared pool sync controls.
+- **🕸️ Multi-Repo & Monorepo Cross-Project Mesh (R16)**:
+  - Passive automatic monorepo discovery across `pnpm`, `npm`, `bun`, `lerna`, and multi-repo sibling directories.
+  - Cross-project memory query resolver (`resolveMeshMemories`) with origin package provenance tags (`[mesh:@scope/package]`).
+  - Shared invariant and working constraint propagation (`propagateConstraintToMesh`) broadcasting critical security rules across all packages.
+  - Cross-package dependency contract and entrypoint export auditor (`auditMeshContracts`) validating cross-package imports and cross-repo code anchors.
+  - CLI `memory mesh` suite & 4 MCP tools (`muse_mesh_status`, `muse_mesh_query`, `muse_mesh_audit`, `muse_mesh_link`).
+
+### 🧠 v2.0.0 Major Cognitive Overhaul:
+- **🏥 Unified 5-Pillar Project Health Gate (`memory health` / `muse_health`)**: Single-call architectural audit across Store Integrity, Code Anchors, Doc-Code Alignment, Negative Sentry, and Technical Debt.
+- **🤔 Autonomous Engineering Cognition & "Why" Reasoner (`muse_why`)**: Reconstructs historical code evolution through past bug workarounds, accepted trade-offs, and timeless rules before refactoring.
+- **🏛️ First-Class Architecture Decision Records (`memory adr` / `memory_adr_record`)**: Living, queryable ADR entities with options considered, consequences, native code anchors, and supersession lineage.
+- **🔄 Bidirectional Documentation $\longleftrightarrow$ Code Drift Engine (`memory_drift_audit`)**: Continuously verifies alignment across 6 states (`DOCUMENTED`, `IMPLEMENTED`, `PARTIAL`, `CONFLICTING`, `STALE`, `MISSING`).
+- **🎯 Flagship Unified Context Orchestrator (`muse_context`)**: Single-call fused context injection with knapsack token budget packing.
+- **⚙️ Task-Focused MCP Profiles**: Dynamic role-based tool filtering (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`).
+- **⚓ Native Structural Code Anchors (`src/anchors/`)**: Line-independent structural SHA-256 hashing insensitive to spacing/comments.
+- **🪜 Scoped Promotion & Extended Archival Lifecycle (`src/promotion/`)**: 3-tier promotion ladder (`local` $\rightarrow$ `project` $\rightarrow$ `global`), 5× repeated success policy, universal generalization, and `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with query rehydration.
+- **⚡ Hot Query Cache & SQLite WAL Optimization**: Microsecond memory lookups and high-throughput concurrent I/O.
 
 ---
 
 ## 📑 Table of Contents
 
-- [🚀 What's New in v2.0.0](#-whats-new-in-v200-autonomous-cognitive-engine-major-overhaul)
+- [🚀 What's New in v2.1.0 & v2.0.0](#-whats-new-in-v210--v200-autonomous-cognitive-engine-p2p-sync--monorepo-mesh)
 - [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
 - [✨ Key Feature Highlights](#-key-feature-highlights)
 - [⚡ Quick Start & Installation](#-quick-start--installation)
@@ -62,36 +82,43 @@ Most AI chatbots and coding assistants have **"goldfish memory"**: every time yo
 **Muse Memory gives your AI assistants a persistent, self-organizing cognitive notebook directly on your machine.**
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    AI Agents & IDE Platforms                │
-│  (Claude Code, Cursor, Antigravity, Windsurf, Codex, CLI)   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ MCP stdio / Terminal CLI
-┌──────────────────────────────▼──────────────────────────────┐
-│                    Muse Memory Core Engine                  │
-│                                                             │
-│ ┌───────────────────┐ ┌──────────────────┐ ┌──────────────┐ │
-│ │  Retrieval Engine │ │ Vibeguard Secret │ │ Auto-Migrate │ │
-│ │ (Token Knapsack)  │ │ Defense Scanner  │ │  (29 Engines)│ │
-│ └───────────────────┘ └──────────────────┘ └──────────────┘ │
-│ ┌───────────────────┐ ┌──────────────────┐ ┌──────────────┐ │
-│ │ LifeCycle Machine │ │ Knowledge Wiki   │ │ Audit Ledger │ │
-│ │(State Transitions)│ │ (Obsidian/Entities│ │(audit.jsonl) │ │
-│ └───────────────────┘ └──────────────────┘ └──────────────┘ │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Atomic I/O
-┌──────────────────────────────▼──────────────────────────────┐
-│              Dual-Scope Storage Engine (.memory/)           │
-│                                                             │
-│  .memory/                                                   │
-│  ├── memory.db          # Primary SQLite cognitive database │
-│  ├── CURRENT.md         # Active hard constraints & handoff │
-│  ├── USER.md            # Persona & developer preferences   │
-│  ├── audit.jsonl        # Append-only operational audit trail│
-│  └── memories/          # Dual-persisted YAML export mirror │
-│      ├── m_1700000001000_auth.yaml                          │
-│      └── m_1700000002000_arch.yaml                          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 AI Agents, Subagent Pods & Autonomous Swarms                 │
+│        (Claude Code, Cursor, Antigravity, Windsurf, Codex, CLI)             │
+└───────────────────────┬─────────────────────────────────────┬───────────────┘
+                        │ MCP stdio / Terminal CLI            │ Local HTTP
+┌───────────────────────▼─────────────────────────────────────▼───────────────┐
+│                           Muse Memory Core Engine                           │
+│                                                                             │
+│ ┌──────────────────────┐ ┌──────────────────────┐ ┌───────────────────────┐ │
+│ │  Unified Context &   │ │ 5-Pillar Health Gate │ │ Autonomous Cognition  │ │
+│ │  Knapsack Retrieval  │ │  & ADR Drift Sentry  │ │   & "Why" Reasoner    │ │
+│ └──────────────────────┘ └──────────────────────┘ └───────────────────────┘ │
+│ ┌──────────────────────┐ ┌──────────────────────┐ ┌───────────────────────┐ │
+│ │   P2P Gossip Sync    │ │  Monorepo Workspace  │ │   Web Observability   │ │
+│ │  (Vector Clock Mesh) │ │  Cross-Project Mesh  │ │ Studio (memory studio)│ │
+│ └──────────────────────┘ └──────────────────────┘ └───────────────────────┘ │
+│ ┌──────────────────────┐ ┌──────────────────────┐ ┌───────────────────────┐ │
+│ │ Vibeguard Credential │ │ Dynamic Code Anchors │ │ Universal Migrator    │ │
+│ │    Secret Defense    │ │ & Structural Hashes  │ │     (29 Engines)      │ │
+│ └──────────────────────┘ └──────────────────────┘ └───────────────────────┘ │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Atomic SQLite & File I/O
+┌──────────────────────────────────────▼──────────────────────────────────────┐
+│                     Dual-Scope Storage Engine (.memory/)                    │
+│                                                                             │
+│  .memory/                                                                   │
+│  ├── memory.db          # Primary SQLite database (WAL + FTS5 BM25)         │
+│  ├── CURRENT.md         # Real-time working constraints & session handoffs  │
+│  ├── USER.md            # Persona archetypes & working style preferences    │
+│  ├── sync_pool/         # Zero-daemon shared P2P gossip pool drop folder    │
+│  ├── mesh_links.json    # Explicit multi-repo cross-project mesh links      │
+│  ├── sync_peers.json    # Peer agent vector clock causal tracking ledger    │
+│  ├── audit.jsonl        # Append-only operational audit & compliance trail  │
+│  └── memories/          # Dual-persisted human-readable YAML mirror         │
+│      ├── m_1700000001000_auth.yaml                                          │
+│      └── m_1700000002000_mesh.yaml                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -174,13 +201,13 @@ npx musememory upgrade
 │  🧠 MUSE MEMORY · SYSTEM LEVEL-UP & RECOVERY MATRIX              │
 └──────────────────────────────────────────────────────────────────┘
 
-  [████████████████████] 100% ✓ LEVEL 1: Vibeguard Security & Credential Audit [OK]
-  [████████████████████] 100% ✓ LEVEL 2: Package Manager Sync (bun/npm) [OK]
-  [████████████████████] 100% ✓ LEVEL 3: Synaptic Storage & Schema Alignment [OK]
-  [████████████████████] 100% ✓ LEVEL 4: 80+ Agent Platforms & Skills Auto-Wiring [OK]
-  [████████████████████] 100% ✓ LEVEL 5: Cognitive Ascendance Complete [OK]
+  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [1/5] Vibeguard Security & Credential Audit [OK]
+  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [2/5] Package Manager Sync (bun/npm) [OK]
+  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [3/5] Synaptic Storage & Schema Alignment [OK]
+  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [4/5] 80+ Agent Platforms & Skills Auto-Wiring [OK]
+  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [5/5] Cognitive Ascendance Complete [OK]
 
-🏆 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!
+🐾 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!
 ```
 
 #### What `memory upgrade` automatically handles:
