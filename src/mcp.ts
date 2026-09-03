@@ -96,6 +96,19 @@ import {
 } from "./cognition/index.ts";
 import { evaluateProjectHealth } from "./health/index.ts";
 import {
+  broadcastKnowledge,
+  ingestKnowledge,
+  getSyncStatus,
+  syncWithSharedPool,
+} from "./sync/index.ts";
+import {
+  discoverWorkspaceMesh,
+  resolveMeshMemories,
+  auditMeshContracts,
+  addMeshLink,
+  removeMeshLink,
+} from "./mesh/index.ts";
+import {
   resolveMuseContext,
   resolveCodeForMemory,
   resolveMemoryForCode,
@@ -1406,6 +1419,102 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           },
         },
       },
+      {
+        name: "muse_sync_broadcast",
+        description: "Exports a portable, signed SyncPacket containing confirmed memories, active constraints, and supersessions for P2P gossip sync across peer agents",
+        inputSchema: {
+          type: "object",
+          properties: {
+            agent_id: { type: "string", description: "Optional local agent identity (e.g. sol, jasper, nexus)" },
+            project: { type: "string", description: "Optional project scope filter" },
+            limit: { type: "number", description: "Optional maximum number of memories to include" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_sync_ingest",
+        description: "Ingests a peer agent's SyncPacket with Vibeguard secret inspection, deduplication, and contradiction resolution",
+        inputSchema: {
+          type: "object",
+          properties: {
+            packet: { type: "object", description: "The SyncPacket object received from peer agent" },
+            agent_id: { type: "string", description: "Optional local agent identity" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+          required: ["packet"],
+        },
+      },
+      {
+        name: "muse_sync_status",
+        description: "Inspects peer synchronization status, known peer agents, vector clocks, and pending outgoing knowledge",
+        inputSchema: {
+          type: "object",
+          properties: {
+            agent_id: { type: "string", description: "Optional local agent identity" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_sync_pool",
+        description: "Performs two-way P2P gossip synchronization with an in-process filesystem shared pool folder",
+        inputSchema: {
+          type: "object",
+          properties: {
+            pool_dir: { type: "string", description: "Optional custom shared pool directory path" },
+            agent_id: { type: "string", description: "Optional local agent identity" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_mesh_status",
+        description: "Inspects multi-repo and monorepo cross-project mesh topology, workspace type, and discovered package stores",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory to scan" },
+          },
+        },
+      },
+      {
+        name: "muse_mesh_query",
+        description: "Queries memories across the entire monorepo or multi-repo cross-project mesh with origin package provenance",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query or keyword" },
+            projects: { type: "array", items: { type: "string" }, description: "Optional filter by project or package names" },
+            types: { type: "array", items: { type: "string" }, description: "Optional filter by memory types" },
+            limit: { type: "number", description: "Max results to return (default 20)" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_mesh_audit",
+        description: "Audits monorepo cross-package dependency contracts, entrypoint exports, and cross-repo code anchors",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_mesh_link",
+        description: "Explicitly links or unlinks an external repository or package directory path into the project mesh",
+        inputSchema: {
+          type: "object",
+          properties: {
+            action: { type: "string", enum: ["link", "unlink"], description: "Action to perform ('link' or 'unlink')" },
+            path: { type: "string", description: "Absolute or relative target directory path to link/unlink" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+          required: ["path"],
+        },
+      },
     ];
 
     return { tools: filterToolsForProfile(allTools, activeProfile) };
@@ -2329,6 +2438,66 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       case "muse_health": {
         const report = evaluateProjectHealth(activeStore, activeRoot);
         return toolResult(report);
+      }
+      case "muse_sync_broadcast": {
+        const packet = broadcastKnowledge(activeStore, activeRoot, {
+          agentId: a.agent_id as string | undefined,
+          project: a.project as string | undefined,
+          limit: typeof a.limit === "number" ? a.limit : undefined,
+        });
+        return toolResult(packet);
+      }
+      case "muse_sync_ingest": {
+        const packet = a.packet as any;
+        if (!packet) {
+          return toolError("Missing required 'packet' argument");
+        }
+        const result = ingestKnowledge(activeStore, activeRoot, packet, a.agent_id as string | undefined);
+        return toolResult(result);
+      }
+      case "muse_sync_status": {
+        const status = getSyncStatus(activeStore, activeRoot, a.agent_id as string | undefined);
+        return toolResult(status);
+      }
+      case "muse_sync_pool": {
+        const report = syncWithSharedPool(
+          activeStore,
+          activeRoot,
+          a.pool_dir as string | undefined,
+          a.agent_id as string | undefined
+        );
+        return toolResult(report);
+      }
+      case "muse_mesh_status": {
+        const topology = discoverWorkspaceMesh(activeRoot, activeMemoryDir);
+        return toolResult(topology);
+      }
+      case "muse_mesh_query": {
+        const topology = discoverWorkspaceMesh(activeRoot, activeMemoryDir);
+        const results = resolveMeshMemories(activeStore, topology, {
+          query: a.query as string | undefined,
+          targetProjects: Array.isArray(a.projects) ? (a.projects as string[]) : undefined,
+          types: Array.isArray(a.types) ? (a.types as MemoryType[]) : undefined,
+          limit: typeof a.limit === "number" ? a.limit : undefined,
+        });
+        return toolResult({ total_found: results.length, results });
+      }
+      case "muse_mesh_audit": {
+        const topology = discoverWorkspaceMesh(activeRoot, activeMemoryDir);
+        const audit = auditMeshContracts(topology, activeStore);
+        return toolResult(audit);
+      }
+      case "muse_mesh_link": {
+        const targetPath = a.path as string;
+        if (!targetPath) return toolError("Missing required 'path' argument");
+        const action = (a.action as string) || "link";
+        if (action === "unlink") {
+          removeMeshLink(activeMemoryDir, targetPath);
+          return toolResult({ success: true, action: "unlinked", path: targetPath });
+        } else {
+          addMeshLink(activeMemoryDir, targetPath);
+          return toolResult({ success: true, action: "linked", path: targetPath });
+        }
       }
       default:
         return toolError(`unknown tool ${name}`);

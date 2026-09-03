@@ -65,7 +65,8 @@ musememory/
 │   ├── harvester.ts        # Universal agent transcript discovery and auto-learner engine
 │   ├── intelligence/       # Pluggable code intelligence providers (CodeGraph, Graphify, LSP, AST)
 │   ├── learning/           # Observation, candidate distillation, negative anti-patterns
-│   ├── mcp.ts              # Model Context Protocol stdio server (61 tools with profiles)
+│   ├── mcp.ts              # Model Context Protocol stdio server (69 tools with profiles)
+│   ├── mesh/               # Multi-repo & monorepo workspace discovery, query resolver, contracts
 │   ├── orchestrator/       # Flagship muse_context fusion, bidirectional lookups, MCP profiles
 │   ├── promotion/          # 3-tier promotion ladder, 5x success rule, archival lifecycle
 │   ├── quality/            # Deduplication, semantic contradiction engine, utility & ROI
@@ -74,12 +75,14 @@ musememory/
 │   ├── schema.ts           # JSON Schema & store referential validator
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
 │   ├── store.ts            # Dual-scope storage layout & lifecycle state machine
+│   ├── sync/               # Cross-agent knowledge sync, P2P gossip protocol, shared pool
 │   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & search
 │   ├── types.ts            # Core TypeScript interfaces & enums
+│   ├── ui.ts               # Full Web Observability Studio & 3D knowledge graph
 │   ├── user.ts             # Persona & working preference engine
 │   ├── agents/             # Workstation coding agents detection & registry (80+ platforms)
 │   └── migrator/           # Multi-provider auto-detection & migration engine (24+ formats)
-├── test/                   # Automated Vitest/Bun test suites (480 tests across 79 suites)
+├── test/                   # Automated Bun test suites (498 tests across 81 suites)
 ├── package.json            # Package metadata & dependencies (v2.0.0)
 └── dist/                   # Compiled Node/Bun bundle
 ```

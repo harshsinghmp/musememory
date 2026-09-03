@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.0.0`  
-> **Status**: Production Release (Autonomous Cognitive Engine Overhaul)
+> **Version**: `v2.1.0`  
+> **Status**: Production Release (P2P Sync, Studio, and Monorepo Mesh)
 
 ---
 
@@ -31,6 +31,9 @@
 22. **First-Class Architecture Decision Records (ADRs) & Bidirectional Drift Engine**: ADRs as living memory entities (`proposed`, `accepted`, `superseded`, `rejected`) with native code anchors and supersession lineage; bidirectional documentation ↔ code drift engine classifying alignment (`DOCUMENTED`, `IMPLEMENTED`, `PARTIAL`, `CONFLICTING`, `STALE`, `MISSING`) and scoring repository health.
 23. **Autonomous Engineering Cognition & "Why" Reasoner**: Historical "Why" explanation engine synthesizing ADRs, bug fixes, trade-offs, and invariants; recurring bug and fragility clustering across 5 root causes; and technical debt scanner detecting TODOs/FIXMEs, `as any` type bypasses, and drifted anchors.
 24. **Unified 5-Pillar Project Health Gate (`muse_health`)**: Comprehensive architectural health evaluation auditing store integrity, native code anchors, doc/code alignment, anti-pattern sentry, and technical debt; computes composite grade (A-F), gate status (PASS/WARN/FAIL), prioritized remediation checklist, and CLI dashboard.
+25. **Cross-Agent Knowledge Sync & P2P Gossip Protocol (R14)**: Portable sealed `SyncPacket` with SHA-256 integrity, vector clock causal ordering, bidirectional shared pool drop-directory gossip exchange, deduplication, Vibeguard secret scrubbing, and semantic contradiction tagging with mutual `conflict_ids`.
+26. **Full Web Observability Studio & Interactive Visual Dashboard (R15)**: Integrated web studio served over local HTTP (`memory studio`), featuring a 5-pillar health scorecard, overall letter grade, prioritized remediation action checklist, ADR registry with code-to-doc drift inspector, autonomous "Why" reasoner, bug friction clusters heatmap, debt hotspots, and live P2P mesh topology visualizer.
+27. **Multi-Repo & Monorepo Cross-Project Mesh (R16)**: Automatic workspace detection across pnpm, npm, bun, lerna, and multi-repo sibling groups; cross-project memory querying with origin package provenance; cross-package contract and entrypoint export auditing; explicit mesh linking (`mesh_links.json`); and shared invariant propagation across the entire mesh.
 
 ---
 

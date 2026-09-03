@@ -360,18 +360,23 @@ memory migrate --all
 
 ---
 
-## 🌐 Cognitive Studio Dashboard (`memory ui`)
+## 🌐 Cognitive Studio Dashboard (`memory ui` / `memory studio`)
 
-Muse Memory includes an embedded, zero-dependency visual graph studio:
+Muse Memory includes an embedded, zero-dependency visual graph studio and observability dashboard:
 
 ```bash
-memory ui
-# or specify a custom port (default: 2222)
+memory studio
+# or alias:
 memory ui --port 2222
 ```
 
 Navigate to `http://localhost:2222` to access:
 - 🌐 **3D Force-Directed Knowledge Graph**: Orbital canvas physics, degree-scaled node radii, and link relationship viewer.
+- 🏥 **5-Pillar Project Health Gate**: Live architectural scorecard (Store Integrity, Native Anchors, Doc-Code Alignment, Anti-Pattern Sentry, Technical Debt) with A-F grading and PASS/WARN/FAIL status.
+- 🏛️ **ADR Registry & Drift Inspector**: First-class Architecture Decision Records and bi-directional code ↔ documentation drift auditor.
+- 🤔 **Autonomous "Why" Reasoner**: Traces historical evolution of symbols/files backwards through past bug fixes and trade-offs to explain architectural rationale before refactoring.
+- 🤝 **P2P Gossip Mesh Topology**: Real-time peer vector clocks, local agent identity, and one-click broadcast/shared pool sync.
+- 🕸️ **Monorepo & Cross-Project Mesh**: Workspace monorepo topology (pnpm, npm, bun, lerna), discovered package nodes, cross-project memory query, and contract drift audit.
 - ⚡ **Active Invariants & Real-Time Handoff**: Live `CURRENT.md` monitor tracking in-flight session status and agent checkpoints.
 - 📚 **Obsidian Wiki Browser**: Concept and entity page reader with full Markdown rendering.
 - 👤 **Persona Studio (`USER.md`)**: 5 archetype picker (`developer`, `designer`, `marketer`, `casual`, `custom`) and live editor.
@@ -403,6 +408,12 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `memory_archive` / `rehydrate` | **Archival Lifecycle** | Evaluates and manages `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with query rehydration. |
 | `memory_lifecycle_stats` / `sweep` | **Lifecycle Sweeper** | Reports store-wide lifecycle statistics and executes sweep transitions for aging memories. |
 | `anchor_create` / `verify` / `audit` | **Code Identity** | Creates, verifies, and audits line-independent structural code anchors. |
+| `muse_sync_broadcast` / `ingest` | **P2P Gossip Mesh** | Broadcasts and ingests portable sealed SyncPackets with deduplication and contradiction flagging. |
+| `muse_sync_status` / `pool` | **Sync Coordination** | Tracks peer vector clocks and synchronizes memories bidirectionally via shared drop-directory pool. |
+| `muse_mesh_status` | **Monorepo Topology** | Discovers monorepo workspaces and multi-repo sibling groups with package dependencies and stores. |
+| `muse_mesh_query` | **Cross-Project Query** | Queries memories across the entire workspace mesh with origin package provenance tags. |
+| `muse_mesh_audit` | **Contract Verification** | Audits cross-package dependency contracts, entrypoint exports, and cross-repo code anchors. |
+| `muse_mesh_link` | **Mesh Linking** | Explicitly links or unlinks external repository paths into the workspace mesh registry. |
 | `profile_list` / `profile_switch` | **Tool Management** | Lists and switches task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
 | `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, active `CURRENT.md` constraints, and supports `--tier 0|1|2`. |
 | `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
@@ -447,7 +458,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (42 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (47 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -456,6 +467,11 @@ memory <command> [arguments] [flags]  # alias: musememory
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
 | `health` | `[--json] [--global]` | **Unified 5-Pillar Project Health Gate**: audits Store Integrity, Code Anchors, Drift, Sentry, and Tech Debt with A-F grading and pass/fail gate. |
+| `studio` / `ui` | `[--port N] [--global]` | **Web Observability Studio**: visual dashboard with 5-pillar health, ADR drift, why reasoner, and live mesh (default port: `2222`). |
+| `sync` | `[status\|broadcast\|ingest\|pool] [flags]` | **P2P Gossip Mesh**: peer vector clock status, packet export, ingestion, and shared pool gossip sync. |
+| `mesh` | `[overview\|query\|check\|link\|unlink\|propagate] [flags]` | **Monorepo & Multi-Repo Mesh**: workspace discovery, cross-project memory query, and contract drift audit. |
+| `adr` | `[record\|list\|supersede] [args]` | **Architecture Decision Records**: record, list, and supersede living architecture decisions. |
+| `anchor` | `[create\|verify\|audit] [args]` | **Code Anchors**: create, verify, and audit line-independent structural code anchors. |
 | `install` | `[path] [--global]` | **One-line complete setup**: initializes `.memory/`, `USER.md`, and auto-wires coding agents. |
 | `doctor` | `[path] [--global]` | **System diagnostic**: checks SQLite primary, schemas, secrets, and MCP connections. |
 | `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configs (and optionally purges `.memory/`). |
@@ -465,7 +481,6 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `agents` | *(none)* | Scan workstation for 80+ coding agents (Cursor, Claude Code, Antigravity, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
-| `ui` | `[--port N] [--global]` | Launch 6-view Cognitive Studio dashboard (default port: `2222`). |
 | `context` | `[query] [--token-budget N] [--limit N] [--tier 0\|1\|2]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--token-budget N] [--type T]` | Ranked multi-factor token search with score breakdown. |
 | `search-transcript` | `<query> [file.jsonl] [--window N]` | Full-text search past transcripts with dialogue context windows. |
