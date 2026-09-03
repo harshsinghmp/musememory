@@ -183,6 +183,7 @@ export async function main(argv: string[]): Promise<number> {
       return handleConnectCommand(parsed);
     case "ui":
     case "dashboard":
+    case "studio":
       return handleUiCommand(parsed);
     case "graph":
       return handleGraphCommand(parsed);

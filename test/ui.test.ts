@@ -110,5 +110,90 @@ describe("embedded web UI server", () => {
     srv.close();
     cleanup(root);
   });
+
+  test("R15: serves full Web Observability Studio with 5-pillar health, ADRs, cognition why, and P2P sync", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+
+    // 1. Check Studio HTML structure and tabs
+    const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
+    expect(html).toContain('data-view="health"');
+    expect(html).toContain('data-view="adrs"');
+    expect(html).toContain('data-view="cognition"');
+    expect(html).toContain('data-view="sync"');
+    expect(html).toContain('id="panel-health"');
+    expect(html).toContain('id="panel-adrs"');
+    expect(html).toContain('id="panel-cognition"');
+    expect(html).toContain('id="panel-sync"');
+    expect(html).toContain('id="healthGrade"');
+    expect(html).toContain('id="healthChecklistBody"');
+
+    // 2. Test GET /api/health
+    const healthRes = await fetch(`http://localhost:${srv.port}/api/health`);
+    expect(healthRes.status).toBe(200);
+    const health = await healthRes.json();
+    expect(health).toHaveProperty("overall_grade");
+    expect(health).toHaveProperty("overall_score");
+    expect(health).toHaveProperty("gate_status");
+    expect(health).toHaveProperty("pillars");
+    expect(health).toHaveProperty("actionable_checklist");
+
+    // 3. Test GET /api/adrs
+    const adrsRes = await fetch(`http://localhost:${srv.port}/api/adrs`);
+    expect(adrsRes.status).toBe(200);
+    const adrs = await adrsRes.json();
+    expect(Array.isArray(adrs)).toBe(true);
+
+    // 4. Test GET /api/drift
+    const driftRes = await fetch(`http://localhost:${srv.port}/api/drift`);
+    expect(driftRes.status).toBe(200);
+    const drift = await driftRes.json();
+    expect(drift).toHaveProperty("alignment_score");
+    expect(drift).toHaveProperty("items");
+
+    // 5. Test POST /api/cognition/why
+    const whyRes = await fetch(`http://localhost:${srv.port}/api/cognition/why`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "openStore" }),
+    });
+    expect(whyRes.status).toBe(200);
+    const why = await whyRes.json();
+    expect(why).toHaveProperty("target", "openStore");
+    expect(why).toHaveProperty("core_rationale");
+
+    // 6. Test GET /api/cognition/clusters & /api/cognition/debt
+    const clustersRes = await fetch(`http://localhost:${srv.port}/api/cognition/clusters`);
+    expect(clustersRes.status).toBe(200);
+    const clusters = await clustersRes.json();
+    expect(clusters).toHaveProperty("total_clusters");
+
+    const debtRes = await fetch(`http://localhost:${srv.port}/api/cognition/debt`);
+    expect(debtRes.status).toBe(200);
+    const debt = await debtRes.json();
+    expect(debt).toHaveProperty("total_debt_items");
+    expect(debt).toHaveProperty("debt_score");
+
+    // 7. Test GET /api/sync/status & POST /api/sync/broadcast
+    const syncStatusRes = await fetch(`http://localhost:${srv.port}/api/sync/status`);
+    expect(syncStatusRes.status).toBe(200);
+    const syncStatus = await syncStatusRes.json();
+    expect(syncStatus).toHaveProperty("local_agent_id");
+    expect(syncStatus).toHaveProperty("total_peers");
+
+    const broadcastRes = await fetch(`http://localhost:${srv.port}/api/sync/broadcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent_id: "agent_studio_test" }),
+    });
+    expect(broadcastRes.status).toBe(200);
+    const packet = await broadcastRes.json();
+    expect(packet.protocol_version).toBe("2.0.0");
+    expect(packet.sender_id).toBe("agent_studio_test");
+
+    srv.close();
+    cleanup(root);
+  });
 });
 

@@ -449,7 +449,7 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
     memoryDir: ctx.memoryDir,
     store: ctx.store,
   });
-  console.log(`[UI] Muse Memory Visual Dashboard running at: http://localhost:${srv.port}`);
+  console.log(`\x1b[36m[Studio] Muse Memory Web Observability Studio running at: http://localhost:${srv.port}\x1b[0m`);
   console.log(`Press Ctrl+C to stop.`);
 
   // Non-blocking auto-harvest recent un-indexed agent chat transcripts in the background
