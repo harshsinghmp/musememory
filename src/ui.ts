@@ -8,6 +8,19 @@ import { compileWiki, listWikiPages, getWikiPage } from "./wiki/index.ts";
 import { RetrievalEngine } from "./retrieval/index.ts";
 import { validateStore } from "./schema.ts";
 import { exportSnapshot } from "./snapshot.ts";
+import { getStorageLayout } from "./store.ts";
+import { evaluateProjectHealth } from "./health/index.ts";
+import { listAdrs, detectDocumentationCodeDrift } from "./adrs/index.ts";
+import {
+  explainWhyCodeIsTheWayItIs,
+  clusterRecurringBugsAndFriction,
+  analyzeTechnicalDebt,
+} from "./cognition/index.ts";
+import {
+  getSyncStatus,
+  syncWithSharedPool,
+  broadcastKnowledge,
+} from "./sync/index.ts";
 
 export interface UiServerOptions {
   port?: number;
@@ -340,6 +353,137 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      const workspaceRoot = opts.store.layout?.root || getStorageLayout(opts.memoryDir).root;
+
+      // R15: Project Health Gate Endpoint
+      if (pathname === "/api/health" && req.method === "GET") {
+        try {
+          const report = evaluateProjectHealth(opts.store, workspaceRoot);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(report));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: Architecture Decision Records Endpoint
+      if (pathname === "/api/adrs" && req.method === "GET") {
+        try {
+          const adrs = listAdrs(opts.store);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(adrs));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: Code ↔ Documentation Drift Endpoint
+      if (pathname === "/api/drift" && req.method === "GET") {
+        try {
+          const drift = detectDocumentationCodeDrift(opts.store, workspaceRoot);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(drift));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: Cognition "Why" Reasoner Endpoint
+      if (pathname === "/api/cognition/why" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const query = typeof body.query === "string" ? body.query : (typeof body.symbol_or_path === "string" ? body.symbol_or_path : "");
+          const explanation = explainWhyCodeIsTheWayItIs(opts.store, {
+            target: query,
+            filePath: typeof body.file_path === "string" ? body.file_path : undefined,
+            symbolName: typeof body.symbol_name === "string" ? body.symbol_name : undefined,
+          });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(explanation));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: Cognition Recurring Bug Clusters Endpoint
+      if (pathname === "/api/cognition/clusters" && req.method === "GET") {
+        try {
+          const clusters = clusterRecurringBugsAndFriction(opts.store);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ total_clusters: clusters.length, clusters }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: Cognition Technical Debt Endpoint
+      if (pathname === "/api/cognition/debt" && req.method === "GET") {
+        try {
+          const debt = analyzeTechnicalDebt(opts.store, workspaceRoot);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(debt));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: P2P Sync Status Endpoint
+      if (pathname === "/api/sync/status" && req.method === "GET") {
+        try {
+          const status = getSyncStatus(opts.store, workspaceRoot);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(status));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: P2P Sync Pool Endpoint
+      if (pathname === "/api/sync/pool" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const poolDir = typeof body.pool_dir === "string" ? body.pool_dir : undefined;
+          const agentId = typeof body.agent_id === "string" ? body.agent_id : undefined;
+          const report = syncWithSharedPool(opts.store, workspaceRoot, poolDir, agentId);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(report));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R15: P2P Broadcast Endpoint
+      if (pathname === "/api/sync/broadcast" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const agentId = typeof body.agent_id === "string" ? body.agent_id : undefined;
+          const project = typeof body.project === "string" ? body.project : undefined;
+          const packet = broadcastKnowledge(opts.store, workspaceRoot, { agentId, project });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(packet));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
       if (pathname === "/api/export-html" && req.method === "GET") {
         const html = exportStandaloneHtml(opts.store);
         res.setHeader("Content-Disposition", 'attachment; filename="musememory-graph.html"');
@@ -596,6 +740,57 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     .audit-table td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-muted); }
     .audit-table tr:hover td { background: rgba(255,255,255,0.02); color: #fff; }
     .op-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+
+    /* R15 Studio Styles */
+    .grade-circle { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; border: 2px solid var(--panel-border); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    .grade-a { background: rgba(16,185,129,0.15); color: var(--green); border-color: var(--green); box-shadow: 0 0 20px rgba(16,185,129,0.25); }
+    .grade-b { background: rgba(99,102,241,0.15); color: #818cf8; border-color: #818cf8; box-shadow: 0 0 20px rgba(99,102,241,0.25); }
+    .grade-c { background: rgba(245,158,11,0.15); color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 20px rgba(245,158,11,0.25); }
+    .grade-d, .grade-f { background: rgba(239,68,68,0.15); color: var(--red); border-color: var(--red); box-shadow: 0 0 20px rgba(239,68,68,0.25); }
+    
+    .gate-badge { padding: 4px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+    .gate-pass { background: rgba(16,185,129,0.2); color: var(--green); border: 1px solid rgba(16,185,129,0.4); }
+    .gate-warn { background: rgba(245,158,11,0.2); color: var(--yellow); border: 1px solid rgba(245,158,11,0.4); }
+    .gate-fail { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid rgba(239,68,68,0.4); }
+    
+    .pillars-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; }
+    .pillar-card { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .pillar-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .pillar-score { font-size: 20px; font-weight: 800; color: #fff; }
+    .p-bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin: 4px 0; }
+    .p-bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #10b981); border-radius: 3px; transition: width 0.4s ease; }
+    .pillar-meta { font-size: 11px; color: var(--text-dim); display: flex; justify-content: space-between; }
+    
+    .priority-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .priority-critical { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid rgba(239,68,68,0.4); }
+    .priority-high { background: rgba(245,158,11,0.2); color: var(--yellow); border: 1px solid rgba(245,158,11,0.4); }
+    .priority-medium { background: rgba(99,102,241,0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.4); }
+    .priority-low { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--panel-border); }
+    
+    .adr-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-full); text-transform: uppercase; }
+    .adr-accepted { background: rgba(16,185,129,0.2); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .adr-proposed { background: rgba(99,102,241,0.2); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+    .adr-superseded { background: rgba(168,85,247,0.2); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+    .adr-rejected { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+    .drift-badge { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .drift-documented { background: rgba(16,185,129,0.15); color: var(--green); }
+    .drift-implemented { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .drift-partial { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .drift-conflicting, .drift-missing { background: rgba(239,68,68,0.15); color: var(--red); }
+    .drift-stale { background: rgba(100,116,139,0.2); color: #94a3b8; }
+
+    .badge-cause { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .badge-race_condition { background: rgba(239,68,68,0.2); color: var(--red); }
+    .badge-type_drift { background: rgba(245,158,11,0.2); color: var(--yellow); }
+    .badge-missing_guard { background: rgba(168,85,247,0.2); color: var(--purple); }
+    .badge-resource_leak { background: rgba(236,72,153,0.2); color: var(--pink); }
+    .badge-architecture_flaw { background: rgba(99,102,241,0.2); color: #818cf8; }
+    .badge-high { background: rgba(239,68,68,0.2); color: var(--red); }
+    .badge-medium { background: rgba(245,158,11,0.2); color: var(--yellow); }
+    .badge-low { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+
+    .cluster-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; }
   </style>
 </head>
 <body>
@@ -610,10 +805,14 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     
     <div class="nav-tabs">
       <button class="nav-tab active" data-view="graph">🌐 Graph</button>
+      <button class="nav-tab" data-view="health">🏥 Health Gate</button>
+      <button class="nav-tab" data-view="adrs">🏛️ ADRs & Drift</button>
+      <button class="nav-tab" data-view="cognition">🧠 Cognition & Why</button>
+      <button class="nav-tab" data-view="sync">🤝 P2P Mesh</button>
       <button class="nav-tab" data-view="current">⚡ Invariants & Handoff</button>
       <button class="nav-tab" data-view="wiki">📚 Wiki</button>
       <button class="nav-tab" data-view="persona">👤 Persona</button>
-      <button class="nav-tab" data-view="sandbox">🔍 Retrieval Sandbox</button>
+      <button class="nav-tab" data-view="sandbox">🔍 Sandbox</button>
       <button class="nav-tab" data-view="audit">📜 Audit</button>
     </div>
     
@@ -778,6 +977,186 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
               <tr><th>Timestamp</th><th>Operation</th><th>Entry ID</th><th>Actor</th><th>Details</th></tr>
             </thead>
             <tbody id="auditTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 7: Project Health Gate & Observability -->
+    <div class="view-panel" id="panel-health">
+      <div class="content-view-wrap">
+        <div class="view-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(99,102,241,0.06) 100%);">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+            <div style="display:flex; align-items:center; gap:18px;">
+              <div class="grade-circle grade-a" id="healthGrade">A</div>
+              <div>
+                <div style="font-size:20px; font-weight:800; color:#fff; display:flex; align-items:center; gap:10px;">
+                  <span>5-Pillar Project Health Scorecard</span>
+                  <span class="gate-badge gate-pass" id="healthGate">[PASS]</span>
+                </div>
+                <div style="font-size:13px; color:var(--text-muted); margin-top:3px;" id="healthSummary">Comprehensive project cognitive health evaluation.</div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Composite Health Score</div>
+              <div style="font-size:28px; font-weight:800; color:#fff;" id="healthScore">95/100</div>
+            </div>
+          </div>
+
+          <div class="pillars-grid">
+            <!-- Pillar 1: Store Integrity -->
+            <div class="pillar-card">
+              <div class="pillar-title">1. Memory Store Integrity</div>
+              <div class="pillar-score" id="pStoreScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pStoreBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Contradictions: <strong id="pStoreContradictions">0</strong></span>
+                <span>Expired: <strong id="pStoreExpired">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 2: Code Anchors -->
+            <div class="pillar-card">
+              <div class="pillar-title">2. Native Code Anchors</div>
+              <div class="pillar-score" id="pAnchorsScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pAnchorsBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Valid: <strong id="pAnchorsValid">0</strong></span>
+                <span>Drifted: <strong id="pAnchorsDrifted">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 3: Documentation Alignment -->
+            <div class="pillar-card">
+              <div class="pillar-title">3. Doc-Code Alignment</div>
+              <div class="pillar-score" id="pDocScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pDocBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Documented: <strong id="pDocDoc">0</strong></span>
+                <span>Missing: <strong id="pDocMissing">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 4: Anti-Pattern Sentry -->
+            <div class="pillar-card">
+              <div class="pillar-title">4. Anti-Pattern Sentry</div>
+              <div class="pillar-score" id="pLessonsScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pLessonsBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Total Lessons: <strong id="pLessonsTotal">0</strong></span>
+                <span>Active Traps: <strong id="pLessonsActive">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 5: Tech Debt & Fragility -->
+            <div class="pillar-card">
+              <div class="pillar-title">5. Technical Debt & Friction</div>
+              <div class="pillar-score" id="pDebtScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pDebtBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>TODOs/Bypasses: <strong id="pDebtTodos">0</strong></span>
+                <span>Fragile Subsystems: <strong id="pDebtFragile">0</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📋 Prioritized Remediation Action Checklist</span>
+            <button class="btn-icon" onclick="fetchHealth()">🔄 Re-Audit</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th style="width:110px;">Priority</th><th>Issue Detected</th><th>Recommended Action</th></tr>
+            </thead>
+            <tbody id="healthChecklistBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 8: ADRs & Documentation Drift -->
+    <div class="view-panel" id="panel-adrs">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🏛️ Architecture Decision Records (ADRs)</span>
+            <button class="btn-icon" onclick="fetchAdrs()">🔄 Refresh</button>
+          </div>
+          <div id="adrsListGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🔍 Code ↔ Documentation Bi-Directional Drift Inspector</span>
+            <button class="btn-icon" onclick="fetchDrift()">🔄 Audit Drift</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Symbol</th><th>Status</th><th>File Path</th><th>Explanation</th></tr>
+            </thead>
+            <tbody id="driftTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 9: Engineering Cognition & "Why" Reasoner -->
+    <div class="view-panel" id="panel-cognition">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">🤔 Engineering Cognition: Autonomous "Why" Reasoner</div>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+            Traces code evolution backwards through past bug fixes, architectural trade-offs, and ADRs to explain why code was written this way.
+          </p>
+          <div class="sandbox-input-grid">
+            <input type="text" id="whyInput" placeholder="Enter symbol or path (e.g., 'computeFingerprint', 'openStore', 'src/sync/engine.ts')..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
+            <button class="btn-primary" onclick="explainWhyCode()">Explain Why</button>
+          </div>
+          <div id="whyOutput" style="display:none; margin-top:14px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid var(--panel-border); border-radius:var(--radius-md);"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">🔥 Recurring Bugs & Friction Clusters (Fragility Heatmap)</div>
+          <div id="clustersGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-bottom:20px;"></div>
+          
+          <div class="card-title-lg" style="margin-top:20px;">⚠️ Technical Debt & Risk Hotspots</div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>File</th><th>TODOs</th><th>FIXMEs</th><th>Risk Level</th></tr>
+            </thead>
+            <tbody id="debtTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 10: P2P Gossip Mesh Sync -->
+    <div class="view-panel" id="panel-sync">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🤝 Cross-Agent Knowledge Sync & P2P Gossip Mesh</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-primary" onclick="broadcastSyncPacket()">📡 Broadcast Packet</button>
+              <button class="btn-primary" style="background:#059669;" onclick="syncPool()">🔄 Sync with Pool</button>
+            </div>
+          </div>
+          <div class="handoff-grid" style="margin-top:10px;">
+            <div class="handoff-cell"><div class="handoff-lbl">Local Agent ID</div><div class="handoff-val mono" id="syncLocalAgent">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Known Peers</div><div class="handoff-val" id="syncTotalPeers">0</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Outgoing Memories Ready</div><div class="handoff-val" id="syncPendingMemories">0</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Last Sync Time</div><div class="handoff-val" id="syncLastAt">Never</div></div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>👥 Known Peer Agents & Vector Clocks</span>
+            <button class="btn-icon" onclick="fetchSyncStatus()">🔄 Refresh Status</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Peer Agent ID</th><th>Last Seen</th><th>Total Packets</th><th>Memories Ingested</th></tr>
+            </thead>
+            <tbody id="syncPeersTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -1431,6 +1810,295 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       window.open('/api/export-html', '_blank');
     }
 
+    // R15 Studio Loaders
+    async function fetchHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        renderHealth(data);
+      } catch (err) {
+        console.error('Failed to load health report:', err);
+      }
+    }
+
+    function renderHealth(data) {
+      if (!data) return;
+      const gradeEl = document.getElementById('healthGrade');
+      const scoreEl = document.getElementById('healthScore');
+      const gateEl = document.getElementById('healthGate');
+      const summaryEl = document.getElementById('healthSummary');
+      const grade = data.overall_grade || data.grade || '--';
+      const score = data.overall_score !== undefined ? data.overall_score : (data.score || 0);
+      if (gradeEl) {
+        gradeEl.textContent = grade;
+        gradeEl.className = 'grade-circle grade-' + grade.charAt(0).toLowerCase();
+      }
+      if (scoreEl) scoreEl.textContent = Math.round(score) + '/100';
+      if (gateEl) {
+        gateEl.textContent = '[' + (data.gate_status || 'WARN') + ']';
+        gateEl.className = 'gate-badge gate-' + (data.gate_status || 'WARN').toLowerCase();
+      }
+      if (summaryEl) summaryEl.textContent = data.summary || '';
+
+      if (data.pillars) {
+        const p1 = data.pillars.store_integrity || data.pillars.memory_integrity;
+        if (p1) {
+          document.getElementById('pStoreScore').textContent = Math.round(p1.score || 0) + '%';
+          document.getElementById('pStoreBar').style.width = Math.round(p1.score || 0) + '%';
+          document.getElementById('pStoreContradictions').textContent = p1.metrics?.contradictions ?? p1.contradictions_flagged ?? 0;
+          document.getElementById('pStoreExpired').textContent = p1.metrics?.expired_count ?? p1.expired_memories ?? 0;
+        }
+
+        const p2 = data.pillars.code_anchors || data.pillars.native_code_anchors;
+        if (p2) {
+          document.getElementById('pAnchorsScore').textContent = Math.round(p2.score || p2.validity_score || 0) + '%';
+          document.getElementById('pAnchorsBar').style.width = Math.round(p2.score || p2.validity_score || 0) + '%';
+          document.getElementById('pAnchorsValid').textContent = p2.metrics?.valid_anchors ?? p2.valid ?? 0;
+          document.getElementById('pAnchorsDrifted').textContent = p2.metrics?.drifted_anchors ?? p2.drifted ?? 0;
+        }
+
+        const p3 = data.pillars.doc_code_alignment || data.pillars.documentation_drift;
+        if (p3) {
+          document.getElementById('pDocScore').textContent = Math.round(p3.score || p3.alignment_score || 0) + '%';
+          document.getElementById('pDocBar').style.width = Math.round(p3.score || p3.alignment_score || 0) + '%';
+          document.getElementById('pDocDoc').textContent = p3.metrics?.documented_count ?? p3.documented ?? 0;
+          document.getElementById('pDocMissing').textContent = p3.metrics?.missing_count ?? p3.missing ?? 0;
+        }
+
+        const p4 = data.pillars.negative_anti_patterns || data.pillars.negative_lessons_sentry;
+        if (p4) {
+          document.getElementById('pLessonsScore').textContent = Math.round(p4.score || p4.defense_score || 0) + '%';
+          document.getElementById('pLessonsBar').style.width = Math.round(p4.score || p4.defense_score || 0) + '%';
+          document.getElementById('pLessonsTotal').textContent = p4.metrics?.total_negative_lessons ?? p4.total_lessons ?? 0;
+          document.getElementById('pLessonsActive').textContent = p4.metrics?.active_traps ?? p4.active_traps ?? 0;
+        }
+
+        const p5 = data.pillars.technical_debt || data.pillars.technical_debt_friction;
+        if (p5) {
+          document.getElementById('pDebtScore').textContent = Math.round(p5.score || p5.fragility_score || 0) + '%';
+          document.getElementById('pDebtBar').style.width = Math.round(p5.score || p5.fragility_score || 0) + '%';
+          document.getElementById('pDebtTodos').textContent = p5.metrics?.todo_count ?? p5.todo_count ?? 0;
+          document.getElementById('pDebtFragile').textContent = p5.metrics?.fragile_subsystems ?? p5.fragile_subsystems ?? 0;
+        }
+      }
+
+      const tbody = document.getElementById('healthChecklistBody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        const list = data.actionable_checklist || data.checklist || [];
+        list.forEach(item => {
+          const tr = document.createElement('tr');
+          if (typeof item === 'string') {
+            tr.innerHTML = \`
+              <td><span class="priority-badge priority-high">[RECOMMENDED]</span></td>
+              <td colspan="2"><strong>\${escapeHtml(item)}</strong></td>
+            \`;
+          } else {
+            const pillClass = 'priority-' + (item.priority || 'medium').toLowerCase();
+            tr.innerHTML = \`
+              <td><span class="priority-badge \${pillClass}">[\${item.priority}]</span></td>
+              <td><strong>\${escapeHtml(item.issue)}</strong></td>
+              <td>\${escapeHtml(item.action)}</td>
+            \`;
+          }
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    async function fetchAdrs() {
+      try {
+        const res = await fetch('/api/adrs');
+        const list = await res.json();
+        const container = document.getElementById('adrsListGrid');
+        if (container) {
+          container.innerHTML = '';
+          if (!list || list.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">No ADRs recorded yet. Capture with memory_adr_record.</div>';
+          } else {
+            list.forEach(adr => {
+              const card = document.createElement('div');
+              card.className = 'view-card';
+              card.innerHTML = \`
+                <div class="card-header">
+                  <div class="card-title">\${escapeHtml(adr.title)}</div>
+                  <span class="adr-badge adr-\${(adr.status || 'proposed').toLowerCase()}">\${adr.status}</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;"><strong>Context:</strong> \${escapeHtml(adr.context || '')}</div>
+                <div style="font-size:12px; color:#f1f5f9; margin-bottom:6px;"><strong>Decision:</strong> \${escapeHtml(adr.decision || '')}</div>
+                <div style="font-size:11px; color:var(--text-dim);"><strong>Consequences:</strong> \${escapeHtml(adr.consequences || '')}</div>
+              \`;
+              container.appendChild(card);
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load ADRs:', err);
+      }
+    }
+
+    async function fetchDrift() {
+      try {
+        const res = await fetch('/api/drift');
+        const drift = await res.json();
+        const tbody = document.getElementById('driftTableBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          const list = drift.items || drift.classified || [];
+          list.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = \`
+              <td class="mono"><strong>\${escapeHtml(item.symbol)}</strong></td>
+              <td><span class="drift-badge drift-\${(item.status || 'documented').toLowerCase()}">\${item.status}</span></td>
+              <td style="font-size:11px; color:var(--text-dim);">\${escapeHtml(item.docRef || item.codeRef || item.path || '')}</td>
+              <td style="font-size:12px;">\${escapeHtml(item.explanation || '')}</td>
+            \`;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load drift audit:', err);
+      }
+    }
+
+    async function explainWhyCode() {
+      const q = (document.getElementById('whyInput').value || '').trim();
+      if (!q) return;
+      try {
+        const res = await fetch('/api/cognition/why', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol_or_path: q })
+        });
+        const data = await res.json();
+        const out = document.getElementById('whyOutput');
+        if (out) {
+          out.style.display = 'block';
+          out.innerHTML = \`
+            <div class="card-title-lg" style="margin-bottom:8px;">🏛️ Architectural Rationale for <code>\${escapeHtml(q)}</code></div>
+            <p style="font-size:13px; line-height:1.6; color:#f1f5f9; margin-bottom:12px;">\${escapeHtml(data.core_rationale || data.inferred_rationale || 'No specific rationale recorded.')}</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:12px;">
+              <div style="background:rgba(0,0,0,0.25); padding:10px; border-radius:6px; border:1px solid var(--panel-border);">
+                <div style="font-weight:700; color:var(--green); margin-bottom:4px;">Historical Bug Fixes & Lessons</div>
+                <div>\${(data.timeline || data.preceding_failures || []).length > 0 ? (data.timeline || data.preceding_failures).map(f => '• ' + escapeHtml(f.title || f.summary || '')).join('<br>') : 'None recorded'}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25); padding:10px; border-radius:6px; border:1px solid var(--panel-border);">
+                <div style="font-weight:700; color:#818cf8; margin-bottom:4px;">Trade-offs & Constraints</div>
+                <div>\${(data.trade_offs_accepted || data.trade_offs_recorded || []).length > 0 ? (data.trade_offs_accepted || data.trade_offs_recorded).map(t => '• ' + escapeHtml(t.title || t.trade_off || '')).join('<br>') : 'None recorded'}</div>
+              </div>
+            </div>
+          \`;
+        }
+      } catch (err) {
+        flash('Why Reasoner query failed', true);
+      }
+    }
+
+    async function fetchCognition() {
+      try {
+        const [clustRes, debtRes] = await Promise.all([
+          fetch('/api/cognition/clusters'),
+          fetch('/api/cognition/debt')
+        ]);
+        const clustersData = await clustRes.json();
+        const debtData = await debtRes.json();
+
+        const grid = document.getElementById('clustersGrid');
+        if (grid) {
+          grid.innerHTML = '';
+          (clustersData.clusters || []).forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'cluster-card';
+            el.innerHTML = \`
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span class="mono" style="font-weight:700; color:#f1f5f9;">\${escapeHtml(c.subsystem)}</span>
+                <span class="badge-cause badge-\${c.root_cause}">\${c.root_cause}</span>
+              </div>
+              <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">\${escapeHtml(c.pattern_summary)}</div>
+              <div style="font-size:11px; color:var(--text-dim);">Frequency: <strong>\${c.frequency}</strong> &bull; Fragility: <strong>\${(c.fragility_score * 100).toFixed(0)}%</strong></div>
+            \`;
+            grid.appendChild(el);
+          });
+        }
+
+        const debtBody = document.getElementById('debtTableBody');
+        if (debtBody) {
+          debtBody.innerHTML = '';
+          const list = debtData.hotspot_files || debtData.hotspots || debtData.items || [];
+          list.slice(0, 10).forEach(h => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = \`
+              <td class="mono">\${escapeHtml(h.file || h.filePath || '')}</td>
+              <td>\${h.todo_count ?? 0}</td>
+              <td>\${h.fixme_count ?? 0}</td>
+              <td><span class="badge-cause badge-\${h.risk_level || h.severity || 'low'}">\${h.risk_level || h.severity || 'low'}</span></td>
+            \`;
+            debtBody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load cognition data:', err);
+      }
+    }
+
+    async function fetchSyncStatus() {
+      try {
+        const res = await fetch('/api/sync/status');
+        const data = await res.json();
+        document.getElementById('syncLocalAgent').textContent = data.local_agent_id || '--';
+        document.getElementById('syncTotalPeers').textContent = data.total_peers || 0;
+        document.getElementById('syncPendingMemories').textContent = data.pending_outgoing_memories || 0;
+        document.getElementById('syncLastAt').textContent = data.last_sync_at ? new Date(data.last_sync_at).toLocaleTimeString() : 'Never';
+
+        const tbody = document.getElementById('syncPeersTableBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          (data.known_peers || []).forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = \`
+              <td class="mono"><strong>\${escapeHtml(p.agent_id)}</strong></td>
+              <td>\${p.last_seen_at ? new Date(p.last_seen_at).toLocaleTimeString() : '--'}</td>
+              <td>\${p.total_packets_received || 0}</td>
+              <td>\${p.total_memories_ingested || 0}</td>
+            \`;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load sync status:', err);
+      }
+    }
+
+    async function broadcastSyncPacket() {
+      try {
+        const res = await fetch('/api/sync/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const packet = await res.json();
+        flash('✓ Broadcasted packet ' + packet.packet_id + ' (' + packet.payload.memories.length + ' memories)');
+        fetchSyncStatus();
+      } catch (err) {
+        flash('Broadcast failed', true);
+      }
+    }
+
+    async function syncPool() {
+      try {
+        const res = await fetch('/api/sync/pool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const report = await res.json();
+        flash('✓ Synced with shared pool: ingested ' + report.total_ingested + ' new memories from ' + report.peers_contacted.length + ' peers');
+        fetchSyncStatus();
+      } catch (err) {
+        flash('Pool sync failed', true);
+      }
+    }
+
     // Tabs switching
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -1441,6 +2109,10 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         const panel = document.getElementById('panel-' + currentTab);
         if (panel) panel.classList.add('active');
         if (currentTab === 'graph') needsRedraw = true;
+        if (currentTab === 'health') fetchHealth();
+        if (currentTab === 'adrs') { fetchAdrs(); fetchDrift(); }
+        if (currentTab === 'cognition') fetchCognition();
+        if (currentTab === 'sync') fetchSyncStatus();
       });
     });
 
