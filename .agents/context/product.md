@@ -93,7 +93,8 @@ memory audit [--limit 20]
 memory persona [developer|designer|marketer|casual]
 memory current --add "Must use Bun v1.2"
 
-# Diagnostics & Server
+# Diagnostics, Server & Optimization
+memory optimize [--dry-run] [--force] [--project core]
 memory doctor
 memory validate --dry-run
 memory mcp [--profile coding|review|architecture|core|full]

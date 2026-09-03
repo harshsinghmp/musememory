@@ -5,6 +5,45 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-09-03
+
+### Summary
+Feature release introducing the Autonomous Memory Optimizer Engine with zero-daemon auto-cadence, Embedded Web UI dashboard optimization controls, clean `CURRENT.md` operational guidelines for Humans and Agents, and Concurrent Multi-Agent Workstream Tracking to prevent file collisions in parallel agent swarms.
+
+### Added
+- **Autonomous Memory Optimizer Engine (`src/optimize.ts`)**:
+  - High-precision pruning of test assertion noise (`expect(...)` traces, runner mock logs, assertion failures).
+  - Junk fragment detection pruning single-character noise (`'1'`, `'+'`), micro-snippets, accidental system transcript dumps (`MODEL PLANNER_RESPONSE`, `</SYSTEM_MESSAGE>`, `The above content does NOT show the entire file contents`, and truncated outputs).
+  - Normalization-based candidate memory deduplication preserving high-value human-confirmed rules and architecture decisions.
+  - Automatic SQLite `VACUUM;` and `PRAGMA optimize;` defragmentation in WAL mode to reclaim wasted disk pages.
+  - Operational audit logging emitting `operation: "optimize"` events and persisting metadata in `.memory/optimization_meta.json`.
+- **Zero-Daemon Automated Cadence Engine**:
+  - Automatically evaluates store health on turn start (`get_context`, `muse_context`) and CLI invocation:
+    - **7-Day Cadence**: Triggers automatic defragmentation and pruning every 7 days.
+    - **48-Hour Inactivity Window**: Triggers optimization when workspace is idle for 48 hours and hasn't been optimized in 48 hours.
+- **CLI Command: `memory optimize`**:
+  - Full-featured terminal optimization command supporting `--dry-run`, `--force`, `--project`, `--days-interval`, and `--inactivity-hours`, with a formatted terminal audit scoreboard.
+- **Dashboard "⚡ Optimize" Trigger & Endpoints (`src/ui.ts`)**:
+  - Added `#optimizeBtn` with `⚡ Optimize` icon and hover tooltip to the Web Observability Studio header.
+  - Added `POST /api/optimize` and `GET /api/optimize/status` REST endpoints.
+  - Added `optimizeStoreDashboard()` frontend handler with real-time spinner feedback and flash toasts reporting reclaimed bytes and pruned units.
+- **Concurrent Multi-Agent Workstream Tracking (`src/governor.ts`)**:
+  - Introduced `AgentWorkstream` interface tracking `agent`, `sessionId`, `task`, `targetScope`, `status`, `lastActive`, and `lastInstruction`.
+  - Added `WorkspaceGovernor.registerWorkstream(memoryDir, workstream)` and `registerAgentWorkstream()` with 48-hour completion auto-pruning.
+  - Renders live `## 🤖 Active Concurrent Agent Workstreams` Markdown table in `CURRENT.md`.
+  - Injected active concurrent workstreams into `formatPromptContext` (`src/retrieval.ts`) and `resolveMuseContext` (`src/orchestrator/context.ts`) so parallel agents across separate chats or IDE windows stay mutually aware and avoid file collisions.
+- **Automated Test Suite**:
+  - Added `test/optimize.test.ts` verifying test noise detection, junk fragment detection, 7-day / 48-hour auto-cadence, and end-to-end SQLite defragmentation.
+  - Extended `test/governor.test.ts` for concurrent workstream management and `test/ui.test.ts` for optimize endpoints.
+
+### Changed
+- **`CURRENT.md` Operational Guidelines & Sanitation**:
+  - Cleaned `.memory/CURRENT.md` from 5,234 lines of raw terminal logs down to 26 clean lines of authoritative invariants.
+  - Established explicit guidelines: single-pane executive summary for Humans (zero verbose logs) vs. mandatory grounding contract and concurrency awareness for AI Agents.
+  - Hardened `syncConstraints` and `parseCurrentFile` in `src/governor.ts` with `isValidConstraintLine(text)` and normalized deduplication, preventing multi-line terminal debris from ever re-bloating `CURRENT.md`.
+- **Agent Skill Documentation**:
+  - Updated `.agents/skills/muse-current/SKILL.md` with operational guidelines and the multi-agent coordination protocol.
+
 ## [2.2.1] - 2026-09-03
 
 ### Fixed

@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.2.1`  
-> **Status**: Production Release (Hardened v2.2 with Linus-Style Code Review Bug Fixes)
+> **Version**: `v2.3.0`  
+> **Status**: Feature Release (Autonomous Memory Optimizer, UI Dashboard Controls & Concurrent Multi-Agent Workstream Tracking)
 
 ---
 
@@ -39,6 +39,8 @@
 30. **Interactive Code Anchor Reconciler**: Audits and repairs code anchors across memories, pruning dead references and updating structural hashes (`memory reconcile` / `muse_reconcile_anchors`).
 31. **Latency & Quality Telemetry Suite**: Benchmarks microsecond hot caches, FTS5 BM25 search, knapsack token packing, and ROI in a clean ASCII scoreboard (`memory benchmark`).
 32. **Linus-Style Architectural Hardening (v2.2.1)**: Elimination of shell command injection via `execFileSync`, concurrency-safe `PRAGMA busy_timeout = 5000` on SQLite WAL mode, O(N) stat storm elimination in `list(store)`, structured warnings on YAML dual-write failures, and tightened word-boundary/code-anchor ADR matching.
+33. **Autonomous Memory Optimizer & Auto-Cadence Engine (v2.3.0)**: Multi-factor noise and junk pruning engine with zero-daemon auto-cadence (every 7 days or after 48h idle), SQLite WAL defragmentation (`VACUUM;` + `PRAGMA optimize;`), CLI command `memory optimize`, and dashboard "⚡ Optimize" button.
+34. **Concurrent Multi-Agent Workstream Tracking & Clean `CURRENT.md` (v2.3.0)**: Live `AgentWorkstream` tracking table in `CURRENT.md` enabling multi-agent swarms across separate chat sessions to coordinate active tasks and target scopes; injected into prompt context (`formatPromptContext`, `resolveMuseContext`); sanitized single-pane executive summary for humans with strict grounding rules for agents.
 
 ---
 
