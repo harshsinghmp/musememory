@@ -31,6 +31,12 @@ Muse Memory is a zero-daemon, file-backed cognitive memory engine designed to gi
 | `memory_promote_scope` | **Scoped Promotion** | Promotes memory along 3-tier ladder (`local` $\rightarrow$ `project` $\rightarrow$ `global`) with 5× repeated success policy and universal generalization. |
 | `memory_archive` / `rehydrate` | **Archival Lifecycle** | Evaluates and manages `active` $\rightarrow$ `cold` $\rightarrow$ `dormant` $\rightarrow$ `archived` lifecycle with query rehydration. |
 | `anchor_create` / `verify` / `audit` | **Code Identity** | Creates, verifies, and audits line-independent structural code anchors. |
+| `muse_sync_broadcast` / `ingest` | **P2P Gossip Mesh** | Broadcasts and ingests portable sealed SyncPackets with deduplication and contradiction flagging. |
+| `muse_sync_status` / `pool` | **Sync Coordination** | Tracks peer vector clocks and synchronizes memories bidirectionally via shared drop-directory pool. |
+| `muse_mesh_status` | **Monorepo Topology** | Discovers monorepo workspaces and multi-repo sibling groups with package dependencies and stores. |
+| `muse_mesh_query` | **Cross-Project Query** | Queries memories across the entire workspace mesh with origin package provenance tags. |
+| `muse_mesh_audit` | **Contract Verification** | Audits cross-package dependency contracts, entrypoint exports, and cross-repo code anchors. |
+| `muse_mesh_link` | **Mesh Linking** | Explicitly links or unlinks external repository paths into the workspace mesh registry. |
 
 ### 🛠️ Core Memory & Lifecycle Tools
 | MCP Tool | Execution Phase | Agent Purpose |

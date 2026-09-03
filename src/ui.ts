@@ -21,6 +21,12 @@ import {
   syncWithSharedPool,
   broadcastKnowledge,
 } from "./sync/index.ts";
+import {
+  discoverWorkspaceMesh,
+  resolveMeshMemories,
+  auditMeshContracts,
+  addMeshLink,
+} from "./mesh/index.ts";
 
 export interface UiServerOptions {
   port?: number;
@@ -484,6 +490,68 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      // R16: Mesh Topology Status Endpoint
+      if (pathname === "/api/mesh/status" && req.method === "GET") {
+        try {
+          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(topology));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R16: Mesh Cross-Project Query Endpoint
+      if (pathname === "/api/mesh/query" && req.method === "GET") {
+        try {
+          const q = url.searchParams.get("q") || "";
+          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          const results = resolveMeshMemories(opts.store, topology, { query: q });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(results));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R16: Mesh Contract Audit Endpoint
+      if (pathname === "/api/mesh/audit" && req.method === "GET") {
+        try {
+          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          const audit = auditMeshContracts(topology, opts.store);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(audit));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      // R16: Mesh Link Endpoint
+      if (pathname === "/api/mesh/link" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const targetPath = typeof body.path === "string" ? body.path : "";
+          if (!targetPath) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Missing required 'path' field" }));
+            return;
+          }
+          addMeshLink(opts.memoryDir, targetPath);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, linked: targetPath }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
       if (pathname === "/api/export-html" && req.method === "GET") {
         const html = exportStandaloneHtml(opts.store);
         res.setHeader("Content-Disposition", 'attachment; filename="musememory-graph.html"');
@@ -809,6 +877,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       <button class="nav-tab" data-view="adrs">🏛️ ADRs & Drift</button>
       <button class="nav-tab" data-view="cognition">🧠 Cognition & Why</button>
       <button class="nav-tab" data-view="sync">🤝 P2P Mesh</button>
+      <button class="nav-tab" data-view="mesh">🕸️ Monorepo Mesh</button>
       <button class="nav-tab" data-view="current">⚡ Invariants & Handoff</button>
       <button class="nav-tab" data-view="wiki">📚 Wiki</button>
       <button class="nav-tab" data-view="persona">👤 Persona</button>
@@ -1157,6 +1226,56 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
               <tr><th>Peer Agent ID</th><th>Last Seen</th><th>Total Packets</th><th>Memories Ingested</th></tr>
             </thead>
             <tbody id="syncPeersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 11: Multi-Repo & Monorepo Mesh -->
+    <div class="view-panel" id="panel-mesh">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🕸️ Monorepo & Multi-Repo Cross-Project Mesh Topology</span>
+            <button class="btn-icon" onclick="fetchMeshStatus()">🔄 Refresh Mesh</button>
+          </div>
+          <div class="handoff-grid" style="margin-top:10px;">
+            <div class="handoff-cell"><div class="handoff-lbl">Workspace Root</div><div class="handoff-val mono" style="font-size:12px;" id="meshRoot">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Workspace Type</div><div class="handoff-val" id="meshType">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Monorepo Mode</div><div class="handoff-val" id="meshIsMono">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Discovered Nodes</div><div class="handoff-val" id="meshNodeCount">0</div></div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📦 Discovered Package & Subproject Nodes</span>
+          </div>
+          <div id="meshNodesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🔍 Cross-Project Mesh Memory Query</span>
+          </div>
+          <div class="sandbox-input-grid">
+            <input type="text" id="meshQueryInput" placeholder="Search across all linked packages & repos..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
+            <button class="btn-primary" onclick="searchMesh()">Search Mesh</button>
+          </div>
+          <div id="meshQueryResults" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🛡️ Cross-Package Contract & Dependency Audit</span>
+            <button class="btn-icon" onclick="fetchMeshAudit()">🔄 Run Audit</button>
+          </div>
+          <div id="meshAuditSummary" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Source</th><th>Target</th><th>Symbol</th><th>Status</th><th>Details</th></tr>
+            </thead>
+            <tbody id="meshAuditTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -2099,6 +2218,104 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       }
     }
 
+    // R16 Mesh Loaders
+    async function fetchMeshStatus() {
+      try {
+        const res = await fetch('/api/mesh/status');
+        const data = await res.json();
+        document.getElementById('meshRoot').textContent = data.rootPath || '--';
+        document.getElementById('meshType').textContent = (data.workspaceType || 'none').toUpperCase();
+        document.getElementById('meshIsMono').textContent = data.isMonorepo ? 'YES (Active)' : 'NO';
+        document.getElementById('meshNodeCount').textContent = (data.nodes || []).length;
+
+        const grid = document.getElementById('meshNodesGrid');
+        if (grid) {
+          grid.innerHTML = '';
+          (data.nodes || []).forEach(node => {
+            const el = document.createElement('div');
+            el.className = 'cluster-card';
+            const storeStatus = node.hasStore ? '<span class="drift-badge drift-documented">Store: Active</span>' : '<span class="drift-badge drift-stale">Store: None</span>';
+            const currentBadge = node.isCurrent ? ' <span class="priority-badge priority-high">CURRENT</span>' : '';
+            el.innerHTML = \`
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span class="mono" style="font-weight:800; color:#fff;">\${escapeHtml(node.name)}\${currentBadge}</span>
+                \${storeStatus}
+              </div>
+              <div style="font-size:11px; color:var(--text-dim); margin-bottom:6px; word-break:break-all;">\${escapeHtml(node.path)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">Type: <strong>\${node.nodeType}</strong></div>
+              \${node.dependencies && node.dependencies.length > 0 ? \`<div style="font-size:11px; color:var(--text-dim); margin-top:4px;">Deps: \${node.dependencies.slice(0, 3).map(escapeHtml).join(', ')}\${node.dependencies.length > 3 ? '...' : ''}</div>\` : ''}
+            \`;
+            grid.appendChild(el);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load mesh status:', err);
+      }
+    }
+
+    async function searchMesh() {
+      const q = (document.getElementById('meshQueryInput').value || '').trim();
+      try {
+        const res = await fetch('/api/mesh/query?q=' + encodeURIComponent(q));
+        const list = await res.json();
+        const container = document.getElementById('meshQueryResults');
+        if (container) {
+          container.innerHTML = '';
+          if (!list || list.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">No memories found across mesh workspace.</div>';
+          } else {
+            list.forEach(res => {
+              const card = document.createElement('div');
+              card.className = 'view-card';
+              card.style.marginBottom = '0';
+              card.innerHTML = \`
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <div style="font-weight:700; color:#fff;">\${escapeHtml(res.memory.title)}</div>
+                  <div>
+                    <span class="priority-badge priority-medium">[\${escapeHtml(res.originProject)}]</span>
+                    <span class="adr-badge adr-proposed">\${res.memory.type}</span>
+                  </div>
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">\${escapeHtml(res.memory.content)}</div>
+                <div style="font-size:11px; color:var(--text-dim);">Source: \${escapeHtml(res.sourceNode.path)} &bull; Score: \${(res.score * 100).toFixed(0)}%</div>
+              \`;
+              container.appendChild(card);
+            });
+          }
+        }
+      } catch (err) {
+        flash('Mesh search failed', true);
+      }
+    }
+
+    async function fetchMeshAudit() {
+      try {
+        const res = await fetch('/api/mesh/audit');
+        const data = await res.json();
+        const sumEl = document.getElementById('meshAuditSummary');
+        if (sumEl) sumEl.textContent = data.summary || '';
+
+        const tbody = document.getElementById('meshAuditTableBody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          (data.items || []).forEach(item => {
+            const tr = document.createElement('tr');
+            const color = item.status === 'valid' ? 'drift-documented' : item.status === 'drifted' ? 'drift-partial' : 'drift-conflicting';
+            tr.innerHTML = \`
+              <td class="mono"><strong>\${escapeHtml(item.sourcePackage)}</strong></td>
+              <td class="mono"><strong>\${escapeHtml(item.targetPackage)}</strong></td>
+              <td class="mono">\${escapeHtml(item.symbol)}</td>
+              <td><span class="drift-badge \${color}">\${item.status}</span></td>
+              <td style="font-size:12px;">\${escapeHtml(item.detail)}</td>
+            \`;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to run mesh audit:', err);
+      }
+    }
+
     // Tabs switching
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -2113,6 +2330,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         if (currentTab === 'adrs') { fetchAdrs(); fetchDrift(); }
         if (currentTab === 'cognition') fetchCognition();
         if (currentTab === 'sync') fetchSyncStatus();
+        if (currentTab === 'mesh') { fetchMeshStatus(); fetchMeshAudit(); }
       });
     });
 

@@ -192,6 +192,27 @@ describe("embedded web UI server", () => {
     expect(packet.protocol_version).toBe("2.0.0");
     expect(packet.sender_id).toBe("agent_studio_test");
 
+    // 8. Test R16 Mesh endpoints and markup
+    expect(html).toContain('data-view="mesh"');
+    expect(html).toContain('id="panel-mesh"');
+    expect(html).toContain('id="meshNodesGrid"');
+
+    const meshStatusRes = await fetch(`http://localhost:${srv.port}/api/mesh/status`);
+    expect(meshStatusRes.status).toBe(200);
+    const meshStatus = await meshStatusRes.json();
+    expect(meshStatus).toHaveProperty("rootPath");
+    expect(meshStatus).toHaveProperty("nodes");
+
+    const meshQueryRes = await fetch(`http://localhost:${srv.port}/api/mesh/query?q=test`);
+    expect(meshQueryRes.status).toBe(200);
+    const meshQueryData = await meshQueryRes.json();
+    expect(Array.isArray(meshQueryData)).toBe(true);
+
+    const meshAuditRes = await fetch(`http://localhost:${srv.port}/api/mesh/audit`);
+    expect(meshAuditRes.status).toBe(200);
+    const meshAudit = await meshAuditRes.json();
+    expect(meshAudit).toHaveProperty("total_contracts_checked");
+
     srv.close();
     cleanup(root);
   });
