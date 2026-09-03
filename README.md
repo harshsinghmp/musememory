@@ -458,7 +458,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (42 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (47 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -467,6 +467,11 @@ memory <command> [arguments] [flags]  # alias: musememory
 | Command | Arguments / Flags | Description |
 | :--- | :--- | :--- |
 | `health` | `[--json] [--global]` | **Unified 5-Pillar Project Health Gate**: audits Store Integrity, Code Anchors, Drift, Sentry, and Tech Debt with A-F grading and pass/fail gate. |
+| `studio` / `ui` | `[--port N] [--global]` | **Web Observability Studio**: visual dashboard with 5-pillar health, ADR drift, why reasoner, and live mesh (default port: `2222`). |
+| `sync` | `[status\|broadcast\|ingest\|pool] [flags]` | **P2P Gossip Mesh**: peer vector clock status, packet export, ingestion, and shared pool gossip sync. |
+| `mesh` | `[overview\|query\|check\|link\|unlink\|propagate] [flags]` | **Monorepo & Multi-Repo Mesh**: workspace discovery, cross-project memory query, and contract drift audit. |
+| `adr` | `[record\|list\|supersede] [args]` | **Architecture Decision Records**: record, list, and supersede living architecture decisions. |
+| `anchor` | `[create\|verify\|audit] [args]` | **Code Anchors**: create, verify, and audit line-independent structural code anchors. |
 | `install` | `[path] [--global]` | **One-line complete setup**: initializes `.memory/`, `USER.md`, and auto-wires coding agents. |
 | `doctor` | `[path] [--global]` | **System diagnostic**: checks SQLite primary, schemas, secrets, and MCP connections. |
 | `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configs (and optionally purges `.memory/`). |
@@ -476,7 +481,6 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `agents` | *(none)* | Scan workstation for 80+ coding agents (Cursor, Claude Code, Antigravity, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
-| `ui` | `[--port N] [--global]` | Launch 6-view Cognitive Studio dashboard (default port: `2222`). |
 | `context` | `[query] [--token-budget N] [--limit N] [--tier 0\|1\|2]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--token-budget N] [--type T]` | Ranked multi-factor token search with score breakdown. |
 | `search-transcript` | `<query> [file.jsonl] [--window N]` | Full-text search past transcripts with dialogue context windows. |

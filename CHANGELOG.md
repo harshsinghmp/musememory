@@ -5,6 +5,36 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-09-03
+
+### Summary
+Major feature expansion introducing Cross-Agent Knowledge Sync & P2P Gossip Protocol (R14), Full Web Observability Studio (R15), and Multi-Repo & Monorepo Cross-Project Mesh (R16).
+
+### Added
+- **Cross-Agent Knowledge Sync & P2P Gossip Protocol (`src/sync/`)**:
+  - `SyncPacket` engine with whole-packet SHA-256 integrity verification and vector clock causal ordering (`src/sync/packet.ts`).
+  - Gossip state machine with deduplication, inline Vibeguard credential scrubbing, and semantic contradiction tagging with mutual `conflict_ids` (`src/sync/engine.ts`).
+  - Shared filesystem drop-directory gossip pool (`src/sync/pool.ts`) for zero-daemon multi-agent pods.
+  - CLI command: `memory sync` (`--status`, `--broadcast`, `--ingest`, `--pool`, `--agent-id`, `--pool-dir`).
+  - MCP tools: `muse_sync_broadcast`, `muse_sync_ingest`, `muse_sync_status`, `muse_sync_pool`.
+- **Full Web Observability Studio (`src/ui.ts`)**:
+  - Embedded web dashboard control plane accessible via `memory studio` (or `memory ui`).
+  - 5-Pillar Project Health Gate card with letter grade (A-F), composite score (0-100), pillar progress bars, and actionable remediation checklist.
+  - Interactive ADR registry and bi-directional documentation ↔ code drift audit table.
+  - Autonomous historical "Why" reasoner query interface explaining code evolution.
+  - Fragility bug clustering heatmap and technical debt scanner report.
+  - Live P2P gossip mesh status and interactive broadcast/shared pool sync controls.
+  - 9 REST API endpoints: `/api/health`, `/api/adrs`, `/api/drift`, `/api/cognition/why`, `/api/cognition/clusters`, `/api/cognition/debt`, `/api/sync/status`, `/api/sync/pool`, `/api/sync/broadcast`.
+- **Multi-Repo & Monorepo Cross-Project Mesh (`src/mesh/`)**:
+  - Workspace monorepo discovery (`src/mesh/discovery.ts`): auto-detects pnpm, npm, bun, lerna workspaces, and sibling git repositories.
+  - Explicit external repository linking via `.memory/mesh_links.json`.
+  - Cross-project memory query resolver (`src/mesh/resolver.ts`): queries memories across all package stores with origin package provenance tags (`[mesh:@scope/pkg]`).
+  - Shared invariant and working constraint propagation across the workspace mesh (`propagateConstraintToMesh`).
+  - Cross-package dependency contract and entrypoint export auditor (`src/mesh/contracts.ts`) validating cross-package imports and cross-repo code anchors.
+  - CLI command: `memory mesh` (`query`, `check`, `link`, `unlink`, `propagate`).
+  - MCP tools: `muse_mesh_status`, `muse_mesh_query`, `muse_mesh_audit`, `muse_mesh_link`.
+  - Studio panel: 🕸️ Monorepo Mesh tab with topology cards, package node grid, cross-project search, and contract audit table.
+
 ## [2.0.0] - 2026-09-03 — Autonomous Cognitive Engine Major Overhaul
 
 ### Summary
