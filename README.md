@@ -13,7 +13,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-498%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-497%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -24,7 +24,24 @@
 
 ---
 
-## 🚀 What's New in v2.1.0 & v2.0.0 (Autonomous Cognitive Engine, P2P Sync & Monorepo Mesh)
+## 🚀 What's New in v2.2.0, v2.1.0 & v2.0.0 (Impact Analysis, PR Context, Reconciler & Telemetry)
+
+### 💥 v2.2.0 Flagship Additions: Code Impact, PR Context & Cognitive Governance
+- **💥 Unified Code & Memory Impact Analysis (`memory code-impact`)**:
+  - Synthesizes AST code callers, affected test suites, linked memories, living ADRs, negative anti-patterns, and active constraints.
+  - Computes a composite Risk Score (0–100) and Risk Level (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) with pre-flight actionable recommendations before modifying code.
+  - Available via CLI `memory code-impact <file> [--symbol <name>]` and MCP tool `muse_code_impact`.
+- **📋 PR & Change Context Generator (`memory pr-context`)**:
+  - Automatically analyzes git diff against base branch, linking touched code anchors, respected ADRs, active project constraints, and blast radius.
+  - Generates rich GitHub-ready Markdown pull request descriptions with verification checklists and merge promotion proposals.
+  - Available via CLI `memory pr-context [--base main] [--out <file>]` and MCP tool `muse_pr_context`.
+- **⚓ Interactive Code Anchor Reconciler (`memory reconcile`)**:
+  - Audits code anchors across memories, pruning dead anchors, refreshing structural hashes for drifted code, and marking abandoned memories stale.
+  - Supports `--dry-run`, `--prune`, `--mark-stale`, `--update-hashes`, and MCP tool `muse_reconcile_anchors`.
+- **⚡ Repeatable Speed, Quality & ROI Benchmark Suite (`memory benchmark`)**:
+  - Measures microsecond in-process cache reads (P50 < 4µs), SQLite FTS5 BM25 search, knapsack token packing, contradiction rates, and compression ratios in a clean ASCII scoreboard.
+- **🧠 Complete Agent Skills Roster for v2.0–v2.2**:
+  - Added `.agents/skills/muse-health`, `muse-drift`, `muse-why`, `muse-sync`, and `muse-mesh`.
 
 ### 🌟 v2.1.0 Flagship Additions: Multi-Agent & Mesh Orchestration
 - **🤝 Cross-Agent Knowledge Sync & P2P Gossip Protocol (R14)**:
@@ -534,13 +551,18 @@ memory <command> [arguments] [flags]  # alias: musememory
 <details>
 <summary><b>🧠 Shipped Agent Skills (<code>.agents/skills/</code>)</b> — <i>Click to expand</i></summary>
 
-Muse Memory ships with 6 turnkey Agent Skills designed for coding agents (Claude Code, Cursor, Antigravity, OpenCode, Codex, Gemini CLI, etc.) under `.agents/skills/`:
+Muse Memory ships with 11 turnkey Agent Skills designed for coding agents (Claude Code, Cursor, Antigravity, OpenCode, Codex, Gemini CLI, etc.) under `.agents/skills/`:
 
 | Skill | Trigger Phase | Core Agent Responsibility |
 | :--- | :--- | :--- |
 | [`muse-ground`](.agents/skills/muse-ground/SKILL.md) | **Session Start** | Retrieves Top-$K$ relevant memories, active `USER.md` persona profile, and `CURRENT.md` constraints before writing code. |
 | [`muse-capture`](.agents/skills/muse-capture/SKILL.md) | **During Fixes & Refactors** | Captures atomic fix/architecture memories, validates evidence, runs Vibeguard secret scan, and supersedes obsolete knowledge. |
 | [`muse-current`](.agents/skills/muse-current/SKILL.md) | **Invariants & Handoffs** | Synchronizes hard constraints into `.memory/CURRENT.md` and persists structured handoffs across context resets. |
+| [`muse-health`](.agents/skills/muse-health/SKILL.md) | **Hardening Gates & PRs** | Evaluates 5-pillar architectural health (store, anchors, doc/code alignment, negative sentry, debt) and outputs remediation checklists. |
+| [`muse-drift`](.agents/skills/muse-drift/SKILL.md) | **System Architecture & ADRs** | Audits documentation $\longleftrightarrow$ code drift across 6 states, records living ADRs, and supersedes legacy architectural decisions. |
+| [`muse-why`](.agents/skills/muse-why/SKILL.md) | **Refactoring & Historical Context** | Reconstructs historical rationale, synthesizes past bug fixes and accepted trade-offs, and audits recurring bug friction clusters. |
+| [`muse-sync`](.agents/skills/muse-sync/SKILL.md) | **Multi-Agent & Swarm Gossip** | Coordinates cross-agent knowledge sync with whole-packet SHA-256 integrity, vector clocks, and P2P gossip mesh pool. |
+| [`muse-mesh`](.agents/skills/muse-mesh/SKILL.md) | **Monorepo & Multi-Repo Mesh** | Discovers monorepo workspaces, resolves cross-package memories with badges, and propagates shared security constraints. |
 | [`muse-graph`](.agents/skills/muse-graph/SKILL.md) | **AST Code Investigation** | Indexes `.codegraph`/`.graphify` symbols and queries symbol-matching decisions with `+0.2` graph overlap bonus. |
 | [`muse-wiki`](.agents/skills/muse-wiki/SKILL.md) | **Knowledge Compounding** | Compiles confirmed memories into Obsidian-compatible Markdown pages (`[[wikilinks]]`) and entity co-occurrence graphs. |
 | [`muse-brief`](.agents/skills/muse-brief/SKILL.md) | **Daily Hygiene & Loops** | Generates morning briefings, tracks 90/180-day staleness decay, and surfaces unresolved transcript commitments. |
@@ -578,7 +600,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 322 passed across 58 test files (1305 assertions)
+bun test          # 497 passed across 84 test files (2190 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```

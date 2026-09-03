@@ -64,3 +64,128 @@ export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
   console.log("");
   return report.gate_status === "FAIL" ? 1 : 0;
 }
+
+export async function handleReconcileCommand(parsed: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(parsed.flags);
+  if (!ctx) {
+    console.error("Error: Could not resolve project root or initialize .memory directory.");
+    return 1;
+  }
+  const { root, store } = ctx;
+
+  const prune = parsed.flags["prune"] === "true" || parsed.flags["p"] === "true";
+  const markStale = parsed.flags["mark-stale"] === "true" || parsed.flags["stale"] === "true";
+  const updateHashes = parsed.flags["update-hashes"] === "true";
+  const dryRun = parsed.flags["dry-run"] === "true" || (!prune && !markStale && !updateHashes);
+
+  const { reconcileCodeAnchors, formatReconcileReport } = await import("../health/index.ts");
+  const report = await reconcileCodeAnchors(store, {
+    prune,
+    markStale,
+    updateHashes,
+    dryRun,
+    workspaceRoot: root,
+  });
+
+  if (parsed.flags.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+
+  console.log(formatReconcileReport(report, dryRun));
+  return 0;
+}
+
+export async function handleBenchmarkCommand(parsed: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(parsed.flags);
+  if (!ctx) {
+    console.error("Error: Could not resolve project root or initialize .memory directory.");
+    return 1;
+  }
+  const { root, store } = ctx;
+
+  const iterations = parsed.flags["iterations"] ? parseInt(parsed.flags["iterations"], 10) : 30;
+  const query = parsed.positional[0] || (parsed.flags["query"] as string);
+  const tokenBudget = parsed.flags["budget"] ? parseInt(parsed.flags["budget"], 10) : undefined;
+
+  const { runMemoryBenchmark, formatBenchmarkScoreboard } = await import("../benchmark/index.ts");
+  const report = await runMemoryBenchmark(store, {
+    iterations,
+    query,
+    tokenBudget,
+    workspaceRoot: root,
+  });
+
+  if (parsed.flags.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+
+  console.log(formatBenchmarkScoreboard(report));
+  return 0;
+}
+
+export async function handleCodeImpactCommand(parsed: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(parsed.flags);
+  if (!ctx) {
+    console.error("Error: Could not resolve project root or initialize .memory directory.");
+    return 1;
+  }
+  const { root, store } = ctx;
+
+  const filePath = parsed.positional[0];
+  if (!filePath) {
+    console.error("Usage: memory code-impact <file> [--symbol <name>] [--json]");
+    return 1;
+  }
+  const symbolName = parsed.flags["symbol"] as string | undefined;
+
+  const { analyzeMemoryCodeImpact, formatImpactReport } = await import("../intelligence/index.ts");
+  const result = await analyzeMemoryCodeImpact(store, {
+    filePath,
+    symbolName,
+    workspaceRoot: root,
+  });
+
+  if (parsed.flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return result.risk === "CRITICAL" ? 1 : 0;
+  }
+
+  console.log(formatImpactReport(result));
+  return result.risk === "CRITICAL" ? 1 : 0;
+}
+
+export async function handlePrContextCommand(parsed: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(parsed.flags);
+  if (!ctx) {
+    console.error("Error: Could not resolve project root or initialize .memory directory.");
+    return 1;
+  }
+  const { root, store } = ctx;
+
+  const baseBranch = parsed.positional[0] || (parsed.flags["base"] as string) || "main";
+  const { generatePrContext } = await import("../compaction/index.ts");
+  const result = await generatePrContext(store, {
+    baseBranch,
+    workspaceRoot: root,
+  });
+
+  const outFile = parsed.flags["out"] as string | undefined;
+  if (outFile) {
+    const { writeFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    writeFileSync(resolve(root, outFile), result.bodyMarkdown, "utf8");
+    console.log(`[+] Wrote PR context description to ${outFile}`);
+    return 0;
+  }
+
+  if (parsed.flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return 0;
+  }
+
+  console.log(`\nPR Title: ${result.title}\n`);
+  console.log(result.bodyMarkdown);
+  return 0;
+}
