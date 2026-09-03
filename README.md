@@ -196,20 +196,6 @@ memory upgrade
 npx musememory upgrade
 ```
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  🧠 MUSE MEMORY · SYSTEM LEVEL-UP & RECOVERY MATRIX              │
-└──────────────────────────────────────────────────────────────────┘
-
-  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [1/5] Vibeguard Security & Credential Audit [OK]
-  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [2/5] Package Manager Sync (bun/npm) [OK]
-  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [3/5] Synaptic Storage & Schema Alignment [OK]
-  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [4/5] 80+ Agent Platforms & Skills Auto-Wiring [OK]
-  [━━━━━━━━━━━━━━━━━━━━ʕ•ᴥ•ʔ] 100% 🐾 [5/5] Cognitive Ascendance Complete [OK]
-
-🐾 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!
-```
-
 #### What `memory upgrade` automatically handles:
 1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
 2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
