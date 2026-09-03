@@ -11,6 +11,7 @@ import {
 } from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
+import { optimizeStore } from "../optimize.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
 import { collectLoops, renderLoops } from "../loops.ts";
 import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
@@ -358,6 +359,58 @@ export async function handleConsolidateCommand({ flags }: ParsedArgs): Promise<n
   for (const sk of report.skippedClusters) {
     console.log(`[skip] ${sk.reason}: ${sk.members.join(", ")}`);
   }
+  return 0;
+}
+
+export async function handleOptimizeCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+
+  const isDryRun = flags["dry-run"] === "true";
+  const force = flags["force"] !== "false";
+  const project = flags["project"];
+
+  console.log(`\n====================================================`);
+  console.log(`  ⚡ Muse Memory Optimizer ${isDryRun ? "(DRY-RUN)" : ""}`);
+  console.log(`====================================================`);
+  if (project) console.log(`Scope: Project '${project}'`);
+  console.log(`Store: ${ctx.memoryDir}\n`);
+
+  const report = optimizeStore(ctx.store, {
+    project,
+    dryRun: isDryRun,
+    force,
+    memoryDir: ctx.memoryDir,
+  });
+
+  if (report.skippedReason) {
+    console.log(`ℹ️  Optimization skipped: ${report.skippedReason}`);
+    console.log(`Tip: Pass --force to run immediately regardless of cadence.`);
+    return 0;
+  }
+
+  const formatBytes = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
+
+  console.log(`Results:`);
+  console.log(`  - Pruned Test Noise:     ${report.prunedNoise} items`);
+  console.log(`  - Pruned Junk Fragments: ${report.prunedJunk} items`);
+  console.log(`  - Pruned Duplicates:     ${report.prunedDuplicates} items`);
+  console.log(`  -----------------------------------------`);
+  console.log(`  - Total Items Pruned:    ${report.totalPruned} items`);
+  console.log(`  - Total Before:          ${report.totalBefore} items`);
+  console.log(`  - Total After:           ${report.totalAfter} items`);
+  if (report.spaceReclaimedBytes > 0) {
+    console.log(`  - Storage Reclaimed:     ${formatBytes(report.spaceReclaimedBytes)}`);
+  }
+  if (report.vacuumExecuted) {
+    console.log(`  - SQLite Vacuum:         Executed (Defragmented)`);
+  }
+  console.log(`  - Duration:              ${report.durationMs}ms\n`);
+  console.log(`✅ Optimization successfully completed.`);
   return 0;
 }
 

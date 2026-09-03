@@ -359,6 +359,44 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      if (pathname === "/api/optimize" && req.method === "POST") {
+        try {
+          const { optimizeStore } = await import("./optimize.ts");
+          const body = await parseJsonBody(req);
+          const report = optimizeStore(opts.store, {
+            memoryDir: opts.memoryDir,
+            project: body.project ? String(body.project) : undefined,
+            dryRun: body.dryRun === true,
+            force: body.force !== false,
+          });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, report }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+        return;
+      }
+
+      if (pathname === "/api/optimize/status" && req.method === "GET") {
+        try {
+          const { readOptimizationMetadata, shouldAutoOptimize } = await import("./optimize.ts");
+          const meta = readOptimizationMetadata(opts.memoryDir);
+          const autoCheck = shouldAutoOptimize(opts.memoryDir);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: true,
+            meta,
+            shouldAutoOptimize: autoCheck.shouldRun,
+            autoOptimizeReason: autoCheck.reason,
+          }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+        return;
+      }
+
       const workspaceRoot = opts.store.layout?.root || getStorageLayout(opts.memoryDir).root;
 
       // R15: Project Health Gate Endpoint
@@ -890,6 +928,10 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         <span class="refresh-icon" id="refreshIcon">🔄</span>
         <span id="refreshLabel">Refresh</span>
       </button>
+      <button class="btn-icon btn-optimize" id="optimizeBtn" onclick="optimizeStoreDashboard()" title="Clean test noise, prune junk, deduplicate candidates, and defragment SQLite storage">
+        <span class="optimize-icon" id="optimizeIcon">⚡</span>
+        <span id="optimizeLabel">Optimize</span>
+      </button>
       <div class="status-badge"><div class="status-dot"></div>[LIVE] Active</div>
       <button class="btn-icon" onclick="exportDataHtml()">⬇ Export HTML</button>
     </div>
@@ -1347,6 +1389,40 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       } finally {
         if (icon) icon.classList.remove('spinning');
         if (label) label.textContent = 'Refresh';
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function optimizeStoreDashboard() {
+      const icon = document.getElementById('optimizeIcon');
+      const label = document.getElementById('optimizeLabel');
+      const btn = document.getElementById('optimizeBtn');
+      if (icon) icon.classList.add('spinning');
+      if (label) label.textContent = 'Optimizing...';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Optimization failed');
+        const rep = data.report;
+        await loadData();
+        const formatBytes = (b) => {
+          if (b >= 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+          if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+          return b + ' B';
+        };
+        const spaceMsg = rep.spaceReclaimedBytes > 0 ? ' Reclaimed ' + formatBytes(rep.spaceReclaimedBytes) + '.' : '';
+        flash('⚡ Optimization Complete! Pruned ' + rep.totalPruned + ' items (' + rep.prunedNoise + ' noise, ' + rep.prunedJunk + ' junk, ' + rep.prunedDuplicates + ' dupes).' + spaceMsg);
+      } catch (err) {
+        flash('Optimization failed: ' + (err && err.message ? err.message : String(err)), true);
+      } finally {
+        if (icon) icon.classList.remove('spinning');
+        if (label) label.textContent = 'Optimize';
         if (btn) btn.disabled = false;
       }
     }

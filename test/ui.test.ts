@@ -213,6 +213,26 @@ describe("embedded web UI server", () => {
     const meshAudit = await meshAuditRes.json();
     expect(meshAudit).toHaveProperty("total_contracts_checked");
 
+    // 9. Test Optimize Button and Endpoints
+    expect(html).toContain('id="optimizeBtn"');
+    expect(html).toContain("optimizeStoreDashboard()");
+
+    const optRes = await fetch(`http://localhost:${srv.port}/api/optimize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force: true, dryRun: true }),
+    });
+    expect(optRes.status).toBe(200);
+    const optData = await optRes.json();
+    expect(optData.success).toBe(true);
+    expect(optData.report).toHaveProperty("totalPruned");
+
+    const optStatusRes = await fetch(`http://localhost:${srv.port}/api/optimize/status`);
+    expect(optStatusRes.status).toBe(200);
+    const optStatus = await optStatusRes.json();
+    expect(optStatus.success).toBe(true);
+    expect(optStatus).toHaveProperty("shouldAutoOptimize");
+
     srv.close();
     cleanup(root);
   });

@@ -50,6 +50,7 @@ import {
   handleStatsCommand,
   handleStaleCommand,
   handleConsolidateCommand,
+  handleOptimizeCommand,
   handleTraceCommand,
   handleLoopsCommand,
   handleNudgeCommand,
@@ -102,6 +103,7 @@ Core Memory Lifecycle Commands:
   stats                         Display total memory counts and status/type distribution
   stale [--days N]              List entries exceeding staleness policy
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
+  optimize [--dry-run] [--project P] [--force] Prune test noise, junk, duplicates & vacuum SQLite DB
   trace <id> [--depth N]        Walk causal graph pathways from an entry (default depth 5)
   loops                         Prioritized open-loop report: git state, stale candidates, constraints
   nudge                         Proactive attention list: overdue/due-soon entries, stale-by-policy, open loops
@@ -280,6 +282,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleStaleCommand(parsed);
     case "consolidate":
       return handleConsolidateCommand(parsed);
+    case "optimize":
+      return handleOptimizeCommand(parsed);
     case "trace":
       return handleTraceCommand(parsed);
     case "loops":

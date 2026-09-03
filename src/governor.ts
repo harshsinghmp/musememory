@@ -22,9 +22,20 @@ export interface SessionHandoff {
   discoveries?: string[];
 }
 
+export interface AgentWorkstream {
+  agent: string;
+  sessionId?: string;
+  task: string;
+  targetScope?: string;
+  status: "IN-PROGRESS" | "BLOCKED" | "COMPLETED" | "WAITING_REVIEW" | "PAUSED";
+  lastActive: string;
+  lastInstruction?: string;
+}
+
 export interface CurrentFileData {
   constraints: string[];
   handoff: SessionHandoff | null;
+  workstreams?: AgentWorkstream[];
 }
 
 export function currentFilePath(memoryDir: string): string {
@@ -33,42 +44,101 @@ export function currentFilePath(memoryDir: string): string {
 
 export function parseCurrentFile(memoryDir: string): CurrentFileData {
   const p = currentFilePath(memoryDir);
-  if (!existsSync(p)) return { constraints: [], handoff: null };
+  if (!existsSync(p)) return { constraints: [], handoff: null, workstreams: [] };
 
   const raw = readFileSync(p, "utf8");
   const lines = raw.split("\n");
 
   const constraints: string[] = [];
+  const workstreams: AgentWorkstream[] = [];
   let inConstraintsSection = false;
   let inHandoffSection = false;
+  let inWorkstreamsSection = false;
   const handoffLines: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("## Active Working Invariants") || trimmed.startsWith("## Active Constraints")) {
+    if (
+      trimmed.startsWith("## Active Working Invariants") ||
+      trimmed.startsWith("## Active Working Constraints") ||
+      trimmed.startsWith("## Active Constraints") ||
+      trimmed.startsWith("## 🔒 Active Working Invariants")
+    ) {
       inConstraintsSection = true;
       inHandoffSection = false;
+      inWorkstreamsSection = false;
       continue;
     }
-    if (trimmed.startsWith("## Active Work In Progress") || trimmed.startsWith("## In-Flight Session State") || trimmed.startsWith("## Session Handoff")) {
+    if (
+      trimmed.startsWith("## 🤖 Active Concurrent Agent Workstreams") ||
+      trimmed.startsWith("## Concurrent Agent Workstreams") ||
+      trimmed.startsWith("## Active Workstreams")
+    ) {
+      inConstraintsSection = false;
+      inHandoffSection = false;
+      inWorkstreamsSection = true;
+      continue;
+    }
+    if (
+      trimmed.startsWith("## Active Work In Progress") ||
+      trimmed.startsWith("## In-Flight Session State") ||
+      trimmed.startsWith("## Session Handoff") ||
+      trimmed.startsWith("## ⚡ Active Work In Progress")
+    ) {
       inConstraintsSection = false;
       inHandoffSection = true;
+      inWorkstreamsSection = false;
       continue;
     }
-    if (trimmed.startsWith("# ")) {
+    if (trimmed.startsWith("# ") || trimmed.startsWith("> ") || trimmed.startsWith("---")) {
       continue;
     }
 
-    if (inHandoffSection) {
-      handoffLines.push(line);
-    } else if (inConstraintsSection) {
-      if (trimmed.length > 0 && !trimmed.startsWith("#") && !trimmed.startsWith("*(") && !trimmed.startsWith("(*")) {
-        constraints.push(trimmed.replace(/^-\s+/, ""));
+    if (inWorkstreamsSection) {
+      if (trimmed.startsWith("##")) {
+        inWorkstreamsSection = false;
+      } else if (trimmed.startsWith("|")) {
+        const cells = trimmed.split("|").map((c) => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+        if (cells.length >= 3 && !cells[0].includes("---") && !cells[1].toLowerCase().includes("status")) {
+          const agent = cells[0].replace(/[`*]/g, "").trim();
+          const statusRaw = cells[1].replace(/[\[\]`*]/g, "").trim().toUpperCase();
+          const status = (statusRaw === "COMPLETED" || statusRaw === "BLOCKED" || statusRaw === "WAITING_REVIEW" ? statusRaw : "IN-PROGRESS") as any;
+          const task = cells[2].trim();
+          const scope = cells[3] ? cells[3].replace(/[`*()]/g, "").trim() : undefined;
+          const lastActive = cells[4] ? cells[4].trim() : new Date().toISOString();
+          if (agent && task) {
+            workstreams.push({
+              agent,
+              status,
+              task,
+              targetScope: scope && scope !== "all" ? scope : undefined,
+              lastActive,
+            });
+          }
+        }
       }
-    } else if (!inConstraintsSection && !inHandoffSection) {
-      // Flat legacy format
-      if (trimmed.length > 0 && !trimmed.startsWith("#") && !trimmed.startsWith("*(") && !trimmed.startsWith("(*")) {
-        constraints.push(trimmed.replace(/^-\s+/, ""));
+    } else if (inHandoffSection) {
+      if (trimmed.startsWith("##")) {
+        inHandoffSection = false;
+      } else {
+        handoffLines.push(line);
+      }
+    } else if (inConstraintsSection) {
+      if (trimmed.startsWith("##")) {
+        inConstraintsSection = false;
+      } else if (trimmed.length > 0 && !trimmed.startsWith("#") && !trimmed.startsWith("*(") && !trimmed.startsWith("(*")) {
+        const cleaned = trimmed.replace(/^-\s+/, "");
+        if (isValidConstraintLine(cleaned)) {
+          constraints.push(cleaned);
+        }
+      }
+    } else if (!inConstraintsSection && !inHandoffSection && !inWorkstreamsSection) {
+      // Flat legacy format (only active if file has zero H2 sections)
+      const hasSections = lines.some((l) => l.trim().startsWith("## "));
+      if (!hasSections && trimmed.length > 0 && !trimmed.startsWith("#") && !trimmed.startsWith("*(") && !trimmed.startsWith("(*") && !trimmed.startsWith("|")) {
+        if (isValidConstraintLine(trimmed)) {
+          constraints.push(trimmed.replace(/^-\s+/, ""));
+        }
       }
     }
   }
@@ -129,17 +199,23 @@ export function parseCurrentFile(memoryDir: string): CurrentFileData {
     }
   }
 
-  return { constraints, handoff };
+  return { constraints, handoff, workstreams };
 }
 
 export function writeCurrentFile(memoryDir: string, data: CurrentFileData): void {
   const p = currentFilePath(memoryDir);
   mkdirSync(memoryDir, { recursive: true });
 
-  const parts: string[] = ["# Active Project Constraints & In-Flight Context\n"];
+  const parts: string[] = [
+    "# Active Project Constraints & In-Flight Context\n",
+    "> **Operational Guidelines**:",
+    "> - **For Humans**: Single-pane executive summary of active hard constraints and in-flight agent tasks. Zero verbose logs or transient filler.",
+    "> - **For AI Agents**: Mandatory grounding rules (never violate active constraints) and concurrent workstream awareness (check what other agents are touching before editing files).\n",
+    "---\n",
+  ];
 
   // 1. Invariants & Constraints Section
-  parts.push("## Active Working Invariants & Hard Constraints");
+  parts.push("## 🔒 Active Working Invariants & Hard Constraints");
   if (data.constraints.length === 0) {
     parts.push("*(No active hard constraints)*\n");
   } else {
@@ -149,9 +225,22 @@ export function writeCurrentFile(memoryDir: string, data: CurrentFileData): void
     parts.push("");
   }
 
-  // 2. Real-Time Handoff Section
+  // 2. Multi-Agent Concurrent Workstreams Section
+  if (data.workstreams && data.workstreams.length > 0) {
+    parts.push("## 🤖 Active Concurrent Agent Workstreams");
+    parts.push("| Agent / Session ID | Status | Active Task | Target Scope / Files | Last Active |");
+    parts.push("| :--- | :--- | :--- | :--- | :--- |");
+    for (const ws of data.workstreams) {
+      const statusTag = `[${ws.status || "IN-PROGRESS"}]`;
+      const scope = ws.targetScope ? `\`${ws.targetScope}\`` : "*(all)*";
+      parts.push(`| \`${ws.agent}\` | ${statusTag} | ${ws.task} | ${scope} | ${ws.lastActive} |`);
+    }
+    parts.push("");
+  }
+
+  // 3. Real-Time Handoff Section
   if (data.handoff) {
-    parts.push("## Active Work In Progress (Real-Time Session Handoff)");
+    parts.push("## ⚡ Active Work In Progress (Real-Time Session Handoff)");
     parts.push(`- **Status**: [${data.handoff.status}]`);
     if (data.handoff.agent) parts.push(`- **Active Agent**: ${data.handoff.agent}`);
     if (data.handoff.sessionId) parts.push(`- **Session ID**: ${data.handoff.sessionId}`);
@@ -202,12 +291,86 @@ export function updateSessionHandoff(memoryDir: string, update: Partial<SessionH
     discoveries: discoveriesMerged,
   };
 
+  const workstreams = current.workstreams ? [...current.workstreams] : [];
+  if (updated.agent && (updated.task || updated.lastQuery)) {
+    const wsIdx = workstreams.findIndex(
+      (w) => (updated.sessionId && w.sessionId === updated.sessionId) || w.agent.toLowerCase() === updated.agent!.toLowerCase(),
+    );
+    const wsEntry: AgentWorkstream = {
+      agent: updated.agent,
+      sessionId: updated.sessionId,
+      task: updated.task || updated.lastQuery || "Active task",
+      status: updated.status || "IN-PROGRESS",
+      lastActive: now,
+      lastInstruction: updated.lastQuery,
+    };
+    if (wsIdx >= 0) {
+      workstreams[wsIdx] = { ...workstreams[wsIdx], ...wsEntry };
+    } else {
+      workstreams.push(wsEntry);
+    }
+  }
+
   writeCurrentFile(memoryDir, {
     constraints: current.constraints,
     handoff: updated,
+    workstreams,
   });
 
   return updated;
+}
+
+export function registerAgentWorkstream(
+  memoryDir: string,
+  workstream: {
+    agent: string;
+    sessionId?: string;
+    task: string;
+    targetScope?: string;
+    status?: "IN-PROGRESS" | "BLOCKED" | "COMPLETED" | "WAITING_REVIEW";
+    lastActive?: string;
+    lastInstruction?: string;
+  },
+): AgentWorkstream[] {
+  const current = parseCurrentFile(memoryDir);
+  const now = new Date().toISOString();
+  const workstreams = current.workstreams ? [...current.workstreams] : [];
+
+  const entry: AgentWorkstream = {
+    agent: workstream.agent,
+    sessionId: workstream.sessionId,
+    task: workstream.task,
+    targetScope: workstream.targetScope,
+    status: workstream.status || "IN-PROGRESS",
+    lastActive: workstream.lastActive || now,
+    lastInstruction: workstream.lastInstruction,
+  };
+
+  const idx = workstreams.findIndex(
+    (w) =>
+      (entry.sessionId && w.sessionId === entry.sessionId) ||
+      w.agent.toLowerCase() === entry.agent.toLowerCase(),
+  );
+
+  if (idx >= 0) {
+    workstreams[idx] = { ...workstreams[idx], ...entry, lastActive: now };
+  } else {
+    workstreams.push(entry);
+  }
+
+  // Prune completed workstreams older than 48 hours
+  const nowMs = Date.now();
+  const pruned = workstreams.filter((w) => {
+    if (w.status === "COMPLETED") {
+      const activeMs = Date.parse(w.lastActive) || 0;
+      return (nowMs - activeMs) < 48 * 3600 * 1000;
+    }
+    return true;
+  });
+
+  current.workstreams = pruned;
+  writeCurrentFile(memoryDir, current);
+  return pruned;
 }
 
 export function getSessionHandoff(memoryDir: string): SessionHandoff | null {
@@ -223,6 +386,14 @@ export function markSessionCompleted(memoryDir: string, summary?: string): void 
   current.handoff.updatedAt = now;
   if (summary) {
     current.handoff.task = `[COMPLETED] ${summary}`;
+  }
+  if (current.workstreams && current.handoff.agent) {
+    const ws = current.workstreams.find((w) => w.agent.toLowerCase() === current.handoff!.agent!.toLowerCase());
+    if (ws) {
+      ws.status = "COMPLETED";
+      ws.lastActive = now;
+      if (summary) ws.task = `[COMPLETED] ${summary}`;
+    }
   }
   writeCurrentFile(memoryDir, current);
 }
@@ -243,6 +414,19 @@ export function setCurrent(memoryDir: string, text: string, project = "default")
   return current.constraints;
 }
 
+export function isValidConstraintLine(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 5 || trimmed.length > 300) return false;
+  if (trimmed.includes("\n")) return false;
+  if (/expect\(/i.test(trimmed) || /Ran\s+\d+\s+tests/i.test(trimmed)) return false;
+  if (trimmed.startsWith("Showing lines") || trimmed.startsWith("Created At:") || trimmed.startsWith("File Path:")) return false;
+  if (trimmed.startsWith("MODEL PLANNER_RESPONSE") || trimmed.startsWith("</SYSTEM_MESSAGE>")) return false;
+  if (trimmed.includes("<truncated") || trimmed.includes("User: That worked")) return false;
+  if (trimmed.startsWith("total ") || /^\d+:\s+/.test(trimmed) || /^\d+\s*\|\s*/.test(trimmed)) return false;
+  if (trimmed.startsWith("The following code has been modified") || trimmed.startsWith("The above content does NOT")) return false;
+  return true;
+}
+
 export function syncConstraints(memoryDir: string, store: Store, pruneContents: string[] = []): string[] {
   const entries = list(store);
   const activeConstraintMemories = entries.filter((e) => e.type === "constraint" && (e.status === "active" || e.status === "confirmed"));
@@ -255,9 +439,14 @@ export function syncConstraints(memoryDir: string, store: Store, pruneContents: 
   const current = parseCurrentFile(memoryDir);
 
   const keptManual: string[] = [];
+  const seenNorms = new Set<string>();
   for (const c of current.constraints) {
+    if (!isValidConstraintLine(c)) continue;
     if (pruneContents.some((p) => c.includes(p))) continue;
     if (inactiveConstraintContents.some((ic) => ic.length > 0 && (c.includes(ic) || ic.includes(c)))) continue;
+    const norm = c.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (seenNorms.has(norm)) continue;
+    seenNorms.add(norm);
     keptManual.push(c);
   }
 
@@ -265,8 +454,24 @@ export function syncConstraints(memoryDir: string, store: Store, pruneContents: 
 
   for (const m of activeConstraintMemories) {
     const rawContent = m.content.trim();
-    if (!resultConstraints.some((c) => c.includes(rawContent))) {
-      const stamp = `[${m.created_at || new Date().toISOString()}] (${m.project}) ${rawContent}`;
+    if (rawContent.length < 5) continue;
+
+    let constraintText = rawContent;
+    if (rawContent.includes("\n") || rawContent.length > 300) {
+      const firstLine = rawContent.split("\n")[0].trim().replace(/^[-*#0-9.:\s|]+/, "");
+      constraintText =
+        firstLine.length >= 10 && firstLine.length <= 300
+          ? firstLine
+          : m.title.replace(/^[-*#0-9.:\s|]+/, "").slice(0, 200).trim();
+    }
+
+    const norm = constraintText.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (
+      constraintText.length >= 5 &&
+      isValidConstraintLine(constraintText) &&
+      !resultConstraints.some((c) => c.toLowerCase().replace(/[^a-z0-9]/g, "").includes(norm))
+    ) {
+      const stamp = `[${m.created_at || new Date().toISOString()}] (${m.project}) ${constraintText}`;
       resultConstraints.push(stamp);
     }
   }
@@ -274,6 +479,7 @@ export function syncConstraints(memoryDir: string, store: Store, pruneContents: 
   writeCurrentFile(memoryDir, {
     constraints: resultConstraints,
     handoff: current.handoff,
+    workstreams: current.workstreams,
   });
 
   return resultConstraints;
@@ -579,6 +785,21 @@ export class WorkspaceGovernor {
 
   static checkpointSession(memoryDir: string, update: Partial<SessionHandoff>): SessionHandoff {
     return updateSessionHandoff(memoryDir, update);
+  }
+
+  static registerWorkstream(
+    memoryDir: string,
+    workstream: {
+      agent: string;
+      sessionId?: string;
+      task: string;
+      targetScope?: string;
+      status?: "IN-PROGRESS" | "BLOCKED" | "COMPLETED" | "WAITING_REVIEW";
+      lastActive?: string;
+      lastInstruction?: string;
+    },
+  ): AgentWorkstream[] {
+    return registerAgentWorkstream(memoryDir, workstream);
   }
 
   static completeSession(memoryDir: string, summary?: string): void {

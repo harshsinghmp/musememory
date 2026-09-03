@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
 import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
+import { parseCurrentFile } from "../governor.ts";
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import type { MuseContextInput, FusedContextResult } from "./types.ts";
 
@@ -41,20 +42,31 @@ export async function resolveMuseContext(
   // 2. Active Constraints & CURRENT.md
   const activeConstraints: Array<{ id: string; title: string; content: string }> = [];
   
-  // Try loading CURRENT.md constraints
+  // Try loading CURRENT.md constraints & concurrent workstreams
   if (store.memoryDir) {
-    const currentPath = join(store.memoryDir, "CURRENT.md");
-    if (existsSync(currentPath)) {
-      const currentMd = readFileSync(currentPath, "utf8");
-      const constraintMatch = currentMd.match(/## Active Working Constraints & Open Loops([\s\S]*?)(?:##|$)/);
-      if (constraintMatch && constraintMatch[1].trim()) {
+    try {
+      const currentData = parseCurrentFile(store.memoryDir);
+      if (currentData.constraints.length > 0) {
         activeConstraints.push({
           id: "current_md_constraints",
           title: "Session Working Constraints",
-          content: constraintMatch[1].trim(),
+          content: currentData.constraints.join("\n"),
         });
       }
-    }
+      if (currentData.workstreams && currentData.workstreams.length > 0) {
+        const activeWs = currentData.workstreams.filter((w) => w.status === "IN-PROGRESS" || w.status === "BLOCKED");
+        if (activeWs.length > 0) {
+          const wsSummary = activeWs
+            .map((w) => `- Agent \`${w.agent}\` [${w.status}]: ${w.task}${w.targetScope ? ` (Scope: ${w.targetScope})` : ""}`)
+            .join("\n");
+          activeConstraints.push({
+            id: "concurrent_workstreams",
+            title: "Active Concurrent Agent Workstreams",
+            content: wsSummary,
+          });
+        }
+      }
+    } catch {}
   }
 
   // Also query store for timeless or active constraints

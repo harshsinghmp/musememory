@@ -277,7 +277,8 @@ export type AuditOperation =
   | "anchor_reconciled"
   | "adr_recorded"
   | "adr_superseded"
-  | "drift_detected";
+  | "drift_detected"
+  | "optimize";
 
 export interface AuditEntry {
   timestamp: string;

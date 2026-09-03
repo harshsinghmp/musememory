@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { getCurrent, syncConstraints, getSessionHandoff } from "./governor.ts";
+import { getCurrent, syncConstraints, getSessionHandoff, parseCurrentFile } from "./governor.ts";
 import { listWikiPages } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
@@ -363,6 +363,19 @@ export function formatPromptContext(
       parts.push(`- ${c}`);
     }
     parts.push("");
+  }
+
+  const currentData = memoryDir ? parseCurrentFile(memoryDir) : null;
+  if (currentData?.workstreams && currentData.workstreams.length > 0) {
+    const activeWs = currentData.workstreams.filter((w) => w.status === "IN-PROGRESS" || w.status === "BLOCKED");
+    if (activeWs.length > 0) {
+      parts.push("### Active Concurrent Agent Workstreams (CURRENT.md)");
+      for (const w of activeWs) {
+        const scope = w.targetScope ? ` | Target: \`${w.targetScope}\`` : "";
+        parts.push(`- Agent \`${w.agent}\` [${w.status}]: ${w.task}${scope} (Active: ${w.lastActive})`);
+      }
+      parts.push("");
+    }
   }
 
   const handoff = memoryDir ? getSessionHandoff(memoryDir) : null;

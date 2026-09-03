@@ -48,4 +48,46 @@ describe("WorkspaceGovernor Engine", () => {
 
     cleanup(root);
   });
+
+  test("manages concurrent agent workstreams in CURRENT.md across multiple agents", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    // Agent 1 registers
+    WorkspaceGovernor.registerWorkstream(memoryDir, {
+      agent: "Agent-Sol",
+      sessionId: "session-1",
+      task: "Next.js API Rate Limiter",
+      targetScope: "src/api/rate-limit.ts",
+      status: "IN-PROGRESS",
+    });
+
+    // Agent 2 registers simultaneously
+    WorkspaceGovernor.registerWorkstream(memoryDir, {
+      agent: "Agent-Nexus",
+      sessionId: "session-2",
+      task: "Database WAL Concurrency Audit",
+      targetScope: "src/sqlite.ts",
+      status: "IN-PROGRESS",
+    });
+
+    const state = WorkspaceGovernor.getActiveState(store, memoryDir);
+    expect(state.workstreams?.length).toBe(2);
+    expect(state.workstreams?.find((w) => w.agent === "Agent-Sol")?.task).toBe("Next.js API Rate Limiter");
+    expect(state.workstreams?.find((w) => w.agent === "Agent-Nexus")?.targetScope).toBe("src/sqlite.ts");
+
+    // Agent 1 marks task completed
+    WorkspaceGovernor.registerWorkstream(memoryDir, {
+      agent: "Agent-Sol",
+      sessionId: "session-1",
+      task: "Next.js API Rate Limiter",
+      status: "COMPLETED",
+    });
+
+    const updatedState = WorkspaceGovernor.getActiveState(store, memoryDir);
+    const solWs = updatedState.workstreams?.find((w) => w.agent === "Agent-Sol");
+    expect(solWs?.status).toBe("COMPLETED");
+
+    cleanup(root);
+  });
 });
