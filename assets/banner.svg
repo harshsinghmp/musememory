@@ -1,0 +1,316 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060911" />
+      <stop offset="35%" stop-color="#0b1120" />
+      <stop offset="70%" stop-color="#090d1a" />
+      <stop offset="100%" stop-color="#04060a" />
+    </linearGradient>
+
+    <!-- Typography Gradients -->
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#fde68a" />
+      <stop offset="75%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Glowing Accents -->
+    <linearGradient id="amberGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="1" />
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.8" />
+    </linearGradient>
+
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="1" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.8" />
+    </linearGradient>
+
+    <linearGradient id="purpleGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6" />
+    </linearGradient>
+
+    <linearGradient id="emeraldGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.6" />
+    </linearGradient>
+
+    <linearGradient id="pillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9" />
+    </linearGradient>
+
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.6" />
+      <stop offset="30%" stop-color="#38bdf8" stop-opacity="0.3" />
+      <stop offset="70%" stop-color="#818cf8" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.4" />
+    </linearGradient>
+
+    <!-- Filters for Bloom & Glow -->
+    <filter id="bloom-strong" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur1" />
+      <feGaussianBlur stdDeviation="16" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="bloom-subtle" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Ambient Lighting Nodes -->
+    <radialGradient id="ambientAmber" cx="80%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.16" />
+      <stop offset="50%" stop-color="#d97706" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="ambientCyan" cx="68%" cy="75%" r="45%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.14" />
+      <stop offset="60%" stop-color="#0369a1" stop-opacity="0.02" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Subtle Technical Dot/Grid Pattern -->
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#1e293b" stroke-width="0.8" stroke-opacity="0.35" />
+      <circle cx="32" cy="0" r="1" fill="#475569" fill-opacity="0.3" />
+    </pattern>
+  </defs>
+
+  <!-- Canvas Container -->
+  <rect x="0" y="0" width="1200" height="440" rx="16" fill="url(#bgGrad)" />
+  
+  <!-- Subtle Grid Texture -->
+  <rect x="0" y="0" width="1200" height="440" rx="16" fill="url(#grid)" />
+
+  <!-- Ambient Light Orbs -->
+  <rect x="450" y="0" width="750" height="440" fill="url(#ambientAmber)" rx="16" />
+  <rect x="350" y="0" width="850" height="440" fill="url(#ambientCyan)" rx="16" />
+
+  <!-- Outer Luminous Border -->
+  <rect x="1.5" y="1.5" width="1197" height="437" rx="15" fill="none" stroke="url(#borderGrad)" stroke-width="1.5" />
+
+  <!-- ==================== LEFT COLUMN: BRAND & HERO HEADLINE ==================== -->
+  <g transform="translate(68, 0)">
+    
+    <!-- Top Meta Tag / Status Ribbon -->
+    <g transform="translate(0, 48)">
+      <rect x="0" y="0" width="375" height="28" rx="14" fill="#0f172a" fill-opacity="0.8" stroke="#f59e0b" stroke-opacity="0.4" stroke-width="1" />
+      <circle cx="15" cy="14" r="4.5" fill="#f59e0b" filter="url(#bloom-subtle)" />
+      <circle cx="15" cy="14" r="2" fill="#ffffff" />
+      <text x="28" y="18.5" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">COGNITIVE MEMORY ENGINE · v2.2.0</text>
+      <line x1="285" y1="7" x2="285" y2="21" stroke="#334155" stroke-width="1" />
+      <text x="296" y="18.5" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="10.5" font-weight="600" letter-spacing="0.5">LOCAL-FIRST</text>
+    </g>
+
+    <!-- Main Title -->
+    <g transform="translate(0, 134)">
+      <text x="0" y="0" fill="url(#titleGrad)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="54" font-weight="900" letter-spacing="-1.2">MUSE MEMORY</text>
+    </g>
+
+    <!-- Value Proposition / Tagline -->
+    <g transform="translate(0, 175)">
+      <text x="0" y="0" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="19" font-weight="600" letter-spacing="-0.2">
+        Autonomous, Persistent Knowledge for AI Coding Agents
+      </text>
+      <text x="0" y="27" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="14" font-weight="400" letter-spacing="0.1">
+        Eliminate agent amnesia. Zero-daemon local SQLite + Markdown engine with
+      </text>
+      <text x="0" y="50" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="14" font-weight="400" letter-spacing="0.1">
+        living ADR sentries, AST code graph anchors, and P2P vector gossip mesh.
+      </text>
+    </g>
+
+    <!-- Architecture Badges with Crisp Vector Icons -->
+    <g transform="translate(0, 276)">
+      
+      <!-- Pill 1: Zero-Daemon -->
+      <g transform="translate(0, 0)">
+        <rect width="144" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="144" height="36" rx="8" fill="none" stroke="#f59e0b" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Bolt Icon -->
+        <path d="M 21 11 L 13 21 L 18 21 L 16 27 L 24 17 L 19 17 Z" fill="#f59e0b" filter="url(#bloom-subtle)" />
+        <text x="32" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">Zero-Daemon</text>
+      </g>
+
+      <!-- Pill 2: Dual-Scope SQLite -->
+      <g transform="translate(154, 0)">
+        <rect width="170" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="170" height="36" rx="8" fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Database Icon -->
+        <g transform="translate(14, 11)" stroke="#38bdf8" stroke-width="1.5" fill="none" stroke-linecap="round">
+          <ellipse cx="6" cy="3" rx="6" ry="2" />
+          <path d="M 0 3 v 4 c 0 1.1 2.7 2 6 2 s 6 -0.9 6 -2 v -4" />
+          <path d="M 0 7 v 4 c 0 1.1 2.7 2 6 2 s 6 -0.9 6 -2 v -4" />
+        </g>
+        <text x="34" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">Dual-Scope SQLite</text>
+      </g>
+
+      <!-- Pill 3: AST CodeGraph -->
+      <g transform="translate(334, 0)">
+        <rect width="162" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="162" height="36" rx="8" fill="none" stroke="#c084fc" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Graph / AST Tree Icon -->
+        <g transform="translate(13, 11)" stroke="#c084fc" stroke-width="1.5" fill="none">
+          <circle cx="8" cy="2" r="2" fill="#c084fc" />
+          <circle cx="3" cy="12" r="2" fill="#c084fc" />
+          <circle cx="13" cy="12" r="2" fill="#c084fc" />
+          <path d="M 8 4 L 3 10 M 8 4 L 13 10" />
+        </g>
+        <text x="35" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">AST CodeGraph</text>
+      </g>
+
+      <!-- Row 2 -->
+      <!-- Pill 4: Vibeguard Defense -->
+      <g transform="translate(0, 46)">
+        <rect width="166" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="166" height="36" rx="8" fill="none" stroke="#ef4444" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Shield Icon -->
+        <g transform="translate(14, 11)" stroke="#ef4444" stroke-width="1.5" fill="none" stroke-linejoin="round">
+          <path d="M 6 0 L 12 2.5 v 4 c 0 4 -3 6.5 -6 7.5 c -3 -1 -6 -3.5 -6 -7.5 v -4 Z" />
+          <path d="M 4 7 L 5.5 8.5 L 8.5 5.5" stroke-width="1.3" />
+        </g>
+        <text x="34" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">Vibeguard Defense</text>
+      </g>
+
+      <!-- Pill 5: P2P Gossip Sync -->
+      <g transform="translate(176, 46)">
+        <rect width="158" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="158" height="36" rx="8" fill="none" stroke="#34d399" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Refresh / Sync Arrows Icon -->
+        <g transform="translate(14, 11)" stroke="#34d399" stroke-width="1.5" fill="none" stroke-linecap="round">
+          <path d="M 12 6 A 5 5 0 0 0 2 6" />
+          <path d="M 2 2 v 4 h 4" />
+          <path d="M 0 8 A 5 5 0 0 0 10 8" />
+          <path d="M 10 12 v -4 h -4" />
+        </g>
+        <text x="34" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">P2P Gossip Sync</text>
+      </g>
+
+      <!-- Pill 6: Native MCP Protocol -->
+      <g transform="translate(344, 46)">
+        <rect width="152" height="36" rx="8" fill="url(#pillGrad)" stroke="#334155" stroke-width="1" />
+        <rect width="152" height="36" rx="8" fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="1" />
+        <!-- Plug / Protocol Icon -->
+        <g transform="translate(14, 11)" stroke="#38bdf8" stroke-width="1.5" fill="none" stroke-linecap="round">
+          <path d="M 4 2 v 3 M 8 2 v 3" />
+          <rect x="2" y="5" width="8" height="5" rx="1.5" fill="#0f172a" />
+          <path d="M 6 10 v 4" />
+        </g>
+        <text x="33" y="22.5" fill="#f1f5f9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="600">MCP 2024-11-05</text>
+      </g>
+
+    </g>
+
+    <!-- Bottom Telemetry Ribbon -->
+    <g transform="translate(0, 390)">
+      <text fill="#64748b" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" letter-spacing="0.5">
+        <tspan fill="#10b981">✓</tspan> 497 Tests Passing  ·  <tspan fill="#10b981">✓</tspan> Zero Daemon  ·  <tspan fill="#10b981">✓</tspan> 29 Storage Migrators  ·  <tspan fill="#38bdf8">bun / node / npx</tspan>
+      </text>
+    </g>
+  </g>
+
+  <!-- ==================== RIGHT COLUMN: COGNITIVE NEURAL CORE ==================== -->
+  <g transform="translate(885, 215)">
+    <!-- Ambient Pulse Rays & Rings -->
+    <circle cx="0" cy="0" r="175" fill="none" stroke="#38bdf8" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="4 8" />
+    <circle cx="0" cy="0" r="140" fill="none" stroke="#f59e0b" stroke-opacity="0.1" stroke-width="1.5" stroke-dasharray="8 6" />
+    <circle cx="0" cy="0" r="105" fill="none" stroke="#0ea5e9" stroke-opacity="0.18" stroke-width="1" />
+
+    <!-- Orbital Connecting Synaptic Traces -->
+    <!-- Node 1: AI Agents (Top-Left) -->
+    <path d="M -45 -45 L -120 -105 L -155 -105" fill="none" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1.5" stroke-dasharray="4 3" />
+    <!-- Node 2: SQLite Storage (Bottom-Left) -->
+    <path d="M -50 40 L -125 100 L -155 100" fill="none" stroke="#38bdf8" stroke-opacity="0.45" stroke-width="1.5" />
+    <!-- Node 3: AST Graph (Top-Right) -->
+    <path d="M 45 -45 L 115 -100 L 150 -100" fill="none" stroke="#c084fc" stroke-opacity="0.5" stroke-width="1.5" />
+    <!-- Node 4: Health Sentry (Bottom-Right) -->
+    <path d="M 50 40 L 120 95 L 150 95" fill="none" stroke="#34d399" stroke-opacity="0.45" stroke-width="1.5" stroke-dasharray="4 4" />
+
+    <!-- Satellite Node Badges -->
+    <!-- Top-Left: AGENTS -->
+    <g transform="translate(-155, -105)">
+      <rect x="-86" y="-15" width="86" height="30" rx="6" fill="#0b1329" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.6" filter="url(#bloom-subtle)" />
+      <circle cx="-71" cy="0" r="4" fill="#f59e0b" />
+      <text x="-58" y="4" fill="#fde68a" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="700">AGENTS</text>
+    </g>
+
+    <!-- Bottom-Left: SQLITE -->
+    <g transform="translate(-155, 100)">
+      <rect x="-86" y="-15" width="86" height="30" rx="6" fill="#0b1329" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.6" filter="url(#bloom-subtle)" />
+      <circle cx="-71" cy="0" r="4" fill="#38bdf8" />
+      <text x="-58" y="4" fill="#bae6fd" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="700">SQLITE</text>
+    </g>
+
+    <!-- Top-Right: AST-GRAPH -->
+    <g transform="translate(150, -100)">
+      <rect x="0" y="-15" width="98" height="30" rx="6" fill="#0b1329" stroke="#c084fc" stroke-width="1" stroke-opacity="0.6" filter="url(#bloom-subtle)" />
+      <circle cx="15" cy="0" r="4" fill="#c084fc" />
+      <text x="27" y="4" fill="#f3e8ff" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="700">AST-GRAPH</text>
+    </g>
+
+    <!-- Bottom-Right: SENTRY -->
+    <g transform="translate(150, 95)">
+      <rect x="0" y="-15" width="88" height="30" rx="6" fill="#0b1329" stroke="#34d399" stroke-width="1" stroke-opacity="0.6" filter="url(#bloom-subtle)" />
+      <circle cx="15" cy="0" r="4" fill="#34d399" />
+      <text x="27" y="4" fill="#d1fae5" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="700">SENTRY</text>
+    </g>
+
+    <!-- Central Layered Hexagon Core -->
+    <!-- Layer 1: Outer glowing amber hexagon -->
+    <polygon points="0,-72 62,-36 62,36 0,72 -62,36 -62,-36" fill="#080e1e" stroke="url(#amberGlow)" stroke-width="2" filter="url(#bloom-strong)" />
+    
+    <!-- Layer 2: Mid cyan hexagon -->
+    <polygon points="0,-56 48,-28 48,28 0,56 -48,28 -48,-28" fill="#0b1426" stroke="url(#cyanGlow)" stroke-width="1.6" />
+    
+    <!-- Layer 3: Inner dark plate -->
+    <polygon points="0,-38 33,-19 33,19 0,38 -33,19 -33,-19" fill="#131c33" stroke="#94a3b8" stroke-opacity="0.4" stroke-width="1" />
+
+    <!-- Intricate Neural Synaptic Core Glyph -->
+    <g transform="translate(0, 0)">
+      <!-- Cybernetic Brain & Synaptic Pathways -->
+      <path d="M -18 -14 C -28 -6 -28 10 -16 20 C -6 28 6 28 16 20 C 28 10 28 -6 18 -14" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M -10 -22 C -18 -12 -18 4 -8 14 C -2 20 2 20 8 14 C 18 4 18 -12 10 -22" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" />
+      
+      <!-- Central Quantum Spark -->
+      <circle cx="0" cy="-2" r="6" fill="#ffffff" filter="url(#bloom-strong)" />
+      <circle cx="0" cy="-2" r="11" fill="none" stroke="#f59e0b" stroke-width="1.8" />
+      
+      <!-- Synaptic Nodes with High Intensity Glow -->
+      <circle cx="-18" cy="-14" r="3.5" fill="#f59e0b" filter="url(#bloom-subtle)" />
+      <circle cx="18" cy="-14" r="3.5" fill="#38bdf8" filter="url(#bloom-subtle)" />
+      <circle cx="-16" cy="20" r="3.5" fill="#38bdf8" />
+      <circle cx="16" cy="20" r="3.5" fill="#f59e0b" />
+      <circle cx="0" cy="24" r="3" fill="#c084fc" />
+      <circle cx="-10" cy="-22" r="2.5" fill="#ffffff" />
+      <circle cx="10" cy="-22" r="2.5" fill="#ffffff" />
+    </g>
+
+    <!-- Floating Synaptic Particles -->
+    <circle cx="-80" cy="-30" r="2.5" fill="#38bdf8" filter="url(#bloom-subtle)" />
+    <circle cx="90" cy="15" r="3" fill="#f59e0b" filter="url(#bloom-subtle)" />
+    <circle cx="-40" cy="85" r="2" fill="#c084fc" />
+    <circle cx="50" cy="-90" r="2.5" fill="#38bdf8" />
+    <circle cx="-95" cy="55" r="2" fill="#34d399" />
+    <circle cx="80" cy="-60" r="2" fill="#f59e0b" />
+  </g>
+
+  <!-- Bottom Accent Gradient Line -->
+  <rect x="120" y="438" width="960" height="2" fill="url(#titleGrad)" opacity="0.75" filter="url(#bloom-subtle)" />
+</svg>
