@@ -33,32 +33,10 @@
 
 ## 🚀 What's New
 
-### v2.3.0
 - **Autonomous Memory Optimizer (`memory optimize`)**: High-precision noise and junk pruning engine with zero-daemon auto-cadence (every 7 days or after 48h idle) and SQLite WAL defragmentation (`VACUUM;` + `PRAGMA optimize;`).
 - **Dashboard "⚡ Optimize" Trigger**: Live visual optimization controls directly inside the Web Observability Studio (`memory ui` / `memory studio`) with real-time feedback on items pruned and bytes reclaimed.
 - **Concurrent Multi-Agent Workstream Tracking**: Live coordination table in `CURRENT.md` enabling multiple agents across parallel chats to monitor active tasks and target scopes without collisions.
 - **Clean Operational Guidelines**: Curated single-pane executive summary for humans and strict grounding/concurrency rules for AI agents.
-
-### v2.2.0
-- **Unified Code & Memory Impact Analysis**: Pre-flight blast radius analysis evaluating AST callers, test suites, governing ADRs, negative warnings, and risk levels (`memory code-impact` / `muse_code_impact`).
-- **PR & Change Context Generator**: Automatically turns git diffs into rich, memory-grounded GitHub PR descriptions linking touched anchors and active constraints (`memory pr-context` / `muse_pr_context`).
-- **Interactive Code Anchor Reconciler**: Audits and repairs code anchors across memories, pruning dead references and updating structural hashes (`memory reconcile` / `muse_reconcile_anchors`).
-- **Latency & Quality Telemetry Suite**: Benchmarks microsecond hot caches, FTS5 BM25 search, knapsack token packing, and ROI in a clean ASCII scoreboard (`memory benchmark`).
-- **Expanded Agent Skills**: Shipped turnkey skills for `muse-health`, `muse-drift`, `muse-why`, `muse-sync`, and `muse-mesh`.
-
-### v2.1.0
-- **Cross-Agent Knowledge Sync & P2P Gossip Protocol**: Sealed portable `SyncPacket` engine with SHA-256 integrity and zero-daemon shared filesystem gossip pool (`memory sync` / `muse_sync_*`).
-- **Web Observability Studio**: Embedded visual dashboard (`memory studio` / `memory ui`) with interactive 5-pillar health, ADR registry, code drift inspector, and sync controls.
-- **Monorepo & Multi-Repo Mesh**: Automatic workspace discovery (pnpm, npm, bun, lerna) with cross-project memory queries and shared constraint propagation (`memory mesh` / `muse_mesh_*`).
-
-### v2.0.0
-- **5-Pillar Project Health Gate**: Architectural health gate evaluating store integrity, code anchors, doc-code alignment, negative sentry, and technical debt (`memory health` / `muse_health`).
-- **Cognitive "Why" Reasoner**: Reconstructs historical code evolution, bug workarounds, and trade-offs before refactoring (`muse_why`).
-- **Living Architecture Decision Records (ADRs)**: Queryable ADRs with options, consequences, native code anchors, and supersession lineage (`memory adr` / `memory_adr_record`).
-- **Doc ⟷ Code Drift Engine**: Continuously audits documentation against AST code implementations across 6 drift states (`memory drift` / `memory_drift_audit`).
-- **Unified Context Orchestrator & MCP Profiles**: Single-call fused context injection with knapsack token packing (`muse_context`) and task-specific tool profiles.
-- **Native Structural Code Anchors**: Line-independent structural SHA-256 hashing for files, symbols, and routes.
-- **Scoped Promotion & Archival Lifecycle**: 3-tier promotion ladder (`local` → `project` → `global`) and cold/dormant/archived storage tiers.
 
 ---
 

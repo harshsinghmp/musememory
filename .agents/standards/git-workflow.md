@@ -87,6 +87,11 @@ All releases and git tags must follow strict `vX.Y.Z` semantic versioning:
 - Sync `package.json` `"version"` with the `vX.Y.Z` tag in the release commit.
 - Stage on `release/vX.Y.Z` from `dev` → merge to `master` → back-merge to `dev`.
 - CI publishes on `v*` tag push (`git tag -a vX.Y.Z -m "release: vX.Y.Z"`). Never publish manually.
+- **README "What's New" Rule**:
+  - Keep only the current release/feature highlights in `README.md` under `## 🚀 What's New`.
+  - Do NOT accumulate historical version blocks (`### vX.Y.Z`).
+  - Do NOT write version headers (`### vX.Y.Z`) inside `## 🚀 What's New`; format as a clean, plain-English bullet list understandable to non-technical users.
+  - Detailed versioned change history lives strictly in `CHANGELOG.md`.
 
 ---
 
