@@ -295,7 +295,7 @@
   <!-- CARD 5: ZERO-DAEMON & PRIVACY (Bottom Center) -->
   <g transform="translate(418, 322)">
     <rect width="364" height="146" rx="16" fill="url(#glassCardBg)" />
-    <rect width="418" height="146" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
+    <rect width="364" height="146" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
 
     <!-- Rebus: 🔒 + 🏠 -->
     <g transform="translate(22, 18)">
