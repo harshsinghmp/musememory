@@ -68,6 +68,7 @@ import {
 } from "./cli/evolution.ts";
 import { handleHealthCommand } from "./cli/health.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
+import { handleMeshCommand } from "./cli/mesh.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -146,6 +147,8 @@ Ecosystem, Migration & Connectivity:
   graph [status|index]          Inspect or index CodeGraph/Graphify AST provider symbols
   ui / dashboard [--port 2222]  Launch embedded visual knowledge graph UI
   daemon [--port N]             Real-time agency hub (SSE event stream + publish API, default port 7878)
+  sync [status|broadcast|ingest|pool] Cross-agent knowledge sync & P2P gossip mesh
+  mesh [query|check|link|unlink|propagate] Multi-repo & monorepo cross-project mesh
   mcp                           Run stdio MCP server for agent platforms
 `;
 
@@ -310,6 +313,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleHealthCommand(parsed);
     case "sync":
       return handleSyncCommand(parsed);
+    case "mesh":
+      return handleMeshCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);

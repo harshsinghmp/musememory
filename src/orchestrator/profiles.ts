@@ -60,6 +60,10 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "muse_sync_ingest",
     "muse_sync_status",
     "muse_sync_pool",
+    "muse_mesh_status",
+    "muse_mesh_query",
+    "muse_mesh_audit",
+    "muse_mesh_link",
   ],
   maintenance: [
     "muse_health",
@@ -73,6 +77,10 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "muse_sync_ingest",
     "muse_sync_status",
     "muse_sync_pool",
+    "muse_mesh_status",
+    "muse_mesh_query",
+    "muse_mesh_audit",
+    "muse_mesh_link",
   ],
   full: [], // empty list means include all registered tools
 };
