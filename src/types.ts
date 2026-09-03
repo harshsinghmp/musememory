@@ -274,6 +274,7 @@ export type AuditOperation =
   | "anchor_created"
   | "anchor_verified"
   | "anchor_drifted"
+  | "anchor_reconciled"
   | "adr_recorded"
   | "adr_superseded"
   | "drift_detected";

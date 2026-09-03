@@ -94,7 +94,9 @@ import {
   clusterRecurringBugsAndFriction,
   analyzeTechnicalDebt,
 } from "./cognition/index.ts";
-import { evaluateProjectHealth } from "./health/index.ts";
+import { evaluateProjectHealth, reconcileCodeAnchors } from "./health/index.ts";
+import { analyzeMemoryCodeImpact } from "./intelligence/index.ts";
+import { generatePrContext } from "./compaction/index.ts";
 import {
   broadcastKnowledge,
   ingestKnowledge,
@@ -1515,6 +1517,44 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           required: ["path"],
         },
       },
+      {
+        name: "muse_code_impact",
+        description: "Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Target source file path to analyze" },
+            symbol_name: { type: "string", description: "Optional specific function, class, or symbol name" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+          required: ["file_path"],
+        },
+      },
+      {
+        name: "muse_pr_context",
+        description: "Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment",
+        inputSchema: {
+          type: "object",
+          properties: {
+            base_branch: { type: "string", description: "Base git branch to diff against (default: 'main')" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
+      {
+        name: "muse_reconcile_anchors",
+        description: "Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted",
+        inputSchema: {
+          type: "object",
+          properties: {
+            prune: { type: "boolean", description: "Whether to prune orphaned anchors (default: false)" },
+            mark_stale: { type: "boolean", description: "Whether to mark memories stale if all anchors are orphaned (default: false)" },
+            update_hashes: { type: "boolean", description: "Whether to update structural hashes for drifted anchors (default: false)" },
+            dry_run: { type: "boolean", description: "Whether to simulate without saving changes (default: true)" },
+            dir: { type: "string", description: "Optional workspace directory" },
+          },
+        },
+      },
     ];
 
     return { tools: filterToolsForProfile(allTools, activeProfile) };
@@ -2498,6 +2538,39 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           addMeshLink(activeMemoryDir, targetPath);
           return toolResult({ success: true, action: "linked", path: targetPath });
         }
+      }
+      case "muse_code_impact": {
+        const filePath = a.file_path as string;
+        if (!filePath) return toolError("Missing required 'file_path' argument");
+        const symbolName = a.symbol_name as string | undefined;
+        const result = await analyzeMemoryCodeImpact(activeStore, {
+          filePath,
+          symbolName,
+          workspaceRoot: activeRoot,
+        });
+        return toolResult(result);
+      }
+      case "muse_pr_context": {
+        const baseBranch = (a.base_branch as string) || "main";
+        const result = await generatePrContext(activeStore, {
+          baseBranch,
+          workspaceRoot: activeRoot,
+        });
+        return toolResult(result);
+      }
+      case "muse_reconcile_anchors": {
+        const prune = a.prune === true;
+        const markStale = a.mark_stale === true;
+        const updateHashes = a.update_hashes === true;
+        const dryRun = a.dry_run !== false;
+        const report = await reconcileCodeAnchors(activeStore, {
+          prune,
+          markStale,
+          updateHashes,
+          dryRun,
+          workspaceRoot: activeRoot,
+        });
+        return toolResult(report);
       }
       default:
         return toolError(`unknown tool ${name}`);

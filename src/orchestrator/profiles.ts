@@ -10,6 +10,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   coding: [
     "muse_context",
+    "muse_code_impact",
     "memory_anchor_create",
     "memory_anchor_verify",
     "memory_read",
@@ -32,6 +33,8 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   review: [
     "muse_context",
+    "muse_code_impact",
+    "muse_pr_context",
     "muse_health",
     "muse_why",
     "muse_tech_debt",
@@ -44,6 +47,9 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   architecture: [
     "muse_context",
+    "muse_code_impact",
+    "muse_pr_context",
+    "muse_reconcile_anchors",
     "muse_health",
     "muse_why",
     "muse_bug_clusters",
@@ -67,6 +73,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   ],
   maintenance: [
     "muse_health",
+    "muse_reconcile_anchors",
     "memory_lifecycle_status",
     "memory_archive",
     "memory_rehydrate",
