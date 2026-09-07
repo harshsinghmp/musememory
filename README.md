@@ -1,7 +1,7 @@
 <div align="center">
 
-<a href="#-what-is-muse-memory-tldr">
-  <img src="./assets/banner.svg" alt="Muse Memory — Autonomous Cognitive Memory Engine for AI Agents" width="100%" />
+<a href="#what-muse-memory-does">
+  <img src="./assets/banner.svg" alt="Muse Memory, persistent local-first memory for AI agents" width="100%" />
 </a>
 
 <br />
@@ -25,29 +25,31 @@
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
 
-**Autonomous, Self-Organizing Cognitive Memory System for AI Agents & Agency Networks**
+**Persistent, local-first memory for AI agents and the projects they work on.**
+
+[Visit the live site](https://harshsinghmp.github.io/musememory/) · [Read the comparison dossier](https://harshsinghmp.github.io/musememory/musememory-comparison.html) · [Install Muse Memory](#start-with-one-command)
 
 </div>
 
 ---
 
-## 🚀 What's New
+## What changed
 
 - **Autonomous Memory Optimizer (`memory optimize`)**: High-precision noise and junk pruning engine with zero-daemon auto-cadence (every 7 days or after 48h idle) and SQLite WAL defragmentation (`VACUUM;` + `PRAGMA optimize;`).
 - **Dashboard "⚡ Optimize" Trigger**: Live visual optimization controls directly inside the Web Observability Studio (`memory ui` / `memory studio`) with real-time feedback on items pruned and bytes reclaimed.
 - **Concurrent Multi-Agent Workstream Tracking**: Live coordination table in `CURRENT.md` enabling multiple agents across parallel chats to monitor active tasks and target scopes without collisions.
 - **Clean Operational Guidelines**: Curated single-pane executive summary for humans and strict grounding/concurrency rules for AI agents.
-- **GitHub Pages Landing Page**: A static public homepage now lives in [`web/index.html`](./web/index.html), built to mirror the project's current positioning in a responsive marketing layout and deployed from the `web/` folder.
-- **Live Website**: Visit [harshsinghmp.github.io/musememory](https://harshsinghmp.github.io/musememory/) for the published homepage and [`musememory-comparison.html`](https://harshsinghmp.github.io/musememory/musememory-comparison.html) for the comparison dossier.
+- **Public website**: The responsive homepage lives in [`web/index.html`](./web/index.html) and deploys to the [Muse Memory project site](https://harshsinghmp.github.io/musememory/).
+- **Comparison dossier**: Explore the [agent memory comparison](https://harshsinghmp.github.io/musememory/musememory-comparison.html) for storage, retrieval, privacy, lifecycle, and migration differences.
 
 ---
 
 ## 📑 Table of Contents
 
-- [🚀 What's New](#-whats-new)
-- [💡 What is Muse Memory? (TL;DR)](#-what-is-muse-memory-tldr)
-- [✨ Key Feature Highlights](#-key-feature-highlights)
-- [⚡ Quick Start & Installation](#-quick-start--installation)
+- [What changed](#what-changed)
+- [What Muse Memory does](#what-muse-memory-does)
+- [Key capabilities](#key-capabilities)
+- [Start with one command](#start-with-one-command)
 - [🔄 Upgrading & Self-Healing Maintenance](#-upgrading--self-healing-maintenance)
 - [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
 - [👤 5 Role Archetypes (`USER.md`)](#-5-zero-fingerprint-role-archetypes-usermd)
@@ -59,11 +61,11 @@
 
 ---
 
-## 💡 What is Muse Memory? (TL;DR)
+## What Muse Memory does
 
-Most AI chatbots and coding assistants have **"goldfish memory"**: every time you close a session, switch tasks, or start a new prompt, they forget your project invariants, coding habits, and the hard-fought bug workarounds you solved yesterday.
+AI agents lose project context when a session ends. Muse Memory keeps that context on your machine, where your tools can retrieve it during the next task.
 
-**Muse Memory gives your AI assistants a persistent, self-organizing cognitive notebook directly on your machine.**
+Store working constraints, decisions, handoffs, and verified facts in one local memory layer. SQLite handles retrieval, while readable Markdown and YAML files keep the important context inspectable in Git.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -107,7 +109,7 @@ Most AI chatbots and coding assistants have **"goldfish memory"**: every time yo
 
 ---
 
-## ✨ Key Feature Highlights
+## Key capabilities
 
 - 👤 **Persona & Style Grounding (`USER.md`)**: Configures your role (`developer`, `designer`, `marketer`, `casual`, `custom`) and communication preferences so AI models write code that matches your style.
 - 📐 **Real-Time Active Constraints (`CURRENT.md`)**: Bi-temporal working constraints and invariant tracking synchronized on every mutation to eliminate amnesia during task handoffs.
@@ -124,11 +126,11 @@ Most AI chatbots and coding assistants have **"goldfish memory"**: every time yo
 
 ---
 
-## ⚡ Quick Start & Installation
+## Start with one command
 
 > [!TIP]
-> ### ⚡ Instant 5-Second Setup (Zero-Install NPX / BunX)
-> **No global installation required.** Set up your memory system and wire your AI agents with a single command:
+> ### Install without a global package
+> Set up the memory store and connect your local AI agents with one command:
 >
 > ```bash
 > npx musememory install
