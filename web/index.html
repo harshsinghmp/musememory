@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta
+    name="description"
+    content="Muse Memory is a local-first memory layer for agents. Keep project facts, working constraints, and handoffs in one place."
+  >
+  <title>Muse Memory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    :root {
+      --bg: oklch(13% 0.028 252);
+      --bg-alt: oklch(17% 0.03 252);
+      --surface: oklch(20% 0.03 252 / 0.82);
+      --surface-strong: oklch(24% 0.03 252 / 0.92);
+      --surface-soft: oklch(100% 0 0 / 0.02);
+      --line: oklch(100% 0 0 / 0.09);
+      --line-strong: oklch(100% 0 0 / 0.16);
+      --text: oklch(97% 0.012 252);
+      --muted: oklch(77% 0.02 252);
+      --muted-strong: oklch(88% 0.016 252);
+      --accent: oklch(80% 0.13 188);
+      --accent-soft: oklch(80% 0.08 188 / 0.16);
+      --accent-2: oklch(76% 0.12 154);
+      --accent-warm: oklch(82% 0.1 71);
+      --shadow: 0 1.25rem 4rem oklch(0% 0 0 / 0.35);
+      --shadow-soft: 0 0.8rem 2rem oklch(0% 0 0 / 0.26);
+      --radius-xl: 2rem;
+      --radius-lg: 1.25rem;
+      --radius-md: 0.875rem;
+      --radius-sm: 0.625rem;
+      --page-pad: clamp(1rem, 2.8vw, 2rem);
+      --section-gap: clamp(4rem, 9vw, 7rem);
+      --content-width: 74rem;
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-block-size: 100dvh;
+      background:
+        radial-gradient(circle at top left, oklch(38% 0.09 195 / 0.26), transparent 34%),
+        radial-gradient(circle at 82% 16%, oklch(48% 0.08 154 / 0.22), transparent 22%),
+        radial-gradient(circle at 20% 78%, oklch(78% 0.06 70 / 0.08), transparent 28%),
+        linear-gradient(180deg, var(--bg), var(--bg-alt));
+      color: var(--text);
+      font-family: "Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::before {
+      background:
+        linear-gradient(transparent, transparent),
+        linear-gradient(90deg, oklch(100% 0 0 / 0.035) 0.0625rem, transparent 0.0625rem),
+        linear-gradient(oklch(100% 0 0 / 0.035) 0.0625rem, transparent 0.0625rem);
+      background-size: auto, 5rem 5rem, 5rem 5rem;
+      mask-image: linear-gradient(180deg, transparent, black 18%, black 84%, transparent);
+      opacity: 0.7;
+    }
+
+    body::after {
+      background:
+        radial-gradient(circle at center, transparent 0, transparent 62%, oklch(0% 0 0 / 0.18) 100%);
+      mix-blend-mode: soft-light;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      display: block;
+      max-inline-size: 100%;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-start: 50%;
+      transform: translate(-50%, -120%);
+      padding: 0.75rem 1rem;
+      border-radius: 999rem;
+      background: var(--surface-strong);
+      color: var(--text);
+      border: 0.0625rem solid var(--line-strong);
+      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 20;
+    }
+
+    .skip-link:focus-visible {
+      transform: translate(-50%, 0.75rem);
+      outline: none;
+    }
+
+    .sr-only {
+      position: absolute;
+      inline-size: 0.0625rem;
+      block-size: 0.0625rem;
+      padding: 0;
+      margin: -0.0625rem;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .shell {
+      width: min(var(--content-width), calc(100% - var(--page-pad) * 2));
+      margin-inline: auto;
+    }
+
+    .topbar {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: 10;
+      padding-block: 0.875rem;
+      backdrop-filter: blur(1.5rem);
+      background: linear-gradient(180deg, oklch(13% 0.028 252 / 0.88), oklch(13% 0.028 252 / 0.62));
+      border-block-end: 0.0625rem solid oklch(100% 0 0 / 0.06);
+    }
+
+    .topbar .shell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.8rem;
+      min-inline-size: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      inline-size: 2.5rem;
+      block-size: 2.5rem;
+      border-radius: 0.875rem;
+      border: 0.0625rem solid var(--line-strong);
+      background:
+        linear-gradient(145deg, oklch(30% 0.05 252 / 0.9), oklch(18% 0.03 252 / 0.85)),
+        var(--surface);
+      box-shadow: var(--shadow-soft);
+      color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .brand-mark svg {
+      inline-size: 1.2rem;
+      block-size: 1.2rem;
+    }
+
+    .brand-copy {
+      display: grid;
+      gap: 0.1rem;
+      min-inline-size: 0;
+    }
+
+    .brand-name {
+      font-size: 0.98rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .brand-tag {
+      font-size: 0.78rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-inline-start: auto;
+    }
+
+    .nav a {
+      font-size: 0.92rem;
+      color: var(--muted);
+      transition: color 200ms ease, opacity 200ms ease;
+    }
+
+    .nav a:hover,
+    .nav a:focus-visible {
+      color: var(--text);
+      outline: none;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .button,
+    .button-ghost,
+    .tab-button,
+    .copy-button {
+      appearance: none;
+      border: 0;
+      font: inherit;
+      cursor: pointer;
+      transition:
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 220ms ease,
+        border-color 220ms ease,
+        color 220ms ease,
+        opacity 220ms ease;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-block-size: 2.75rem;
+      padding-inline: 1rem;
+      border-radius: 999rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: oklch(14% 0.02 252);
+      font-weight: 600;
+      box-shadow: 0 0.75rem 2rem oklch(0% 0 0 / 0.28);
+    }
+
+    .button:hover,
+    .button:focus-visible,
+    .button-ghost:hover,
+    .button-ghost:focus-visible,
+    .copy-button:hover,
+    .copy-button:focus-visible,
+    .tab-button:hover,
+    .tab-button:focus-visible {
+      transform: translateY(-0.08rem);
+      outline: none;
+    }
+
+    .button:active,
+    .button-ghost:active,
+    .copy-button:active,
+    .tab-button:active {
+      transform: translateY(0);
+    }
+
+    .button-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2.75rem;
+      padding-inline: 1rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid var(--line-strong);
+      background: oklch(100% 0 0 / 0.04);
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .hero {
+      padding-block: clamp(2rem, 4vw, 3rem) var(--section-gap);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      gap: clamp(2rem, 4vw, 3.5rem);
+      align-items: center;
+      min-block-size: min(48rem, calc(100dvh - 5rem));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid var(--line);
+      background: oklch(100% 0 0 / 0.03);
+      color: var(--muted-strong);
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      width: fit-content;
+    }
+
+    .eyebrow-dot {
+      inline-size: 0.5rem;
+      block-size: 0.5rem;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0.375rem var(--accent-soft);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-block: 1rem 1rem;
+      max-inline-size: 13ch;
+      font-size: clamp(3rem, 7vw, 5.75rem);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+      text-wrap: balance;
+    }
+
+    .lede {
+      max-inline-size: 34rem;
+      font-size: clamp(1.05rem, 0.9rem + 0.45vw, 1.3rem);
+      line-height: 1.6;
+      color: var(--muted);
+      text-wrap: pretty;
+    }
+
+    .hero-actions {
+      margin-block: 1.75rem 1.5rem;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-block-start: 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 0.8rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid var(--line);
+      background: oklch(100% 0 0 / 0.03);
+    }
+
+    .meta-pill strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .hero-panel {
+      position: relative;
+      isolation: isolate;
+      border-radius: var(--radius-xl);
+      overflow: clip;
+      border: 0.0625rem solid var(--line-strong);
+      background:
+        linear-gradient(180deg, oklch(26% 0.03 252 / 0.75), oklch(18% 0.03 252 / 0.9)),
+        var(--surface);
+      box-shadow: var(--shadow);
+      transform: translateZ(0);
+    }
+
+    .hero-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% 14%, oklch(74% 0.12 188 / 0.14), transparent 18%),
+        radial-gradient(circle at 86% 20%, oklch(76% 0.12 154 / 0.1), transparent 20%),
+        linear-gradient(180deg, transparent 20%, oklch(0% 0 0 / 0.2));
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-visual {
+      position: relative;
+      aspect-ratio: 6 / 7;
+      min-block-size: 30rem;
+    }
+
+    .hero-visual img {
+      inline-size: 100%;
+      block-size: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .hero-panel:hover .hero-visual img,
+    .hero-panel:focus-within .hero-visual img {
+      transform: scale(1.05);
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: auto 1rem 1rem 1rem;
+      z-index: 2;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid oklch(100% 0 0 / 0.12);
+      background: oklch(13% 0.03 252 / 0.7);
+      color: var(--muted-strong);
+      font-size: 0.78rem;
+      backdrop-filter: blur(1rem);
+    }
+
+    .status-chip::before {
+      content: "";
+      inline-size: 0.42rem;
+      block-size: 0.42rem;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0.3rem oklch(80% 0.13 188 / 0.12);
+      flex: 0 0 auto;
+    }
+
+    .snapshot {
+      display: grid;
+      gap: 0.75rem;
+      padding: 1rem;
+      border-radius: calc(var(--radius-lg) - 0.1rem);
+      border: 0.0625rem solid oklch(100% 0 0 / 0.09);
+      background: oklch(15% 0.03 252 / 0.78);
+      backdrop-filter: blur(1rem);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .snapshot-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .snapshot-row strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .section {
+      padding-block: var(--section-gap);
+    }
+
+    .section + .section {
+      border-block-start: 0.0625rem solid oklch(100% 0 0 / 0.06);
+    }
+
+    .section-head {
+      display: grid;
+      gap: 1rem;
+      margin-block-end: 1.75rem;
+      max-inline-size: 40rem;
+    }
+
+    .section-head h2 {
+      font-size: clamp(2rem, 1.25rem + 2vw, 3.25rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-wrap: balance;
+    }
+
+    .section-head p {
+      color: var(--muted);
+      font-size: 1rem;
+      text-wrap: pretty;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: clamp(1.5rem, 3vw, 2.5rem);
+      align-items: start;
+    }
+
+    .card {
+      border-radius: var(--radius-lg);
+      border: 0.0625rem solid var(--line-strong);
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface));
+      box-shadow: var(--shadow-soft);
+    }
+
+    .card.pad {
+      padding: clamp(1.1rem, 2.5vw, 1.5rem);
+    }
+
+    .terminal {
+      position: relative;
+      overflow: clip;
+      background:
+        linear-gradient(180deg, oklch(26% 0.03 252 / 0.86), oklch(16% 0.03 252 / 0.96));
+    }
+
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-block-end: 1rem;
+    }
+
+    .lights {
+      display: inline-flex;
+      gap: 0.45rem;
+    }
+
+    .lights span {
+      inline-size: 0.7rem;
+      block-size: 0.7rem;
+      border-radius: 50%;
+      background: oklch(100% 0 0 / 0.12);
+      box-shadow: inset 0 0 0 0.0625rem oklch(100% 0 0 / 0.08);
+    }
+
+    .terminal-label {
+      font-family: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+
+    .tablist {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-block-end: 1rem;
+      padding: 0.35rem;
+      border-radius: 999rem;
+      background: oklch(100% 0 0 / 0.04);
+      border: 0.0625rem solid oklch(100% 0 0 / 0.06);
+    }
+
+    .tab-button {
+      min-block-size: 2.5rem;
+      padding-inline: 0.9rem;
+      border-radius: 999rem;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .tab-button[aria-selected="true"] {
+      background: linear-gradient(135deg, oklch(80% 0.13 188 / 0.2), oklch(76% 0.12 154 / 0.18));
+      color: var(--text);
+      box-shadow: inset 0 0 0 0.0625rem oklch(100% 0 0 / 0.08);
+    }
+
+    .code-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .code-shell {
+      display: grid;
+      gap: 1rem;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 0.0625rem solid oklch(100% 0 0 / 0.08);
+      background: oklch(10% 0.025 252 / 0.96);
+    }
+
+    pre {
+      margin: 0;
+      overflow: auto;
+      padding: 0;
+      font-family: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      text-wrap: pretty;
+    }
+
+    code {
+      font-family: inherit;
+    }
+
+    .code-note {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .copy-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-block-size: 2.5rem;
+      padding-inline: 0.95rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid var(--line-strong);
+      background: oklch(100% 0 0 / 0.04);
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .feature {
+      padding: 1.25rem;
+      border-radius: var(--radius-lg);
+      border: 0.0625rem solid var(--line-strong);
+      background:
+        linear-gradient(180deg, oklch(100% 0 0 / 0.05), oklch(100% 0 0 / 0.02)),
+        var(--surface);
+      box-shadow: var(--shadow-soft);
+      min-block-size: 12rem;
+    }
+
+    .feature h3 {
+      margin-block-start: 0.95rem;
+      font-size: 1.1rem;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+    }
+
+    .feature p {
+      margin-block-start: 0.7rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+      text-wrap: pretty;
+    }
+
+    .feature-icon {
+      display: inline-grid;
+      place-items: center;
+      inline-size: 2.6rem;
+      block-size: 2.6rem;
+      border-radius: 0.9rem;
+      border: 0.0625rem solid oklch(100% 0 0 / 0.08);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .feature-icon svg {
+      inline-size: 1.15rem;
+      block-size: 1.15rem;
+    }
+
+    .ecosystem {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: clamp(1.5rem, 3vw, 2.5rem);
+      align-items: start;
+    }
+
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.65rem 0.9rem;
+      border-radius: 999rem;
+      border: 0.0625rem solid var(--line-strong);
+      background: oklch(100% 0 0 / 0.04);
+      color: var(--muted-strong);
+      font-size: 0.92rem;
+      box-shadow: inset 0 0 0 0.0625rem oklch(100% 0 0 / 0.02);
+    }
+
+    .panel-stack {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .panel {
+      padding: 1.1rem;
+      border-radius: var(--radius-lg);
+      border: 0.0625rem solid var(--line-strong);
+      background: linear-gradient(180deg, oklch(100% 0 0 / 0.05), oklch(100% 0 0 / 0.02));
+    }
+
+    .panel strong {
+      display: block;
+      margin-block-end: 0.35rem;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .panel p {
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .updates {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .update {
+      display: grid;
+      gap: 0.8rem;
+      padding: 1.25rem;
+      border-radius: var(--radius-lg);
+      border: 0.0625rem solid var(--line-strong);
+      background:
+        radial-gradient(circle at top right, oklch(80% 0.13 188 / 0.12), transparent 35%),
+        linear-gradient(180deg, oklch(100% 0 0 / 0.05), oklch(100% 0 0 / 0.02)),
+        var(--surface);
+    }
+
+    .update time {
+      color: var(--accent);
+      font-family: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .update h3 {
+      font-size: 1.08rem;
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+    }
+
+    .update p {
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .cta {
+      padding-block: 0;
+    }
+
+    .cta-card {
+      display: grid;
+      gap: 1.5rem;
+      padding: clamp(1.5rem, 4vw, 2.25rem);
+      border-radius: calc(var(--radius-xl) + 0.25rem);
+      border: 0.0625rem solid oklch(100% 0 0 / 0.1);
+      background:
+        radial-gradient(circle at 20% 0%, oklch(80% 0.13 188 / 0.22), transparent 24%),
+        radial-gradient(circle at 88% 12%, oklch(76% 0.12 154 / 0.16), transparent 20%),
+        linear-gradient(180deg, oklch(21% 0.03 252 / 0.98), oklch(15% 0.03 252 / 0.98));
+      box-shadow: var(--shadow);
+    }
+
+    .cta-card h2 {
+      max-inline-size: 14ch;
+      font-size: clamp(2.1rem, 1.3rem + 2.7vw, 4rem);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+      text-wrap: balance;
+    }
+
+    .cta-card p {
+      max-inline-size: 34rem;
+      color: var(--muted);
+      font-size: 1rem;
+      text-wrap: pretty;
+    }
+
+    .footer {
+      padding-block: 1.75rem 2.5rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .footer-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+      padding-block-start: 1rem;
+      border-block-start: 0.0625rem solid oklch(100% 0 0 / 0.06);
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-links a:hover,
+    .footer-links a:focus-visible {
+      color: var(--text);
+      outline: none;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(1rem);
+      transition:
+        opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    html[data-ready="true"] .reveal {
+      opacity: 1;
+      transform: none;
+    }
+
+    .delay-1 { transition-delay: 60ms; }
+    .delay-2 { transition-delay: 120ms; }
+    .delay-3 { transition-delay: 180ms; }
+    .delay-4 { transition-delay: 240ms; }
+
+    :focus-visible {
+      outline: 0.125rem solid oklch(80% 0.13 188);
+      outline-offset: 0.2rem;
+    }
+
+    ::selection {
+      background: oklch(80% 0.13 188 / 0.3);
+      color: var(--text);
+    }
+
+    @media (max-width: 64rem) {
+      .hero-grid,
+      .split,
+      .ecosystem {
+        grid-template-columns: 1fr;
+      }
+
+      .updates {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 48rem) {
+      .topbar .shell {
+        align-items: flex-start;
+      }
+
+      .nav {
+        gap: 0.75rem 1rem;
+      }
+
+      h1 {
+        max-inline-size: 11ch;
+      }
+
+      .hero-visual {
+        min-block-size: 24rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+
+      .reveal,
+      html[data-ready="true"] .reveal {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+
+  <header class="topbar" aria-label="Primary">
+    <div class="shell">
+      <a class="brand" href="#top" aria-label="Muse Memory home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7.5 8.25L12 4.5l4.5 3.75v6l-4.5 3.75-4.5-3.75v-6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 4.5v15" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" opacity=".75"/>
+            <path d="M7.5 11.25h9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" opacity=".75"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <span class="brand-name">Muse Memory</span>
+          <span class="brand-tag">Local memory for agents.</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Site">
+        <a href="#features">Features</a>
+        <a href="#quickstart">Quick start</a>
+        <a href="#ecosystem">Ecosystem</a>
+        <a href="#updates">Updates</a>
+      </nav>
+
+      <div class="button-row">
+        <a class="button-ghost" href="https://github.com/harshsinghmp/musememory" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="button" href="#quickstart">Read the docs</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="hero" id="top">
+      <div class="shell hero-grid">
+        <div class="reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            GitHub Pages demo
+          </div>
+          <h1>Keep context when sessions end.</h1>
+          <p class="lede">
+            Muse Memory is a local-first memory layer for agents. It keeps project facts, working constraints, and handoffs in one place, so the next session starts with the same picture.
+          </p>
+          <div class="button-row hero-actions">
+            <a class="button" href="#quickstart">Get started</a>
+            <a class="button-ghost" href="https://github.com/harshsinghmp/musememory" target="_blank" rel="noreferrer">View on GitHub</a>
+          </div>
+          <div class="hero-meta" aria-label="Key platform notes">
+            <span class="meta-pill"><strong>Zero daemon</strong> local runtime</span>
+            <span class="meta-pill"><strong>SQLite</strong> primary store</span>
+            <span class="meta-pill"><strong>MCP</strong> native support</span>
+            <span class="meta-pill"><strong>GitHub Pages</strong> static build</span>
+          </div>
+        </div>
+
+        <div class="hero-panel reveal delay-1" aria-label="Muse Memory visual">
+          <div class="hero-visual">
+            <img src="./assets/banner-hero-3d.jpg" alt="Muse Memory hero artwork showing a glowing brain surrounded by connected nodes and memory clusters." loading="eager" fetchpriority="high" decoding="async">
+          </div>
+          <div class="hero-overlay">
+            <div class="status-strip" aria-label="Core states">
+              <span class="status-chip">Project-local memory</span>
+              <span class="status-chip">Current work visible</span>
+              <span class="status-chip">Provenance kept</span>
+            </div>
+            <div class="snapshot">
+              <div class="snapshot-row">
+                <span>Working state</span>
+                <strong>Current.md + store</strong>
+              </div>
+              <div class="snapshot-row">
+                <span>Access paths</span>
+                <strong>CLI, MCP, web studio</strong>
+              </div>
+              <div class="snapshot-row">
+                <span>Promise</span>
+                <strong>Memory that stays with the work</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="quickstart">
+      <div class="shell split">
+        <div class="section-head reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Up and running in minutes
+          </div>
+          <h2>Install it locally, then point it at the workspace.</h2>
+          <p>
+            Start with one command, keep the current task in view, and use the same store from the CLI, the MCP server, or the dashboard.
+          </p>
+        </div>
+
+        <div class="card pad terminal reveal delay-1" aria-label="Quick start terminal">
+          <div class="terminal-top">
+            <div class="lights" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="terminal-label">Quick start</div>
+          </div>
+
+          <div class="code-panel">
+            <div class="tablist" role="tablist" aria-label="Install options">
+              <button class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="install-panel" data-command="bunx musememory install" data-description="Best when Bun is already installed.">Bun</button>
+              <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="install-panel" data-command="npx musememory install" data-description="Use this when npm is the default on the machine.">npm</button>
+              <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="install-panel" data-command="memory ui" data-description="Open the studio after install to inspect state, drift, and workstreams.">Studio</button>
+            </div>
+
+            <div class="code-shell" id="install-panel">
+              <pre><code id="install-command">bunx musememory install</code></pre>
+              <div class="code-note">
+                <span id="install-description">Best when Bun is already installed.</span>
+                <span class="sr-only" id="copy-status" aria-live="polite"></span>
+                <button class="copy-button" type="button" id="copy-command">Copy command</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="shell">
+        <div class="section-head reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            What it keeps in view
+          </div>
+          <h2>The system is useful when it stays out of the way.</h2>
+          <p>
+            These are the parts that matter most when the work spans multiple sessions, multiple tools, and more than one agent.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6 10.5V6.75A2.25 2.25 0 0 1 8.25 4.5h7.5A2.25 2.25 0 0 1 18 6.75v3.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M6 10.5h12v4.75a2.25 2.25 0 0 1-2.25 2.25h-7.5A2.25 2.25 0 0 1 6 15.25V10.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M9 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Project-local memory.</h3>
+            <p>Each repo keeps its own working state. You can link broader context when you want it, not before.</p>
+          </article>
+
+          <article class="feature reveal delay-1">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 12.5a5 5 0 1 1 10 0v2.25A2.25 2.25 0 0 1 14.75 17h-5.5A2.25 2.25 0 0 1 7 14.75V12.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M12 8.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M10.25 13.75h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Current work stays visible.</h3>
+            <p>The active task, open loops, and handoff notes live in plain Markdown so a new session can pick them up fast.</p>
+          </article>
+
+          <article class="feature reveal delay-2">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4.75 12a7.25 7.25 0 1 0 14.5 0 7.25 7.25 0 0 0-14.5 0Z" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M12 8.25v3.25l2.25 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 4.75v1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Why and provenance travel with the memory.</h3>
+            <p>Claims keep their source trail, so the next person or agent can see what changed and why it was kept.</p>
+          </article>
+
+          <article class="feature reveal delay-3">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6.75 9.25a5.25 5.25 0 0 1 10.5 0c0 3.9-1.8 5.2-3.1 6.6-.57.62-.9 1.33-1.05 2.15h-2.2c-.15-.82-.48-1.53-1.05-2.15-1.3-1.4-3.1-2.7-3.1-6.6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M9.5 20.25h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M10 16.25h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Secret defense is built in.</h3>
+            <p>Vibeguard checks for obvious credentials before they land in memory, so the store does not become a leak path.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ecosystem">
+      <div class="shell ecosystem">
+        <div class="section-head reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Built in the open
+          </div>
+          <h2>It sits beside the editor, the terminal, and the agent loop.</h2>
+          <p>
+            The page stays close to the same rhythm as the reference site: a simple promise up top, one practical way to begin, and a section that shows where it fits in the real workflow.
+          </p>
+        </div>
+
+        <div class="panel-stack reveal delay-1">
+          <div class="panel">
+            <strong>Works with the tools you already use.</strong>
+            <p>Muse Memory plugs into CLI agents, MCP clients, and the local dashboard without asking for a new workflow.</p>
+          </div>
+          <div class="chip-grid" aria-label="Compatible tools">
+            <span class="chip">Claude Code</span>
+            <span class="chip">Cursor</span>
+            <span class="chip">Codex</span>
+            <span class="chip">OpenCode</span>
+            <span class="chip">Windsurf</span>
+            <span class="chip">Gemini CLI</span>
+            <span class="chip">MCP clients</span>
+            <span class="chip">Obsidian</span>
+            <span class="chip">GitHub</span>
+          </div>
+          <div class="card pad">
+            <img src="./assets/banner-bento-3d.jpg" alt="Bento-style Muse Memory artwork with privacy, recall, structure, and local storage motifs." loading="lazy" decoding="async" style="border-radius: 1rem; border: 0.0625rem solid oklch(100% 0 0 / 0.08);">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="updates">
+      <div class="shell">
+        <div class="section-head reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Always improving
+          </div>
+          <h2>The store gets trimmed, the handoff stays current, and the studio keeps the state visible.</h2>
+          <p>
+            This section mirrors the reference layout's release area, but keeps the copy grounded in what Muse Memory actually does today.
+          </p>
+        </div>
+
+        <div class="updates">
+          <article class="update reveal">
+            <time datetime="2026-09-07">Optimizer</time>
+            <h3>Less noise, less drift.</h3>
+            <p>Use the optimizer when the store needs a clean pass. It trims low-value clutter and keeps the useful parts near the surface.</p>
+          </article>
+
+          <article class="update reveal delay-1">
+            <time datetime="2026-09-07">Studio</time>
+            <h3>One place to see the current state.</h3>
+            <p>The dashboard keeps health, workstreams, and active constraints visible without asking you to dig through separate files.</p>
+          </article>
+
+          <article class="update reveal delay-2">
+            <time datetime="2026-09-07">Workstreams</time>
+            <h3>Parallel sessions without guesswork.</h3>
+            <p>Multiple agents can stay coordinated because the active task and next step are written down where everyone can see them.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section cta">
+      <div class="shell">
+        <div class="cta-card reveal">
+          <div class="eyebrow">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Ready when you are
+          </div>
+          <h2>Keep the memory close.</h2>
+          <p>
+            If the work matters tomorrow, it belongs in Muse Memory today. Start local, keep the state visible, and let the next session begin with context instead of guesswork.
+          </p>
+          <div class="button-row">
+            <a class="button" href="#quickstart">Install Muse Memory</a>
+            <a class="button-ghost" href="https://github.com/harshsinghmp/musememory" target="_blank" rel="noreferrer">Open the repository</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell footer-row">
+      <p>Muse Memory. Static landing page for GitHub Pages. Local first, open source, and built to stay out of the way.</p>
+      <div class="footer-links">
+        <a href="#top">Back to top</a>
+        <a href="https://github.com/harshsinghmp/musememory" target="_blank" rel="noreferrer">Repository</a>
+        <a href="./musememory-comparison.html">Comparison</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll("[data-command]"));
+    const command = document.getElementById("install-command");
+    const description = document.getElementById("install-description");
+    const copyStatus = document.getElementById("copy-status");
+    const copyButton = document.getElementById("copy-command");
+    let activeCommand = command.textContent ?? "";
+    let resetCopyLabel = 0;
+
+    const setActiveTab = (button) => {
+      tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab === button)));
+      activeCommand = button.dataset.command ?? "";
+      command.textContent = activeCommand;
+      description.textContent = button.dataset.description ?? "";
+    };
+
+    tabs.forEach((button) => {
+      button.addEventListener("click", () => setActiveTab(button));
+    });
+
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(activeCommand);
+        copyButton.textContent = "Copied";
+        copyStatus.textContent = "Command copied to clipboard.";
+        window.clearTimeout(resetCopyLabel);
+        resetCopyLabel = window.setTimeout(() => {
+          copyButton.textContent = "Copy command";
+          copyStatus.textContent = "";
+        }, 1600);
+      } catch {
+        copyButton.textContent = "Copy failed";
+        copyStatus.textContent = "Copy failed.";
+        window.clearTimeout(resetCopyLabel);
+        resetCopyLabel = window.setTimeout(() => {
+          copyButton.textContent = "Copy command";
+          copyStatus.textContent = "";
+        }, 1600);
+      }
+    });
+
+    requestAnimationFrame(() => {
+      document.documentElement.dataset.ready = "true";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Muse Memory">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#173043"/>
+      <stop offset="0.58" stop-color="#0f1c28"/>
+      <stop offset="1" stop-color="#081019"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="18" y1="16" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ff5dc"/>
+      <stop offset="1" stop-color="#2cc9b3"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)"/>
+  <path d="M20 25.5 32 15l12 10.5V38l-12 10.5L20 38V25.5Z" fill="none" stroke="url(#accent)" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M32 15v33.5" fill="none" stroke="url(#accent)" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
+  <path d="M20 30.5h24" fill="none" stroke="url(#accent)" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
+</svg>
