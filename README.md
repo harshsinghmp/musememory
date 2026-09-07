@@ -37,6 +37,7 @@
 - **Dashboard "⚡ Optimize" Trigger**: Live visual optimization controls directly inside the Web Observability Studio (`memory ui` / `memory studio`) with real-time feedback on items pruned and bytes reclaimed.
 - **Concurrent Multi-Agent Workstream Tracking**: Live coordination table in `CURRENT.md` enabling multiple agents across parallel chats to monitor active tasks and target scopes without collisions.
 - **Clean Operational Guidelines**: Curated single-pane executive summary for humans and strict grounding/concurrency rules for AI agents.
+- **GitHub Pages Landing Page**: A static public homepage now lives in [`web/index.html`](./web/index.html), built to mirror the project's current positioning in a responsive marketing layout and deployed from the `web/` folder.
 
 ---
 
@@ -351,7 +352,7 @@ memory migrate --provider mem0
 memory migrate --provider beads
 memory migrate --all
 ```
-> See [`musememory-comparison.html`](musememory-comparison.html) for the full table-free 30-system architectural dossier.
+> See [`web/musememory-comparison.html`](./web/musememory-comparison.html) for the matching comparison page and architectural dossier.
 
 ---
 

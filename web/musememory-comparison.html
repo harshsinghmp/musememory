@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Muse Memory vs 34 Agent Memory Providers · Architecture & Feature Matrix</title>
+  <title>Muse Memory vs 42 Agent Memory Providers · Architecture & Feature Matrix</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -124,12 +124,12 @@
     <!-- Header -->
     <header>
       <div class="brand-group">
-        <h1>Muse Memory vs 34 Agent Memory Providers</h1>
+        <h1>Muse Memory vs 42 Agent Memory Providers</h1>
         <p>Architectural Dossier, Concrete Differences & Autonomous Migration Playbook</p>
       </div>
       <div class="stats-bar">
-        <div class="stat-pill">Compared Engines: <span>34 Total</span></div>
-        <div class="stat-pill">Test Suite: <span style="color:#10b981;">278 Passing (50 Suites)</span></div>
+        <div class="stat-pill">Compared Engines: <span>42 Total</span></div>
+        <div class="stat-pill">Test Suite: <span style="color:#10b981;">502 Passing (85 Suites)</span></div>
         <div class="stat-pill">Zero Secret Exposure: <span style="color:#10b981;">Vibeguard Inline</span></div>
         <div class="stat-pill">Primary DB: <span style="color:#10b981;">SQLite .memory/memory.db</span></div>
         <div class="stat-pill">Auto-Wired: <span style="color:#a5b4fc;">80+ Platforms</span></div>
@@ -185,15 +185,15 @@
           <span class="search-icon">🔍</span>
           <input type="text" id="searchInput" placeholder="Search any provider, technology, storage engine, or mapping (press '/' to focus)..." oninput="handleSearch()">
         </div>
-        <div class="results-count" id="resultsCount">Showing 34 External Providers</div>
+        <div class="results-count" id="resultsCount">Showing 42 External Providers</div>
       </div>
       <div class="filter-chips-row">
         <span class="filter-label">Categories:</span>
-        <div class="chip active" data-filter="all" onclick="setCategoryFilter('all', this)">All (34)</div>
-        <div class="chip" data-filter="local-file" onclick="setCategoryFilter('local-file', this)">Local File-First (12)</div>
-        <div class="chip" data-filter="graph-rag" onclick="setCategoryFilter('graph-rag', this)">Graph / Vector DB (10)</div>
-        <div class="chip" data-filter="agent-harness" onclick="setCategoryFilter('agent-harness', this)">Agent Harnesses (6)</div>
-        <div class="chip" data-filter="cloud-service" onclick="setCategoryFilter('cloud-service', this)">Cloud Managed (5)</div>
+        <div class="chip active" data-filter="all" onclick="setCategoryFilter('all', this)">All (42)</div>
+        <div class="chip" data-filter="local-file" onclick="setCategoryFilter('local-file', this)">Local File-First (16)</div>
+        <div class="chip" data-filter="graph-rag" onclick="setCategoryFilter('graph-rag', this)">Graph / Vector DB (12)</div>
+        <div class="chip" data-filter="agent-harness" onclick="setCategoryFilter('agent-harness', this)">Agent Harnesses (7)</div>
+        <div class="chip" data-filter="cloud-service" onclick="setCategoryFilter('cloud-service', this)">Cloud Managed (7)</div>
       </div>
     </div>
 
@@ -889,6 +889,166 @@
         offline: "100% Local-first (No cloud requirement)",
         detectPath: ".slm/ | slm CLI",
         mappingRule: "admitted memories ➔ confirmed, expired nodes ➔ stale"
+      },
+      {
+        id: "zep",
+        name: "Zep (Graphiti)",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/getzep/graphiti",
+        storage: "Temporal Knowledge Graph (Neo4j / FalkorDB + Vector Embeddings)",
+        scoping: "Users, Sessions & Group Spaces",
+        difference: "Zep/Graphiti requires an external graph database daemon (Neo4j/FalkorDB) and Python service for bi-temporal edge maintenance, whereas Muse Memory delivers zero-daemon in-process SQLite with AST code anchors, git-level drift detection, and knapsack token budgeting without external services.",
+        secrets: "None (Raw text ingested into graph extractors)",
+        retrieval: "Hybrid search over temporal knowledge subgraphs",
+        lifecycle: "Bi-temporal edge invalidation based on timestamped updates",
+        proactive: "Passive API queries on user turn",
+        compounding: "Dynamic entity-edge consolidation into graph nodes",
+        wiring: "Python/TypeScript SDK connecting to Zep Cloud or local Docker daemon",
+        offline: "Requires Docker graph database & background services",
+        detectPath: "zep.yaml | .zep/ | ZEP_API_KEY",
+        mappingRule: "active graph edges ➔ confirmed, invalidated temporal nodes ➔ superseded"
+      },
+      {
+        id: "langmem",
+        name: "LangMem (LangChain / LangGraph)",
+        category: "agent-harness",
+        catLabel: "Agent Harnesses",
+        badgeClass: "badge-harness",
+        url: "https://github.com/langchain-ai/langmem",
+        storage: "LangGraph BaseStore (Postgres, In-Memory, SQLite) + Semantic Extractors",
+        scoping: "Namespaced Key-Value (User, Assistant, Thread)",
+        difference: "LangMem is an extraction SDK tightly bound to LangGraph execution graphs and LLM prompt runs, whereas Muse Memory is an autonomous, framework-agnostic engine that auto-connects to 80+ agent platforms, inspects codebase AST symbols, and enforces strict pre-write secret defenses.",
+        secrets: "None (Relies on caller sanitization)",
+        retrieval: "Semantic vector search & namespaces via LangGraph Store",
+        lifecycle: "Custom prompt-based memory consolidator functions",
+        proactive: "Background async consolidation jobs across threads",
+        compounding: "Thread summarization and episodic fact extraction",
+        wiring: "LangGraph / LangChain Python and JS/TS SDKs",
+        offline: "In-memory or local SQLite, but requires LLM API keys for extraction",
+        detectPath: ".langmem/ | langgraph.json | @langchain/langmem",
+        mappingRule: "namespace facts ➔ confirmed, thread summaries ➔ candidate"
+      },
+      {
+        id: "hipporag",
+        name: "HippoRAG",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/OSU-NLP-Group/HippoRAG",
+        storage: "OpenIE Knowledge Graph + Personalized PageRank (PPR) + Vector DB",
+        scoping: "Corpus / Document Level (Global)",
+        difference: "HippoRAG focuses on multi-hop associative recall via graph algorithms (Personalized PageRank) for academic question answering, whereas Muse Memory operates as a production coding memory harness with deterministic state lifecycles, AST code anchors, and live CURRENT.md handoff checkpoints.",
+        secrets: "None",
+        retrieval: "Personalized PageRank associative diffusion across entity graphs",
+        lifecycle: "Static graph indexing without explicit confirmation or supersession gates",
+        proactive: "None (Query-time PPR exploration)",
+        compounding: "Entity co-occurrence graph extraction",
+        wiring: "Python research codebase / scripts",
+        offline: "Local Python environment with heavy embedding dependencies",
+        detectPath: "hipporag/ | .hipporag",
+        mappingRule: "high PPR entity triples ➔ confirmed, unindexed nodes ➔ candidate"
+      },
+      {
+        id: "lightrag",
+        name: "LightRAG",
+        category: "graph-rag",
+        catLabel: "Graph / Vector DB",
+        badgeClass: "badge-graph",
+        url: "https://github.com/HKUDS/LightRAG",
+        storage: "Dual-Level Graph Structure (NanoVectorDB / NetworkX / Neo4j / TiDB)",
+        scoping: "Workspace / Corpus Namespaces",
+        difference: "LightRAG builds a lightweight two-level entity-relationship graph for document RAG, whereas Muse Memory focuses specifically on autonomous agent engineering with AST code anchors, ADR drift verification, negative mistake sentries, and 5-pillar project health gates.",
+        secrets: "None",
+        retrieval: "Dual-level retrieval (low-level specific entities + high-level themes)",
+        lifecycle: "Graph node insertion with incremental update scripts",
+        proactive: "None (Passive RAG pipeline)",
+        compounding: "Entity extraction and community theme summarization",
+        wiring: "Python package (pip install lightrag-hku)",
+        offline: "Local storage options (NanoVectorDB / JSON / SQLite)",
+        detectPath: "lightrag/ | .lightrag/ | lightrag.db",
+        mappingRule: "entity relationships ➔ confirmed, high-level themes ➔ candidate"
+      },
+      {
+        id: "claude-projects",
+        name: "Claude Projects / Custom Instructions",
+        category: "cloud-service",
+        catLabel: "Cloud Managed",
+        badgeClass: "badge-cloud",
+        url: "https://claude.ai",
+        storage: "Anthropic Cloud Project Context (Project Knowledge + Custom Instructions)",
+        scoping: "Project-Level & User-Level Cloud Scopes",
+        difference: "Claude Projects stores flat text snippets and project files locked inside Anthropic's cloud ecosystem with no code anchor tracking, AST awareness, or local offline CLI access, whereas Muse Memory provides zero-cloud local SQLite storage with bidirectional drift detection across 80+ agent platforms.",
+        secrets: "Cloud-hosted; proprietary filtering",
+        retrieval: "Full prompt prefix injection without knapsack budgeting",
+        lifecycle: "Manual text edit or automatic cloud memory updates",
+        proactive: "None (Static prompt injection on conversation start)",
+        compounding: "None (Relies on manual documentation uploads)",
+        wiring: "Web UI and Claude API",
+        offline: "0% Offline (Requires Anthropic Cloud API)",
+        detectPath: ".claude/ | claude.json | CLAUDE.md",
+        mappingRule: "project instructions ➔ confirmed, scratchpad notes ➔ candidate"
+      },
+      {
+        id: "windsurf",
+        name: "Windsurf Cascade Memories",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://codeium.com/windsurf",
+        storage: "Local Scratchpad & Auto-Generated Rules (.windsurf/rules or global storage)",
+        scoping: "Workspace & Global User Profile",
+        difference: "Windsurf Cascade generates informal rule bullets and session scratchpads within its proprietary IDE, whereas Muse Memory is open-standard MCP/CLI, line-independently fingerprinting AST symbols, detecting living ADR drift, and enforcing Vibeguard secret scrubbing.",
+        secrets: "Basic IDE sanitization",
+        retrieval: "IDE prompt context injection per cascade prompt",
+        lifecycle: "Implicit creation from user corrections; manual deletion",
+        proactive: "Auto-detects developer preferences during IDE chatting",
+        compounding: "Accumulates markdown rules in project settings",
+        wiring: "Proprietary Windsurf IDE native engine",
+        offline: "Local rule files with cloud model execution",
+        detectPath: ".windsurfrules | .windsurf/ | ~/.codeium/windsurf",
+        mappingRule: "confirmed rules ➔ confirmed, cascade scratchpad ➔ candidate"
+      },
+      {
+        id: "amem",
+        name: "A-Mem (Agentic Memory)",
+        category: "agent-harness",
+        catLabel: "Agent Harnesses",
+        badgeClass: "badge-harness",
+        url: "https://github.com/WooooDyy/A-mem",
+        storage: "Zettelkasten Semantic Note Graph + Vector Embeddings",
+        scoping: "Agent Experiential Space (Local/Global)",
+        difference: "A-Mem applies Zettelkasten interlinked slip-box notes with dynamic memory evolution for conversational agents, while Muse Memory scales this into real-world software engineering with native AST code anchors, multi-repo workspace meshes, and 5-pillar architectural health gates.",
+        secrets: "None",
+        retrieval: "Semantic note traversal with dynamic link expansion",
+        lifecycle: "Dynamic memory evolution (updating past notes when new knowledge arrives)",
+        proactive: "Autonomous link creation upon new memory arrival",
+        compounding: "Interlinked note graph with evolving context attributes",
+        wiring: "Python framework",
+        offline: "Local JSON/vector storage",
+        detectPath: ".amem/ | amem_store/ | a_mem.py",
+        mappingRule: "interlinked note nodes ➔ confirmed, dangling thoughts ➔ candidate"
+      },
+      {
+        id: "openhands",
+        name: "OpenHands Microagents",
+        category: "local-file",
+        catLabel: "Local File-First",
+        badgeClass: "badge-local",
+        url: "https://github.com/All-Hands-AI/OpenHands",
+        storage: "Repository Microagents (.openhands/microagents/) & Episodic Event Log",
+        scoping: "Repository-Scoped Markdown Microagents",
+        difference: "OpenHands uses markdown microagent triggers matching keyword regexes, whereas Muse Memory features an 11-dimension multi-factor scoring engine, SQLite FTS5 BM25, deterministic supersession lineages, and live bidirectional doc/code drift auditing.",
+        secrets: "None (Relies on environment isolation)",
+        retrieval: "Keyword match & trigger regex against user prompts",
+        lifecycle: "Static markdown files loaded based on keyword triggers",
+        proactive: "Injects microagent guidelines when triggered by keywords",
+        compounding: "Manual curation of repo microagents",
+        wiring: "OpenHands runtime / GitHub action / Docker sandbox",
+        offline: "Local repository files",
+        detectPath: ".openhands/microagents/ | .openhands/",
+        mappingRule: "repo microagents ➔ confirmed, episodic task events ➔ candidate"
       }
     ];
 
