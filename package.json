@@ -4,6 +4,21 @@
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
+    "site:dev": "bun run --cwd apps/website dev",
+    "site:build": "bun run --cwd apps/website build",
+    "site:preview": "bun run --cwd apps/website preview",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "validate": "bun run dist/index.js validate --dry-run",
+    "start": "bun run dist/index.js mcp",
+    "prepublishOnly": "bun run build && bun test"
+  },
   "bin": {
     "memory": "dist/index.js",
     "musememory": "dist/index.js"
@@ -17,14 +32,6 @@
     "LICENSE",
     "package.json"
   ],
-  "scripts": {
-    "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "validate": "bun run dist/index.js validate --dry-run",
-    "start": "bun run dist/index.js mcp",
-    "prepublishOnly": "bun run build && bun test"
-  },
   "keywords": [
     "ai",
     "agent",

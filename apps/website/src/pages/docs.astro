@@ -1,0 +1,147 @@
+---
+import Base from "../layouts/Base.astro";
+
+const sections = [
+  {
+    id: "quickstart",
+    title: "Quickstart",
+    body: [
+      "Install, connect, verify — under two minutes, no API key. One command wires Muse into every detected coding agent over MCP:",
+    ],
+    code: `npx musememory connect           # wire every detected agent
+npx musememory connect --with-hooks  # + Claude Code lifecycle hooks
+memory health                    # verify the store`,
+  },
+  {
+    id: "concepts",
+    title: "Core concepts",
+    body: [
+      "Memories live in .memory/ (project) and ~/.memory/ (global) as SQLite + YAML you can read, back up, or git. Every entry moves through a deterministic lifecycle: propose → candidate → confirmed → superseded, with an archival ladder (active → cold → dormant → archived) and query rehydration.",
+      "Memory types: fix (90d), operation (180d), architecture (365d), discovery (30d), preference (permanent), constraint (synced to CURRENT.md), session (timeline nodes).",
+    ],
+  },
+  {
+    id: "cli",
+    title: "CLI essentials",
+    code: `memory capture "Auth uses jose" --type architecture
+memory context --query "how does auth work" --budget 2000
+memory propose "..." && memory confirm <id>
+memory supersede <old-id> <new-id>
+memory capture --negative "Do not use X because Y"
+memory hooks install           # Claude Code hook pack
+memory studio                  # web observability dashboard
+memory optimize                # prune noise + VACUUM (auto-cadence)`,
+  },
+  {
+    id: "mcp",
+    title: "MCP tools that matter",
+    body: [
+      "muse_context — flagship fused recall: constraints + ranked memories + negative lessons + code anchors under one token budget.",
+      "muse_why — traces code evolution backwards through ADRs and bug fixes before you refactor.",
+      "muse_memory_for_code / muse_code_for_memory — bidirectional code ↔ memory lookups.",
+      "memory_anchor_create / verify / audit — structural, line-invariant code anchors with write-time citation verification.",
+      "69 tools total, delivered through 6 task-focused profiles (core, coding, debugging, review, architecture, maintenance) so agents never face tool bloat.",
+    ],
+  },
+  {
+    id: "hooks",
+    title: "Hands-free hooks (Claude Code)",
+    body: [
+      "memory connect --with-hooks wires the lifecycle pack: SessionStart injects constraints and top memories before your agent's first turn, PostToolUse captures tool results as observations, Stop distills the session into candidate memories. Every hook is fail-open — memory problems never block coding.",
+    ],
+    code: `# .claude/settings.json (managed by: memory hooks install)
+{ "hooks": {
+    "SessionStart": [{ "type": "command", "command": "memory hooks session-start" }],
+    "PostToolUse":   [{ "type": "command", "command": "memory hooks post-tool-use" }],
+    "Stop":          [{ "type": "command", "command": "memory hooks stop" }] } }`,
+  },
+  {
+    id: "trust",
+    title: "Trust gates",
+    body: [
+      "Write time: Vibeguard scans every write for 45+ credential shapes (fail-fast); anchors are verified against the live filesystem and hallucinated citations are rejected.",
+      "Recall time: the freshness gate withholds memories whose anchors drifted or whose cited files vanished — reported, never silently served. Include them with muse_context include_drifted: true to get provenance warnings.",
+      "Sync time: P2P gossip packets are sealed, vector-clocked, deduplicated, and secret-scanned in both directions.",
+    ],
+  },
+];
+
+const nav = sections.map((s) => ({ id: s.id, title: s.title }));
+---
+
+<Base title="Docs — Muse Memory" description="Connect Muse Memory to your agents, capture verified memories, and recall them in under 2ms. Quickstart, CLI, MCP tools, hooks, and trust gates.">
+  <header class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href={`${import.meta.env.BASE_URL}/`}>Muse<span>Memory</span></a>
+      <nav class="nav-links">
+        <a href={`${import.meta.env.BASE_URL}/compare`}>Comparison</a>
+        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
+      </nav>
+      <a class="btn btn-primary" href={`${import.meta.env.BASE_URL}/#install`}>Get started</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container docs-grid">
+        <aside class="docs-toc">
+          <p class="toc-title">On this page</p>
+          <nav>
+            {nav.map((n) => <a href={`#${n.id}`}>{n.title}</a>)}
+          </nav>
+        </aside>
+        <div class="docs-body">
+          <h1>Docs</h1>
+          <p class="docs-intro">Everything needed to run Muse Memory day-to-day: connect your agents, capture what matters, recall it in under 2ms. The full API reference lives in the <a href="https://github.com/harshsinghmp/musememory#readme" rel="noopener">repo README</a>.</p>
+
+          {sections.map((s, i) => (
+            <section class="docs-section reveal" style={`--reveal-delay:${Math.min(i * 60, 240)}ms`} id={s.id}>
+              <h2>{s.title}</h2>
+              {s.body?.map((p) => <p>{p}</p>)}
+              {s.code && (
+                <pre class="term"><code>{s.code}</code></pre>
+              )}
+            </section>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p><strong>Muse Memory</strong> — autonomous cognitive memory for AI agents · MIT</p>
+      <nav>
+        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub</a>
+        <a href={`${import.meta.env.BASE_URL}/compare`}>Comparison</a>
+      </nav>
+    </div>
+  </footer>
+
+  <style>
+    .docs-grid { display: grid; grid-template-columns: 200px 1fr; gap: 3rem; }
+    /* Grid items default to min-width:auto — without this, the wide <pre> code
+       blocks force the 1fr track past the viewport and the page overflows. */
+    .docs-body { min-width: 0; }
+    @media (max-width: 820px) { .docs-grid { grid-template-columns: 1fr; } .docs-toc { display: none; } }
+    .docs-toc { position: sticky; top: 84px; align-self: start; }
+    .toc-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-faint); margin-bottom: 0.8rem; }
+    .docs-toc nav { display: grid; gap: 0.45rem; }
+    .docs-toc a { color: var(--text-dim); font-size: 0.9rem; }
+    .docs-toc a:hover { color: var(--text); text-decoration: none; }
+    .docs-body h1 { font-size: var(--fs-h2); margin-bottom: 0.4em; }
+    .docs-intro { color: var(--text-dim); margin-bottom: 2.5rem; }
+    .docs-section { margin-bottom: 2.8rem; scroll-margin-top: 80px; }
+    .docs-section h2 { font-size: var(--fs-h3); margin-bottom: 0.7em; }
+    .docs-section p { color: var(--text-dim); margin-bottom: 0.8rem; max-width: 62ch; }
+    .term {
+      background: var(--bg-panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      margin: 0.8rem 0;
+    }
+    .term code { background: none; border: none; padding: 0; color: var(--text); font-size: 0.88rem; line-height: 1.7; white-space: pre; }
+  </style>
+</Base>

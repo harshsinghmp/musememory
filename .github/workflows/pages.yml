@@ -24,23 +24,64 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          enablement: true
+          bun-version: latest
 
-      - name: Assemble site
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ── Showreel auto-regeneration (hash-gated) ─────────────────────────
+      # The video is rebuilt only when something that changes its pixels did:
+      # site source, styles, or the capture script itself. The hash of those
+      # inputs is stored alongside the committed video; a mismatch triggers a
+      # fresh capture with headless Chromium + ffmpeg, then the hash is
+      # refreshed. Committed showreel files keep CI runs fast and diffs stable.
+      - name: Compute showreel input hash
+        id: reelhash
         run: |
-          mkdir -p _site
-          cp web/index.html _site/index.html
-          cp web/musememory-comparison.html _site/musememory-comparison.html
-          cp web/favicon.svg _site/favicon.svg
-          cp -R assets _site/assets
+          INPUTS=$(cat \
+            apps/website/src/styles/global.css \
+            apps/website/src/pages/index.astro \
+            apps/website/src/layouts/Base.astro \
+            apps/website/scripts/capture-showreel.ts \
+            | sha256sum | cut -d' ' -f1)
+          STORED=$(cat apps/website/public/brand/.showreel-hash 2>/dev/null || echo "none")
+          echo "hash=$INPUTS" >> "$GITHUB_OUTPUT"
+          echo "stored=$STORED" >> "$GITHUB_OUTPUT"
+          if [ "$INPUTS" != "$STORED" ]; then
+            echo "regen=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "regen=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install headless Chromium
+        if: steps.reelhash.outputs.regen == 'true'
+        run: |
+          cd apps/website
+          bunx --bun playwright install chromium
+
+      - name: Regenerate showreel (design changed)
+        if: steps.reelhash.outputs.regen == 'true'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          cd apps/website
+          bun scripts/capture-showreel.ts
+          echo "${{ steps.reelhash.outputs.hash }}" > public/brand/.showreel-hash
+
+      - name: Build website
+        run: bun run site:build
+
+      - name: Refresh committed brand assets (banner/OG changed)
+        run: |
+          cd apps/website
+          bun scripts/render-brand-assets.ts
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: apps/website/dist
 
       - name: Deploy to GitHub Pages
         id: deployment

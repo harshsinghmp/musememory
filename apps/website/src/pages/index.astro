@@ -1,0 +1,743 @@
+---
+import Base from "../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+
+const pillars = [
+  {
+    tag: "verified",
+    color: "violet",
+    title: "Write-time citation verification",
+    body: "Before a memory is stored, every citation in it is checked against your live filesystem. A memory that references a file or symbol which doesn't exist is rejected on the spot — your agent can't file facts about code that was never there.",
+    stat: "hallucinated citations rejected",
+  },
+  {
+    tag: "sub-millisecond",
+    color: "cyan",
+    title: "In-process retrieval engine",
+    body: "SQLite FTS5 BM25, an L0 hot cache that answers entry lookups in under 50µs, and 11-dimension multi-factor ranking with knapsack token packing. No network, no daemon, no LLM at query time — recall never waits on an API round-trip.",
+    stat: "sub-2ms recall",
+  },
+  {
+    tag: "hands-free",
+    color: "amber",
+    title: "One command, every agent",
+    body: "One command auto-detects and wires 80+ coding agent platforms over MCP, and the universal migrator imports history from 24+ formats — Mem0, Letta, AgentMemory and friends. Your agent starts remembering from its first session.",
+    stat: "80+ platforms",
+  },
+  {
+    tag: "self-organizing",
+    color: "green",
+    title: "Deterministic lifecycle & forgetting",
+    body: "Every memory moves through a 7-state lifecycle — propose, confirm, supersede — with per-type staleness policies, an archival ladder, query rehydration, and an optimizer that prunes noise while you're idle.",
+    stat: "7-state lifecycle",
+  },
+  {
+    tag: "code-grounded",
+    color: "violet",
+    title: "Structural code anchors",
+    body: "Memories attach to files, symbols, and routes through structural fingerprints — not line numbers. When code changes, drift detection flags the affected memory at recall time, before it can steer your agent wrong.",
+    stat: "line-invariant anchors",
+  },
+  {
+    tag: "zero-leakage",
+    color: "red",
+    title: "Vibeguard secret defense",
+    body: "Every write — captures, profiles, imports, sync packets — passes a credential scanner covering 45+ key and token shapes. Secrets are refused before they ever touch disk.",
+    stat: "45+ credential shapes",
+  },
+];
+
+const benchmarks = [
+  { label: "Lexical search latency", value: "sub-2ms", note: "SQLite FTS5 BM25" },
+  { label: "Hot cache entry lookup", value: "<50µs", note: "L0 in-process cache" },
+  { label: "Agent platforms", value: "80+", note: "auto-wired via MCP" },
+  { label: "Migrator formats", value: "24+", note: "Mem0, Letta, AgentMemory…" },
+  { label: "Tests passing", value: "527", note: "88 files, fully offline" },
+  { label: "External daemons", value: "0", note: "SQLite WAL in-process" },
+];
+
+const flow = [
+  {
+    step: "01",
+    title: "Capture",
+    body: "As your agent works, it records decisions, fixes, constraints, and anti-patterns to avoid. Vibeguard scans every write; new entries enter the lifecycle as candidates.",
+  },
+  {
+    step: "02",
+    title: "Verify",
+    body: "Citations are verified against live code and structural hashes are stamped. When a new memory contradicts an old one, the conflict is opened explicitly — nothing is silently clobbered.",
+  },
+  {
+    step: "03",
+    title: "Consolidate",
+    body: "The distiller compresses raw observation streams into reviewable candidates, and rollups compound hundreds of micro-memories into the handful of facts that actually matter.",
+  },
+  {
+    step: "04",
+    title: "Recall",
+    body: "One call fuses active constraints, code anchors, ranked memories, and negative lessons into a token-budgeted context package — a sub-2ms local query, ready before your agent's first turn.",
+  },
+];
+
+const installCode = `# Zero-install, any agent
+npx musememory connect
+
+# Your agent now has:
+#   muse_context      — flagship fused recall
+#   muse_why          — "why is it built this way"
+#   muse_memory_for_code — file ↔ memory bridge
+#   ... 69 tools across 6 task profiles`;
+
+const trustChecks = [
+  { text: "Secret committed to memory", got: "write refused, fail-fast", color: "red" },
+  { text: "Citation to a deleted file", got: "anchor flagged orphaned, drift audited", color: "amber" },
+  { text: "Two contradicting facts", got: "conflicted state + resolution strategies", color: "cyan" },
+  { text: "Hallucinated anchor", got: "write rejected at the door", color: "violet" },
+];
+
+const faqs = [
+  {
+    q: "Does Muse Memory need an LLM or an API key?",
+    a: "No. Capture, ranking, and recall run entirely in-process — SQLite FTS5 BM25 plus structural scoring — with no embedding API and no cloud call anywhere in the path. LLMs remain optional and are only ever invoked by you.",
+  },
+  {
+    q: "Will a memory engine slow my agent down?",
+    a: "No — recall is a sub-2ms local SQLite query with a hard token budget, and the L0 hot cache answers entry lookups in under 50µs. That is far cheaper than re-explaining your architecture to the agent every session.",
+  },
+  {
+    q: "Where does my data live?",
+    a: "In your project: .memory/ locally and ~/.memory/ globally, as plain SQLite and YAML files you can read, back up, gitignore, or sync. There is no cloud, no telemetry, and no background daemon.",
+  },
+  {
+    q: "What happens when my code changes after a memory is stored?",
+    a: "The recall-time freshness gate catches it. Anchors are structural hashes rather than line numbers, so refactors survive; real drift is detected at recall time and stale memories are withheld with an explicit notice instead of being served.",
+  },
+  {
+    q: "Can an agent hallucinate memories into the store?",
+    a: "Not citations. Every code anchor is verified against the live filesystem at write time, so a memory citing a file or symbol that doesn't exist is rejected before it is ever stored.",
+  },
+  {
+    q: "How do I import my existing agent history?",
+    a: "The universal migrator imports 24+ formats — including Mem0, Letta, and AgentMemory — and transcript harvesters distill past JSONL session logs into candidate memories automatically.",
+  },
+];
+
+const faqJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+});
+
+const appJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Muse Memory",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Linux, Windows",
+  softwareVersion: "2.3.0",
+  description:
+    "Zero-daemon, sub-2ms persistent memory for AI coding agents. Citations verified at write time, stale memories withheld at recall time.",
+  url: "https://harshsinghmp.github.io/musememory/",
+  downloadUrl: "https://www.npmjs.com/package/musememory",
+  codeRepository: "https://github.com/harshsinghmp/musememory",
+  license: "https://opensource.org/licenses/MIT",
+  runtimePlatform: "Node.js, Bun",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  featureList: [
+    "Write-time citation verification",
+    "In-process retrieval engine (sub-2ms recall)",
+    "One command, 80+ agent platforms",
+    "Deterministic lifecycle and forgetting",
+    "Structural code anchors (line-invariant)",
+    "Vibeguard secret defense on every write",
+  ],
+});
+---
+
+<Base>
+  <header class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href={`${base}/`}>
+        <svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8b7cf7"></stop>
+              <stop offset="1" stop-color="#4fd6e0"></stop>
+            </linearGradient>
+          </defs>
+          <path d="M14 40 L26 24 L38 40 L50 24" stroke="url(#bg1)" stroke-width="4" fill="none" stroke-linecap="round"></path>
+        </svg>
+        Muse<span>Memory</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#pillars">Capabilities</a>
+        <a href="#compare">Compare</a>
+        <a href={`${base}/docs`}>Docs</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
+      </nav>
+      <a class="btn btn-primary" href="#install">Get started</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="synapse-orb" style="width:34rem;height:34rem;top:-12rem;left:8%;background:var(--violet);opacity:.16"></div>
+      <div class="synapse-orb" style="width:28rem;height:28rem;top:-6rem;right:6%;background:var(--cyan);opacity:.13;animation-delay:-7s"></div>
+      <div class="container">
+        <p class="hero-kicker">
+          <span class="pulse"></span> Zero-daemon · Local-first · MCP-native
+        </p>
+        <h1>
+          Give your agents a memory
+          <span class="grad">that verifies itself.</span>
+        </h1>
+        <p class="hero-sub">
+          A local-first cognitive memory engine for AI coding agents. Recall runs in
+          under 2ms against your own disk, every citation is verified at write time, and
+          nothing stale gets served — wired to 80+ platforms with one command.
+        </p>
+        <div class="hero-cta reveal" style="--reveal-delay:150ms">
+          <a class="btn btn-primary" href="#install">Install in one command</a>
+          <a class="btn btn-ghost" href="https://github.com/harshsinghmp/musememory" rel="noopener">
+            Star on GitHub ↗
+          </a>
+        </div>
+        <pre class="term" aria-label="terminal"><code>{installCode}<span class="caret"></span></code></pre>
+
+        <div class="hero-strip reveal" style="--reveal-delay:300ms" aria-hidden="true">
+          {["recall", "verify", "consolidate", "forget", "rehydrate", "sync", "repeat"].map(
+            (w) => <span>{w}</span>,
+          )}
+        </div>
+      </div>
+    </section>
+
+    <!-- PILLARS -->
+    <section class="section" id="pillars">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Capabilities</p>
+          <h2>Six pillars of a memory you can trust</h2>
+          <p>
+            This is not a vector dump with a search box. It's a governed engine: every
+            memory is captured, verified, consolidated, and recalled under rules you can
+            audit.
+          </p>
+        </div>
+        <div class="grid-3">
+          {pillars.map((p, i) => (
+            <article class={`card card-${p.color} card-sheen reveal`} style={`--reveal-delay:${i * 80}ms`}>
+              <span class={`chip chip-${p.color}`}>{p.tag}</span>
+              <h3>{p.title}</h3>
+              <p>{p.body}</p>
+              <p class="card-stat">{p.stat}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- SHOWREEL -->
+    <section class="section section-alt" id="showreel">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Showreel</p>
+          <h2>Ten seconds, straight from the engine</h2>
+          <p>Screen capture of the real site and CLI surfaces. Nothing rendered, nothing mocked.</p>
+        </div>
+        <figure class="reel reveal">
+          <video
+            controls
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            poster={`${base}/showreel-poster.png`}
+            src={`${base}/showreel.mp4`}
+          ></video>            <figcaption>The 10-second showreel — download public/showreel.mp4 for social embedding.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section class="section" id="flow">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2>A memory loop, not a storage bucket</h2>
+          <p>Knowledge moves through one deterministic pipeline — the same steps every time, auditable at every stage.</p>
+        </div>
+        <ol class="flow">
+          {flow.map((f, i) => (
+            <li class="flow-step reveal" style={`--reveal-delay:${i * 110}ms`}>
+              <span class="flow-num">{f.step}</span>
+              <div>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+
+    <!-- BENCHMARKS -->
+    <section class="section" id="benchmarks">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Benchmarks</p>
+          <h2>Fast by architecture, not by cache luck</h2>
+          <p>Measured with the built-in "memory benchmark" suite: clean store, cold process, no network.</p>
+        </div>
+        <div class="bench-grid">
+          {benchmarks.map((b, i) => (
+            <div class="bench reveal" style={`--reveal-delay:${i * 70}ms`}>
+              <p class="bench-value">{b.value}</p>
+              <p class="bench-label">{b.label}</p>
+              <p class="bench-note">{b.note}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- TRUST -->
+    <section class="section section-alt" id="trust">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Trust gates</p>
+          <h2>What happens when a memory is wrong</h2>
+          <p>Most memory systems serve stale facts with total confidence. Muse gates every boundary — write, recall, sync — and refuses what it can't verify.</p>
+        </div>
+        <div class="trust-list">
+          {trustChecks.map((t, i) => (
+            <div class="trust-row reveal" style={`--reveal-delay:${i * 90}ms`}>
+              <span class={`chip chip-${t.color}`}>✕</span>
+              <span class="trust-bad">{t.text}</span>
+              <span class="trust-arrow">→</span>
+              <span class={`trust-good good-${t.color}`}>{t.got}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS BAND -->
+    <section class="stats-band" aria-label="Proof points">
+      <div class="container stats-inner">
+        {[ 
+          ["527+", "tests passing, fully offline"],
+          ["24+", "migrator formats"],
+          ["69", "MCP tools, profiled"],
+          ["0", "cloud dependencies"],
+        ].map(([v, l], i) => (
+          <div class="stat reveal" style={`--reveal-delay:${i * 70}ms`}>
+            <p class="stat-v">{v}</p>
+            <p class="stat-l">{l}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- COMPARISON -->
+    <section class="section section-alt" id="compare">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Landscape</p>
+          <h2>How Muse compares</h2>
+          <p>Vector stores optimize for similarity, graphs for relationships. Muse optimizes for what a coding agent actually needs: verified, code-grounded recall that never serves stale truth.</p>
+        </div>
+        <div class="table-wrap reveal">
+          <table class="compare">
+            <thead>
+              <tr><th>Capability</th><th>Muse Memory</th><th>Vector stores<br/><span class="th-sub">Mem0 / Supermemory</span></th><th>Graph platforms<br/><span class="th-sub">Zep / Graphiti / Cognee</span></th></tr>
+            </thead>
+            <tbody>
+              {[
+                ["Runs 100% local, zero daemons", true, false, false],
+                ["No API key required (keyless mode)", true, false, false],
+                ["Sub-2ms retrieval (in-process)", true, false, false],
+                ["Write-time citation verification", true, false, false],
+                ["Recall-time freshness gate", true, false, false],
+                ["Deterministic lifecycle state machine", true, false, true],
+                ["Structural code anchors (line-invariant)", true, false, false],
+                ["Secret defense on every write", true, false, false],
+                ["Single command wires 80+ platforms", true, false, false],
+                ["Git-reviewable memory files", true, false, false],
+              ].map(([cap, muse, vec, graph]: any) => (
+                <tr>
+                  <td>{cap}</td>
+                  <td class="yes">{muse ? "✓" : "—"}</td>
+                  <td class={vec ? "yes" : "no"}>{vec ? "✓" : "✕"}</td>
+                  <td class={graph ? "yes" : "no"}>{graph ? "✓" : "✕"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note">Generalizations — each platform evolves quickly; check their docs. Comparison reflects Muse v2.3 capabilities.</p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <div class="container faq-wrap">
+        <div class="section-head">
+          <p class="eyebrow">FAQ</p>
+          <h2>Questions agents ask before installing</h2>
+        </div>
+        <div class="faq">
+          {faqs.map((f, i) => (
+            <details class="faq-item reveal" style={`--reveal-delay:${i * 60}ms`}>
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <script is:inline type="application/ld+json" set:html={faqJsonLd} />
+    <script is:inline type="application/ld+json" set:html={appJsonLd} />
+
+    <!-- FINAL CTA -->
+    <section class="cta-final" id="install-cta">
+      <div class="container cta-inner reveal">
+        <h2>Stop re-explaining. Start remembering.</h2>
+        <p>One command wires every agent you run. The memory verifies itself from there.</p>
+        <div class="cta-actions">
+          <a class="btn btn-primary btn-lg" href="#install">Install now</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/harshsinghmp/musememory" rel="noopener">Read the source ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- INSTALL -->
+    <section class="section" id="install">
+      <div class="container install-wrap">
+        <div class="section-head">
+          <p class="eyebrow">Get started</p>
+          <h2>One command. That's the whole setup.</h2>
+          <p>
+            Muse detects every installed agent and wires itself in over MCP, profiled per
+            task: Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes,
+            OpenClaw and 70+ more get exactly the tools their task needs — nothing more.
+          </p>
+        </div>
+        <div class="install-grid">
+          <pre class="term"><code>npx musememory connect</code></pre>
+          <pre class="term"><code>memory capture "Auth uses jose, not jsonwebtoken" --type architecture</code></pre>
+          <pre class="term"><code>memory context --query "how does auth work" --budget 2000</code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p>
+        <strong>Muse Memory</strong> — autonomous cognitive memory for AI agents · MIT
+      </p>
+      <nav>
+        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub</a>
+        <a href="https://www.npmjs.com/package/musememory" rel="noopener">npm</a>
+        <a href="https://github.com/harshsinghmp/musememory/blob/main/README.md" rel="noopener">Docs</a>
+      </nav>
+    </div>
+  </footer>
+
+  <style>
+    /* nav & footer chrome lives in global.css (shared across all pages) */
+
+    .hero { padding: clamp(4rem, 10vw, 7.5rem) 0 2.5rem; text-align: center; }
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55em;
+      font-size: var(--fs-small);
+      color: var(--text-dim);
+      border: 1px solid var(--line);
+      background: var(--bg-raised);
+      border-radius: 999px;
+      padding: 0.45em 1.1em;
+      margin-bottom: 1.6rem;
+    }
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5);
+      animation: pulse 2.2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5); }
+      70% { box-shadow: 0 0 0 9px rgba(95, 211, 154, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0); }
+    }
+    h1 {
+      font-size: var(--fs-hero);
+      font-weight: 800;
+      max-width: 19ch;
+      margin: 0 auto 1.2rem;
+    }
+    .grad {
+      background: linear-gradient(92deg, var(--violet) 10%, var(--cyan) 90%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-sub {
+      max-width: 44rem;
+      margin: 0 auto 2.2rem;
+      color: var(--text-dim);
+      font-size: clamp(1.02rem, 1.7vw, 1.16rem);
+    }
+    .hero-cta {
+      display: flex;
+      gap: 0.9rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2.4rem;
+    }
+    .term {
+      text-align: left;
+      background: var(--bg-panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.3rem;
+      max-width: 640px;
+      margin: 0 auto;
+      overflow-x: auto;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    }
+    .term code {
+      background: none; border: none; padding: 0;
+      color: var(--text);
+      font-size: 0.92rem;
+      line-height: 1.7;
+      white-space: pre;
+    }
+    .hero-strip {
+      display: flex;
+      gap: 0.7rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 2.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-faint);
+    }
+    .hero-strip span {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.28em 0.95em;
+    }
+
+    .section-alt {
+      background: var(--bg-raised);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 1.1rem;
+    }
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.5rem 1.3rem;
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: var(--line-strong); }
+    .card h3 { margin: 0.9rem 0 0.55rem; }
+    .card p { color: var(--text-dim); font-size: 0.95rem; }
+    .card-stat {
+      margin-top: 1rem !important;
+      font-family: var(--font-mono);
+      font-size: 0.8rem !important;
+      color: var(--text-faint) !important;
+    }
+    .chip {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      border-radius: 999px;
+      padding: 0.3em 0.8em;
+    }
+    .chip-violet { background: var(--violet-soft); color: var(--violet); }
+    .chip-cyan   { background: var(--cyan-soft);   color: var(--cyan); }
+    .chip-amber  { background: var(--amber-soft);  color: var(--amber); }
+    .chip-green  { background: var(--green-soft);  color: var(--green); }
+    .chip-red    { background: var(--red-soft);    color: var(--red); }
+
+    .flow {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.1rem;
+      counter-reset: none;
+    }
+    .flow-step {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      position: relative;
+    }
+    .flow-num {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      letter-spacing: 0.12em;
+    }
+    .flow-step h3 { margin: 0.55rem 0 0.45rem; }
+    .flow-step p { color: var(--text-dim); font-size: 0.93rem; }
+
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem;
+    }
+    .bench {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.3rem 1.2rem;
+      text-align: center;
+    }
+    .bench-value {
+      font-size: clamp(1.5rem, 2.6vw, 2rem);
+      font-weight: 800;
+      background: linear-gradient(92deg, var(--violet), var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .bench-label { color: var(--text); font-size: 0.9rem; margin-top: 0.35rem; font-weight: 600; }
+    .bench-note { color: var(--text-faint); font-size: 0.78rem; }
+
+    .trust-list {
+      display: grid;
+      gap: 0.8rem;
+      max-width: 46rem;
+    }
+    .trust-row {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1.1rem;
+    }
+    .trust-bad { color: var(--text-dim); }
+    .trust-arrow { color: var(--text-faint); }
+    .trust-good { font-family: var(--font-mono); font-size: 0.85rem; }
+    .good-violet { color: var(--violet); }
+    .good-cyan   { color: var(--cyan); }
+    .good-amber  { color: var(--amber); }
+    .good-red    { color: var(--red); }
+
+    .reel {
+      max-width: 880px;
+      margin: 0 auto;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+      background: var(--bg-panel);
+    }
+    .reel video { display: block; width: 100%; height: auto; }
+    .reel figcaption {
+      padding: 0.8rem 1.1rem;
+      font-size: var(--fs-small);
+      color: var(--text-faint);
+      border-top: 1px solid var(--line);
+    }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-panel); }
+    .compare { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 640px; }
+    .compare th, .compare td { padding: 0.85rem 1.1rem; text-align: left; border-bottom: 1px solid var(--line); }
+    .compare thead th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); background: rgba(139,124,247,0.05); }
+    .th-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 0.74rem; }
+    .compare tbody tr:last-child td { border-bottom: none; }
+    .compare tbody tr:hover td { background: rgba(139,124,247,0.04); }
+    .compare td:nth-child(2) { font-weight: 700; }
+    .compare .yes { color: var(--green); font-weight: 600; }
+    .compare .no { color: var(--text-faint); }
+    .table-note { margin-top: 0.8rem; font-size: 0.8rem; color: var(--text-faint); }
+
+    .faq-wrap { max-width: 780px; }
+    .faq { display: grid; gap: 0.75rem; }
+    .faq-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.3rem;
+      transition: border-color 0.2s ease;
+    }
+    .faq-item[open] { border-color: var(--line-strong); }
+    .faq-item summary {
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .faq-item summary::after { content: "+"; color: var(--cyan); font-size: 1.3rem; line-height: 1; transition: transform 0.2s ease; }
+    .faq-item[open] summary::after { transform: rotate(45deg); }
+    .faq-item p { margin-top: 0.7rem; color: var(--text-dim); font-size: 0.95rem; }
+
+    .stats-band {
+      border-block: 1px solid var(--line);
+      background: linear-gradient(180deg, var(--bg-raised), var(--bg));
+      padding: 2.6rem 0;
+    }
+    .stats-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.4rem; text-align: center; }
+    .stat-v {
+      font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+      font-weight: 800;
+      background: linear-gradient(92deg, var(--violet), var(--cyan));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .stat-l { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.2rem; }
+
+    .cta-final {
+      padding: clamp(3.5rem, 9vw, 6.5rem) 0;
+      text-align: center;
+      background:
+        radial-gradient(40rem 20rem at 50% 120%, rgba(139,124,247,0.18), transparent 65%),
+        var(--bg-raised);
+      border-top: 1px solid var(--line);
+    }
+    .cta-inner h2 { font-size: var(--fs-h2); margin-bottom: 0.5em; }
+    .cta-inner p { color: var(--text-dim); margin-bottom: 2rem; }
+    .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-lg { padding: 1em 2em; font-size: 1rem; }
+
+    .install-wrap { text-align: center; }
+    .install-wrap .section-head { margin-inline: auto; }
+    .install-grid {
+      display: grid;
+      gap: 0.9rem;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .install-grid .term { max-width: none; margin: 0; }
+
+  </style>
+</Base>
