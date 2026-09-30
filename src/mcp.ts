@@ -1274,6 +1274,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             token_budget: { type: "number", description: "Maximum token budget to consume (default: 4000)" },
             project: { type: "string", description: "Optional project filter" },
             dir: { type: "string", description: "Optional project workspace directory path" },
+            include_drifted: {
+              type: "boolean",
+              description: "Include memories whose code anchors have drifted (default false: they are withheld by the freshness gate and reported instead)",
+            },
           },
         },
       },
@@ -2364,11 +2368,19 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           qualifiedName: a.qualified_name ? String(a.qualified_name) : undefined,
           providerMetadata: (a.provider_metadata && typeof a.provider_metadata === "object") ? a.provider_metadata as Record<string, any> : undefined,
         });
+        // Kage-pattern trust gate: a hallucinated citation (orphaned anchor) is
+        // refused with an explicit error so it can never enter storage.
+        if (anchor.status === "orphaned") {
+          return toolError(
+            `Hallucinated citation rejected: ${anchor.file_path}${anchor.symbol_name ? `#${anchor.symbol_name}` : ""} does not exist in the workspace. Verify the file/symbol exists, then retry.`,
+          );
+        }
         const updatedEntry = attachAnchorToMemory(activeStore, String(a.memory_id), anchor, a.agent ? String(a.agent) : undefined);
         return toolResult({
           anchor,
           entry_id: updatedEntry.id,
           total_anchors: updatedEntry.anchors?.length || 0,
+          verification: anchor.status === "drifted" ? "drifted: code body changed since memory was recorded" : "valid",
         });
       }
       case "memory_anchor_verify": {
@@ -2396,6 +2408,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           token_budget: typeof a.token_budget === "number" ? a.token_budget : undefined,
           project: a.project ? String(a.project) : undefined,
           dir: a.dir ? String(a.dir) : undefined,
+          include_drifted: a.include_drifted === true,
         });
         return toolResult(result);
       }

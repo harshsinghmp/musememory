@@ -203,16 +203,39 @@ export function verifyCodeAnchor(
 
 /**
  * Attaches or updates a code anchor on a memory entry.
+ *
+ * Write-time citation verification (GAP-1): the anchor is verified against the
+ * live filesystem before the write is admitted. A hallucinated citation (file or
+ * symbol that does not exist) rejects the write under the default `fail_fast`
+ * policy. Pass `verify: false` to opt out.
  */
 export function attachAnchorToMemory(
   store: Store,
   memoryId: string,
   anchor: CodeAnchor,
-  actor: string = "agent"
+  actor: string = "agent",
+  options: { verify?: boolean; verification_policy?: "fail_fast" | "warn" | "strict"; workspaceRoot?: string } = {}
 ): MemoryEntry {
   const entry = get(store, memoryId);
   if (!entry) {
     throw new Error(`Memory entry '${memoryId}' not found in store`);
+  }
+
+  // Write-time citation verification: reject hallucinated citations before storage.
+  if (options.verify !== false) {
+    const { enforceWriteTimeVerification, formatRejectionError } = require("./verify-write.ts");
+    // Canonical workspace root from the store layout; callers may override.
+    const workspaceRoot = options.workspaceRoot ?? store.layout?.root ?? (store.memoryDir ? resolve(store.memoryDir, "..") : process.cwd());
+    const probe: MemoryEntry = { ...entry, anchors: [anchor] };
+    const result = enforceWriteTimeVerification(store, workspaceRoot, probe, {
+      policy: options.verification_policy ?? "fail_fast",
+    });
+    if (!result.admitted) {
+      throw new Error(formatRejectionError(result));
+    }
+    // Adopt the verified anchor (fresh status/hash/verified_at stamps).
+    const verified = probe.anchors?.[0];
+    if (verified) anchor = verified;
   }
 
   const anchors = entry.anchors || [];
