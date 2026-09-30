@@ -14,3 +14,4 @@
 | [`current.md`](./current.md) | Current shipped state (v2.0.0), test coverage, and active constraints | Before starting work on bugs, features, or refactors |
 | [`decisions.md`](./decisions.md) | Locked architectural decisions (zero-daemon, file-backed SQLite, atomic I/O) | Evaluating technical choices or refactors |
 | [`roadmap.md`](./roadmap.md) | Planned improvements, ecosystem expansions, and backlog | Scoping new capabilities |
+| [`deep-research-agentic-memory-evolution.md`](./deep-research-agentic-memory-evolution.md) | Deep research brief & architectural plan for agentic cognitive OS evolution | Designing R17-R22 milestones and feature implementations |

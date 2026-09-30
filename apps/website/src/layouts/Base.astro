@@ -1,0 +1,47 @@
+---
+import "../styles/global.css";
+import { initMotion } from "../scripts/motion.ts";
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+const {
+  title = "Muse Memory — Agent memory that verifies itself",
+  description = "Zero-daemon, sub-2ms persistent memory for AI coding agents. Citations verified at write time, stale memories withheld at recall time. 80+ platforms wired in one command — fully local, keyless, MIT.",
+  ogImage = "brand/og.png",
+} = Astro.props;
+const ogAbs = `${import.meta.env.BASE_URL}/${ogImage.replace(/^\//, "")}`;
+const motionScript = initMotion();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={ogAbs} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogAbs} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+  </head>
+  <body>
+    <slot />
+    <script is:inline set:html={motionScript} />
+  </body>
+</html>

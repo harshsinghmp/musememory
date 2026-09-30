@@ -1,0 +1,44 @@
+---
+import Base from "../layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="404 — Muse Memory" description="That page was never stored. Head back to the Muse Memory home page or read the docs.">
+  <main class="nf">
+    <div class="container nf-inner">
+      <svg width="72" height="72" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="nf1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#8b7cf7"></stop>
+            <stop offset="1" stop-color="#4fd6e0"></stop>
+          </linearGradient>
+        </defs>
+        <path d="M14 40 L26 24 L38 40 L50 24" stroke="url(#nf1)" stroke-width="4" fill="none" stroke-linecap="round"></path>
+        <circle cx="50" cy="24" r="5" fill="#f27b7b"></circle>
+      </svg>
+      <p class="nf-code">404</p>
+      <h1>This memory was never stored.</h1>
+      <p class="nf-sub">The page you're after isn't in the store — but unlike your agent, now you know why.</p>
+      <div class="nf-actions">
+        <a class="btn btn-primary" href={`${base}/`}>Back home</a>
+        <a class="btn btn-ghost" href={`${base}/docs`}>Read the docs</a>
+      </div>
+    </div>
+  </main>
+
+  <style>
+    .nf { min-height: 100vh; display: grid; place-items: center; text-align: center; }
+    .nf-code {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: clamp(3rem, 8vw, 5rem);
+      font-weight: 800;
+      background: linear-gradient(92deg, var(--violet), var(--cyan));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin: 1rem 0 0;
+    }
+    h1 { font-size: var(--fs-h2); margin: 0.4em 0; }
+    .nf-sub { color: var(--text-dim); max-width: 42ch; margin: 0 auto 2rem; }
+    .nf-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  </style>
+</Base>

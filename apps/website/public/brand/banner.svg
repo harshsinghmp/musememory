@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Muse Memory — Autonomous cognitive memory for AI agents">
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07090f"/>
+      <stop offset="1" stop-color="#0d1220"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <radialGradient id="glowV" cx="0.18" cy="0.1" r="0.7">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="0.88" cy="0.12" r="0.65">
+      <stop offset="0" stop-color="#4fd6e0" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4fd6e0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#ink)"/>
+  <rect width="1280" height="640" fill="url(#glowV)"/>
+  <rect width="1280" height="640" fill="url(#glowC)"/>
+
+  <!-- synapse trace: capture → verify → consolidate → recall -->
+  <g stroke="url(#accent)" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9">
+    <path d="M120 470 L215 355 L310 470 L405 355"/>
+  </g>
+  <g fill="#8b7cf7">
+    <circle cx="120" cy="470" r="7"/>
+    <circle cx="310" cy="470" r="7"/>
+  </g>
+  <g fill="#4fd6e0">
+    <circle cx="215" cy="355" r="7"/>
+    <circle cx="405" cy="355" r="7"/>
+  </g>
+  <g font-family="Menlo, Consolas, monospace" font-size="17" fill="#64708f" letter-spacing="2">
+    <text x="88" y="512">CAPTURE</text>
+    <text x="188" y="330">VERIFY</text>
+    <text x="278" y="512">CONSOLIDATE</text>
+    <text x="378" y="330">RECALL</text>
+  </g>
+
+  <!-- wordmark -->
+  <text x="470" y="270" font-family="Inter, 'Segoe UI', sans-serif" font-size="92" font-weight="800" fill="#e8ecf8" letter-spacing="-3">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="473" y="330" font-family="Inter, 'Segoe UI', sans-serif" font-size="27" fill="#9aa5c3">Autonomous cognitive memory for AI agents</text>
+
+  <!-- proof chips -->
+  <g font-family="Menlo, Consolas, monospace" font-size="18">
+    <g>
+      <rect x="473" y="372" rx="17" width="200" height="38" fill="#101624" stroke="#253052"/>
+      <text x="492" y="397" fill="#8b7cf7">◆ sub-2ms recall</text>
+    </g>
+    <g>
+      <rect x="689" y="372" rx="17" width="196" height="38" fill="#101624" stroke="#253052"/>
+      <text x="708" y="397" fill="#4fd6e0">◆ 80+ agents</text>
+    </g>
+    <g>
+      <rect x="901" y="372" rx="17" width="222" height="38" fill="#101624" stroke="#253052"/>
+      <text x="920" y="397" fill="#5fd39a">◆ zero daemons</text>
+    </g>
+  </g>
+
+  <!-- terminal strip -->
+  <g>
+    <rect x="473" y="446" rx="12" width="480" height="58" fill="#0c1019" stroke="#2a3557"/>
+    <circle cx="499" cy="475" r="5.5" fill="#f27b7b"/>
+    <circle cx="519" cy="475" r="5.5" fill="#f5b455"/>
+    <circle cx="539" cy="475" r="5.5" fill="#5fd39a"/>
+    <text x="563" y="482" font-family="Menlo, Consolas, monospace" font-size="20" fill="#e8ecf8">$ npx <tspan fill="#4fd6e0">musememory</tspan> connect</text>
+  </g>
+
+  <g font-family="Menlo, Consolas, monospace" font-size="16" fill="#474f6b">
+    <text x="473" y="556">MIT · local-first · MCP-native · write-time citation verification</text>
+  </g>
+
+  <rect x="0" y="634" width="1280" height="6" fill="url(#accent)"/>
+</svg>

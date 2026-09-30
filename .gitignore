@@ -75,3 +75,6 @@ dogfood-output/
 !skills/
 !skills/**
 .crush/
+
+# Astro generated cache/types
+.astro/

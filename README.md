@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="#what-muse-memory-does">
-  <img src="./assets/banner.svg" alt="Muse Memory, persistent local-first memory for AI agents" width="100%" />
+  <img src="./apps/website/public/brand/banner.png" alt="Muse Memory — Autonomous cognitive memory for AI agents" width="100%" />
 </a>
 
 <br />
@@ -27,7 +27,11 @@
 
 **Persistent, local-first memory for AI agents and the projects they work on.**
 
-[Visit the live site](https://harshsinghmp.github.io/musememory/) · [Read the comparison dossier](https://harshsinghmp.github.io/musememory/musememory-comparison.html) · [Install Muse Memory](#start-with-one-command)
+[Visit the live site](https://harshsinghmp.github.io/musememory/) · [Docs](https://harshsinghmp.github.io/musememory/docs) · [Comparison](https://harshsinghmp.github.io/musememory/compare) · [Install](#start-with-one-command)
+
+https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000
+
+*→ Prefer the raw clip? [`apps/website/public/showreel.mp4`](./apps/website/public/showreel.mp4) (10s, 1280×720, 240KB) — or watch it embedded on the [live site](https://harshsinghmp.github.io/musememory/#showreel).*
 
 </div>
 
