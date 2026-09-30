@@ -242,6 +242,67 @@ export async function handleHookCommand({ positional, flags }: ParsedArgs): Prom
   return result.installed ? 0 : 1;
 }
 
+/**
+ * `memory hooks` — Claude Code lifecycle hook pack (GAP-2).
+ *
+ *  memory hooks install [--dry-run]     wire SessionStart/PostToolUse/Stop
+ *  memory hooks uninstall               remove Muse-owned hook entries
+ *  memory hooks session-start           (hook payload; reads Claude Code stdin)
+ *  memory hooks post-tool-use           (hook payload)
+ *  memory hooks stop                    (hook payload)
+ *
+ * Payload commands are fail-open: they exit 0 even on error so a memory
+ * problem can never block the agent loop.
+ */
+export async function handleHooksCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const sub = positional[0] ?? "install";
+  const { installHookPack, uninstallHookPack, runSessionStartHook, runPostToolUseHook, runStopHook } = await import(
+    "../hooks/pack.ts"
+  );
+
+  switch (sub) {
+    case "install": {
+      const dryRun = flags["dry-run"] === "true";
+      try {
+        const result = installHookPack(undefined, {
+          dryRun,
+          settingsPath: flags["settings"],
+        });
+        console.log(`${dryRun ? "[DRY RUN] " : ""}Claude Code hook pack -> ${result.settingsPath}`);
+        for (const r of result.installed) console.log(`  * ${r.message}`);
+        if (result.alreadyPresent) console.log("  (existing Muse hooks were refreshed in place)");
+        console.log("\nMemory is now hands-free: context injects at SessionStart, tool results are captured at PostToolUse, sessions distill at Stop.");
+        return 0;
+      } catch (err: any) {
+        return fail(`hooks install error: ${err.message}`);
+      }
+    }
+    case "uninstall": {
+      const result = uninstallHookPack(undefined, {
+        dryRun: flags["dry-run"] === "true",
+        settingsPath: flags["settings"],
+      });
+      if (result.removed.length === 0) {
+        console.log(`No Muse hooks found in ${result.settingsPath}.`);
+      } else {
+        console.log(`Removed ${result.removed.join(", ")} hook(s) from ${result.settingsPath}.`);
+      }
+      return 0;
+    }
+    case "session-start":
+      await runSessionStartHook();
+      return 0;
+    case "post-tool-use":
+      runPostToolUseHook();
+      return 0;
+    case "stop":
+      runStopHook();
+      return 0;
+    default:
+      return usageError(`unknown hooks subcommand '${sub}' (expected install | uninstall | session-start | post-tool-use | stop)`);
+  }
+}
+
 export async function handleHarvestAutoCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;

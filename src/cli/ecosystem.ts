@@ -413,6 +413,20 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
     agent = "all";
   }
 
+  // GAP-2: optionally wire the Claude Code lifecycle hook pack (hands-free capture/inject).
+  const withHooks = flags["with-hooks"] === "true";
+  if (withHooks && !dryRun) {
+    try {
+      const { installHookPack } = await import("../hooks/pack.ts");
+      const hookResult = installHookPack();
+      for (const r of hookResult.installed) console.log(`  [HOOKS] ${r.message}`);
+    } catch (err: any) {
+      console.log(`  [HOOKS] Skipped: ${err.message}`);
+    }
+  } else if (withHooks && dryRun) {
+    console.log(`  [HOOKS] [DRY RUN] Would wire SessionStart/PostToolUse/Stop hooks into ~/.claude/settings.json`);
+  }
+
   try {
     const reports = connectAgent(agent, undefined, { dryRun, force });
     if (reports.length === 0) {

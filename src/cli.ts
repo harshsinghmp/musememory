@@ -25,6 +25,7 @@ import {
   handleImportTranscriptCommand,
   handleSearchTranscriptCommand,
   handleHookCommand,
+  handleHooksCommand,
   handleHarvestAutoCommand,
   handleReindexCommand,
 } from "./cli/retrieval.ts";
@@ -140,7 +141,9 @@ Persona, Settings & Constraints Commands:
   core [tier] [--set T|--remove|--show] Manage CORE.md permanent partitions (identity|directives|conventions|context)
 
 Ecosystem, Migration & Connectivity:
-  connect [agent|all] [--force] Auto-wire MCP into detected coding agents with zero permissions
+  connect [agent|all] [--force] [--with-hooks]
+                                 Auto-wire MCP into detected coding agents; --with-hooks also installs
+                                 the Claude Code lifecycle hook pack (SessionStart/PostToolUse/Stop)
   agents / detect-agents        Scan workstation for 80+ coding agent platforms
   detect                        Scan machine for 24+ external memory formats
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
@@ -232,6 +235,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleHarvestAutoCommand(parsed);
     case "hook":
       return handleHookCommand(parsed);
+    case "hooks":
+      return handleHooksCommand(parsed);
     case "reindex":
       return handleReindexCommand(parsed);
     case "import-transcript":

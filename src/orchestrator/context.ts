@@ -5,6 +5,7 @@ import { list } from "../store.ts";
 import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
 import { parseCurrentFile } from "../governor.ts";
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
+import { gateCandidates } from "./freshness.ts";
 import type { MuseContextInput, FusedContextResult } from "./types.ts";
 
 function estimateTokens(text: string): number {
@@ -146,11 +147,21 @@ export async function resolveMuseContext(
     }
   }
 
+  // 4.5 Recall-time freshness gate (GAP-3): withhold memories whose code
+  // citations no longer match the live workspace. Drifted/orphaned memories are
+  // excluded from context by default and reported explicitly — never silently
+  // dropped. Opt in via include_drifted to receive them with provenance warnings.
+  const gate = gateCandidates(store, workspaceRoot, candidatePool, {
+    enforce: input.include_drifted !== true,
+    include_drifted: input.include_drifted === true,
+  });
+  const gatedPool = gate.entries;
+
   // 5. Separate negative lessons & anti-patterns
   const negativeLessons: MemoryEntry[] = [];
   const relevantMemories: MemoryEntry[] = [];
 
-  for (const entry of candidatePool) {
+  for (const entry of gatedPool) {
     if (
       entry.negative != null ||
       entry.tags?.some((t) => t.includes("anti-pattern") || t.includes("bug") || t.includes("negative"))
@@ -211,8 +222,10 @@ export async function resolveMuseContext(
     suggestedNextSteps.push("Verify error resolution against previous bug fixes in relevant memories");
   }
 
-  if (suggestedNextSteps.length === 0) {
-    suggestedNextSteps.push("Proceed with planned task implementation and record decisions via memory_capture");
+  if (gate.withheldNotice) {
+    suggestedNextSteps.push(
+      `${gate.withheld.length} memor${gate.withheld.length === 1 ? "y" : "ies"} withheld by the freshness gate — re-verify or supersede them if the drift is intentional`
+    );
   }
 
   return {
@@ -223,5 +236,15 @@ export async function resolveMuseContext(
     tokens_used: usedBudget,
     token_budget: budget,
     suggested_next_steps: suggestedNextSteps,
+    withheld_memories: gate.withheld.length > 0
+      ? gate.withheld.map((w) => ({
+          id: w.memory_id,
+          reason: w.reason,
+          file_path: w.file_path,
+          symbol_name: w.symbol_name,
+        }))
+      : undefined,
+    freshness_notice: gate.withheldNotice ?? undefined,
+    freshness_stats: gate.stats,
   };
 }

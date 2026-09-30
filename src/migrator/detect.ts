@@ -273,6 +273,103 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
       "~/.roo"
     ],
     description: "Cline and Roo Code persistent task checkpoints and memory context"
+  },
+  {
+    id: "zep",
+    name: "Zep (Graphiti)",
+    category: "graph-rag",
+    scope: "global",
+    paths: [
+      ".zep",
+      "~/.zep",
+      "zep.yaml"
+    ],
+    description: "Temporal knowledge graph engine and episode memory store"
+  },
+  {
+    id: "langmem",
+    name: "LangMem (LangChain / LangGraph)",
+    category: "agent-harness",
+    scope: "hybrid",
+    paths: [
+      ".langmem",
+      "langgraph.json",
+      "~/.langmem"
+    ],
+    description: "LangGraph long-term semantic, episodic, and procedural memory store"
+  },
+  {
+    id: "hipporag",
+    name: "HippoRAG",
+    category: "graph-rag",
+    scope: "global",
+    paths: [
+      ".hipporag",
+      "hipporag",
+      "~/.hipporag"
+    ],
+    description: "Neurobiologically inspired hippocampal memory and Personalized PageRank graph"
+  },
+  {
+    id: "lightrag",
+    name: "LightRAG",
+    category: "graph-rag",
+    scope: "local",
+    paths: [
+      ".lightrag",
+      "lightrag",
+      "lightrag.db",
+      "~/.lightrag"
+    ],
+    description: "Dual-level lightweight entity and community graph RAG engine"
+  },
+  {
+    id: "claude-projects",
+    name: "Claude Projects / Custom Instructions",
+    category: "cloud-service",
+    scope: "global",
+    paths: [
+      "~/.claude",
+      ".claude",
+      "claude.json"
+    ],
+    description: "Anthropic Claude project memory, custom instructions, and cloud prompts"
+  },
+  {
+    id: "windsurf",
+    name: "Windsurf Cascade Memories",
+    category: "local-file",
+    scope: "hybrid",
+    paths: [
+      ".windsurfrules",
+      ".windsurf",
+      "~/.codeium/windsurf"
+    ],
+    description: "Windsurf cascade flow state, scratchpads, and auto-generated memory rules"
+  },
+  {
+    id: "amem",
+    name: "A-Mem (Agentic Memory)",
+    category: "agent-harness",
+    scope: "local",
+    paths: [
+      ".amem",
+      "amem_store",
+      "~/.amem"
+    ],
+    description: "Zettelkasten-inspired interlinked agent memory with dynamic note evolution"
+  },
+  {
+    id: "openhands",
+    name: "OpenHands Microagents",
+    category: "local-file",
+    scope: "local",
+    paths: [
+      ".openhands/microagents",
+      ".openhands",
+      "~/.openhands"
+    ],
+    description: "OpenHands repository microagent guidelines and episodic event traces"
   }
 ];
 
