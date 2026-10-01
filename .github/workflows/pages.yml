@@ -4,6 +4,11 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      rebuild-showreel:
+        description: "Re-render the showreel from the HyperFrames composition in CI"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,43 +37,46 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # ── Showreel auto-regeneration (hash-gated) ─────────────────────────
-      # The video is rebuilt only when something that changes its pixels did:
-      # site source, styles, or the capture script itself. The hash of those
-      # inputs is stored alongside the committed video; a mismatch triggers a
-      # fresh capture with headless Chromium + ffmpeg, then the hash is
-      # refreshed. Committed showreel files keep CI runs fast and diffs stable.
+      # ── Showreel freshness gate (hash-verified) ──────────────────────────
+      # The committed showreel.mp4 is rendered from the HyperFrames
+      # composition (apps/website/showreel-hf/) — the render is done locally
+      # via `bun run site:showreel`, never during deploy. The hash of the
+      # composition + build script + fonts is stored beside the video; a
+      # mismatch fails the deploy fast so the video can never drift from
+      # its source. To refresh: run `bun run site:showreel`, commit the new
+      # video + hash, or dispatch this workflow with rebuild-showreel=true.
       - name: Compute showreel input hash
         id: reelhash
         run: |
-          INPUTS=$(cat \
-            apps/website/src/styles/global.css \
-            apps/website/src/pages/index.astro \
-            apps/website/src/layouts/Base.astro \
-            apps/website/scripts/capture-showreel.ts \
+          INPUTS=$( (cat \
+            apps/website/showreel-hf/index.html \
+            apps/website/scripts/build-showreel.ts \
+            ; sha256sum apps/website/showreel-hf/assets/fonts/*.woff2) \
             | sha256sum | cut -d' ' -f1)
           STORED=$(cat apps/website/public/brand/.showreel-hash 2>/dev/null || echo "none")
           echo "hash=$INPUTS" >> "$GITHUB_OUTPUT"
           echo "stored=$STORED" >> "$GITHUB_OUTPUT"
           if [ "$INPUTS" != "$STORED" ]; then
-            echo "regen=true" >> "$GITHUB_OUTPUT"
+            echo "stale=true" >> "$GITHUB_OUTPUT"
           else
-            echo "regen=false" >> "$GITHUB_OUTPUT"
+            echo "stale=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install headless Chromium
-        if: steps.reelhash.outputs.regen == 'true'
+      - name: Fail on stale showreel (source changed, video not rebuilt)
+        if: steps.reelhash.outputs.stale == 'true' && inputs.rebuild-showreel != true
         run: |
-          cd apps/website
-          bunx --bun playwright install chromium
+          echo "::error::showreel.mp4 is stale — the HyperFrames composition changed without a re-render."
+          echo "Refresh locally with: bun run site:showreel"
+          echo "Then commit the new public/showreel.mp4, showreel-poster.png, and public/brand/.showreel-hash."
+          exit 1
 
-      - name: Regenerate showreel (design changed)
-        if: steps.reelhash.outputs.regen == 'true'
+      - name: Rebuild showreel in CI (dispatched)
+        if: inputs.rebuild-showreel == true
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           cd apps/website
-          bun scripts/capture-showreel.ts
+          bun scripts/build-showreel.ts
           echo "${{ steps.reelhash.outputs.hash }}" > public/brand/.showreel-hash
+          echo "⚠ Commit the regenerated showreel + updated public/brand/.showreel-hash." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build website
         run: bun run site:build
