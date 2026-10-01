@@ -101,6 +101,47 @@ async function reviewPage(
   await page.setViewportSize({ width: vp.w, height: vp.h });
   await page.goto(`http://127.0.0.1:${PORT}${path}`, { waitUntil: "networkidle" });
 
+  // ── Natural reveal check (BEFORE any freeze) ─────────────────────────────
+  // .reveal elements ship at opacity:0 and are shown by the site's injected
+  // IntersectionObserver runtime. If that runtime dies, whole sections render
+  // empty — so verify reveals fire naturally before masking them for layout
+  // measurements. (Freezing first would hide this exact class of bug.)
+  await page.waitForTimeout(1500);
+  const revealCheck = await page.evaluate(async () => {
+    const op = (el: Element) => parseFloat(getComputedStyle(el).opacity);
+    const onScreen = [...document.querySelectorAll(".reveal")].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top < window.innerHeight && r.bottom > 0;
+    });
+    const visibleOnScreen = onScreen.filter((el) => op(el) > 0.5).length;
+
+    // Scroll the page end-to-end so every reveal observer gets a chance to fire.
+    // Force instant scrolling: the site sets scroll-behavior:smooth, which makes
+    // successive scrollTo calls cancel each other before reaching lower sections.
+    const prevBehavior = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = "auto";
+    const height = document.documentElement.scrollHeight;
+    for (let y = 0; y <= height; y += Math.round(window.innerHeight * 0.7)) {
+      window.scrollTo(0, y);
+      await new Promise((r) => setTimeout(r, 140));
+    }
+    window.scrollTo(0, 0);
+    await new Promise((r) => setTimeout(r, 300));
+    document.documentElement.style.scrollBehavior = prevBehavior;
+    const all = [...document.querySelectorAll(".reveal")];
+    const stillHidden = all.filter((el) => op(el) <= 0.5).length;
+    return { totalOnScreen: onScreen.length, visibleOnScreen, total: all.length, stillHidden };
+  });
+  if (revealCheck.totalOnScreen > 0 && revealCheck.visibleOnScreen / revealCheck.totalOnScreen < 0.8) {
+    add(
+      "FAIL",
+      `reveal runtime dead: ${revealCheck.visibleOnScreen}/${revealCheck.totalOnScreen} in-viewport .reveal elements visible after 1.5s`,
+    );
+  }
+  if (revealCheck.stillHidden > 0) {
+    add("FAIL", `${revealCheck.stillHidden}/${revealCheck.total} .reveal elements never became visible after full-page scroll`);
+  }
+
   // Freeze motion so measurements see the settled state.
   await page.evaluate(() => {
     document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-visible"));
