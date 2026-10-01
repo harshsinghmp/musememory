@@ -224,20 +224,25 @@ const appJsonLd = JSON.stringify({
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Capabilities</p>
-          <h2>Six pillars of a memory you can trust</h2>
+          <h2>Six pillars of AI agent memory you can trust</h2>
           <p>
-            This is not a vector dump with a search box. It's a governed engine: every
-            memory is captured, verified, consolidated, and recalled under rules you can
-            audit.
+            Persistent memory for AI coding agents is not a vector dump with a search box.
+            Muse is a governed memory engine over MCP: every memory is captured, verified,
+            consolidated, and recalled locally under rules you can audit.
           </p>
         </div>
-        <div class="grid-3">
+        <div class="bands">
           {pillars.map((p, i) => (
-            <article class={`card card-${p.color} card-sheen reveal`} style={`--reveal-delay:${i * 80}ms`}>
-              <span class={`chip chip-${p.color}`}>{p.tag}</span>
-              <h3>{p.title}</h3>
-              <p>{p.body}</p>
-              <p class="card-stat">{p.stat}</p>
+            <article class={`band band-${p.color} reveal`} style={`--reveal-delay:${i * 70}ms`}>
+              <span class="band-index" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+              <div class="band-lead">
+                <span class={`chip chip-${p.color}`}>{p.tag}</span>
+                <h3>{p.title}</h3>
+              </div>
+              <div class="band-copy">
+                <p>{p.body}</p>
+                <p class="band-stat">{p.stat}</p>
+              </div>
             </article>
           ))}
         </div>
@@ -455,6 +460,66 @@ const appJsonLd = JSON.stringify({
 
   <style>
     /* nav & footer chrome lives in global.css (shared across all pages) */
+
+    /* ── Editorial capability bands ────────────────────────────────────────
+       Replaces the uniform card grid: each pillar is a numbered band with an
+       oversized index numeral, a hairline rule, and an asymmetric two-column
+       split that alternates side to side. */
+    .bands { display: grid; gap: 0; margin-top: 1rem; }
+    .band {
+      display: grid;
+      grid-template-columns: minmax(74px, 92px) minmax(260px, 1fr) minmax(320px, 1.25fr);
+      gap: clamp(1.2rem, 4vw, 3.5rem);
+      align-items: start;
+      padding: clamp(1.7rem, 4vw, 2.9rem) 0;
+      border-top: 1px solid var(--line);
+    }
+    .band:last-child { border-bottom: 1px solid var(--line); }
+    .band:nth-child(even) .band-lead { order: 3; }
+    .band:nth-child(even) .band-copy { order: 1; text-align: right; }
+    .band:nth-child(even) .band-copy .band-stat { margin-left: auto; }
+    .band-index {
+      font-family: var(--font-mono, ui-monospace, monospace);
+      font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+    }
+    .band-violet .band-index { color: var(--violet); }
+    .band-cyan .band-index { color: var(--cyan); }
+    .band-amber .band-index { color: var(--amber); }
+    .band-green .band-index { color: var(--green); }
+    .band-red .band-index { color: var(--red); }
+    .band-lead h3 {
+      font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+      letter-spacing: -0.02em;
+      margin: 0.7em 0 0;
+      max-width: 22ch;
+    }
+    .band-copy p {
+      color: var(--text-dim);
+      font-size: 1.02rem;
+      max-width: 52ch;
+    }
+    .band-stat {
+      display: inline-block;
+      margin-top: 1rem;
+      font-family: var(--font-mono, ui-monospace, monospace);
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.35em 0.95em;
+    }
+    @media (max-width: 860px) {
+      .band { grid-template-columns: 56px 1fr; }
+      .band-lead { order: 1 !important; }
+      .band-copy { order: 2 !important; grid-column: 2; text-align: left !important; }
+    }
 
     .hero { padding: clamp(4rem, 10vw, 7.5rem) 0 2.5rem; text-align: center; }
     .hero-kicker {
