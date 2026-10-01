@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: block;
+        src: url("/assets/fonts/inter-var.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "IBM Plex Mono";
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url("/assets/fonts/plex-400.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "IBM Plex Mono";
+        font-style: normal;
+        font-weight: 600;
+        font-display: block;
+        src: url("/assets/fonts/plex-600.woff2") format("woff2");
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #07090f;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      #root { width: 100%; height: 100%; position: relative; }
+
+      /* ── persistent backdrop ─────────────────────────────────────────── */
+      .grid-bg {
+        position: absolute; inset: 0;
+        background-image:
+          linear-gradient(rgba(139,124,247,.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(139,124,247,.06) 1px, transparent 1px);
+        background-size: 80px 80px;
+        -webkit-mask-image: radial-gradient(1200px 700px at 50% 45%, #000 30%, transparent 78%);
+        mask-image: radial-gradient(1200px 700px at 50% 45%, #000 30%, transparent 78%);
+      }
+      .orb { position: absolute; border-radius: 50%; filter: blur(70px); }
+      .orb-1 {
+        width: 980px; height: 980px; left: -260px; top: -320px;
+        background: radial-gradient(circle, rgba(139,124,247,.20), transparent 62%);
+      }
+      .orb-2 {
+        width: 820px; height: 820px; right: -240px; bottom: -300px;
+        background: radial-gradient(circle, rgba(79,214,224,.14), transparent 62%);
+      }
+      /* Cinematic edge scrim. The gradient lives on a ::after pseudo-element
+         so the .vignette node itself paints nothing — the scenes above it are
+         never occluded by an opaque element (layout inspector contract). */
+      .vignette {
+        position: absolute; inset: 0;
+        pointer-events: none;
+      }
+      .vignette::after {
+        content: "";
+        position: absolute; inset: 0;
+        background: radial-gradient(1300px 800px at 50% 46%, transparent 55%, rgba(4,6,11,.72) 100%);
+      }
+
+      /* ── scenes ────────────────────────────────────────────────────────
+         .clip scene containers are managed by the framework (visibility).
+         All GSAP animation targets the inner .sc-wrap wrappers only. */
+      .scene {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+      }
+      .sc-wrap {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        opacity: 0; /* baseline; GSAP drives it */
+      }
+
+      .brandmark {
+        display: flex; align-items: center; gap: 18px;
+        margin-bottom: 56px;
+      }
+      .brandmark svg { display: block; }
+      .brandmark .word {
+        font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: #e8ecf8;
+      }
+      .brandmark .word b { color: #4fd6e0; font-weight: 800; }
+
+      .kick {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 26px; font-weight: 600; letter-spacing: 0.34em;
+        color: #9aa5c3; text-transform: uppercase;
+        margin-bottom: 40px;
+      }
+      .kick .dot { color: #8b7cf7; }
+
+      h1 {
+        font-size: 128px; line-height: 1.04; font-weight: 800;
+        letter-spacing: -0.045em; text-align: center; color: #f2f5fd;
+      }
+      h1 .grad {
+        background: linear-gradient(92deg, #a78bfa 8%, #4fd6e0 92%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+
+      /* ── terminal ────────────────────────────────────────────────────── */
+      .term {
+        width: 1280px;
+        background: rgba(12,16,25,.97);
+        border: 1px solid rgba(139,124,247,.30);
+        border-radius: 20px;
+        box-shadow: 0 40px 110px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.4);
+        overflow: hidden;
+      }
+      .term-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 20px 26px;
+        background: rgba(139,124,247,.05);
+        border-bottom: 1px solid rgba(139,124,247,.14);
+      }
+      .term-head .d { width: 16px; height: 16px; border-radius: 50%; }
+      .d-r { background: #f27b7b; } .d-a { background: #f5b455; } .d-g { background: #5fd39a; }
+      .term-head .t {
+        margin-left: 14px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 21px; color: #8791ad;
+      }
+      .term-body { padding: 40px 46px 46px; }
+      .tline {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 33px; line-height: 1.5; color: #e8ecf8;
+        white-space: nowrap;
+      }
+      .tline .p { color: #8b7cf7; font-weight: 600; }
+      .tline .arg { color: #9aa5c3; }
+      .tok { color: #4fd6e0; font-weight: 600; }
+      .tokok { color: #5fd39a; font-weight: 600; }
+      .toknum { color: #f5b455; font-weight: 600; }
+      .caret {
+        display: inline-block; width: 17px; height: 38px;
+        background: #4fd6e0; vertical-align: -6px; margin-left: 6px;
+      }
+
+      /* ── stats ───────────────────────────────────────────────────────── */
+      .statrow { display: flex; gap: 44px; }
+      .statcard {
+        width: 460px; padding: 54px 40px 48px;
+        text-align: center;
+        background: rgba(16,22,36,.92);
+        border: 1px solid rgba(139,124,247,.26);
+        border-radius: 24px;
+        box-shadow: 0 30px 80px rgba(0,0,0,.45);
+      }
+      .statcard .v {
+        font-size: 96px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+        background: linear-gradient(92deg, #a78bfa, #4fd6e0);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        font-variant-numeric: tabular-nums;
+      }
+      .statcard .l {
+        margin-top: 22px;
+        font-size: 27px; color: #9aa5c3; line-height: 1.35;
+      }
+      .subrow {
+        margin-top: 66px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 25px; color: #8791ad; letter-spacing: 0.02em;
+      }
+      .subrow .sep { color: #8b7cf7; margin: 0 14px; }
+
+      /* ── CTA ─────────────────────────────────────────────────────────── */
+      .cta-mark { margin-bottom: 40px; }
+      .tagline {
+        font-size: 84px; font-weight: 800; letter-spacing: -0.04em; color: #f2f5fd;
+        margin-bottom: 64px; text-align: center;
+      }
+      .tagline .grad {
+        background: linear-gradient(92deg, #a78bfa 8%, #4fd6e0 92%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .chip {
+        display: inline-flex; align-items: center; gap: 16px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 40px; font-weight: 600; color: #e8ecf8;
+        background: rgba(139,124,247,.10);
+        border: 1px solid rgba(139,124,247,.38);
+        border-radius: 16px;
+        padding: 26px 44px;
+        box-shadow: 0 0 60px rgba(139,124,247,.16), 0 24px 70px rgba(0,0,0,.5);
+      }
+      .chip .p { color: #8b7cf7; }
+      .url {
+        margin-top: 46px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 24px; color: #8791ad; letter-spacing: 0.08em;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="10"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div class="grid-bg"></div>
+      <div class="orb orb-1" id="orb1"></div>
+      <div class="orb orb-2" id="orb2"></div>
+
+      <!-- Scene 0 · hook -->
+      <div class="scene clip" id="s0" data-start="0" data-duration="2.0" data-track-index="0">
+        <div class="sc-wrap" id="s0-w">
+          <div class="brandmark" id="s0-brand">
+            <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+              <defs>
+                <linearGradient id="bm1" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#8b7cf7"></stop>
+                  <stop offset="1" stop-color="#4fd6e0"></stop>
+                </linearGradient>
+              </defs>
+              <path d="M14 40 L26 24 L38 40 L50 24" stroke="url(#bm1)" stroke-width="5" fill="none" stroke-linecap="round"></path>
+            </svg>
+            <span class="word">Muse<b>Memory</b></span>
+          </div>
+          <p class="kick" id="s0-kick">Zero-daemon <span class="dot">·</span> Local-first <span class="dot">·</span> MCP-native</p>
+          <h1>
+            <span class="hline" id="s0-l1">Your agent forgets.</span><br />
+            <span class="hline grad" id="s0-l2">Muse doesn&rsquo;t.</span>
+          </h1>
+        </div>
+      </div>
+
+      <!-- Scene 1 · live terminal -->
+      <div class="scene clip" id="s1" data-start="2.0" data-duration="2.3" data-track-index="1">
+        <div class="sc-wrap" id="s1-w">
+          <div class="term">
+            <div class="term-head">
+              <span class="d d-r"></span><span class="d d-a"></span><span class="d d-g"></span>
+              <span class="t">~/project — muse memory</span>
+            </div>
+            <div class="term-body">
+              <p class="tline" id="t-l1"><span class="p">❯</span> npx <span class="tok">musememory</span> connect</p>
+              <p class="tline" id="t-o1"><span class="tokok">✓</span> <span class="arg"><span class="toknum">80+</span> platforms wired · zero daemons · zero API keys</span></p>
+              <p class="tline" id="t-l2"><span class="p">❯</span> memory context --query <span class="arg">"how does auth work"</span> --budget <span class="toknum">2000</span></p>
+              <p class="tline" id="t-o2"><span class="tokok">✓</span> <span class="arg">fused recall in <span class="toknum">1.9ms</span> — constraints, anchors, memories</span><span class="caret" id="t-caret"></span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 2 · measured speed -->
+      <div class="scene clip" id="s2" data-start="4.3" data-duration="2.2" data-track-index="2">
+        <div class="sc-wrap" id="s2-w">
+          <p class="kick" id="s2-kick">Built for speed you can measure</p>
+          <div class="statrow">
+            <div class="statcard" id="sc1">
+              <p class="v" id="cnt1">&lt;50µs</p>
+              <p class="l">L0 cache entry lookup</p>
+            </div>
+            <div class="statcard" id="sc2">
+              <p class="v" id="cnt2">1.9ms</p>
+              <p class="l">end-to-end recall<br />(BM25 + 11-dim ranking)</p>
+            </div>
+            <div class="statcard" id="sc3">
+              <p class="v" id="cnt3">0</p>
+              <p class="l">daemons, cloud calls,<br />or API keys</p>
+            </div>
+          </div>
+          <p class="subrow" id="s2-sub">
+            80+ agent platforms<span class="sep">·</span>24+ migrator formats<span class="sep">·</span>45+ secret shapes blocked<span class="sep">·</span>527 tests green
+          </p>
+        </div>
+      </div>
+
+      <!-- Scene 3 · CTA -->
+      <div class="scene clip" id="s3" data-start="6.5" data-duration="3.5" data-track-index="3">
+        <div class="sc-wrap" id="s3-w">
+          <div id="s3-inner">
+            <div class="cta-mark">
+              <svg width="120" height="120" viewBox="0 0 64 64" aria-hidden="true">
+                <defs>
+                  <linearGradient id="bm2" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#8b7cf7"></stop>
+                    <stop offset="1" stop-color="#4fd6e0"></stop>
+                  </linearGradient>
+                </defs>
+                <path id="cta-path" d="M14 40 L26 24 L38 40 L50 24" stroke="url(#bm2)" stroke-width="5" fill="none" stroke-linecap="round" pathLength="100"></path>
+              </svg>
+            </div>
+            <h2 class="tagline">A memory that <span class="grad">verifies itself.</span></h2>
+            <p class="chip" id="s3-chip"><span class="p">❯</span> npx musememory connect</p>
+            <p class="url" id="s3-url">harshsinghmp.github.io/musememory</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="vignette"></div>
+    </div>
+
+    <script>
+      const cnt1 = document.getElementById("cnt1");
+      const cnt2 = document.getElementById("cnt2");
+      const counter1 = { v: 0 };
+      const counter2 = { v: 0 };
+
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+
+      /* Stable baselines at t=0 so any pre-tween seek sees a known state */
+      tl.set("#s0-w", { autoAlpha: 0 }, 0);
+      tl.set("#s1-w", { autoAlpha: 0 }, 0);
+      tl.set("#s2-w", { autoAlpha: 0 }, 0);
+      tl.set("#s3-w", { autoAlpha: 0 }, 0);
+      tl.set("#s3-chip", { boxShadow: "0 0 60px rgba(139,124,247,.16), 0 24px 70px rgba(0,0,0,.5)" }, 0);
+
+      /* backdrop — slow, subtle, alive for the full 10s */
+      tl.fromTo(".grid-bg", { opacity: 0.9 }, { opacity: 1, duration: 2 }, 0);
+      tl.fromTo(
+        "#orb1",
+        { x: 0, y: 0, opacity: 0.75 },
+        { x: 70, y: 50, opacity: 1, duration: 10, ease: "sine.inOut" },
+        0,
+      );
+      tl.fromTo(
+        "#orb2",
+        { x: 0, y: 0, opacity: 0.7 },
+        { x: -60, y: -40, opacity: 1, duration: 10, ease: "sine.inOut" },
+        0,
+      );
+
+      /* ── Scene 0 · hook (0 → 2.0) ── */
+      tl.fromTo("#s0-w", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0);
+      tl.fromTo("#s0-brand", { autoAlpha: 0, y: -18 }, { autoAlpha: 1, y: 0, duration: 0.5 }, 0.08);
+      tl.fromTo("#s0-kick", { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 0.5 }, 0.2);
+      tl.fromTo("#s0-l1", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 0.3);
+      tl.fromTo("#s0-l2", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 0.48);
+      tl.to("#s0-w", { autoAlpha: 0, y: -26, duration: 0.34, ease: "power2.in" }, 1.66);
+
+      /* ── Scene 1 · terminal (2.0 → 4.3) ── */
+      tl.fromTo("#s1-w", { autoAlpha: 0, y: 46 }, { autoAlpha: 1, y: 0, duration: 0.5 }, 2.0);
+      tl.fromTo(
+        "#t-l1",
+        { clipPath: "inset(0 100% 0 0)" },
+        { clipPath: "inset(0 0% 0 0)", duration: 0.42, ease: "none" },
+        2.42,
+      );
+      tl.fromTo("#t-o1", { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: 0.3 }, 2.84);
+      tl.fromTo(
+        "#t-l2",
+        { clipPath: "inset(0 100% 0 0)" },
+        { clipPath: "inset(0 0% 0 0)", duration: 0.42, ease: "none" },
+        3.14,
+      );
+      tl.fromTo("#t-o2", { autoAlpha: 0, x: -14 }, { autoAlpha: 1, x: 0, duration: 0.3 }, 3.56);
+      tl.fromTo("#t-caret", { opacity: 1 }, { opacity: 0.15, duration: 0.3, yoyo: true, repeat: 2, ease: "sine.inOut" }, 3.6);
+      tl.to("#s1-w", { autoAlpha: 0, y: -26, duration: 0.3, ease: "power2.in" }, 4.0);
+
+      /* ── Scene 2 · measured speed (4.3 → 6.5) ── */
+      tl.fromTo("#s2-w", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25 }, 4.3);
+      tl.fromTo("#s2-kick", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.45 }, 4.32);
+      tl.fromTo("#sc1", { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 4.44);
+      tl.fromTo("#sc2", { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 4.56);
+      tl.fromTo("#sc3", { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 4.68);
+      tl.fromTo(
+        counter1,
+        { v: 0 },
+        {
+          v: 50,
+          duration: 1.0,
+          ease: "power2.out",
+          onUpdate: () => { cnt1.innerHTML = "&lt;" + Math.round(counter1.v) + "µs"; },
+        },
+        4.62,
+      );
+      tl.fromTo(
+        counter2,
+        { v: 0 },
+        {
+          v: 1.9,
+          duration: 1.0,
+          ease: "power2.out",
+          onUpdate: () => { cnt2.innerHTML = counter2.v.toFixed(1) + "ms"; },
+        },
+        4.62,
+      );
+      tl.fromTo("#cnt3", { scale: 0.6, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.5, ease: "back.out(2)" }, 4.7);
+      tl.fromTo("#s2-sub", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.45 }, 5.7);
+      tl.to("#s2-w", { autoAlpha: 0, y: -26, duration: 0.3, ease: "power2.in" }, 6.2);
+
+      /* ── Scene 3 · CTA (6.5 → 10) ── */
+      tl.fromTo("#s3-w", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.25 }, 6.5);
+      /* cinematic push-in on the whole scene for the closing hold */
+      tl.fromTo("#s3-inner", { scale: 1 }, { scale: 1.035, duration: 3.3, ease: "none" }, 6.7);
+      /* logo sting: stroke draws itself */
+      tl.fromTo(
+        "#cta-path",
+        { strokeDasharray: 100, strokeDashoffset: 100 },
+        { strokeDashoffset: 0, duration: 0.75, ease: "power2.inOut" },
+        6.62,
+      );
+      tl.fromTo(".tagline", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 7.08);
+      tl.fromTo("#s3-chip", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55 }, 7.5);
+      tl.fromTo("#s3-url", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.45 }, 7.95);
+      /* quiet glow pulse on the chip during the hold (baseline set at t=0) */
+      tl.fromTo(
+        "#s3-chip",
+        { boxShadow: "0 0 60px rgba(139,124,247,.16), 0 24px 70px rgba(0,0,0,.5)" },
+        { boxShadow: "0 0 110px rgba(139,124,247,.34), 0 24px 70px rgba(0,0,0,.5)", duration: 0.7, yoyo: true, repeat: 1, ease: "sine.inOut", immediateRender: false },
+        8.6,
+      );
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

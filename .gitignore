@@ -78,3 +78,6 @@ dogfood-output/
 
 # Astro generated cache/types
 .astro/
+
+# HyperFrames render artifacts (rebuilt via: bun run site:showreel)
+apps/website/showreel-hf/renders/
