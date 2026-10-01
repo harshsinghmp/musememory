@@ -15,6 +15,15 @@
 | Vector path is thin | `src/vector.ts` = 182 lines |
 | **Dashboard is a monolith** | `src/ui.ts` = **2,475 lines**, serving inline HTML/CSS/JS, CSP `'unsafe-inline'`; `startUiServer()`; `/api/export-html` produces a standalone graph HTML |
 | Tests that constrain refactors | `test/graph.test.ts`, `test/graph_ast.test.ts`, `test/ui.test.ts`, `test/optimize.test.ts`, `test/governor.test.ts` |
+| UI server contract | `startUiServer({ port?, memoryDir, store })` → `{ port, close }` (`src/ui.ts:31–37`); node `createServer`, CSP `'unsafe-inline'` |
+| **No `/api/graph` route exists** | 30+ routes enumerated (`/api/memories`, `/api/stats`, `/api/snapshot`, `/api/search`, `/api/wiki`, `/api/cognition/*`, `/api/mesh/*`, `/api/uplink`, …). The graph is therefore rendered client-side from `/api/snapshot` and/or `/api/memories` — **that is the poll/re-render path to instrument** |
+
+### C-recon (verified 2026-10-01, second pass)
+
+1. Candidate endpoints to time first: `/api/snapshot`, `/api/memories`, `/api/stats`, `/api/search` (POST). Graph payload has no dedicated route.
+2. Harness should bootstrap the real server in-process: `startUiServer({ port, memoryDir, store })` on a throwaway port, then drive `fetch` for server-side timings and Playwright for client-side metrics — no source edits, so nothing has to be reverted.
+3. Client metrics to capture generically (no component internals needed): document load, DOM node count, canvas/SVG node count, long tasks via `PerformanceObserver`, and rAF frame deltas while dispatching pointer/wheel events at the graph.
+4. Run the harness against three store sizes (100 / 1k / 10k memories) to get the scaling curve — the shape of that curve is what will confirm or kill the “re-fetch + full re-render” hypothesis.
 
 **Latency hypotheses to verify before changing anything** (do not assume):
 1. Provider index re-read per request instead of a memoized, mtime-invalidated index.
