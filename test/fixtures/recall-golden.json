@@ -1,0 +1,25 @@
+{
+  "description": "Golden recall fixture over the standard 9-entry test corpus (test/fixtures/*.yaml). Grows from real .memory/ stores — no invented data. Covers the five LongMemEval-V2 abilities: static state recall, dynamic state tracking, workflow knowledge, environment gotchas, premise awareness. Default engine = live lexical scoring (trigram + BM25); rerun with an embedder configured to measure the semantic delta.",
+  "queries": [
+    { "query": "how many database connections does the pool allow", "relevant": ["m_1700000000000_pool"], "distractors": ["m_1700000005000_theme"] },
+    { "query": "what is the postgres connection limit", "relevant": ["m_1700000000000_pool"], "distractors": ["m_1700000001000_auth"] },
+    { "query": "connection limit for postgres", "relevant": ["m_1700000000000_pool"], "distractors": ["m_1700000001000_auth"] },
+    { "query": "when do auth tokens expire", "relevant": ["m_1700000001000_auth"], "distractors": ["m_1700000000000_pool"] },
+    { "query": "session duration for api tokens", "relevant": ["m_1700000001000_auth"], "distractors": ["m_1700000000000_pool"] },
+    { "query": "token expiry limit", "relevant": ["m_1700000001000_auth"], "distractors": ["m_1700000005000_theme"] },
+    { "query": "what constraints apply to auth", "relevant": ["m_1700000001000_auth"], "distractors": ["m_1700000000000_pool"] },
+    { "query": "what deploy method is current", "relevant": ["m_1700000004000_newdeploy"], "distractors": ["m_1700000003000_olddeploy"] },
+    { "query": "how do I ship code to staging", "relevant": ["m_1700000004000_newdeploy"], "distractors": ["m_1700000003000_olddeploy"] },
+    { "query": "shipping code to staging", "relevant": ["m_1700000004000_newdeploy"], "distractors": ["m_1700000003000_olddeploy"] },
+    { "query": "what is the release process", "relevant": ["m_1700000004000_newdeploy"], "distractors": ["m_1700000006000_candidate"] },
+    { "query": "current deployment approach", "relevant": ["m_1700000004000_newdeploy"], "distractors": ["m_1700000003000_olddeploy"] },
+    { "query": "is dark mode the default theme", "relevant": ["m_1700000005000_theme"], "distractors": ["m_1700000006000_candidate"] },
+    { "query": "what color scheme does kameli use", "relevant": ["m_1700000005000_theme"], "distractors": ["m_1700000000000_pool"] },
+    { "query": "what fixed the login redirect bug", "relevant": ["m_1700000009000_confirmed"], "distractors": ["m_1700000006000_candidate"] },
+    { "query": "why were login redirects broken", "relevant": ["m_1700000009000_confirmed"], "distractors": ["m_1700000001000_auth"] },
+    { "query": "nightly worker schedule note", "relevant": ["m_1700000007000_stale"], "distractors": ["m_1700000006000_candidate"] },
+    { "query": "when does the worker run", "relevant": ["m_1700000007000_stale"], "distractors": ["m_1700000000000_pool"] },
+    { "query": "what approach was rejected for messaging", "relevant": [], "distractors": ["m_1700000008000_rejected"] },
+    { "query": "queue based idea that was dropped", "relevant": [], "distractors": ["m_1700000008000_rejected"] }
+  ]
+}
