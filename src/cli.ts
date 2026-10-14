@@ -30,6 +30,7 @@ import {
   handleReindexCommand,
 } from "./cli/retrieval.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
+import { handleEmbedCommand } from "./cli/embed.ts";
 import { handleWikiCommand } from "./cli/wiki.ts";
 import { handleEntitiesCommand, handleExtractEntitiesCommand } from "./cli/entities.ts";
 import { handleSettingsCommand } from "./cli/settings.ts";
@@ -126,6 +127,7 @@ Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] [--tier 0|1|2] Top-ranked prompt context
   search <query> [--limit N] [--token-budget N] [--hybrid] [--tree] Scored token retrieval (hybrid: vector+BM25, tree: hierarchical reasoning)
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
+  embed [status|build|reindex]  Manage semantic embeddings (llama.cpp / OpenAI-compatible endpoint; opt-in)
   recall [query]                Search active/confirmed memories with filters
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
@@ -239,6 +241,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleHooksCommand(parsed);
     case "reindex":
       return handleReindexCommand(parsed);
+    case "embed":
+      return handleEmbedCommand(parsed);
     case "import-transcript":
     case "import-jsonl":
       return handleImportTranscriptCommand(parsed);

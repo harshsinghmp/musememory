@@ -19,6 +19,7 @@ import {
   type SqliteDatabase,
 } from "./sqlite.ts";
 import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
+import { initEmbedTables } from "./retrieval/embedders.ts";
 import {
   computeFingerprint,
   inferTemporalMode,
@@ -76,6 +77,13 @@ export function openStore(memoryDir: string): Store {
 
   const cache = getOrCreateStoreCache(memoryDir);
   const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache };
+
+  // R21: ensure the embedding vector + pipeline-fingerprint tables exist.
+  if (db) {
+    try {
+      initEmbedTables(db);
+    } catch {}
+  }
 
   // Fast startup sync: only sync YAML files into SQLite database if DB is empty or missing entries
   if (db && existsSync(layout.memoriesDir)) {

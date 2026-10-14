@@ -17,6 +17,7 @@ export interface ScoreFactors {
   negativeWarningBonus: number;
   timelessBoost: number;
   statusPenalty: number;
+  semanticMatch: number;
   baseApplicability: number;
   totalScore: number;
 }
@@ -34,6 +35,8 @@ export interface MultiFactorRankingOptions {
   targetSymbol?: string;
   ftsMatchIds?: Set<string>;
   blastRadiusFiles?: Set<string>;
+  /** R21: precomputed semantic cosine scores by entry id. */
+  semanticScores?: Map<string, number>;
 }
 
 /**
@@ -48,6 +51,7 @@ export interface MultiFactorRankingOptions {
  * - Negative lesson warning bonus: +0.3 for anti-patterns matching query/files
  * - Invariant / timeless boost: +0.2 for constraint/timeless entries
  * - Status penalties: -0.8 conflicted, -0.5 stale/superseded
+ * - Semantic cosine (R21): +0.5 * cosine when semanticScores are supplied (opt-in embedder)
  */
 export function calculateMultiFactorScore(
   entry: MemoryEntry,
@@ -185,9 +189,12 @@ export function calculateMultiFactorScore(
 
   // 11. Status Penalty (-0.8 conflicted, -0.5 stale/superseded)
   const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
+  // 12. Semantic cosine (+0.5 * cosine, when precomputed scores are provided)
+  const semanticMatch = options.semanticScores?.get(entry.id) ?? 0;
 
   const totalScore =
     baseApplicability +
+    0.5 * semanticMatch +
     exactSymbolMatch +
     pathMatch +
     bm25Match +
@@ -211,6 +218,7 @@ export function calculateMultiFactorScore(
     negativeWarningBonus,
     timelessBoost,
     statusPenalty,
+    semanticMatch,
     totalScore,
   };
 
@@ -236,6 +244,8 @@ export async function rankAndRetrieveMemories(
     targetSymbol?: string;
     includeSuperseded?: boolean;
     now?: number;
+    /** R21: precomputed semantic cosine scores by entry id. */
+    semanticScores?: Map<string, number>;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -283,6 +293,7 @@ export async function rankAndRetrieveMemories(
       targetSymbol: options.targetSymbol,
       ftsMatchIds,
       blastRadiusFiles,
+      semanticScores: options.semanticScores,
     }),
   );
 
