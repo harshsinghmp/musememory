@@ -351,7 +351,7 @@ memory migrate --provider mem0
 memory migrate --provider beads
 memory migrate --all
 ```
-> See [`musememory-comparison.html`](musememory-comparison.html) for the full table-free 30-system architectural dossier.
+> See [`docs/research/musememory-comparison.html`](docs/research/musememory-comparison.html) for the full table-free 68-system survey dossier.
 
 ---
 

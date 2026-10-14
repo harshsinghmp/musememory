@@ -139,3 +139,29 @@ Engine verdict: Muse Memory's zero-daemon SQLite+FTS5+YAML+MCP architecture is t
 50. Memory marketplace (spec only)
 
 **Hard rejects:** daemon-backed stores, SaaS memory backends, AGPL/BSL/PolyForm code copies, multilingual stemming, auto-delete, full-file injection.
+
+---
+
+## 🧹 R18: Retirement & Hygiene Audit (2026-10-14)
+
+Full evidence: `.agents/research/retirement-audit-2026-10.md` (two-lane audit, reconciled). Verdict summary — almost nothing is dead; the work is drift plus two security defects.
+
+**Do first (security, outranks all features):**
+1. Fix `verify.ts:23` `/bin/sh -c` on memory-supplied `test_command` — RCE-class, reachable via `memory_verify`/`memory_verify_strict`.
+2. Fix studio UI XSS (`ui.ts:1510`, `ui.ts:1557` unescaped interpolation) + gate `/api/optimize`.
+
+**Free drift fixes (no runtime risk):**
+3. Remove 7 phantom names from `orchestrator/profiles.ts`.
+4. Retire `connect.ts:9-50` allowlist (auto-approves 3 phantom tools, omits 61 real).
+5. RETIRE: `maybeAutoOptimize` (0 callers), unreachable LSP tier (`lsp.ts:16`), 4 unused registry methods, 3 dead governor exports.
+
+**Deprecations (visible externally, docs-level breakage only):**
+6. Deprecate 20 of 24 migrator providers (only 4 adapters exist; delete detectors before adapters).
+7. Freeze 20 dormant agent platforms; fix README "80+" → 52 claim; fix `daemon.ts` README (SSE, not WebSocket).
+8. Flip YAML mirror read precedence to DB-first (`store.ts:174-202`, ~6 lines); keep the mirror.
+
+**Hygiene:**
+9. Real dispatch tests (or documented-untested status) for 12 circular + 20 full-profile-only tools.
+10. Deprecate `recall` as a third retrieval path (alias only).
+
+**Decisions deferred:** MCP profile default change to `core` (~5k tokens/session saved, but visible behavior change — belongs with the R17b P2 tool-packaging work); YAML full-delete (rejected, largest blast radius).
