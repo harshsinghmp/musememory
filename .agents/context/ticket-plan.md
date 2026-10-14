@@ -17,9 +17,9 @@
 ## Wave B — DRIFT (free fixes; no runtime path changes)
 
 - [ ] T-010 · profiles.ts: remove 7 phantom tool names (record_observation, capture_negative, conflict_detect, wiki_page, tree_index, dedup, audit_query) · orchestrator/profiles.ts · new · F
-- [ ] T-011 · connect.ts: retire ALL_MEMORY_TOOLS allowlist (auto-approves 3 phantom, omits 61 real) · connect.ts:9-50 · new · F
+- [ ] T-011 · connect.ts: retire ALL_MEMORY_TOOLS allowlist (auto-approves 3 phantom; MEASURED: 71 registered tools absent) · connect.ts:9-50 · new · F
 - [ ] T-012 · delete `maybeAutoOptimize` (0 callers) · optimize.ts:362 · new · F
-- [ ] T-013 · retire unreachable LSP tier; keep provider slot in chain signature · intelligence/lsp.ts:16 · new · F
+- [ ] T-013 · retire unreachable LSP tier; keep provider slot in chain signature · src/intelligence/adapters/lsp.ts:14 · new · F
 - [ ] T-014 · delete 4 unused registry methods + `registerProvider` + 3 dead governor exports · registry.ts:68-117, governor.ts · new · F
 - [ ] T-015 · docs truth pass: README 80+→52 platforms, daemon SSE≠WebSocket, remove profile_switch · README, docs · new · N
 
@@ -32,6 +32,7 @@
 - [ ] T-024 · bounded FTS preflight (cap term count; reject oversized queries) · store.ts · new · F
 - [ ] T-025 · single-transaction writes (replace 3-commit paths; ~180ms→~60ms) · store.ts · new · F
 - [ ] T-026 · FTS↔row parity check + repair command · store.ts · new · F
+- [ ] T-016 · dispatch-coverage matrix: 64/107 MCP tools referenced by NO test (T-016 was referenced but never defined — plan's largest coverage hole had no ticket). Ships with Wave 5; T-371 lands first · F
 - [x] RESOLVED (intended lane): `dedup` IS wired at store.ts:418 — only memory_capture omits it; scope folded into T-027 note + T-040 covers the missing normalization · mcp.ts:55, quality · new · F
 - [ ] T-028 · `recordRetrievals`: wire into recall or delete · mcp.ts:1692, quality · new · F
 - [ ] T-029 · `touchActivity`: wire into store or delete · optimize.ts:77 · new · F
@@ -197,7 +198,7 @@
 - [ ] T-202 · platform freeze: deprecate 20 dormant entries, freeze registry · agents/registry.ts · new · F
 - [ ] T-203 · `recall` deprecate to alias of unified retrieval · cli, mcp · new · F
 - [ ] T-204 · YAML mirror read precedence → DB-first (6 lines; stops disk shadowing DB) · store.ts:174-202 · new · F
-- [ ] T-205 · Dockerfile: remove test-on-build stage · Dockerfile:12-13 · new · N
+- [ ] T-205 · Dockerfile: remove test-on-build stage · Dockerfile:9-11 · new · N
 - [x] MERGED→T-015 T-206 · README/CHANGELOG pass for all R18 deprecations · docs · new · N
 
 ---
@@ -226,11 +227,11 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 
 ## Wave G — READ-PATH PURITY & INVALIDATION (new gap class)
 
-- [ ] T-301 · CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Move to background queue; add invariant test: no writes during any read tool · dep: T-041 · F
+- [ ] T-301 · CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Move to in-process async queue + flush-on-exit; add invariant test: no writes during any read tool · dep: — (senior review: NOT T-041 — single-writer, no outbox table needed) · F
 - [ ] T-302 · HIGH (B15) · `memory_capture` full passthrough: currently sets 7 of ~40 propose options (no evidence/source/verification/dedup/validFrom/expiresAt) — provenance tickets T-075/090/099/103/105 assume write-time capture that the flagship tool cannot express · mcp.ts:1692-1699 · dep: T-075 · F
 - [ ] T-303 · CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories injected at scale · dep: T-030 · F
 - [ ] T-304 · HIGH (B4) · vector index invalidation: `save()` never updates `index.json` (retrieval/engine.ts:124-127, store.ts:306); MCP hardcodes `stale:false` while serving ancient snapshots (mcp.ts:1683) · dep: T-064 · F
-- [ ] T-305 · HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,90,98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · F
+- [ ] T-305 · HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,:91,:98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · F
 - [ ] T-306 · HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · F
 - [ ] T-307 · HIGH (B2) · Hebbian graph is write-only O(n²) per recall (plasticity.ts:37-64, mcp.ts:1611): n(n-1) edges + full-file rewrite every get_context; loaders have zero production callers. Bound it, make it incremental, consume it (see T-316) — or delete · F
 
@@ -338,7 +339,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
 - [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
 - [ ] T-360 · F-31/F-35 · UI shutdown + numeric validation: keep-alive sockets block close (ui.ts:626); unvalidated parseInt limits (ui.ts:209,613) · F
-- [ ] T-361 · F-32 · escapeHtml omits `'`; `item.priority` unescaped into class attribute (ui.ts:1588,2093) · F
+- [ ] T-361 · F-32 · escapeHtml omits `'`; `item.priority` unescaped into class attribute (ui.ts:1588 (omits ') + :2092/:2094) · F
 - [ ] T-362 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
 
 ## New tickets from intended mode (claims ↔ evidence)
@@ -381,7 +382,7 @@ Source: read-only test audit (85 suites / 502 tests / 12,450 LOC). Suite hygiene
 - [ ] T-371 · lying security tests: `security_hardening.test.ts:95-100` (1MB-DoS guard proves nothing — catch returns synthesized 500; real path `ui.ts:642 req.destroy()` never asserted), `:127-136` (SQL-injection half vanishes behind `if (store.db)`) · F
 - [ ] T-372 · tautological doctor test: name says "uninitialized directory", asserts `initialized === true` — `doctor.ts:60-63` creates `.memory` before the check, assertion cannot fail (`doctor.test.ts:10-19`) · F
 - [ ] T-373 · substring-grep UI tests → real assertions: ~30 `expect(html).toContain(id)` asserts on generated HTML (`ui.test.ts:48-57,114-124,132-210`) prove identifiers exist, not behavior · F
-- [ ] T-374 · toBeDefined/tautology assertions → value assertions: `health.test.ts:221-228` (9× toBeDefined on muse_health MCP+CLI), `benchmark.test.ts:47-72` (9× `>= 0` — cannot fail) · F
+- [ ] T-374 · toBeDefined/tautology assertions → value assertions: `health.test.ts:221-228` (9× toBeDefined on muse_health MCP+CLI), `benchmark.test.ts:47-72` (6× `>= 0` at :50,54,58,66,70,71 — cannot fail) · F
 - [ ] T-375 · Array.isArray-only list tests → content assertions: `optimize.test.ts`, `mesh.test.ts:271`, `ui.test.ts:32,63,81,146,209`, `connect.test.ts:34`, `mcp.test.ts:70-129` (12 dynamic-import re-imports inflate apparent coverage) · F
 - [ ] T-376 · reconcile authoritative-test conflicts: `graph.test.ts` ⊂ `graph_ast.test.ts`; `retrieval_engine.test.ts` asserts 3 headings where `retrieval.test.ts:44-77` asserts content; `panda_loader.test.ts` supersedes `upgrade.test.ts:28-34`; `agents.test.ts:56` supersedes connect duplicates; `sqlite_primary.test.ts:19-91` supersedes `store.test.ts:9-24` (never reloads store) · F
 - [ ] T-377 · false-coverage test name: `sqlite_primary.test.ts:47` claims "stale" transition in a body that imports `markStale` and never calls it (`:4`) — rename or execute · F
@@ -401,3 +402,33 @@ Source: read-only test audit (85 suites / 502 tests / 12,450 LOC). Suite hygiene
 | v4 test integrity | 8 |
 | **Plan total** | **246** |
 - [x] MERGED→T-015 T-379 · amend AGENTS.md invariant "Zero External Daemons: Never depend on background servers" + decisions.md ADR-001 to: "no feature may REQUIRE a background service; local/team services are opt-in" (records the T-367 principal decision) · N
+
+---
+
+# v6 — SENIOR REVIEW RECONCILIATION (2026-10-14)
+
+Two independent senior reviews of the plan (strategic + implementation-executability). Reconciled below; ticket-level corrections applied inline above.
+
+- [x] **V1 RELEASE STRATEGY (was absent)**: `v2.3.1 "trust"` = 12 tickets: **T-001, T-363, T-336, T-337, T-351, T-355, T-342, T-020, T-303, T-368, T-301, T-024** (+ T-015 docs truth). Six weeks, one changelog, one demonstrable number (cache hit rate 0%→>0%; wrong-recall-at-scale fixed). v2.4.0 = remaining Wave 1 + Wave 2 items PROVEN by the R2/R3 baselines. v3.0 = Wave 3, only if a deferred-trigger fires.
+- [x] **T-368 RE-SCOPED** (both audits): 20-line stamp, NOT a framework — `PRAGMA user_version` + ordered `{version, up(db)}` array + backfill from the existing `data` JSON blob in the same PR + `doctor` parity check + `tar .memory` snapshot. The YAML mirror (`store.ts:174-202` rehydrates SQLite) IS the rollback. R1 red test (T-383) is its acceptance criterion.
+- [x] **T-364 RE-SCOPED**: only `src/adrs/engine.ts:104` + `src/pageindex/engine.ts:34` need same-ms ID guards; `store.ts:347-358` already has one.
+- [x] **Wave 3 DEFERRED (30 tickets: T-150-156, T-157-162, T-164-166, T-168-177, T-180, T-181)**: no team customers, no external HTTP consumer; T-332 (sync auth) was dep-on T-150 — auth for a server with no clients. Un-defer trigger: a second concurrent writer observed OR a paying team user. Kept: T-201..T-205 (cheap deprecations).
+- [x] **T-163 → DECISION, not ticket**: read-only UI invariant contradicts 15 live write endpoints + is a breaking change → principal decision D3.
+- [x] **Multi-writer cluster DEFERRED**: T-038, T-039, T-040, T-041, T-042, T-043, T-328 (one principal, one local store). Kept: T-044 flock (~20 lines, protects the real daemon+CLI+MCP multi-process case).
+- [x] **Embedding cluster GATED**: T-071, T-136, T-137, T-138, T-139 blocked on T-381 (spike) — the branch has zero implementation files.
+- [x] **YAGNI redirects**: T-129 (AST config-honesty) → CI grep for unreferenced exports; T-080/081/088/099/102/122/123/124/125/132/176/180/181 flagged speculative, re-propose only after the v2.4.0 baseline proves need; T-105/106/107 → cut to T-104 + T-105 only.
+- [x] **Corrected critical path**: T-001 → T-363 → T-336/337/351/355/342 → T-020 → T-303 → T-368 → T-301/024/025/026/308/311 → **v2.3.1**. T-368 is ON the path (was omitted).
+- [x] **Gate claim corrected**: `bunx tsc --noEmit` exits 0, `bun run build` = 374 modules/18ms, `bun test` 502/0/2224/3.29s — full gate runnable today, ~5s/ticket, ~20min total. NOT a blocker (earlier claim wrong).
+- [x] **Branch-model reality**: repo default branch is `main`, NOT `master` — `git-workflow.md` lifecycle text does not match; agents must guard `main`/`dev` → decision D2.
+- [x] **T-371 lands BEFORE any Wave-0 security red test**: `security_hardening.test.ts:95` synthesized-500 + `:127` `if (store.db)` mean earlier red tests pass trivially.
+- [ ] T-380 · UI security tests WITHOUT a DOM dep: unit-test the pure `escapeHtml` (`ui.ts:1588`) with `<script>`/quote payloads — zero `escapeHtml` occurrences exist in test/, no DOM dependency exists; render-level tests deferred pending D3 · U
+- [ ] T-381 · embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · F
+- [ ] T-382 · deprecation policy: `deprecated: true` metadata + alias retention + "removed in vX"; prerequisite for T-201/T-202/T-203 · N
+- [ ] T-383 · R1 red test: today's-schema store + one added column + `save()` → must red (proves un-migrated stores throw at `store.ts:317` before the YAML write). IS T-368's acceptance criterion · F
+- [ ] T-384 · R2 fixture: 120 memories / 3 projects / 30 superseded / 30 expired → assert `hybridSearch` returns only matching-project non-superseded rows. Baselines T-303 + T-308 + T-140 at once · F
+- [ ] T-385 · R3 baseline: 40 must-return queries from the principal's own `.memory/` + recall-set grading — gate Wave 2 on the number before T-070 ships · F
+
+**Principal decisions surfaced (asked with this commit):**
+- **D1** — does anything outside this repo hand-edit `.memory/memories/*.yaml`? If yes, T-204 is a breaking semantic change, not a 6-line fix.
+- **D2** — branch model: one branch per ticket (236 branches) or per-wave green gate relaxed to per-merge?
+- **D3** — T-163: keep dashboard writes (drop the invariant) or enforce read-only UI (breaking change + deprecation window)?
