@@ -165,3 +165,5 @@ Full evidence: `.agents/research/retirement-audit-2026-10.md` (two-lane audit, r
 10. Deprecate `recall` as a third retrieval path (alias only).
 
 **Decisions deferred:** MCP profile default change to `core` (~5k tokens/session saved, but visible behavior change — belongs with the R17b P2 tool-packaging work); YAML full-delete (rejected, largest blast radius).
+
+**Exploded ticket plan:** `.agents/context/ticket-plan.md` — 168 atomic tickets (Wave A security 4 · B drift 6 · C P0 45 · D P1 75 · E P2 32 · F deprecations 6), each with source, dependency, existing-branch mapping, and gate. Critical path: T-001 → T-030 → T-041 → T-104/105 → T-114-121 → T-140+.
