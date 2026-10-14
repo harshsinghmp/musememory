@@ -360,7 +360,7 @@ memory migrate --provider mem0
 memory migrate --provider beads
 memory migrate --all
 ```
-> See [`web/musememory-comparison.html`](./web/musememory-comparison.html) for the matching comparison page and architectural dossier.
+> See [`web/musememory-comparison.html`](./web/musememory-comparison.html) for the published comparison page, and [`docs/research/musememory-comparison.html`](docs/research/musememory-comparison.html) for the research survey dossier (68 systems).
 
 ---
 

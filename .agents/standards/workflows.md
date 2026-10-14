@@ -52,3 +52,16 @@ To balance velocity with rigor, overhead is strictly proportional to task risk:
 - **Archive Work Artifacts**: Move completed plans or temporary scratchpads into `.agents/archive/` using the timestamped format `[title]-[YYYYMMDD-HHMMSS].md`.
 - **DOX Pass**: Update `./.agents/context/current.md` and the nearest owning `AGENTS.md`.
 - **Memory Update**: Persist newly confirmed invariants or architectural decisions into `./.memory`.
+
+---
+
+## 3. Mandatory PR & Post-Merge Pipeline (principal rule, 2026-10-15)
+
+1. **One PR per feature.** Every feature or fix lands on its own branch (`feat/*`, `fix/*`) off `dev`. Never commit directly to `main`, `master`, or `dev`.
+2. **Per-phase subagent worktrees.** Every phase starts by dispatching multiple subagents, each in its own worktree, doing the work there. The orchestrator reconciles terminal results back into the feature branch. Execution model: one branch per ticket (`fix/T-xxx`), full gate per commit (`bun test` + `tsc --noEmit` + `bun run build`).
+3. **After feature work merges to `dev`, run in order, end-to-end:**
+   a. `updatedocs` skill — complete mode (doc↔code drift sync; CHANGELOG/docs alignment).
+   b. `updateagents` skill — all modes (AGENTS.md + `.agents/` context synchronization).
+   c. `git` skill — end-to-end, **stopping before release**. Release cutting is principal-confirmed only; never auto-release.
+4. **Docs upkeep.** Update CHANGELOG.md, CONTRIBUTING.md, and credits (package.json author/contributors, README credits) whenever required: behavioral changes, new dependencies, new contributors, process changes.
+5. Gates unchanged: green per commit, Why/What/Verification commit bodies, zero secret exposure, English only.

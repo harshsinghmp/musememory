@@ -9,6 +9,7 @@
 - **GAP-1 (2026-09-30): Write-Time Citation Verification** — hallucinated citations rejected at write; shipped in `src/anchors/verify-write.ts` + MCP `memory_anchor_create` gate. From the 2026-09 memory-mechanisms deep research (`.agents/context/deep-research-memory-mechanisms-2026-09.md` §14–15).
 - **GAP-2 (2026-09-30): Claude Code Lifecycle Hook Pack** — SessionStart/PostToolUse/Stop hooks, hands-free capture & injection; `memory hooks install` / `memory connect --with-hooks`. Same research §14 (GAP-2).
 - **GAP-3 (2026-09-30): Recall-Time Freshness Gate** — drifted/orphaned-anchor memories withheld from `muse_context` by default with explicit notices; `include_drifted` opt-in. Same research §14 (GAP-3). Remaining roadmap below.
+- **R17: Deep Research & Architectural Audit (2026-10-14)**: Walrus Memory competitive teardown, SOTA memory-systems scan (Mem0 v3, Zep/Graphiti, Letta MemFS, Supermemory, Cognee, LangMem, A-MEM, HippoRAG, vendor-native), and a read-only source audit of the engine (30.8k LOC / 113 files) that surfaced 10 ranked defects, 4 advertised-but-dead features, 1 security path, 1 data-loss path. Deliverable: `.agents/research/research-brief-walrus-memory-architecture.md`.
 
 ---
 
@@ -191,3 +192,109 @@
 ### 16. **R32: Studio Recall-Debug (extends R15 + A22)**
 - Surface `ranking.ts` per-factor score breakdowns in the Observability Studio: *why* was this memory retrieved.
 - Eval-harness (R27) results panel. Small diffs on `src/ui.ts`.
+
+
+---
+
+# 🗂️ 2026-10-14 Research Track (competitive + engine audits)
+
+> Sections below were produced by the October research/audit program. They reference the **243-ticket implementation plan** in `.agents/context/ticket-plan.md` (IDs `T-###`) and the external-review artifact `.agents/plans/EVOLUTION_PLAN.md`. Product milestones R17-R32 above remain the spec-level roadmap; this track is the audit-backed execution plan derived from it plus ecosystem research.
+
+## 🧬 R17b: Ecosystem Teardown Upgrades (2026-10-14)
+
+69-URL principal-supplied competitor scan (Hermes plugin ecosystem + major OSS memory systems) + Hermes platform teardown + DB/transport research. Full evidence: `.agents/research/ecosystem-teardown-2026-10.md` (competition list + 50-item consolidated implementation catalog + explicit rejections). Decided waves:
+
+- **P0 additions (v2.4.0, 22 items)**: idempotency keys + content-hash dedup; write outbox with stale-lock recovery; `on_pre_compress` fact extraction; wake gate (`wakeAgent:false`) for background passes; overnight loss guard; memory-pressure alerts; honest dual-measure token accounting; refuse-incomplete digest contract; circuit breaker around store calls; `atexit` bounded joins; read-path re-validation; safe FTS query construction; limit clamping; stale-read tags.
+- **P1 additions (v2.5.0, 18 items)**: consolidated abstention gates; decay/forgetting engine (decay_score + veracity tiers + trust-tier half-life + stamped expiry + pin policy); bitemporal `valid_to_exact`/`as_of` discipline; conflicts-table-never-delete + federation handshake; veracity trust table + evidence-age stamping; TOON/manifest context packing + omission markers + reserved slots; linked_memory_ids + supersede-not-delete + prefer_observations dedup; provenance tables + hash-chained audit + index-time redaction; write gates (scoreRetain + corroboration-gated promotion + two-tier flush); recall hygiene (re-injection + echo suppression + seen-chunk TTL); ranking upgrades (soft-OR fusion + discrimination rerank + watermark staleness + intent bias); L0/L1 abstracts + resident INDEX; why_retrieved + usage telemetry + config-honesty audit; constitution contract; failure-visibility signals; embeddings (R21) + eval harness (R27); fix-pair mining.
+- **P2 additions**: server mode (Streamable HTTP + per-tenant DB files + SyncPool-over-HTOP + git YAML distribution + Litestream backups); dashboard rehaul (recall-debug, lineage graph, eval panel, control tower, mesh view); always-on memory cadence; Hermes MemoryProvider adapter (qdrant branch becomes opt-in vector adapter); federation handshake; observer/observed team semantics; memory forking; gated graph retrieval; funded pools; marketplace.
+- **Hard rejects**: daemon-backed stores, SaaS memory backends, AGPL/BSL/PolyForm code copies, multilingual stemming, auto-delete, full-file injection.
+
+Engine verdict: Muse Memory's zero-daemon SQLite+FTS5+YAML+MCP architecture is the majority position of the field and ahead of the Hermes plugin long tail; the gap is shipping the convergent mechanisms (above), not architecture change.
+
+### R17b Full Item List (source of truth: `.agents/research/ecosystem-teardown-2026-10.md` §10)
+
+**P0 — reliability (v2.4.0)**
+1. Query-cache self-destruction fix (`store.ts:281`)
+2. Memoized file verification + precomputed token sets in ranking hot path
+3. `openStore` dirty-gate for wiki recompile
+4. Bounded FTS preflight; single-transaction writes; FTS↔row parity repair
+5. `/bin/sh -c` removal in `memory verify`
+6. Wire or delete 4 dead features (`dedup`, `recordRetrievals`, `maybeAutoOptimize`, `touchActivity`)
+7. Tombstones + `memory_restore` + audit-replay restore
+8. `Math.max` spread crash + IDF caching + redundant list() fixes
+9. Idempotency keys + content-hash dedup on capture
+10. Write outbox with stale-lock recovery
+11. `on_pre_compress` fact extraction
+12. Wake gate (`wakeAgent:false`) for background passes
+13. Overnight loss guard
+14. Memory-pressure alerts
+15. Honest dual-measure token accounting
+16. Refuse-incomplete digest contract
+17. Circuit breaker around store calls
+18. `atexit` bounded joins + generation-counter prefetch invalidation
+19. Read-path re-validation for injection markup/credentials
+20. Safe FTS query construction + compound-token expansion
+21. Clamp model-supplied limits; dry-run-by-default destructive ops
+22. Stale-read provenance tags
+
+**P1 — memory quality (v2.5.0)**
+23. Consolidated abstention gates (IDF relevance, dual thresholds, no_confident_match)
+24. Decay/forgetting engine (decay_score, veracity tiers, trust-tier half-life, stamped expiry)
+25. Bitemporal `valid_to_exact`/`as_of` discipline
+26. Conflicts-table-never-delete + federation handshake
+27. Veracity trust table + evidence-age stamping
+28. TOON/manifest context packing + omission markers + reserved slots
+29. linked_memory_ids + supersede-not-delete + prefer_observations dedup
+30. Provenance tables + hash-chained audit + index-time redaction
+31. Write gates (scoreRetain, corroboration-gated promotion, two-tier flush)
+32. Recall hygiene (re-injection, echo suppression, seen-chunk TTL)
+33. Ranking upgrades (soft-OR fusion, discrimination rerun, watermark staleness, intent bias)
+34. L0/L1 abstracts + resident INDEX route-map
+35. why_retrieved + usage telemetry + config-honesty audit
+36. Constitution contract
+37. Failure-visibility signals (degraded notes, ground-moved, loosening ladder)
+38. Embeddings per R21 spec branch (SQLite BLOB brute-force, FTS5 floor)
+39. Eval harness per R27 spec branch (recall-gate grading)
+40. Fix-pair mining from transcripts
+
+**P2 — team, server, UI**
+41. Server mode (Streamable HTTP, per-tenant DB files, SyncPool-over-HTTP, git YAML distribution, Litestream backups)
+42. Dashboard rehaul (recall-debug, lineage graph, eval panel, control tower, mesh view)
+43. Always-on memory cadence (event-triggered consolidation, dual-trigger maintenance, wake gates)
+44. Hermes MemoryProvider adapter (qdrant branch → opt-in vector adapter)
+45. Federation handshake for mesh mode
+46. Observer/observed team semantics
+47. Memory forking/branching
+48. Gated graph retrieval (behind the P1 eval harness)
+49. Funded/shared memory pools (spec only)
+50. Memory marketplace (spec only)
+
+**Hard rejects:** daemon-backed stores, SaaS memory backends, AGPL/BSL/PolyForm code copies, multilingual stemming, auto-delete, full-file injection.
+
+---
+
+## 🧹 R18: Retirement & Hygiene Audit (2026-10-14)
+
+Full evidence: `.agents/research/retirement-audit-2026-10.md` (two-lane audit, reconciled). Verdict summary — almost nothing is dead; the work is drift plus two security defects.
+
+**Do first (security, outranks all features):**
+1. Fix `verify.ts:23` `/bin/sh -c` on memory-supplied `test_command` — RCE-class, reachable via `memory_verify`/`memory_verify_strict`.
+2. Fix studio UI XSS (`ui.ts:1510`, `ui.ts:1557` unescaped interpolation) + gate `/api/optimize`.
+
+**Free drift fixes (no runtime risk):**
+3. Remove 7 phantom names from `orchestrator/profiles.ts`.
+4. Retire `connect.ts:9-50` allowlist (auto-approves 3 phantom tools, omits 61 real).
+5. RETIRE: `maybeAutoOptimize` (0 callers), unreachable LSP tier (`lsp.ts:16`), 4 unused registry methods, 3 dead governor exports.
+
+**Deprecations (visible externally, docs-level breakage only):**
+6. Deprecate 20 of 24 migrator providers (only 4 adapters exist; delete detectors before adapters).
+7. Freeze 20 dormant agent platforms; fix README "80+" → 52 claim; fix `daemon.ts` README (SSE, not WebSocket).
+8. Flip YAML mirror read precedence to DB-first (`store.ts:174-202`, ~6 lines); keep the mirror.
+
+**Hygiene:**
+9. Real dispatch tests (or documented-untested status) for 12 circular + 20 full-profile-only tools.
+10. Deprecate `recall` as a third retrieval path (alias only).
+
+**Decisions deferred:** MCP profile default change to `core` (~5k tokens/session saved, but visible behavior change — belongs with the R17b P2 tool-packaging work); YAML full-delete (rejected, largest blast radius).
+
+**Exploded ticket plan:** `.agents/context/ticket-plan.md` — 168 atomic tickets (Wave A security 4 · B drift 6 · C P0 45 · D P1 75 · E P2 32 · F deprecations 6), each with source, dependency, existing-branch mapping, and gate. Critical path: T-001 → T-030 → T-041 → T-104/105 → T-114-121 → T-140+.
