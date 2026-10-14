@@ -17,6 +17,10 @@ export interface RetrievalSettings {
   enableLLMReasoning: boolean;
   hybridVectorWeight: number;
   hybridTreeWeight: number;
+  /** R21: OpenAI-compatible /v1/embeddings endpoint (llama.cpp server, Ollama, hosted). Unset = trigram fallback. */
+  embedderUrl?: string;
+  /** Embedding model name; omit when the server serves a single model. */
+  embedderModel?: string;
 }
 
 export interface WikiSettings {

@@ -22,6 +22,8 @@ export interface ContextQueryOptions extends SearchOptions {
   now?: number;
   /** Progressive disclosure tier for formatted context (default L2). */
   depth?: DisclosureDepth;
+  /** R21: precomputed semantic cosine scores by entry id (ranking dim #12). */
+  semanticScores?: Map<string, number>;
 }
 
 export interface SearchResult {
@@ -177,12 +179,14 @@ export function filterByRelevanceThreshold(
  * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
  * AST Graph: +0.2 bonus for matching indexed symbol names.
  * Runtime Trust (SOW-201): +0.15 for verified strong disk files, -0.4 for stale missing paths.
+ * Semantic (R21): +0.5 * cosine when a precomputed score is supplied (opt-in embedder).
  */
 export function scoreEntry(
   entry: MemoryEntry,
   queryTokens: string[],
   now: number = Date.now(),
   workspaceRoot?: string,
+  semanticScore: number = 0,
 ): number {
   const app = applicability(entry, queryTokens);
   const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
@@ -209,13 +213,18 @@ export function scoreEntry(
   // If query tokens exist but there is zero token/graph overlap, apply a relevance penalty (SOW-202)
   const zeroMatchPenalty = queryTokens.length > 0 && app === 0 && graphBonus === 0 ? -0.35 : 0;
 
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + zeroMatchPenalty;
+  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + zeroMatchPenalty + 0.5 * semanticScore;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
-export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[], now: number): ScoredEntry[] {
+export function sortCandidates(
+  candidates: MemoryEntry[],
+  queryTokens: string[],
+  now: number,
+  semanticScores?: Map<string, number>,
+): ScoredEntry[] {
   return candidates
-    .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now) }))
+    .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now, undefined, semanticScores?.get(entry.id) ?? 0) }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const bU = Date.parse(b.entry.updated_at);
@@ -276,7 +285,7 @@ export function queryContext(
     entries = entries.filter((e) => !isExpired(e, now));
   }
 
-  const scored = sortCandidates(entries, queryTokens, now);
+  const scored = sortCandidates(entries, queryTokens, now, options.semanticScores);
   const limit = options.limit ?? 10;
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
