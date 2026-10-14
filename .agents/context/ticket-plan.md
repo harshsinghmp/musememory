@@ -434,3 +434,29 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - **D1** ✅ RESOLVED: no external YAML editing (CLI/MCP only) → T-204 is a safe fix.
 - **D2** ✅ RESOLVED: one branch per ticket; full gate per commit; collisions serialized by file map.
 - **D3** ✅ RESOLVED: dashboard keeps writes; read-only invariant dropped; T-004/T-163 scope adjusted.
+
+---
+
+# v7 — TEAM SLICE (trigger fired 2026-10-15)
+
+**Trigger**: principal reports 5 team members on the same network. Wave-3 un-defer condition met ("second concurrent writer observed"). Strategic review's "no team customers" premise is now false — but the need is a *slice*, not the 30-ticket wave.
+
+## The trap to avoid first
+
+**Do NOT put `.memory/` (SQLite) on a shared network mount** (NFS/SMB/network drive) and run five local Muse processes against it. SQLite's WAL lock + shared-memory sidecar files (`-wal`, `-shm`) do not behave on network filesystems: writers see stale shared-memory state and corrupt the index. The DB research lane rejected every distributed-SQLite option for this reason. **Correct topology: exactly one Muse process owns the store** (the host), all five members' agents talk to it as clients.
+
+## Un-deferred slice (7 tickets)
+
+- [ ] T-150 · `memory serve`: MCP **Streamable HTTP transport** (re-scoped from Wave 3: LAN-first, one server process, stdio remains the default for solo use) · mcp.ts · F
+- [ ] T-151 · transport security headers: Origin validation + session id + protocol version (2025-06-18 spec) — scoped to the team server · F
+- [ ] T-386 · NEW · bearer-token auth + per-peer allowlist on the team server: sync gossip already has **no identity layer** (T-332) and CURRENT.md is a team-wide instruction surface — on a shared network, the Letta CURRENT.md injection defect (F-05) and any pool-write become 5-person poisoning. Not deferrable · F
+- [ ] T-153 · re-scoped: **team DB file + per-member local DBs**; the server process is the single writer to the team DB (WAL contention is in-process only; no network FS, no multi-writer cluster needed yet) · store, root · F
+- [ ] T-204 · promoted into the slice: DB-first read precedence now matters (server-side YAML mirror sync across members is the corruption path) · F
+- [ ] T-368 · promoted into the slice: schema stamp + backfill must land before multiple stores exist · F
+- [ ] T-387 · NEW · member wiring: docs + `memory connect`/client-config recipe (opencode/claude/cursor MCP endpoint + token), team-vs-personal scoping policy (what belongs in shared memory vs personal; CURRENT.md = shared constraints, so every member's constraint write is a team-wide rule) · N
+
+**Explicitly NOT in the slice** (stays deferred): dashboard rehaul, per-tenant RLS, marketplace/forking, 28 remaining Wave-3 tickets, multi-writer merge cluster (T-038..T-043, T-328) — un-defer only when two *writers to the same store* are observed through the server.
+
+## Ordering
+
+T-204 + T-368 (one day) → T-150 + T-151 + T-386 (the transport, one branch pair) → T-153 (topology) → T-387 (docs). T-001/T-363 land first regardless — a 5-person attack surface makes the RCE and path-primitive tickets pre-reqs for the slice, not optional.
