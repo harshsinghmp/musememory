@@ -197,7 +197,7 @@
 - [ ] T-201 · migrator: delete 20 stale detectors BEFORE adapter fallback (stale recognition mis-imports) · migrator/detect.ts · new · F
 - [ ] T-202 · platform freeze: deprecate 20 dormant entries, freeze registry · agents/registry.ts · new · F
 - [ ] T-203 · `recall` deprecate to alias of unified retrieval · cli, mcp · new · F
-- [ ] T-204 · YAML mirror read precedence → DB-first (6 lines; stops disk shadowing DB) · store.ts:174-202 · new · F
+- [x] T-204 · **RESOLVED DECISION D1**: safe fix, NOT breaking — principal confirmed nothing outside the repo hand-edits the YAML mirror (CLI/MCP only), so no deprecation window needed · store.ts:174-202 · new · F
 - [ ] T-205 · Dockerfile: remove test-on-build stage · Dockerfile:9-11 · new · N
 - [x] MERGED→T-015 T-206 · README/CHANGELOG pass for all R18 deprecations · docs · new · N
 
@@ -413,7 +413,7 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [x] **T-368 RE-SCOPED** (both audits): 20-line stamp, NOT a framework — `PRAGMA user_version` + ordered `{version, up(db)}` array + backfill from the existing `data` JSON blob in the same PR + `doctor` parity check + `tar .memory` snapshot. The YAML mirror (`store.ts:174-202` rehydrates SQLite) IS the rollback. R1 red test (T-383) is its acceptance criterion.
 - [x] **T-364 RE-SCOPED**: only `src/adrs/engine.ts:104` + `src/pageindex/engine.ts:34` need same-ms ID guards; `store.ts:347-358` already has one.
 - [x] **Wave 3 DEFERRED (30 tickets: T-150-156, T-157-162, T-164-166, T-168-177, T-180, T-181)**: no team customers, no external HTTP consumer; T-332 (sync auth) was dep-on T-150 — auth for a server with no clients. Un-defer trigger: a second concurrent writer observed OR a paying team user. Kept: T-201..T-205 (cheap deprecations).
-- [x] **T-163 → DECISION, not ticket**: read-only UI invariant contradicts 15 live write endpoints + is a breaking change → principal decision D3.
+- [x] **T-163 → RESOLVED DECISION D3**: dashboard KEEPS writes; read-only invariant dropped. When Wave 3 un-defers: guarded writes + T-004 endpoint hardening, not an inspector-only UI.
 - [x] **Multi-writer cluster DEFERRED**: T-038, T-039, T-040, T-041, T-042, T-043, T-328 (one principal, one local store). Kept: T-044 flock (~20 lines, protects the real daemon+CLI+MCP multi-process case).
 - [x] **Embedding cluster GATED**: T-071, T-136, T-137, T-138, T-139 blocked on T-381 (spike) — the branch has zero implementation files.
 - [x] **YAGNI redirects**: T-129 (AST config-honesty) → CI grep for unreferenced exports; T-080/081/088/099/102/122/123/124/125/132/176/180/181 flagged speculative, re-propose only after the v2.4.0 baseline proves need; T-105/106/107 → cut to T-104 + T-105 only.
@@ -428,7 +428,9 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [ ] T-384 · R2 fixture: 120 memories / 3 projects / 30 superseded / 30 expired → assert `hybridSearch` returns only matching-project non-superseded rows. Baselines T-303 + T-308 + T-140 at once · F
 - [ ] T-385 · R3 baseline: 40 must-return queries from the principal's own `.memory/` + recall-set grading — gate Wave 2 on the number before T-070 ships · F
 
-**Principal decisions surfaced (asked with this commit):**
-- **D1** — does anything outside this repo hand-edit `.memory/memories/*.yaml`? If yes, T-204 is a breaking semantic change, not a 6-line fix.
-- **D2** — branch model: one branch per ticket (236 branches) or per-wave green gate relaxed to per-merge?
-- **D3** — T-163: keep dashboard writes (drop the invariant) or enforce read-only UI (breaking change + deprecation window)?
+**Principal decisions — all resolved 2026-10-14:**
+- **D2** ✅ RESOLVED: one branch per ticket (`fix/T-xxx`); every commit passes the full gate (bunx tsc --noEmit + bun test + bun run build); merge order follows the corrected critical path; per-file collision serialization at merge (sqlite.ts → store.ts → mcp.ts → retrieval → ui.ts).
+
+- **D1** ✅ RESOLVED: no external YAML editing (CLI/MCP only) → T-204 is a safe fix.
+- **D2** ✅ RESOLVED: one branch per ticket; full gate per commit; collisions serialized by file map.
+- **D3** ✅ RESOLVED: dashboard keeps writes; read-only invariant dropped; T-004/T-163 scope adjusted.

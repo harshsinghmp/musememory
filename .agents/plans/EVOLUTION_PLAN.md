@@ -332,8 +332,8 @@ Then:        v2.3.1 ships. Re-evaluate Wave 2 against measured baselines (T-384/
 1. **The 12-ticket cut for v2.3.1** — is it the right 12? (Strategic review chose it from trust-risk; executability review confirmed all 12 are small except T-363.)
 2. **Wave 2's premise** — 74 quality tickets. The R3 baseline (T-385: 40 must-return queries from the principal's own `.memory/`) gates the wave: if the engine already clears the bar, most of Wave 2 is unmeasurable. Should the baseline run before any Wave-2 implementation?
 3. **T-163 (dashboard writes vs read-only invariant)** — 15 live write endpoints vs a claim the dashboard never writes. Principal decision pending (D3).
-4. **YAML-first read (T-204)** — if external harnesses hand-edit `.memory/memories/*.yaml`, flipping read precedence to DB-first is a breaking semantic change. Principal decision pending (D1).
-5. **Branch/gate model (D2)** — 236+ one-commit-per-ticket against existing feat branches carrying 6-8 tickets each; per-wave "must exit green" may be unachievable as written.
+4. **YAML-first read (T-204)** — ✅ RESOLVED (D1): nothing outside the repo edits the YAML mirror, so the DB-first flip is a safe 6-line fix, no deprecation window.
+5. **Branch/gate model (D2)** — ✅ RESOLVED: one branch per ticket (`fix/T-xxx`), full gate per commit; 236 branches merge in critical-path order with per-file collision serialization.
 6. **The collision map** — `src/sqlite.ts` initSchema (10 tickets add columns), `src/store.ts` (17 refs), `src/mcp.ts` (12, incl. 4 tickets claiming the `memory_capture` case at :1692), `src/retrieval*` (~13), `src/ui.ts` (16). Serialize by file, not by wave.
 
 ## 7. Known weaknesses of this plan itself
