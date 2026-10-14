@@ -217,3 +217,155 @@
 Dependency-critical path: T-001 → T-030 (tombstones) → T-041 (outbox) → T-104/105 (write gates) → T-114-121 (ranking) → T-140+ (eval proves the rest).
 Existing branches cover ~40 tickets; remainder need new branches off `dev`.
 Every F-gated ticket requires Why/What/Verification commit body and passing bun test + tsc --noEmit + bun run build before merge.
+
+---
+
+# v2 — GAP AUDIT ADDENDUM (2026-10-14)
+
+Source: read-only gap audit cross-checking the 168 tickets against the four research documents AND the engine source (`mcp.ts`, `store.ts`, `retrieval*`, `orchestrator/`, `cognition/`, `learning/`, `quality/`, `sync/`, `vector.ts`). Verdict from audit: ~70% of findings uncovered; the plan is strongest where ecosystem research was strongest (ranking/lifecycle/sync) and thinnest where the ecosystem scan could not see — **read-path purity, derived-artifact invalidation, feedback attribution**. 35 tickets below; severity is the audit's severity, argued from source (B3/B8/B10 argued, not measured — flagged).
+
+## Wave G — READ-PATH PURITY & INVALIDATION (new gap class)
+
+- [ ] T-301 · CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Move to background queue; add invariant test: no writes during any read tool · dep: T-041 · F
+- [ ] T-302 · HIGH (B15) · `memory_capture` full passthrough: currently sets 7 of ~40 propose options (no evidence/source/verification/dedup/validFrom/expiresAt) — provenance tickets T-075/090/099/103/105 assume write-time capture that the flagship tool cannot express · mcp.ts:1692-1699 · dep: T-075 · F
+- [ ] T-303 · CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories injected at scale · dep: T-030 · F
+- [ ] T-304 · HIGH (B4) · vector index invalidation: `save()` never updates `index.json` (retrieval/engine.ts:124-127, store.ts:306); MCP hardcodes `stale:false` while serving ancient snapshots (mcp.ts:1683) · dep: T-064 · F
+- [ ] T-305 · HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,90,98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · F
+- [ ] T-306 · HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · F
+- [ ] T-307 · HIGH (B2) · Hebbian graph is write-only O(n²) per recall (plasticity.ts:37-64, mcp.ts:1611): n(n-1) edges + full-file rewrite every get_context; loaders have zero production callers. Bound it, make it incremental, consume it (see T-316) — or delete · F
+
+## Wave H — RANKING & FEEDBACK CORRECTNESS
+
+- [ ] T-308 · HIGH (B5) · two divergent ranking engines: `scoreEntry` (9 factors) drives get_context; `calculateMultiFactorScore` (11 factors) drives muse_context (retrieval.ts:181-213 vs retrieval/ranking.ts:52-222) — same store, two incompatible orderings. Unify behind one scorer or document the split explicitly · F
+- [ ] T-309 · HIGH (B6) · symbol match is binary and IDF-free: `` `get` `` in tags beats all lexically-relevant memories for any query containing "get" (ranking.ts:87-96). IDF-weighted term; T-070's gate covers the FTS prefilter, not this · F
+- [ ] T-310 · MEDIUM (B7) · word-boundary token matching: `entryText.includes(token)` matches race⊂trace, port⊂report (ranking.ts:62-66) · U
+- [ ] T-311 · HIGH (B8) · non-ASCII queries silently degenerate: `/[a-z0-9]+/g` returns [] for CJK and fragments "café" (retrieval.ts:67-70); zero-match penalty never fires → recall returns "most recently confirmed" with no signal. Unicode-aware fallback + penalty · U
+- [ ] T-312 · HIGH (B9) · FTS failure indistinguishable from no-match: `catch { return [] }` (sqlite.ts:366-374) silently removes the only lexical signal. Degraded flag + loud log; T-133's notes signal doesn't cover this · U
+- [ ] T-313 · HIGH (B11) · failure attribution: `isRegression = exitCode !== 0` applies to ALL recalled memories; 3 strikes auto-flip confirmed→disputed → drops from sync + confirm() (learning/feedback.ts:30-44, quality/utility.ts:72-79). Scope regression to anchor-relevant memories + decaying counter + corroboration before demotion · dep: T-030 · F
+- [ ] T-314 · MEDIUM (A2) · source-tagged recall hits `_source ∈ {hot,fts,vector,tree,distilled}` feeding rank — HOT.md is built (compounding/temporal.ts:50) and never read · dep: T-028 · U
+- [ ] T-315 · MEDIUM (A3) · frequency as first-class rank axis (LangMem) · dep: T-028 · U
+- [ ] T-316 · MEDIUM (A4) · promote Hebbian co-activation edges into write-time `linked_memory_ids` seeding + retrieval expansion (A-MEM note-evolution; substrate already written, never read) · dep: T-095 · U
+- [ ] T-317 · MEDIUM (A5) · split T-179: query-seeded PPR restart set + A/B on factual-recall-only fixture slice (HippoRAG v1 regressed factual recall) · dep: T-140, T-178 · U
+- [ ] T-318 · MEDIUM (A12) · retrieval weight auto-tuner from ROI telemetry, gated behind eval harness (memoria) · dep: T-127, T-140 · U
+- [ ] T-319 · MEDIUM (A1) · `is_inference` + `parent_ids` columns; inference down-weight; `memory_review_queue` ordered by support count (Supermemory) — distilled candidates currently rank identical to user-stated facts · dep: T-075 · U
+
+## Wave I — GOVERNANCE & SCALE
+
+- [ ] T-320 · HIGH (B10) · contradiction engine calibration: 7 regexes flip BOTH sides to `conflicted` at 0.85 on any 0.4-Jaccard pair (quality/contradiction.ts:15-23,85-114) → −0.8 rank, sync removal, −25 health each = 4 false positives = FAIL. Dry-run mode, negation-pair scoping, calibration fixtures · U
+- [ ] T-321 · HIGH (B12) · per-project health gate: gate/clustering/tech-debt call `list(store)` unfiltered and label by `entries[0].project` (health/gate.ts:31,220; cognition/clustering.ts:62; tech-debt.ts:102) — one number attributed to whichever memory sorts first · dep: T-153 · U
+- [ ] T-322 · MEDIUM (B13) · per-file read cache: anchor audit reads every source file 3× per health check (health/gate.ts:82,111,176 → anchors/resolver.ts:121) · U
+- [ ] T-323 · MEDIUM (B14) · anchored memories force-injected to front regardless of `anchor.status` + budget ordering (orchestrator/context.ts:104-147) — anchor to a deleted file wins the slot forever · dep: T-134 · U
+- [ ] T-324 · HIGH (B18) · checkpoint merge semantics: `generateSessionHandoff` overwrites CURRENT.md wholesale; omitted constraints default to 2 hardcoded strings → hand-added constraints destroyed (compaction/engine.ts:145,54). Diff-preserving update, never drop unknown constraints · F
+- [ ] T-325 · MEDIUM (B19) · `rollupTemporal` never filters by its own period — every rollup contains all history (compounding/temporal.ts:120-135) · U
+- [ ] T-326 · MEDIUM (B20) · tier 0/1 run the full ranking path (retrieval/tiered.ts:37) — audit D9 named this line; no ticket makes tier 0 cheap or removes it · U
+- [ ] T-327 · MEDIUM (B21) · paged candidate source: `list()` = full SELECT * + JSON.parse ×44 call sites (store.ts:220-288); getSyncStatus filters whole store to count; collectNudges calls it twice uncapped · U
+- [ ] T-328 · MEDIUM (B22) · real Lamport counter: sync clock is `memories.length + Date.now()` (sync/engine.ts:118-125) — equal counts collide, divergence undetectable · dep: T-044 · U
+
+## Wave J — ECOSYSTEM GAPS NOT YET TICKETIZED
+
+- [ ] T-329 · MEDIUM (A6) · episode table + episode-scoped search + episode stamp on hits (Zep: session_id is indexed at sqlite.ts:157 and never used as a retrieval unit) · U
+- [ ] T-330 · MEDIUM (A7) · `absent` memory type ("checked, no X exists") + role scoping user/agent/external/system (Mem0 v3) · U
+- [ ] T-331 · MEDIUM (A8) · read-tool purity sweep across CLI + MCP: every read command read-only (converges with T-301) · F
+- [ ] T-332 · HIGH (A9) · signed SyncPacket + peer allowlist + fail-closed on unknown sender (Walrus: gossip has no identity layer; any process writing `.memory/sync/pool/` injects memories — zero auth tickets existed) · dep: T-044, T-150 · F
+- [ ] T-333 · MEDIUM (A10) · confirm() extends expiry + expiry-horizon alert N days out (Walrus documented failure: expiry without renewal) · dep: T-078, T-079 · U
+- [ ] T-334 · LOW (A11) · `write_origin` tier (interactive/harvest/distill/sync) → rank weight (LangMem: hot-path vs background writes as trust axis) · dep: T-089 · U
+- [ ] T-335 · LOW (A13) · tombstone `visible_until` delayed-deletion semantics: hidden from all surfaces, retained in audit (ChatGPT-memory caution row) · dep: T-030, T-031 · U
+
+## v2 adjacency notes (amendments to earlier tickets)
+
+- T-021/022 note B5: hot-path fixes apply to `retrieval.ts`; the muse_context scorer (`ranking.ts`) has its own tokenization — T-308 owns the unification.
+- T-070 note B6: the IDF abstention gate covers the FTS prefilter only; the binary symbol bonus needs T-309.
+- T-024 note B3: bounding FTS terms ≠ bounding result rows; T-303 owns row-level lifecycle/project filtering.
+- T-028 note B11/A3: wiring `recordRetrievals` is necessary but not sufficient — T-313 fixes what the telemetry is allowed to conclude.
+- T-177 note B18: governance-pass snapshots ≠ checkpoint overwrite; T-324 owns CURRENT.md merge semantics.
+
+## v2 totals
+
+| Wave | Tickets | |
+|---|---|---|
+| G read-path purity | 7 | 2 critical (T-301, T-303) |
+| H ranking/feedback | 12 | |
+| I governance/scale | 9 | |
+| J ecosystem gaps | 7 | |
+| **Plan total** | **203** | v1 168 + v2 35 |
+
+---
+
+# v3 — NEXUS MULTI-MODE AUDIT + IMPLEMENTABILITY (2026-10-14)
+
+Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/`, `mesh/`, `wiki/`, `adrs/`, `pageindex/`, `migrator/`) + intended mode (34 shipped-capability claims + README claims ↔ implementation evidence; 48 sampled tickets verified against source).
+
+## VERDICT: implementable as written — with ordering corrections
+
+45/48 sampled ticket references are exact; 3 shifted (T-013, T-021, T-205 — cosmetic). Two tickets need re-scoping (T-045, T-163). One structural gap: no migration mechanism is named by any column-adding ticket. All RB items below are ordering, not architecture.
+
+## Wave 0 — FOUNDATIONAL SEAMS (must land before dependent tickets)
+
+- [ ] T-363 · RB-1 CRITICAL · path-validation choke point: single `resolveWithin(base, ...segments)` primitive applied at every boundary (ui.ts:164,503,577; pageindex/engine.ts:111,205,250; wiki/compiler.ts:504; mesh/discovery.ts:29; sync/pool.ts:19). F-01/F-02/F-03/F-21/F-26 are four call sites of this one missing primitive — fixing per-endpoint guarantees reintroduction · blocks T-336, T-337, T-351, T-355 · F
+- [ ] T-364 · RB-3 · unique-ID seam: `crypto.randomUUID` (or DB UNIQUE + collision retry) behind one id-generator; current `Date.now()` ids (adrs/engine.ts:104, pageindex/engine.ts:34) collide same-millisecond with no constraint to reject · blocks T-038, T-041, T-044, T-328 and every parallel-writer ticket · F
+- [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
+- [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
+- [ ] T-367 · RB-5 DECISION · zero-daemon charter vs reality: `daemon.ts` + `ui.ts` are two blocking HTTP servers (cli/ecosystem.ts:507, decisions.md:7 ADR-001 binding) — principal decision: amend charter, or daemon becomes opt-in-removable; until decided, every watch/HTTP/background ticket stacks onto a violated foundation · N (decision record)
+- [ ] T-368 · CRITICAL · migration mechanism: `memories` table is 14 columns + `data` JSON (sqlite.ts:137-155); ~20 D/C-wave tickets need real columns (idempotency_key, content_hash, decay_score, fact_provenance, linked_memory_ids, is_inference, parent_ids). One migration framework + one migration PR pattern (additive ALTER + backfill + test) · blocks the whole D-wave · F
+
+## Findings from Nexus audit mode (new tickets T-336..T-362)
+
+**Reject:**
+- [ ] T-336 · F-01/F-02 · pageindex path traversal: unsanitized `project`/`indexId` → `rmSync(recursive)` arbitrary delete via `memory_disconnect_pageindex` (pageindex/engine.ts:250,252,256 + mcp.ts:2032) · dep: T-363 · F
+- [ ] T-337 · F-03 · wiki path traversal: raw `slug` → arbitrary `.md` read (wiki/compiler.ts:504,513; mcp.ts:1955; ui.ts:166) · dep: T-363 · F
+- [ ] T-338 · F-04 · migrator self-certification: imported data stamped `verification.level:"independently-verified"` with zero verification (migrator/adapters/agentmemory.ts:59-62) · dep: T-366 · F
+- [ ] T-339 · F-05 · Letta injection: human/persona core memory marked `isConstraint:true` → verbatim into CURRENT.md (letta.ts:26,38; engine.ts:113-115) — cross-agent instruction injection · dep: T-366 · F
+- [ ] T-340 · F-06/F-07 · generic adapter imports junk as confirmed: any JSON object value becomes a memory (generic.ts:21; engine.ts:130); whole .md/.txt/.jsonl files imported wholesale (generic.ts:77-86) · dep: T-366 · F
+- [ ] T-341 · F-08 · `memory upgrade --dry-run` still rewires agents: step 3 unguarded `repairInstallation` hardcodes `dryRun:false` (cli/upgrade.ts:524,359) · F
+- [ ] T-342 · F-09 · studio export XSS: `JSON.stringify(memories)` unescaped `</script>` + `$&`-pattern corruption (ui.ts:2473-2474) · F
+
+**Request Changes:**
+- [ ] T-343 · F-10 · malformed Host header crashes dashboard: `new URL(req.url, "http://"+req.headers.host)` outside try → unhandled rejection → exit(1) (ui.ts:42; bin/memory.ts:4) · F
+- [ ] T-344 · F-11 · `origin === "null"` classified local, echoed into CORS (ui.ts:56,59) — sandboxed iframe gets full read+write · F
+- [ ] T-345 · F-12/F-13 · daemon hardening: no `server.on("error")` (EADDRINUSE crashes), `/publish` no origin check, client sockets leaked (daemon.ts:36-78,87), shared debounce collapses watcher events, watchers never re-armed · F
+- [ ] T-346 · F-14 · upgrade CLI exit codes: zero non-zero exits in 558 LOC; CI cannot distinguish success from failure (cli/upgrade.ts:498) · F
+- [ ] T-347 · F-15 · port-handling contract broken: auto-increment path dead (ecosystem.ts:443 always passes port); `--port abc` → NaN → random port (ui.ts:613) · F
+- [ ] T-348 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
+- [ ] T-349 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
+- [ ] T-350 · F-18/F-19/F-20 · drift endpoint: unguarded statSync 500s on dangling symlink; O(exports × memories) substring scan; a READ appends audit events (drift.ts:27,139-144,178-191) · F
+- [ ] T-351 · F-21 · mesh anchor path traversal: memory-supplied `file_path` → unbounded readFileSync; only gate is `includes("packages/")` (contracts.ts:121; ui.ts:577; discovery.ts:28-41) · dep: T-363 · F
+- [ ] T-352 · F-22/F-23 · ADR integrity: supersede-before-save leaves dangling ref on failure; rejected ADR stored as confirmed (engine.ts:148,162-165,191) · F
+- [ ] T-353 · F-24 · wiki frontmatter forge: unescaped memory title/tags interpolated into YAML scalars (wiki/render.ts:6,10,13,31; read back at compiler.ts:487) · F
+- [ ] T-354 · F-25 · CLI arg parsing: `--k=a=b` truncates; `--limit -1` parses as flag; no `--` terminator (cli/shared.ts:17,20) · F
+- [ ] T-355 · F-26 · sync pool_dir forwarding: `/api/sync/pool` body → arbitrary mkdir/readdir (ui.ts:503 → sync/pool.ts:19,22,33) · dep: T-363 · F
+- [ ] T-356 · F-27 · pageindex disclosure-depth is a no-op: `maxDepth`/`disclosureDepth` accepted, never used (engine.ts:124-125 vs 137-165) · F
+- [ ] T-357 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
+- [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
+- [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
+- [ ] T-360 · F-31/F-35 · UI shutdown + numeric validation: keep-alive sockets block close (ui.ts:626); unvalidated parseInt limits (ui.ts:209,613) · F
+- [ ] T-361 · F-32 · escapeHtml omits `'`; `item.priority` unescaped into class attribute (ui.ts:1588,2093) · F
+- [ ] T-362 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
+
+## New tickets from intended mode (claims ↔ evidence)
+
+- [ ] T-369 · benchmark threshold tests: "sub-50 µs" (benchmark/suite.ts:85) and "sub-2ms" claims have NO threshold assertions — `test/benchmark.test.ts:54,58` assert `>= 0`. Either assert real gates or remove the claims (feeds T-131 honesty) · F
+- [ ] T-370 · docs truth pass (replaces/extend T-015): 80+→52 platforms (×5 README places); "24+ formats"→22 detectors/3 adapters; "29 engines"→same; "61 tools/6 profiles"→107 tools/7 profiles; remove `profile_switch` (0 occurrences); daemon SSE≠WebSocket label; README body 497/84/2190→502/85/2224; current.md #32 "Linus hardening" is PARTIAL until T-001 lands (verify.ts:23 unpatched); capability #15 PARTIAL (`evaluateSessionOutcomes` 0 production callers); #21 PARTIAL (7 phantom profile names); #33 PARTIAL (`maybeAutoOptimize` 0 callers) · N
+
+## v3 amendments to existing tickets
+
+- T-013: real path `intelligence/adapters/lsp.ts:14` (plan said `intelligence/lsp.ts:16`)
+- T-021: real hot path `retrieval.ts:199` (`verifyRuntimeFiles` inside scoreEntry)
+- T-205: `Dockerfile:9-11` (lines shifted)
+- T-027 CORRECTION: `dedup` IS wired in propose (`store.ts:418`); the real gap is `memory_capture` never passing it → folded into T-302
+- T-302: 6 of 23 propose options passed (not "~40"); add dedup passthrough
+- T-308: `scoreEntry` has 10 factors (not 9)
+- T-045 RE-SCOPE: compaction is 4 pure functions with no injection surface — this ticket CREATES the seam (new interface + tests), then the hook
+- T-163 RE-SCOPE: read-only UI invariant contradicts 15 live write endpoints — it is a breaking change; needs deprecation path + principal decision, not a hardening ticket
+- T-136/137/138 RE-SCOPE: branch exists with ZERO implementation files — add a spike ticket (validate llama-cpp local embeddings E2E) before the three build tickets
+- T-201: 19 generic-fallback detectors (not 20)
+
+## v3 totals
+
+| Section | Tickets |
+|---|---|
+| v1 | 168 |
+| v2 gap audit | 35 |
+| v3 Wave 0 seams | 6 |
+| v3 audit findings | 27 |
+| v3 claims/bench | 2 |
+| **Plan total** | **238** (pending test-integrity tickets T-371+) |
