@@ -1007,5 +1007,99 @@
     // Initial render
     renderDossierCards();
   </script>
+
+<!-- R17b: Ecosystem long tail (2026-10-14) -->
+<style>
+  .eco-section { margin-top: 40px; }
+  .eco-section h2 { font-size: 1.25rem; color: #fff; margin-bottom: 6px; }
+  .eco-section p.sub { color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 16px; }
+  .eco-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .eco-card { background: var(--surface-card); border: 1px solid var(--border-whisper); border-radius: var(--radius-md); padding: 12px 14px; }
+  .eco-card .n { font-weight: 700; color: #fff; font-size: 0.92rem; }
+  .eco-card .u { font-size: 0.72rem; color: var(--text-dim); word-break: break-all; margin: 2px 0 6px; }
+  .eco-card .v { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .eco-card .d { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+  .v-adopt { color: #10b981; } .v-adapt { color: #06b6d4; } .v-skip { color: #f59e0b; } .v-license { color: #ef4444; }
+</style>
+<section class="eco-section container" id="ecoSection">
+  <h2>Hermes Plugin Ecosystem &amp; 2026 Memory Systems — Full Survey</h2>
+  <p class="sub">69 competitors surveyed 2026-10-14 (R17b). Verdicts are mechanism-level for Muse Memory. Long tail insight: the Hermes memory-plugin ecosystem is 0&#8211;16&#9733; vendor land grab; the maintained core is the vendor-backed providers listed first.</p>
+  <div class="eco-grid" id="ecoGrid"></div>
+</section>
+<script>
+const ECO = [
+  ["Mem0","github.com/mem0ai/mem0","adapt","ADD-only v3; steal linked_memory_ids write-time edges + semantic threshold gate before BM25 fusion"],
+  ["OpenViking","github.com/volcengine/OpenViking","license","AGPL — idea only: L0/L1 abstract sidecars + ratio-batched parent refresh (reimplement)"],
+  ["Memanto","github.com/moorcheh-ai/memanto","adapt","Stamped expiry (status/expired_at/expired_by rule name) + pin-capable policy YAML"],
+  ["Memoria","github.com/matrixorigin/memoria","adapt","TrustTier-keyed half-life decay (365/180/60/30d); safety snapshots before governance"],
+  ["Hindsight","github.com/vectorize-io/hindsight","adapt","prefer_observations recall-time dedup; watermark staleness from data, not clocks"],
+  ["Honcho","github.com/plastic-labs/honcho","license","AGPL — concept only: observer/observed directional queries; surprisal-gated dreaming (reimplement)"],
+  ["Mnemosyne","github.com/mnemosyne-oss/mnemosyne","adapt","Veracity tiers + Bayesian 1-0.7^n confidence + conflicts-table-never-delete (closest sibling)"],
+  ["ReMe","github.com/agentscope-ai/ReMe","adapt","Files-as-truth rebuildable index; progressive wikilink expansion; seen-chunk TTL"],
+  ["deja-vu","github.com/vshulcz/deja-vu","adapt","SrcTS evidence-age stamping; index-time redaction keeping text searchable; fix-pair mining"],
+  ["BetterDB agent-memory","github.com/BetterDB-inc/monitor","adapt","Two-mode consolidate (summary vs reconcile+tombstones); shared recall/eviction weights"],
+  ["Hermes memory-wiki (official)","hermes-agent.nousresearch.com/docs/plugins/hermes-memory-wiki","adapt","Read-only dashboard pattern: opens host state.db read-only, never writes, prompt-cache safe"],
+  ["Chronicle","github.com/indigokarasu/chronicle-agent-context-and-memory","adapt","Config-honesty AST audit (WIRED/DORMANT/UNREAD, build-failing); [DRAFT] marking; event-sourced"],
+  ["birkin-mnemosyne","github.com/ashmoonori-afk/birkin-mnemosyne","adapt","Resident INDEX route-map (~800 tok/240 docs); curation executor with no delete verb"],
+  ["Holographic (ex-Hermes-core)","github.com/itpartypattaya/hermes-plugin-holographic","adopt","IDF-weighted relevance gate before FTS5; read-path re-validation; bitemporal valid_to_exact; forget tombstone+secure_delete"],
+  ["EntropicMem","github.com/Ufonik88/EntropicMem","adopt","FTS5-tokenizer-matched abstention gate; why_retrieved reason tokens; decay with floor"],
+  ["hermes-dreaming","github.com/itpartypattaya/hermes-dreaming","adopt","wakeAgent:false gate; overnight loss guard; corroboration-gated promotion (machine sources excluded)"],
+  ["OpenLtm","github.com/RohiRIK/OpenLtm","adopt","Materialized decay_score column + importance-gated half-lives + <0.25 deprecate (highest ROI)"],
+  ["lancedb-memory-suite","github.com/3L0935/hermes-lancedb-memory-suite","adopt","Dual-threshold abstain gate + named calibrated-engine constant"],
+  ["memos (MemOS)","github.com/Markgatcha/memos","adapt","TOON context-pack compaction; scoreRetain 0.3 write gate; trust-from-provenance table"],
+  ["nachos","github.com/Nacho-Labs-LLC/hermes-plugin-nachos","adopt","Never-drop manifest TOC (entry line never omitted); rank title+summary not body"],
+  ["mnemostack","github.com/udjin-labs/hermes-mnemostack","adopt","Capture-side echo suppression (age-bounded); event-time-at-capture; degraded-notes fault signal"],
+  ["intelligent-memory","github.com/hoysama/hermes-intelligent-memory","adopt","fact_provenance append-only + lineage FKs + UNIQUE(profile, content_hash) + epoch compression"],
+  ["Compartment","github.com/MaxFreedomPollard/Compartment","adopt","Soft-OR evidence fusion; fixed-bound cosine->prob; multiplicative priors; one ranking module"],
+  ["xmemo","github.com/yonro/hermes-xmemo-plugin","adopt","Write outbox state machine + idempotency_key UNIQUE + recover_stale_locks + stale-read tags"],
+  ["qdrant-memory (catalog)","github.com/cnkang/hermes-plugin-qdrant-memory","adapt","Synchronous SQLite admission ledger before async extraction; capability-honesty README"],
+  ["memobase provider","github.com/fred0m/hermes-memobase-provider","adopt","low_discrimination() conditional rerank gate; idf boost for rare tokens"],
+  ["jev-memory-selector","github.com/Pinutss/jev-memory-selector","adapt","Typed drop-reason/keep-reason audit trail; deterministic tie-break"],
+  ["lcm-x","github.com/electricsheephq/lcm-x","adopt","Summary DAG with source-lineage edges; directness scoring (tool JSON -4.0)"],
+  ["yantrikdb","github.com/yantrikos/yantrikdb-hermes-plugin","adopt","idempotency_key on capture; constitution file pattern; dual-trigger maintenance cadence"],
+  ["icarus","github.com/esaradev/icarus-plugin","adapt","recall->usage telemetry join (usage_rate); >0.6 topic-overlap prefetch skip"],
+  ["optchat-memory","github.com/aska-digital/optchat-memory","adopt","fsync-per-line JSONL + single-writer flock; id+n positional zoom; free-node rule"],
+  ["optmem","github.com/rarf/optmem-hermes-plugin","adapt","Power-of-two aligned compaction blocks; WakeNeedsCompression refusal gate"],
+  ["HyAtlas","github.com/tuancookiez-hub/HyAtlas-Memory","adapt","Supersede-not-delete + hidden-count over-fetch; corroboration-gated schema induction"],
+  ["cognition-memory","github.com/aska-digital/cognition-memory","adopt","Truncation order pin>provenance>recency>salience + mandatory omission marker; tombstones on eviction"],
+  ["hermes-tam-memory","github.com/vbcherepanov/hermes-tam-memory","adopt","<memory-context> strip before capture; bounded drop-oldest write queue + deadline flush"],
+  ["hwiki","github.com/ottosulin/hwiki","adapt","Untrusted-zone quarantine per hit; write tool withheld in cron/subagent; safe FTS token quoting"],
+  ["pubky","github.com/MCarlomagno/hermes-pubky","adapt","Head-moves-last checkpoint ordering; base/head two-pointer restore"],
+  ["cashew","github.com/magnus919/hermes-cashew","adapt","Ownership-token cron reconciliation; cron carries full validated effective config"],
+  ["memex8","github.com/Ex8-ca/memex8","adapt","Per-type Weibull decay; regex query-intent bias table (no LLM)"],
+  ["gbrain-pointer","github.com/praggybuilds/hermes-gbrain-pointer","adopt","Generation-counter invalidation of in-flight prefetch; pop-once cache"],
+  ["gbrain-retrieval-reflex","github.com/aean0x/hermes-gbrain-retrieval-reflex","adapt","Self-injection strip; trivial-turn gate; hard byte-cap; fail-soft invariant"],
+  ["cortexlayer","github.com/Cortex-Layer/cortexlayer-hermes-plugin","adapt","Digest-deduped on_pre_compress capture; never return empty checkpoint"],
+  ["nexus-memory","github.com/Neboy72/nexus-memory","adapt","effective_score = base x reinforcement x decay; fail-closed access level"],
+  ["hicortex","github.com/gamaze-labs/hicortex-hermes-plugin","adapt","Pushed recall index + lazy hydrate as reinforcement signal; hard recall timeout"],
+  ["kuehnberger qdrant","github.com/kuehnberger/hermes-qdrant-memory","adapt","_clamp_limit (tool arg != human budget); dry-run point-ID-only delete"],
+  ["sugar","github.com/roboticforce/sugar","license","AGPL — idea only: reserved guideline slots; per-type expires_at"],
+  ["cognee-integrations","github.com/topoteretes/cognee-integrations","adapt","Two-tier promotion (pending tier -> explicit flush); circuit breaker 5/120s"],
+  ["snapcompact","github.com/vimona3ds/hermes-snapcompact","adapt","Dual-measure honest-vs-host token accounting fail-safe before compaction"],
+  ["agentplaybooks","github.com/matebenyovszky/agentplaybooks","adapt","NoRedirects + strict validate_url; strict tool-arg surface"],
+  ["supermemory plugin","github.com/supermemoryai/hermes-supermemory","adapt","4-hour bucketed customId; bounded oldest-first retry buffer"],
+  ["lancer hermes-agent-memory","github.com/lancedb/hermes-agent-memory","adopt","on_pre_compress extraction as write trigger; stable content-hash dedup"],
+  ["agent-memory-es","github.com/patrykkopycinski/hermes-plugin-agent-memory-es","adapt","user-words vs agent-prose tier split as provenance; trivial-prompt gate"],
+  ["brain-graph","github.com/PIR8-Software/hermes-brain-graph","adapt","Rename-as-planned-transaction with snapshot rollback; resolved|ambiguous|unresolved triage"],
+  ["stack-memory","github.com/Karb-Interactive/hermes-plugin-stack-memory","license","No license — design only: thread-scoped store_jail; verified|drifted|unknown anchor triage"],
+  ["pastdotdev","github.com/pastdotdev/hermes-plugin","adapt","Silence-gap episodic cuts (sittings()); named budget constants with provenance"],
+  ["limbic","github.com/dyiapanis/limbic","license","PolyForm NC — idea only: no_confident_match abstention; matured_at/atrophy_marked_at lifecycle"],
+  ["metronix","github.com/mtrnix/hermes-memory-metronix","skip","REST proxy, no retrieval mechanism of its own"],
+  ["penny-hermes","github.com/HelperLabs/penny-hermes","skip","Hosted MCP client; transport hardening pattern only"],
+  ["dexio","github.com/dexio-wiki/hermes-plugin","skip","Remote SaaS shim; no ranking"],
+  ["excel-line","github.com/kalice-vi/hermes-excel-line","skip","Substring scan over xlsx; strictly worse than FTS5"],
+  ["brethof-brain","github.com/BrethofAI/brethof-brain-client","license","Proprietary — concept only: curator gate between raw facts and canonical records"],
+  ["hydradb / hydra-db","github.com/hydra-db/hydradb-hermes-plugin","skip","60-line vendor adapter, days old"],
+  ["gbrain (kerrz)","github.com/kerrz2020/hermes-gbrain","skip","Postgres installer; verify-install-fresh.sh sandbox-drill discipline only"],
+  ["memory-ui (xraysight)","github.com/xraysight/hermes-memory-ui","skip","Read-only cross-provider inspector (73 stars); UI reference only"],
+  ["obsidian-memory","github.com/kyssta-exe/hermes-obsidian-memory","skip","Vault browser; no cognitive-memory mechanism"],
+  ["Walrus Memory (MemWal)","walrus.xyz/products/walrus-memory","adapt","Content-addressed IDs as sync dedup; hash-chain audit as local availability proof; extend-before-expiry"],
+  ["memos-claude / icarus fine-tune thesis","github.com/esaradev/icarus-plugin","skip","Memory-as-training-dataset pipeline is Icarus's thesis, not ours"]
+];
+const VC = { adopt: "ADOPT", adapt: "ADAPT", skip: "SKIP", license: "LICENSE-CAUTION" };
+document.getElementById("ecoGrid").innerHTML = ECO.map(e =>
+  '<div class="eco-card"><div class="n">' + e[0] + '</div><div class="u">' + e[1] +
+  '</div><div class="v v-' + e[2] + '">' + VC[e[2]] + '</div><div class="d">' + e[3] + '</div></div>').join("");
+</script>
 </body>
 </html>

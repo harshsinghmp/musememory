@@ -66,3 +66,16 @@ _The audit's P0 defects. Smallest complete changes; each has blast-radius notes 
 - **No dead features**: a capability ships only if reachable from a shipped entry point; `current.md` claims must match call sites.
 - **No silent cost**: any per-query I/O (spawn, stat, full scan) is cached or gated; benchmark labels must name what they measure.
 - **Zero-daemon is non-negotiable**: every P1 semantic-retrieval design keeps an FTS5-only degraded path.
+
+---
+
+## 🧬 R17b: Ecosystem Teardown Upgrades (2026-10-14)
+
+69-URL principal-supplied competitor scan (Hermes plugin ecosystem + major OSS memory systems) + Hermes platform teardown + DB/transport research. Full evidence: `.agents/research/ecosystem-teardown-2026-10.md` (competition list + 50-item consolidated implementation catalog + explicit rejections). Decided waves:
+
+- **P0 additions (v2.4.0, 22 items)**: idempotency keys + content-hash dedup; write outbox with stale-lock recovery; `on_pre_compress` fact extraction; wake gate (`wakeAgent:false`) for background passes; overnight loss guard; memory-pressure alerts; honest dual-measure token accounting; refuse-incomplete digest contract; circuit breaker around store calls; `atexit` bounded joins; read-path re-validation; safe FTS query construction; limit clamping; stale-read tags.
+- **P1 additions (v2.5.0, 18 items)**: consolidated abstention gates; decay/forgetting engine (decay_score + veracity tiers + trust-tier half-life + stamped expiry + pin policy); bitemporal `valid_to_exact`/`as_of` discipline; conflicts-table-never-delete + federation handshake; veracity trust table + evidence-age stamping; TOON/manifest context packing + omission markers + reserved slots; linked_memory_ids + supersede-not-delete + prefer_observations dedup; provenance tables + hash-chained audit + index-time redaction; write gates (scoreRetain + corroboration-gated promotion + two-tier flush); recall hygiene (re-injection + echo suppression + seen-chunk TTL); ranking upgrades (soft-OR fusion + discrimination rerank + watermark staleness + intent bias); L0/L1 abstracts + resident INDEX; why_retrieved + usage telemetry + config-honesty audit; constitution contract; failure-visibility signals; embeddings (R21) + eval harness (R27); fix-pair mining.
+- **P2 additions**: server mode (Streamable HTTP + per-tenant DB files + SyncPool-over-HTOP + git YAML distribution + Litestream backups); dashboard rehaul (recall-debug, lineage graph, eval panel, control tower, mesh view); always-on memory cadence; Hermes MemoryProvider adapter (qdrant branch becomes opt-in vector adapter); federation handshake; observer/observed team semantics; memory forking; gated graph retrieval; funded pools; marketplace.
+- **Hard rejects**: daemon-backed stores, SaaS memory backends, AGPL/BSL/PolyForm code copies, multilingual stemming, auto-delete, full-file injection.
+
+Engine verdict: Muse Memory's zero-daemon SQLite+FTS5+YAML+MCP architecture is the majority position of the field and ahead of the Hermes plugin long tail; the gap is shipping the convergent mechanisms (above), not architecture change.
