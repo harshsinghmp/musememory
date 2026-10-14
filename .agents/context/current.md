@@ -5,6 +5,13 @@
 
 ---
 
+## ⏭️ Next Up (planned, not shipped)
+- **v2.4.0 — Correctness & Performance Hardening (P0)**: 15 audit-driven fixes (~200 LOC) — query-cache self-destruction, ranking-loop stat storm + re-tokenization, `openStore` dirty-gating, bounded FTS preflight, single-transaction writes, `/bin/sh -c` hardening in `memory verify`, FTS↔row parity, wiring of 4 dead features (`dedup`, `recordRetrievals`, `maybeAutoOptimize`, `touchActivity`), memory restore/soft-delete, `Math.max` spread crash at 100k.
+- **v2.5.0 — Semantic Retrieval, Verifiability & Evals (P1)**: local embeddings + FTS5 hybrid fusion, retrieval-set eval harness, hash-chained audit + session checkpoints, lineage walker, scoped invalidation, inference review queue, compaction-triggered consolidation, CAS writes.
+- Full evidence + ranked plans: `.agents/context/roadmap.md` and `.agents/research/research-brief-walrus-memory-architecture.md` (R17, 2026-10-14).
+
+---
+
 ## 🚀 Shipped Capabilities
 
 1. **Dual-Scope Cognitive Engine**: Project-local `.memory/` and global `~/.memory/`.
