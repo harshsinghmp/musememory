@@ -148,11 +148,15 @@ function initSchema(db: SqliteDatabase): void {
       expires_at TEXT,
       valid_from TEXT,
       valid_to TEXT,
+      mem_path TEXT,
+      last_accessed_at TEXT,
+      access_count INTEGER,
       data TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
 
+    -- R23: access-weighted retention indexes (A15/A18)
     CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project);
     CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
     CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
@@ -162,6 +166,9 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
+    CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path);
+    CREATE INDEX IF NOT EXISTS idx_memories_last_accessed_at ON memories(last_accessed_at);
+    CREATE INDEX IF NOT EXISTS idx_memories_access_count ON memories(access_count);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
@@ -199,6 +206,9 @@ export interface DbMemoryRow {
   expires_at: string | null;
   valid_from: string | null;
   valid_to: string | null;
+  mem_path: string | null;
+  last_accessed_at: string | null;
+  access_count: number | null;
   data: string;
   created_at: string;
   updated_at: string;
@@ -225,6 +235,9 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
     expires_at: row.expires_at !== null ? row.expires_at : parsedData.expires_at,
     valid_from: row.valid_from !== null ? row.valid_from : parsedData.valid_from,
     valid_to: row.valid_to !== null ? row.valid_to : parsedData.valid_to,
+    mem_path: row.mem_path !== null ? row.mem_path : parsedData.mem_path,
+    last_accessed_at: row.last_accessed_at !== null ? row.last_accessed_at : parsedData.last_accessed_at,
+    access_count: row.access_count !== null ? row.access_count : parsedData.access_count,
     created_at: row.created_at || parsedData.created_at || new Date().toISOString(),
     updated_at: row.updated_at || parsedData.updated_at || new Date().toISOString(),
   };
@@ -234,11 +247,13 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
   const sql = `
     INSERT OR REPLACE INTO memories (
       id, title, content, project, type, status, salience, reinforcement,
-      session_id, due_at, expires_at, valid_from, valid_to, data,
+      session_id, due_at, expires_at, valid_from, valid_to,
+      mem_path, last_accessed_at, access_count, data,
       created_at, updated_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?
     )
   `;
@@ -257,6 +272,9 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
     entry.expires_at ?? null,
     entry.valid_from ?? null,
     entry.valid_to ?? null,
+    entry.mem_path ?? null,
+    entry.last_accessed_at ?? null,
+    typeof entry.access_count === "number" ? entry.access_count : null,
     JSON.stringify(entry),
     entry.created_at,
     entry.updated_at,

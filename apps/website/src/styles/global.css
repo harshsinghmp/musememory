@@ -23,6 +23,19 @@
   --red: #f27b7b;
   --red-soft: rgba(242, 123, 123, 0.12);
 
+  /* Depth palette — decorative only (gradients, glows, edge light). These are
+   never used for text, so they carry no contrast obligation; every text token
+   above stays the audited one. */
+  --plasma: #ff7db1;
+  --indigo: #5b4bd6;
+  --edge-light: rgba(255, 255, 255, 0.14);
+  --edge-dark: rgba(0, 0, 0, 0.55);
+  --glass: rgba(16, 22, 36, 0.72);
+
+  /* 3D scene geometry */
+  --persp: 1200px;
+  --lift: 6px;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
@@ -291,6 +304,180 @@ code {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ─── 3D depth system ───────────────────────────────────────────────────
+   Perspective containers, layered depth, scroll parallax and pointer tilt.
+   Every effect is transform/opacity only — nothing here triggers layout during
+   scroll — and all of it collapses under prefers-reduced-motion further down. */
+.scene {
+  perspective: var(--persp);
+  perspective-origin: 50% 42%;
+}
+.scene-planes {
+  transform-style: preserve-3d;
+}
+
+/* Depth layers: place siblings in Z instead of stacking flat. */
+.layer {
+  transform: translateZ(var(--z, 0px));
+}
+.z-1 { --z: 20px; }
+.z-2 { --z: 44px; }
+.z-3 { --z: 76px; }
+
+/* Scroll parallax. --py/--pz are written by the motion runtime; with no JS or
+   reduced motion they stay at their 0 fallback, which is the flat design. */
+[data-parallax] {
+  transform: translate3d(0, var(--py, 0px), var(--pz, 0px));
+}
+
+/* Pointer tilt — the element turns toward the cursor inside a .scene. */
+.tilt {
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tilt.is-tracking {
+  transition: transform 0.08s linear;
+}
+
+/* Reveal + tilt on the same element: both effects write `transform`, so they
+   must be composed in one declaration. Plain selectors would leave whichever
+   rule comes last in the cascade owning the transform — the element would tilt
+   but never rise, and the opacity transition would be dropped entirely. */
+.reveal.tilt {
+  transform: translateY(22px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal.tilt.is-visible {
+  transform: translateY(0) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+
+/* Glass panel with a lit top edge — reads as a physical card in the scene. */
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 42%), var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 1px 0 var(--edge-light),
+    0 22px 50px var(--edge-dark);
+  backdrop-filter: blur(10px);
+}
+
+/* Gradient mesh: a decorative cloud of colour that sits behind a section.
+   Vertical overshoot only — horizontal overhang would widen the page at some
+   viewport widths, and the responsive audit measures every visible element. */
+.mesh {
+  position: absolute;
+  inset: -20% 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(38rem 24rem at 18% 22%, rgba(139, 124, 247, 0.22), transparent 62%),
+    radial-gradient(32rem 22rem at 82% 18%, rgba(79, 214, 224, 0.16), transparent 64%),
+    radial-gradient(30rem 20rem at 62% 88%, rgba(255, 125, 177, 0.12), transparent 66%);
+  filter: blur(8px);
+  animation: mesh-drift 22s ease-in-out infinite;
+}
+@keyframes mesh-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2%, 2%, 0) scale(1.08); }
+}
+
+/* Seamless marquee band. The track is duplicated (aria-hidden) and travels
+   exactly -50%, so the loop has no visible seam. */
+.marquee {
+  overflow: hidden;
+  border-block: 1px solid var(--line);
+  background: var(--bg-raised);
+  padding: 0.85rem 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 2.6rem;
+  animation: marquee 30s linear infinite;
+}
+.marquee-track > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.marquee-track > span::after {
+  content: "◆";
+  font-size: 0.6rem;
+  color: var(--violet);
+}
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Plain-English callout: the non-technical on-ramp for a section. */
+.plain {
+  border-left: 2px solid var(--cyan);
+  padding: 0.15rem 0 0.15rem 1.1rem;
+  margin-block: 1.2rem;
+  color: var(--text-dim);
+  max-width: 44rem;
+}
+.plain strong {
+  color: var(--text);
+}
+
+/* Glossary — definitions in a definition list, so answer engines can parse
+   term/description pairs without guessing at prose. */
+.glossary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.glossary > div {
+  background: var(--bg-panel);
+  padding: 1.1rem 1.2rem;
+}
+.glossary dt {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+.glossary dd {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* Answer-first blocks: a self-contained, quotable answer right under a
+   question-shaped heading (AEO). */
+.answer {
+  font-size: 1.06rem;
+  color: var(--text);
+  max-width: 52rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-parallax] { transform: none; }
+  .tilt { transform: none; }
+  .mesh, .marquee-track { animation: none; }
+  .marquee { -webkit-mask-image: none; mask-image: none; }
 }
 
 /* ─── Motion system ─────────────────────────────────────────────────────

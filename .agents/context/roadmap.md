@@ -83,6 +83,86 @@
 - **Autonomous Memory Consolidation & Synthesis (A-Mem Evolution Pattern)**:
   - Zero-daemon background consolidation that synthesizes related micro-memories into coherent macro-concepts and updates inter-memory links.
 
+## 🧬 R23–R26: Production-Readiness & Versioned Memory Milestones
+
+### 7. **R23: Versioned Memory + Access-Weighted Retention**
+- **`Memory Versioning` (Git-branchable memory)**:
+  - `mem_path` field: human-readable dotted-path addressing (e.g., `auth.session.jwt-expiry`).
+  - `memory branch <name>`, `memory checkout <branch>`, `memory blame <id>` CLI verbs.
+  - Branch-isolated `.memory/` + `~/.memory/<branch>` scope snapshots with `CURRENT_MD_SCOPE` switching.
+  - Backwards-compatible: UUID `id` still works alongside `mem_path`.
+- **`Access-Weighted Retention` (A15)**:
+  - `last_accessed_at` and `access_count` columns added to SQLite; backfilled from existing `utility_roi`.
+  - `staleness_policy` gains `half_life_days` field; decay curve: `0.5 ^ (days_since_last_use / half_life_days)`.
+  - Memories used ≥2× in a session get +50% longevity extension.
+  - Default half-lives: `fix` = 60d, `adr` = 365d, `anti_pattern` = permanent, `observation` = 7d.
+- **Acceptance criteria**:
+  - `last_accessed_at` updated on every successful `muse_context` / `get_context` recall.
+  - `memory branch`/`checkout`/`blame` verbs work in non-git folders (single main branch).
+  - Existing tests in `test/staleness.test.ts` continue to pass; new `test/retention.test.ts` and `test/branch.test.ts` cover the new behaviour.
+
+---
+
+### 8. **R24: Agent Plugin Registry**
+- **`memory plugin install <agent>`**:
+  - Thin plugin installers for 20+ agents (Claude Code, Cursor, Codex, Gemini CLI, OpenCode, Hermes, OpenClaw, VS Code, Cline, Windsurf, Zed).
+  - Extends MCP registration to plugin registration; each plugin calls `muse_context` at session start + `create_observation` at stop.
+- **`memory plugin init`**:
+  - Scaffold for agent plugin developers (`.mcp.json` + hooks + skills template).
+- **Acceptance criteria**:
+  - `memory plugin list` shows supported agents.
+  - `memory plugin install claude-code` produces a working hook setup.
+  - Documentation at `/docs/plugins`.
+
+---
+
+### 9. **R25: Progressive Disclosure + Scoped Retrieval**
+- **Progressive disclosure**:
+  - `muse_context --include-abstract`: returns a one-line abstract per candidate plus a drill-down handle.
+  - Agent scans cheaply, expands only winners.
+- **Scoped retrieval**:
+  - `muse_context --scope <subtree>`: RRF-fuse BM25 + graph walk within the subtree.
+  - `/api/graph` route fix (bench-graph baseline F1–F7): returns only fields the canvas needs.
+- **Acceptance criteria**:
+  - `--include-abstract` reduces token usage on large stores by ~20%.
+  - `--scope` sub-linear scaling at 10k memories.
+  - `/api/graph` eliminates F1–F7 failures from bench-graph baseline.
+
+---
+
+### 🔟 **R26: Pro Plugin + Monetization Stack**
+- **Pro Plugin (One-time purchase)**:
+  - `memory dream`: overnight synthesis of related micro-memories into macro-concepts (opt-in, zero-LLM by default; local LLM optional).
+  - Obsidian/Optimaze graph export.
+  - Distributed via Gumroad/Polar at $49 one-time.
+- **Team SaaS (Subscription)**:
+  - Shared memory vault, cross-agent handoffs, per-user attribution.
+  - `memory branch` workspace command for team isolation.
+  - Team audit log with git-blame.
+  - $9/user/mo (Stripe).
+- **Enterprise SaaS (Quote)**:
+  - SSO (SAML/OIDC), air-gapped deployment, compliance export (SOC 2, GDPR).
+  - $29/user/mo.
+- **Solo (Free, forever)**:
+  - All current features, local-first, zero-LLM. $0.
+- **Other production-readiness items**:
+  - Self-hostable Plausible analytics (no GA, local-first).
+  - Pricing page at `/pricing`.
+  - `memory benchmark --median` publishing per-store medians.
+
+---
+
+## 📊 Current Status (as of v2.3.0)
+
+| Area | Status | Next Milestone |
+|---|---|---|
+| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 527 tests) | R25 (--include-abstract, --scope) |
+| **Hands-free hooks** | ✅ 3/6 events shipped (GAP-2) | R24 (full plugin registry) |
+| **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) | R23 (extend to multi-repo) |
+| **Version control** | ⚠️ No branch-aware memory | R23 (memory branch/checkout/blame) |
+| **Compounding** | ✅ 7-state lifecycle + archival ladder | R23 (access-weighted retention, half-life decay) |
+| **Team/SaaS** | ⚠️ Not yet built | R26 (pricing page, Plausible, SaaS prototype) |
+
 ---
 
 ### 11. **R27: Recall Quality Eval Harness (LoCoMo-style, CI-gated)**

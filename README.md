@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-502%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-566%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -29,9 +29,10 @@
 
 [Visit the live site](https://harshsinghmp.github.io/musememory/) · [Docs](https://harshsinghmp.github.io/musememory/docs) · [Comparison](https://harshsinghmp.github.io/musememory/compare) · [Install](#start-with-one-command)
 
-https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000
+<img src="./assets/muse-memory-demo.gif" alt="Muse Memory in action — memory init, propose, context recall, and R23 version control (branch / blame / checkout) with access-weighted decay" width="100%" />
 
 *→ Prefer the raw clip? [`apps/website/public/showreel.mp4`](./apps/website/public/showreel.mp4) (10s, 1280×720, 240KB) — or watch it embedded on the [live site](https://harshsinghmp.github.io/musememory/#showreel).*
+*Rebuild the GIF with `bun run build:gif` (deterministic — renders from a declarative scene script, not a screen recording).*
 
 </div>
 
@@ -517,6 +518,10 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `settings` | `get\|set\|reset\|export\|import` | Manage unified settings across retrieval, wiki, PageIndex, and UI. |
 | `current` | `get` / `set <text> --project P` | Read or append hard constraints in `.memory/CURRENT.md`. |
 | `graph` | `status` / `index` | Query active CodeGraph provider status or index AST symbol map. |
+| `branch` | `<id> --path <mem_path> [--label L]` | **Version control (R23)**: tag a memory with semantic dotted-path addressing. |
+| `checkout` | `<path\|id>` | **Version control (R23)**: retrieve a memory by its `mem_path` or entry id. |
+| `blame` | `<id>` | **Version control (R23)**: show access history, staleness score, and audit trail. |
+| `ls-branches` | `[--project P]` | List all registered branch references. |
 | `mcp` | *(none)* | Start stdio MCP server (Protocol 2024-11-05). |
 
 </details>
@@ -573,9 +578,10 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 497 passed across 84 test files (2190 assertions)
+bun test          # 566 passed across 90 test files (2376 assertions)
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
+bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
 ```
 
 ---

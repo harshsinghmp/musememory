@@ -165,6 +165,16 @@ async function reviewPage(
       const cs = getComputedStyle(el);
       if (cs.display === "none" || cs.visibility === "hidden" || r.width === 0) continue;
       if (el.closest("video, pre, .table-wrap")) continue; // scroll containers handle their own overflow
+      // A descendant of a clipping container can never widen the page, however
+      // wide its own box is — marquee tracks and decorative meshes are meant to
+      // be oversized. Real page overflow is still caught by the scrollWidth
+      // check above, which is the authoritative one.
+      let clipped = false;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const ox = getComputedStyle(p).overflowX;
+        if (ox === "hidden" || ox === "clip") { clipped = true; break; }
+      }
+      if (clipped) continue;
       if (r.width > iw + 8 || r.right > iw + 8 || r.left < -8) {
         const tag = el.tagName.toLowerCase() + (el.className && typeof el.className === "string" ? `.${el.className.split(" ")[0]}` : "");
         if (!wide.includes(tag)) wide.push(tag);

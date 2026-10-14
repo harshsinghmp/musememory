@@ -81,3 +81,7 @@ dogfood-output/
 
 # HyperFrames render artifacts (rebuilt via: bun run site:showreel)
 apps/website/showreel-hf/renders/
+
+# README demo GIF intermediates (rebuilt via: bun run build:gif)
+# The committed deliverable is assets/muse-memory-demo.gif; this is scratch.
+apps/website/.gif-build/

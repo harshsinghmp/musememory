@@ -222,6 +222,12 @@ export interface MemoryEntry {
   anchors?: CodeAnchor[];
   /** First-class Architecture Decision Record (ADR) metadata. */
   adr?: AdrDetails;
+  /** Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry") alongside UUID id. */
+  mem_path?: string;
+  /** ISO timestamp of the most recent recall via queryContext / get_context. */
+  last_accessed_at?: string | null;
+  /** Number of times this memory was accessed via recall / get_context. */
+  access_count?: number;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -252,6 +258,11 @@ export const DEFAULT_CONTEXT_LIMIT = 5;
 export const MAX_TITLE_LENGTH = 120;
 export const MAX_TAGS = 8;
 
+// Decay/staleness policy intentionally lives in ./retention.ts, which is the single
+// source of truth for half-life curves, verification multipliers, and thresholds.
+// Do not redeclare a StalenessPolicy type or policy table here — importing from
+// retention.ts into types.ts would invert the dependency direction.
+
 export type AuditOperation =
   | "propose"
   | "confirm"
@@ -278,7 +289,10 @@ export type AuditOperation =
   | "adr_recorded"
   | "adr_superseded"
   | "drift_detected"
-  | "optimize";
+  | "optimize"
+  | "memory_branch"
+  | "memory_checkout"
+  | "memory_blame";
 
 export interface AuditEntry {
   timestamp: string;

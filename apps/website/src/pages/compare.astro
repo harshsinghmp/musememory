@@ -18,16 +18,16 @@ const rows = [
 
 const cols = [
   { key: "muse", label: "Muse Memory", sub: "local-first memory engine" },
-  { key: "vec", label: "Vector stores", sub: "Mem0 · Supermemory · memanto" },
-  { key: "graph", label: "Graph platforms", sub: "Zep · Graphiti · Cognee · MemOS" },
-  { key: "session", label: "Session search", sub: "deja-vu · pond · cass" },
+  { key: "vec", label: "Vector stores", sub: "dense embedding-based" },
+  { key: "graph", label: "Graph platforms", sub: "entity relationship-based" },
+  { key: "session", label: "Session search", sub: "retroactive lookup-only" },
 ];
 
 const icon = (v: string) => (v === "yes" ? "✓" : v === "partial" ? "~" : "✕");
 const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no");
 ---
 
-<Base title="Muse Memory vs vector stores, graph platforms, session search" description="A 12-capability comparison of Muse Memory against vector stores (Mem0, Supermemory), knowledge-graph platforms (Zep, Graphiti, Cognee), and session search tools (deja-vu, pond, cass).">
+<Base title="Muse Memory vs vector stores, graph platforms, session search" description="A 12-capability comparison of Muse Memory against vector stores, knowledge-graph platforms, and session search tools. Muse is the only one that is simultaneously local-first, fully keyless, and git-versioned.">
   <header class="nav">
     <div class="container nav-inner">
       <a class="brand" href={`${import.meta.env.BASE_URL}/`}>Muse<span>Memory</span></a>
@@ -49,6 +49,12 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
             Vector stores optimize for semantic similarity, graph platforms for entity
             relationships, session search for retroactive lookup. Muse optimizes for the thing
             coding agents actually need: <strong>verified, code-grounded recall that never serves stale truth</strong>.
+          </p>
+          <p class="plain">
+            <strong>The differentiator:</strong> while other approaches serve memory at confidence,
+            Muse verifies it at both write and recall. Notes are checked against your real code
+            before they enter the store, and withheld if the code has drifted since they were
+            written. Nothing is served as truth that cannot be traced to a structural anchor.
           </p>
         </div>
 
@@ -85,9 +91,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
           <span class="no">✕</span> not documented
         </p>
         <p class="table-note">
-          Methodology: capability claims follow the evidence-file standard used by the community
-          <a href="https://carsteneu.github.io/ai-memory-comparison/" rel="noopener">AI Memory Comparison</a> project —
-          documented features only, code beats docs, quick evolutions on all sides. Muse row reflects v2.3.
+          Methodology: capability claims follow a documented-features-only standard — code beats docs, quick evolutions on all sides. Muse row reflects v2.3.
         </p>
       </div>
     </section>

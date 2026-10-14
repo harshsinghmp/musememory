@@ -78,6 +78,7 @@ import {
 } from "./cli/health.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
+import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -168,6 +169,12 @@ Ecosystem, Migration & Connectivity:
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms
+
+Version Control (R23):
+  branch <id> --path <path> [--label L] Tag a memory with semantic dotted-path addressing
+  checkout <path|id>              Retrieve memory by mem_path or entry id
+  blame <id>                      Show access history & staleness metadata for a memory
+  ls-branches [--project P]       List all branch references
 `;
 
 export async function main(argv: string[]): Promise<number> {
@@ -348,6 +355,16 @@ export async function main(argv: string[]): Promise<number> {
       return handleSyncCommand(parsed);
     case "mesh":
       return handleMeshCommand(parsed);
+
+    // R23 Versioning Commands
+    case "branch":
+      return handleBranchCommand(parsed);
+    case "checkout":
+      return handleCheckoutCommand(parsed);
+    case "blame":
+      return handleBlameCommand(parsed);
+    case "ls-branches":
+      return handleLsBranchesCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);

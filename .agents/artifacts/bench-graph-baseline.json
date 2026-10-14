@@ -1,0 +1,519 @@
+{
+  "generated_at": "2026-10-01T07:35:57.892Z",
+  "results": [
+    {
+      "size": 100,
+      "seedMs": 0,
+      "seedReused": true,
+      "storeCount": 100,
+      "server": [
+        {
+          "name": "GET /api/memories",
+          "coldMs": 15.82127299999999,
+          "medianMs": 0.8126179999999863,
+          "bytes": 92179,
+          "status": 200
+        },
+        {
+          "name": "GET /api/snapshot",
+          "coldMs": 1.3489560000000438,
+          "medianMs": 0.9502570000000219,
+          "bytes": 92262,
+          "status": 200
+        },
+        {
+          "name": "GET /api/stats",
+          "coldMs": 1.451708999999994,
+          "medianMs": 0.6542199999999525,
+          "bytes": 255,
+          "status": 200
+        },
+        {
+          "name": "POST /api/search",
+          "coldMs": 4.27201100000002,
+          "medianMs": 4.27201100000002,
+          "bytes": 23005,
+          "status": 200
+        }
+      ],
+      "client": {
+        "firstGraphPaintMs": 212.6000000089407,
+        "domNodes": 1714,
+        "graphNodes": 100,
+        "graphEdges": 198,
+        "longTasks": {
+          "count": 1,
+          "totalMs": 68,
+          "maxMs": 68
+        },
+        "longTaskList": [
+          {
+            "start": 66.20000000298023,
+            "dur": 68
+          }
+        ],
+        "interaction": {
+          "frames": 55,
+          "medianFrameMs": 16.69999999999999,
+          "p95FrameMs": 16.700000000000045,
+          "fps": 59.88023952095813,
+          "longFrames": 0
+        },
+        "loopAlive": true,
+        "consoleErrors": [],
+        "notes": [
+          "load event 148ms",
+          "interaction burst wall time 906ms, 55 frames"
+        ]
+      },
+      "clientRuns": [
+        {
+          "firstGraphPaintMs": 1965.1000000089407,
+          "domNodes": 1714,
+          "graphNodes": 100,
+          "graphEdges": 198,
+          "longTasks": {
+            "count": 2,
+            "totalMs": 1859,
+            "maxMs": 1780
+          },
+          "longTaskList": [
+            {
+              "start": 31,
+              "dur": 1780
+            },
+            {
+              "start": 1811.5,
+              "dur": 79
+            }
+          ],
+          "interaction": {
+            "frames": 55,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000273,
+            "fps": 59.88023952095874,
+            "longFrames": 0
+          },
+          "loopAlive": true,
+          "consoleErrors": [],
+          "notes": [
+            "load event 1910ms",
+            "interaction burst wall time 910ms, 55 frames"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 196.79999999701977,
+          "domNodes": 1714,
+          "graphNodes": 100,
+          "graphEdges": 198,
+          "longTasks": {
+            "count": 1,
+            "totalMs": 67,
+            "maxMs": 67
+          },
+          "longTaskList": [
+            {
+              "start": 55.79999999701977,
+              "dur": 67
+            }
+          ],
+          "interaction": {
+            "frames": 55,
+            "medianFrameMs": 16.699999999999932,
+            "p95FrameMs": 16.799999999999955,
+            "fps": 59.88023952095833,
+            "longFrames": 0
+          },
+          "loopAlive": true,
+          "consoleErrors": [],
+          "notes": [
+            "load event 132ms",
+            "interaction burst wall time 913ms, 55 frames"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 212.6000000089407,
+          "domNodes": 1714,
+          "graphNodes": 100,
+          "graphEdges": 198,
+          "longTasks": {
+            "count": 1,
+            "totalMs": 68,
+            "maxMs": 68
+          },
+          "longTaskList": [
+            {
+              "start": 66.20000000298023,
+              "dur": 68
+            }
+          ],
+          "interaction": {
+            "frames": 55,
+            "medianFrameMs": 16.69999999999999,
+            "p95FrameMs": 16.700000000000045,
+            "fps": 59.88023952095813,
+            "longFrames": 0
+          },
+          "loopAlive": true,
+          "consoleErrors": [],
+          "notes": [
+            "load event 148ms",
+            "interaction burst wall time 906ms, 55 frames"
+          ]
+        }
+      ],
+      "paintSpreadMs": [
+        196.79999999701977,
+        1965.1000000089407
+      ]
+    },
+    {
+      "size": 1000,
+      "seedMs": 0,
+      "seedReused": true,
+      "storeCount": 1000,
+      "server": [
+        {
+          "name": "GET /api/memories",
+          "coldMs": 15.22866999999951,
+          "medianMs": 6.522202000000107,
+          "bytes": 927362,
+          "status": 200
+        },
+        {
+          "name": "GET /api/snapshot",
+          "coldMs": 12.185318000000734,
+          "medianMs": 5.486735999999837,
+          "bytes": 927446,
+          "status": 200
+        },
+        {
+          "name": "GET /api/stats",
+          "coldMs": 7.7054049999997005,
+          "medianMs": 7.7054049999997005,
+          "bytes": 266,
+          "status": 200
+        },
+        {
+          "name": "POST /api/search",
+          "coldMs": 32.07821700000022,
+          "medianMs": 31.010749000000033,
+          "bytes": 23205,
+          "status": 200
+        }
+      ],
+      "client": {
+        "firstGraphPaintMs": 267.79999999701977,
+        "domNodes": 11614,
+        "graphNodes": 1000,
+        "graphEdges": 1998,
+        "longTasks": {
+          "count": 2,
+          "totalMs": 191,
+          "maxMs": 116
+        },
+        "longTaskList": [
+          {
+            "start": 29.299999997019768,
+            "dur": 75
+          },
+          {
+            "start": 149.59999999403954,
+            "dur": 116
+          }
+        ],
+        "interaction": null,
+        "loopAlive": false,
+        "consoleErrors": [
+          "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-14.0736) is negative."
+        ],
+        "notes": [
+          "load event 119ms",
+          "interaction burst wall time 852ms, 0 frames",
+          "animation loop stopped repainting"
+        ]
+      },
+      "clientRuns": [
+        {
+          "firstGraphPaintMs": 309.5,
+          "domNodes": 11614,
+          "graphNodes": 1000,
+          "graphEdges": 1998,
+          "longTasks": {
+            "count": 2,
+            "totalMs": 211,
+            "maxMs": 142
+          },
+          "longTaskList": [
+            {
+              "start": 63.29999999701977,
+              "dur": 69
+            },
+            {
+              "start": 166.5,
+              "dur": 142
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-12.0703) is negative."
+          ],
+          "notes": [
+            "load event 141ms",
+            "interaction burst wall time 866ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 267.79999999701977,
+          "domNodes": 11614,
+          "graphNodes": 1000,
+          "graphEdges": 1998,
+          "longTasks": {
+            "count": 2,
+            "totalMs": 191,
+            "maxMs": 116
+          },
+          "longTaskList": [
+            {
+              "start": 29.299999997019768,
+              "dur": 75
+            },
+            {
+              "start": 149.59999999403954,
+              "dur": 116
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-14.0736) is negative."
+          ],
+          "notes": [
+            "load event 119ms",
+            "interaction burst wall time 852ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 260.20000000298023,
+          "domNodes": 11614,
+          "graphNodes": 1000,
+          "graphEdges": 1998,
+          "longTasks": {
+            "count": 2,
+            "totalMs": 196,
+            "maxMs": 124
+          },
+          "longTaskList": [
+            {
+              "start": 26.900000005960464,
+              "dur": 72
+            },
+            {
+              "start": 135.1000000089407,
+              "dur": 124
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-5.47931) is negative."
+          ],
+          "notes": [
+            "load event 123ms",
+            "interaction burst wall time 858ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        }
+      ],
+      "paintSpreadMs": [
+        260.20000000298023,
+        309.5
+      ]
+    },
+    {
+      "size": 10000,
+      "seedMs": 0,
+      "seedReused": true,
+      "storeCount": 10000,
+      "server": [
+        {
+          "name": "GET /api/memories",
+          "coldMs": 70.38181599999916,
+          "medianMs": 81.21665600000051,
+          "bytes": 9323985,
+          "status": 200
+        },
+        {
+          "name": "GET /api/snapshot",
+          "coldMs": 70.74486900000011,
+          "medianMs": 73.06401899999946,
+          "bytes": 9324070,
+          "status": 200
+        },
+        {
+          "name": "GET /api/stats",
+          "coldMs": 57.263083999998344,
+          "medianMs": 53.781958999999915,
+          "bytes": 277,
+          "status": 200
+        },
+        {
+          "name": "POST /api/search",
+          "coldMs": 339.12077000000136,
+          "medianMs": 339.12077000000136,
+          "bytes": 23318,
+          "status": 200
+        }
+      ],
+      "client": {
+        "firstGraphPaintMs": 2027.5,
+        "domNodes": 110614,
+        "graphNodes": 10000,
+        "graphEdges": 19998,
+        "longTasks": {
+          "count": 3,
+          "totalMs": 1874,
+          "maxMs": 1689
+        },
+        "longTaskList": [
+          {
+            "start": 69,
+            "dur": 86
+          },
+          {
+            "start": 238.40000000596046,
+            "dur": 99
+          },
+          {
+            "start": 338,
+            "dur": 1689
+          }
+        ],
+        "interaction": null,
+        "loopAlive": false,
+        "consoleErrors": [
+          "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-0.957297) is negative."
+        ],
+        "notes": [
+          "load event 196ms",
+          "interaction burst wall time 860ms, 0 frames",
+          "animation loop stopped repainting"
+        ]
+      },
+      "clientRuns": [
+        {
+          "firstGraphPaintMs": 2087.4000000059605,
+          "domNodes": 110614,
+          "graphNodes": 10000,
+          "graphEdges": 19998,
+          "longTasks": {
+            "count": 3,
+            "totalMs": 1914,
+            "maxMs": 1713
+          },
+          "longTaskList": [
+            {
+              "start": 25,
+              "dur": 90
+            },
+            {
+              "start": 261.6000000089407,
+              "dur": 111
+            },
+            {
+              "start": 373.5,
+              "dur": 1713
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-10.0694) is negative."
+          ],
+          "notes": [
+            "load event 265ms",
+            "interaction burst wall time 859ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 2020.9000000059605,
+          "domNodes": 110614,
+          "graphNodes": 10000,
+          "graphEdges": 19998,
+          "longTasks": {
+            "count": 3,
+            "totalMs": 1874,
+            "maxMs": 1702
+          },
+          "longTaskList": [
+            {
+              "start": 19.30000001192093,
+              "dur": 82
+            },
+            {
+              "start": 227.40000000596046,
+              "dur": 90
+            },
+            {
+              "start": 318.1000000089407,
+              "dur": 1702
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-3.67911) is negative."
+          ],
+          "notes": [
+            "load event 2024ms",
+            "interaction burst wall time 868ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        },
+        {
+          "firstGraphPaintMs": 2027.5,
+          "domNodes": 110614,
+          "graphNodes": 10000,
+          "graphEdges": 19998,
+          "longTasks": {
+            "count": 3,
+            "totalMs": 1874,
+            "maxMs": 1689
+          },
+          "longTaskList": [
+            {
+              "start": 69,
+              "dur": 86
+            },
+            {
+              "start": 238.40000000596046,
+              "dur": 99
+            },
+            {
+              "start": 338,
+              "dur": 1689
+            }
+          ],
+          "interaction": null,
+          "loopAlive": false,
+          "consoleErrors": [
+            "IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (-0.957297) is negative."
+          ],
+          "notes": [
+            "load event 196ms",
+            "interaction burst wall time 860ms, 0 frames",
+            "animation loop stopped repainting"
+          ]
+        }
+      ],
+      "paintSpreadMs": [
+        2020.9000000059605,
+        2087.4000000059605
+      ]
+    }
+  ]
+}
