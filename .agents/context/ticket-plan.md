@@ -11,7 +11,7 @@
 
 - [ ] T-001 · verify.ts exec: replace `/bin/sh -c` with `execFileSync` + allowlist parse · src verify.ts:23 · dep: — · new · F
 - [ ] T-002 · UI XSS: escape `p.title`/`p.slug` interpolation · ui.ts:1510 · new · F
-- [ ] T-003 · UI XSS: escape `r.entry_id`/`r.actor` interpolation · ui.ts:1557 · new · F
+- [x] MERGED→T-002 T-003 · UI XSS: escape `r.entry_id`/`r.actor` interpolation · ui.ts:1557 · new · F
 - [ ] T-004 · UI optimizer gate: `POST /api/optimize` requires dry-run default + localhost/token check · ui.ts:362 · new · F
 
 ## Wave B — DRIFT (free fixes; no runtime path changes)
@@ -32,7 +32,7 @@
 - [ ] T-024 · bounded FTS preflight (cap term count; reject oversized queries) · store.ts · new · F
 - [ ] T-025 · single-transaction writes (replace 3-commit paths; ~180ms→~60ms) · store.ts · new · F
 - [ ] T-026 · FTS↔row parity check + repair command · store.ts · new · F
-- [ ] T-027 · `dedup` feature: wire into propose() or delete · mcp.ts:55, quality · new · F
+- [x] RESOLVED (intended lane): `dedup` IS wired at store.ts:418 — only memory_capture omits it; scope folded into T-027 note + T-040 covers the missing normalization · mcp.ts:55, quality · new · F
 - [ ] T-028 · `recordRetrievals`: wire into recall or delete · mcp.ts:1692, quality · new · F
 - [ ] T-029 · `touchActivity`: wire into store or delete · optimize.ts:77 · new · F
 - [ ] T-030 · tombstone schema + ops (soft-delete, never hard-delete) · schema, store · branch: memory-tombstones · F
@@ -54,17 +54,17 @@
 - [ ] T-046 · persisted digest-dedup set for extracted facts · compaction · new · F
 - [ ] T-047 · never-empty checkpoint contract (raise instead of emit partial) · compaction, orchestrator · new · F
 - [ ] T-048 · wake gate: background passes exit unless actionable-keys allowlist matches · optimize, cognition · new · F
-- [ ] T-049 · gate exit-0 contract (never blocks a turn) · optimize · new · F
+- [x] MERGED→T-048 T-049 · gate exit-0 contract (never blocks a turn) · optimize · new · F
 - [ ] T-050 · overnight loss guard: snapshot entry-head hashes; >25% loss → alert-only · optimize · new · F
 - [ ] T-051 · memory_pressure as first-class event (store near ceiling) · store.ts · new · F
-- [ ] T-052 · pressure alert in CLI (non-silent refusal) · cli · new · F
+- [x] MERGED→T-051 T-052 · pressure alert in CLI (non-silent refusal) · cli · new · F
 - [ ] T-053 · honest dual-measure token accounting (harness + pessimistic model) · compaction · branch: io-budget-telemetry · F
 - [ ] T-054 · refuse-incomplete digest contract in get_context · orchestrator · new · F
 - [ ] T-055 · circuit breaker around every store path (5 fail → 120s cooldown → degraded mode) · store.ts · new · F
 - [ ] T-056 · `atexit` bounded join for async write workers · store · new · F
 - [ ] T-057 · generation-counter invalidation for in-flight prefetch · orchestrator · new · F
 - [ ] T-058 · read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: poisoning-trust-tiers · F
-- [ ] T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
+- [x] MERGED→T-058 T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
 - [ ] T-060 · safe FTS5 query construction (quote every token — injection surface) · store.ts · new · F
 - [ ] T-061 · compound-token expansion (camelCase/snake_case split) · retrieval · new · F
 - [ ] T-062 · clamp model-supplied `limit` values · mcp tools · new · F
@@ -126,7 +126,7 @@
 - [ ] T-113 · trivial-prompt gate (skip recall for greetings) · orchestrator · new · U
 - [ ] T-114 · soft-OR evidence fusion `P=1-(1-pv)(1-pl)` · retrieval · new · U
 - [ ] T-115 · `low_discrimination()` conditional rerank · retrieval · new · U
-- [ ] T-116 · semantic threshold gate BEFORE BM25/entity fusion · retrieval · branch: local-embeddings-llama-cpp · U
+- [x] MERGED→T-071 T-116 · semantic threshold gate BEFORE BM25/entity fusion · retrieval · branch: local-embeddings-llama-cpp · U
 - [ ] T-117 · watermark staleness from `last_memory_seen_at` (data, not clock) · retrieval · new · U
 - [ ] T-118 · query-intent bias multipliers · retrieval · new · U
 - [ ] T-119 · `effective_score = base × reinforcement × decay` · retrieval · new · U
@@ -175,7 +175,7 @@
 - [ ] T-164 · event-triggered consolidation on compaction/step-count · cognition · new · F
 - [ ] T-165 · dual-trigger maintenance cadence (N turns AND wall-clock) · optimize · new · F
 - [ ] T-166 · cron ownership-token reconciliation with embedded effective config · optimize · new · F
-- [ ] T-167 · wake-gate + breaker wiring into server mode · optimize, store · dep: T-048,T-055 · new · F
+- [x] MERGED→T-150 T-167 · wake-gate + breaker wiring into server mode · optimize, store · dep: T-048,T-055 · new · F
 - [ ] T-168 · Hermes `MemoryProvider` interface · new module · new · F
 - [ ] T-169 · Muse-MCP-backed provider adapter · new module · new · F
 - [ ] T-170 · catalog submission (hermesagents plugin registry) · packaging · new · N
@@ -198,7 +198,7 @@
 - [ ] T-203 · `recall` deprecate to alias of unified retrieval · cli, mcp · new · F
 - [ ] T-204 · YAML mirror read precedence → DB-first (6 lines; stops disk shadowing DB) · store.ts:174-202 · new · F
 - [ ] T-205 · Dockerfile: remove test-on-build stage · Dockerfile:12-13 · new · N
-- [ ] T-206 · README/CHANGELOG pass for all R18 deprecations · docs · new · N
+- [x] MERGED→T-015 T-206 · README/CHANGELOG pass for all R18 deprecations · docs · new · N
 
 ---
 
@@ -265,7 +265,7 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 
 - [ ] T-329 · MEDIUM (A6) · episode table + episode-scoped search + episode stamp on hits (Zep: session_id is indexed at sqlite.ts:157 and never used as a retrieval unit) · U
 - [ ] T-330 · MEDIUM (A7) · `absent` memory type ("checked, no X exists") + role scoping user/agent/external/system (Mem0 v3) · U
-- [ ] T-331 · MEDIUM (A8) · read-tool purity sweep across CLI + MCP: every read command read-only (converges with T-301) · F
+- [x] MERGED→T-301 T-331 · MEDIUM (A8) · read-tool purity sweep across CLI + MCP: every read command read-only (converges with T-301) · F
 - [ ] T-332 · HIGH (A9) · signed SyncPacket + peer allowlist + fail-closed on unknown sender (Walrus: gossip has no identity layer; any process writing `.memory/sync/pool/` injects memories — zero auth tickets existed) · dep: T-044, T-150 · F
 - [ ] T-333 · MEDIUM (A10) · confirm() extends expiry + expiry-horizon alert N days out (Walrus documented failure: expiry without renewal) · dep: T-078, T-079 · U
 - [ ] T-334 · LOW (A11) · `write_origin` tier (interactive/harvest/distill/sync) → rank weight (LangMem: hot-path vs background writes as trust axis) · dep: T-089 · U
@@ -400,4 +400,4 @@ Source: read-only test audit (85 suites / 502 tests / 12,450 LOC). Suite hygiene
 | v1+v2+v3 | 238 |
 | v4 test integrity | 8 |
 | **Plan total** | **246** |
-- [ ] T-379 · amend AGENTS.md invariant "Zero External Daemons: Never depend on background servers" + decisions.md ADR-001 to: "no feature may REQUIRE a background service; local/team services are opt-in" (records the T-367 principal decision) · N
+- [x] MERGED→T-015 T-379 · amend AGENTS.md invariant "Zero External Daemons: Never depend on background servers" + decisions.md ADR-001 to: "no feature may REQUIRE a background service; local/team services are opt-in" (records the T-367 principal decision) · N
