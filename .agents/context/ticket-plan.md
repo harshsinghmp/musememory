@@ -369,3 +369,34 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 | v3 audit findings | 27 |
 | v3 claims/bench | 2 |
 | **Plan total** | **238** (pending test-integrity tickets T-371+) |
+
+---
+
+# v4 — TEST-SUITE INTEGRITY (2026-10-14)
+
+Source: read-only test audit (85 suites / 502 tests / 12,450 LOC). Suite hygiene is genuinely clean: **zero** skip/only/todo, zero snapshots, zero dist/ imports. The problem is assertion quality and dispatch coverage.
+
+## New findings (lying tests + conflicts)
+
+- [ ] T-371 · lying security tests: `security_hardening.test.ts:95-100` (1MB-DoS guard proves nothing — catch returns synthesized 500; real path `ui.ts:642 req.destroy()` never asserted), `:127-136` (SQL-injection half vanishes behind `if (store.db)`) · F
+- [ ] T-372 · tautological doctor test: name says "uninitialized directory", asserts `initialized === true` — `doctor.ts:60-63` creates `.memory` before the check, assertion cannot fail (`doctor.test.ts:10-19`) · F
+- [ ] T-373 · substring-grep UI tests → real assertions: ~30 `expect(html).toContain(id)` asserts on generated HTML (`ui.test.ts:48-57,114-124,132-210`) prove identifiers exist, not behavior · F
+- [ ] T-374 · toBeDefined/tautology assertions → value assertions: `health.test.ts:221-228` (9× toBeDefined on muse_health MCP+CLI), `benchmark.test.ts:47-72` (9× `>= 0` — cannot fail) · F
+- [ ] T-375 · Array.isArray-only list tests → content assertions: `optimize.test.ts`, `mesh.test.ts:271`, `ui.test.ts:32,63,81,146,209`, `connect.test.ts:34`, `mcp.test.ts:70-129` (12 dynamic-import re-imports inflate apparent coverage) · F
+- [ ] T-376 · reconcile authoritative-test conflicts: `graph.test.ts` ⊂ `graph_ast.test.ts`; `retrieval_engine.test.ts` asserts 3 headings where `retrieval.test.ts:44-77` asserts content; `panda_loader.test.ts` supersedes `upgrade.test.ts:28-34`; `agents.test.ts:56` supersedes connect duplicates; `sqlite_primary.test.ts:19-91` supersedes `store.test.ts:9-24` (never reloads store) · F
+- [ ] T-377 · false-coverage test name: `sqlite_primary.test.ts:47` claims "stale" transition in a body that imports `markStale` and never calls it (`:4`) — rename or execute · F
+- [ ] T-378 · dead test imports: `quality.test.ts:8` (computeJaccardSimilarity, consolidateIntoCanonical), `settings.test.ts:10,13`, `orchestrator.test.ts:13` (getActiveMcpProfile), `intelligence.test.ts:7` (LspProvider) — delete imports or restore coverage · F
+
+## v4 amendments
+
+- T-016 scope update: 12 circular tools now named — `memory_observe`, `memory_feedback`, `memory_negative_capture`, `memory_harvest`, `memory_harvest_turn`, `memory_distill`, `memory_distill_observations`, `memory_compaction_check`, `memory_compact_handoff`, `memory_checkpoint`, `memory_roi`, `memory_ranked_retrieval`. Real dispatch coverage is 26/107 tools; **64 tools never referenced by any test** — extend T-016 to a dispatch-coverage matrix ticket for all 64
+- T-001..T-004 amendment: regression tests go RED first — `verify.test.ts` currently only exercises benign commands; zero escapeHtml/`<script>` assertions exist anywhere in the suite
+- Coverage landmines found: `retrieval/engine.ts` `pageindex`/`tree`/`hybrid`/`auto` modes NEVER tested (`engine.ts:83,127` thresholds unreachable in tests — T-303's >100-entry filter gap is exactly the untested path); 6 store exports never called (`listIds`, `markSuperseded`, `getStorageLayout`, `harvestMemories`, `extractEntryText`, `nowIso`)
+
+## v4 totals
+
+| Section | Tickets |
+|---|---|
+| v1+v2+v3 | 238 |
+| v4 test integrity | 8 |
+| **Plan total** | **246** |
