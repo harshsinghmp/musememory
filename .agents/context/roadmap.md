@@ -63,10 +63,13 @@
 
 ---
 
-### 5. **R21: Zero-API-Key Local Vector Embeddings & Hybrid Search Fusion**
-- **In-Process 100% Offline Vector Embeddings (FastEmbed / SQLite-Vec)**:
-  - Embedded lightweight quantized embedding models (via ONNX runtime or native SQLite-Vec) running completely in-process.
-  - Zero cloud API keys, zero network egress, zero third-party billing, and sub-5ms cosine similarity lookups.
+### 5. **R21: Local Vector Embeddings & Hybrid Search Fusion (engine: llama.cpp)**
+- **Local embedding engine — llama.cpp server (default)**:
+  - `llama-server` with a small GGUF embedding model (e.g. bge-small / nomic-embed-text), CPU-only, started on demand — no background service.
+  - One OpenAI-compatible `/v1/embeddings` adapter (zero npm deps, bun `fetch`): llama.cpp, Ollama, hosted providers, and a future Hermes embedding facade are the same code path behind a URL.
+  - Embedding pipeline fingerprint (`model|dims|endpoint`) stored with the vector index; mismatch refuses reuse and requires `memory embed reindex` (qdrant-memory `init` pattern).
+  - Vectors as float32 BLOBs in SQLite; brute-force cosine at current store scale — no ANN index until measured otherwise.
+  - **Unblocks A12** (dense vectors, deferred in the October research): the re-evaluation condition — "zero-cost, zero-API-key local embedding" — is now met. Embeddings stay **opt-in / off by default**; the keyless lexical path remains the default.
 - **Reciprocal Rank Fusion (RRF) Hybrid Engine**:
   - Mathematical fusion blending SQLite FTS5 BM25 lexical ranking, AST symbol proximity, and dense semantic vector similarity into a unified top-$K$ candidate set.
 
@@ -80,3 +83,31 @@
 - **Autonomous Memory Consolidation & Synthesis (A-Mem Evolution Pattern)**:
   - Zero-daemon background consolidation that synthesizes related micro-memories into coherent macro-concepts and updates inter-memory links.
 
+---
+
+### 11. **R27: Recall Quality Eval Harness (LoCoMo-style, CI-gated)**
+- **Golden recall fixture**: labeled queries plus same-topic distractors covering the five LongMemEval-V2 abilities (static state recall, dynamic state tracking, workflow knowledge, environment gotchas, premise awareness). Muse already covers 3–4 of the 5; the fixture proves it.
+- **CI gate**: `bun test` fails below a recall@5 threshold; p50 latency reported beside it. Current benchmarks measure speed only — recall quality is unmeasured.
+- Reuses `src/benchmark/` and existing test infrastructure. Prerequisite for judging R21 and every future retrieval change.
+
+### 12. **R28: Memory Poisoning Trust Tiers (OWASP ASI06)**
+- **`trust: trusted | candidate | untrusted`** set by ingest source: known agent transcripts are candidates; web or external content is untrusted.
+- `muse_context` filters untrusted by default and reports `withheld_memories` — mirrors the GAP-3 freshness gate pattern.
+- Reuses `src/provenance.ts` and `src/orchestrator/freshness.ts`.
+
+### 13. **R29: I/O Budget & NVMe Telemetry**
+- **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical.
+- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification).
+- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note.
+
+### 14. **R30: Tombstones & Scoped Deletion (extends A7 suppress)**
+- **Content-hash tombstones on delete**: replayed events cannot resurrect deleted memories (qdrant-memory fence pattern; A7's suppress state already hides the bytes).
+- `memory delete-all --scope <user|client> --confirm` with a fail-closed `recovery_required` state on interruption (agency client-data deletion).
+
+### 15. **R31: Multi-Writer Merge (extends R19 + sync mesh)**
+- Concurrent writers on one shared store: observations merge append-only; memory-level conflicts are flagged, never clobbered (existing contradiction invariant).
+- Reuses `src/sync/` vector clocks and the contradiction engine. Single-writer remains the default; merge mode is opt-in. No distributed locks.
+
+### 16. **R32: Studio Recall-Debug (extends R15 + A22)**
+- Surface `ranking.ts` per-factor score breakdowns in the Observability Studio: *why* was this memory retrieved.
+- Eval-harness (R27) results panel. Small diffs on `src/ui.ts`.
