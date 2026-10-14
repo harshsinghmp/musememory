@@ -7,7 +7,8 @@ import { listWikiPages } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
 import type { MemoryEntry, SearchOptions } from "./types.ts";
-import { STATUS_PENALTY, VERIFICATION_BONUS, DEFAULT_STALE_DAYS } from "./types.ts";
+import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
+import { nowIso } from "./store.ts";
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -82,23 +83,7 @@ export function computeApplicability(entryTokens: Set<string>, queryTokens: stri
 }
 
 /** Staleness policy in days per memory type. null = never stale. */
-export function stalePolicyDays(type?: string): number | null {
-  if (!type) return DEFAULT_STALE_DAYS;
-  switch (type) {
-    case "fix":
-      return 90;
-    case "operation":
-      return 180;
-    case "architecture":
-      return 365;
-    case "discovery":
-      return 30;
-    case "preference":
-      return null;
-    default:
-      return DEFAULT_STALE_DAYS;
-  }
-}
+export { stalePolicyDays } from "./retention.ts";
 
 /** Estimates prompt token count for a memory entry (~4 characters per token heuristic). */
 export function estimateEntryTokens(entry: MemoryEntry): number {
@@ -210,10 +195,16 @@ export function scoreEntry(
   const decayBase = entry.valid_from ?? entry.updated_at;
   const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
   
+  // R23: Access-weighted retention boost (A15, A18)
+  // Each access gives diminishing returns; higher access_count => higher recall bonus
+  const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
+  // Recent access (within 7 days) gets additional freshness boost
+  const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
+  
   // If query tokens exist but there is zero token/graph overlap, apply a relevance penalty (SOW-202)
   const zeroMatchPenalty = queryTokens.length > 0 && app === 0 && graphBonus === 0 ? -0.35 : 0;
 
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + zeroMatchPenalty + 0.5 * semanticScore;
+  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + accessBoost + recentAccessBoost + zeroMatchPenalty + 0.5 * semanticScore;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
@@ -286,9 +277,27 @@ export function queryContext(
   }
 
   const scored = sortCandidates(entries, queryTokens, now, options.semanticScores);
+
+  // R23: Record access for top results (updates last_accessed_at and access_count)
   const limit = options.limit ?? 10;
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
+
+  const recordAccessFor = (store: Store | undefined, entry: MemoryEntry) => {
+    if (!store) return;
+    const now = nowIso();
+    const currentCount = entry.access_count ?? 0;
+    entry.last_accessed_at = now;
+    entry.access_count = currentCount + 1;
+    if (store.db) {
+      try {
+        store.db.run(
+          `UPDATE memories SET last_accessed_at = ?, access_count = ? WHERE id = ?`,
+          [now, entry.access_count, entry.id],
+        );
+      } catch {}
+    }
+  };
 
   if (options.tokenBudget !== undefined) {
     if (options.tokenBudget > 0) {
@@ -298,6 +307,7 @@ export function queryContext(
         if (totalTokensUsed + tokens <= options.tokenBudget) {
           results.push(item);
           totalTokensUsed += tokens;
+          recordAccessFor(store, item.entry);
         }
       }
     }
@@ -305,6 +315,7 @@ export function queryContext(
     for (const item of scored.slice(0, limit)) {
       results.push(item);
       totalTokensUsed += estimateEntryTokens(item.entry);
+      recordAccessFor(store, item.entry);
     }
   }
 

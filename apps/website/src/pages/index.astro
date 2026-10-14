@@ -3,126 +3,203 @@ import Base from "../layouts/Base.astro";
 
 const base = import.meta.env.BASE_URL;
 
+/* ── The problem, in the reader's words ─────────────────────────────────── */
+const problems = [
+  {
+    title: "Every session starts from zero",
+    body: "Your assistant only knows what fits in its context window. Close the chat and that knowledge is gone — so tomorrow you explain the architecture again.",
+  },
+  {
+    title: "Memory ignores your git state",
+    body: "You checkout a branch and your memory still carries rules from the experiment you abandoned. Stale facts leak between features and contaminate stable code.",
+  },
+  {
+    title: "You're paying token rent on a flat file",
+    body: "Using a global MEMORY.md as your store is a cache-killer. Every memory update invalidates your entire prefix cache, forcing you to re-process everything from scratch — every session.",
+  },
+  {
+    title: "Memory drifts without blame",
+    body: "There's no git blame for memory. A hallucinated rule from one session poisons every future recall, and there's no checkout or rollback to undo it.",
+  },
+];
+
+/* ── How it works: plain sentence first, precise detail second ──────────── */
+const steps = [
+  {
+    step: "01",
+    title: "Remember it",
+    plain:
+      "When your assistant makes a decision or fixes a bug, Muse saves a short note about it — what changed and why.",
+    tech:
+      "Capture is optional per project and every write passes the Vibeguard credential scanner before it touches disk.",
+  },
+  {
+    step: "02",
+    title: "Check it",
+    plain:
+      "Before a note is stored, Muse confirms the file or function it mentions actually exists. If that code later changes, Muse notices and flags the note.",
+    tech:
+      "Anchors are structural fingerprints that survive refactors, not line numbers. Unverifiable citations are refused at write time.",
+  },
+  {
+    step: "03",
+    title: "Hand it back",
+    plain:
+      "Next time you start work, Muse returns the notes that fit the task — a short list sized to your budget, not the whole archive.",
+    tech:
+      "One in-process query over SQLite FTS5, under 2ms, with a hard token budget. No daemon, no network, no model call.",
+  },
+];
+
+/* ── Why versioned memory matters ──────────────────────────────────────── */
+const versionedReasons = [
+  {
+    title: "Branch-aware memory prevents contamination",
+    body: "Without version-aware memory, checking out a hotfix still carries experimental notes from a feature branch. Muse scopes memory to your git branch so each line of development sees only what is true for it.",
+  },
+  {
+    title: "Compile, don't retrieve",
+    body: "Raw observations pile up into noise. Muse compiles them — distilling, deduplicating, superseding — so recall returns a curated summary instead of a search result you have to re-read.",
+  },
+  {
+    title: "Git-blamable memory", 
+    body: "Every memory is traceable. When a note is wrong, git blame shows who wrote it and when — just like your source code. Audit. Revert. Learn.",
+  },
+];
+
+/* ── Capabilities: the same six pillars, explained to two audiences ─────── */
 const pillars = [
   {
     tag: "verified",
     color: "violet",
-    title: "Write-time citation verification",
-    body: "Before a memory is stored, every citation in it is checked against your live filesystem. A memory that references a file or symbol which doesn't exist is rejected on the spot — your agent can't file facts about code that was never there.",
-    stat: "hallucinated citations rejected",
+    title: "Refuses to save what it can't check",
+    body: "A note that points at a file or function which doesn't exist is rejected on the spot. Your assistant can't quietly file facts about code that was never there — and a hallucinated citation never reaches the store.",
+    stat: "citations verified at write time",
   },
   {
-    tag: "sub-millisecond",
+    tag: "instant",
     color: "cyan",
-    title: "In-process retrieval engine",
-    body: "SQLite FTS5 BM25, an L0 hot cache that answers entry lookups in under 50µs, and 11-dimension multi-factor ranking with knapsack token packing. No network, no daemon, no LLM at query time — recall never waits on an API round-trip.",
+    title: "Answers without waiting",
+    body: "Recall runs on your machine in under two milliseconds. There is no upload, no embedding API and no round trip, so looking something up never turns into a coffee break.",
     stat: "sub-2ms recall",
   },
   {
-    tag: "hands-free",
+    tag: "one command",
     color: "amber",
-    title: "One command, every agent",
-    body: "One command auto-detects and wires 80+ coding agent platforms over MCP, and the universal migrator imports history from 24+ formats — Mem0, Letta, AgentMemory and friends. Your agent starts remembering from its first session.",
-    stat: "80+ platforms",
+    title: "Sets itself up",
+    body: "One command finds the AI tools you already have and connects them. If you've been using another memory tool, the importer reads 24+ formats so your history comes with you instead of starting empty.",
+    stat: "80+ tools auto-wired",
   },
   {
-    tag: "self-organizing",
+    tag: "self-tidying",
     color: "green",
-    title: "Deterministic lifecycle & forgetting",
-    body: "Every memory moves through a 7-state lifecycle — propose, confirm, supersede — with per-type staleness policies, an archival ladder, query rehydration, and an optimizer that prunes noise while you're idle.",
+    title: "Cleans up after itself",
+    body: "Notes move through a fixed lifecycle — proposed, confirmed, replaced, archived — with age limits per type. The store stays useful instead of growing into a landfill you never open.",
     stat: "7-state lifecycle",
   },
   {
-    tag: "code-grounded",
+    tag: "refactor-proof",
     color: "violet",
-    title: "Structural code anchors",
-    body: "Memories attach to files, symbols, and routes through structural fingerprints — not line numbers. When code changes, drift detection flags the affected memory at recall time, before it can steer your agent wrong.",
+    title: "Survives your refactors",
+    body: "Notes are tied to code structure rather than line numbers, so moving a function doesn't silently break them. When real drift happens, the note is withheld at recall and you're told, instead of being served stale advice.",
     stat: "line-invariant anchors",
   },
   {
-    tag: "zero-leakage",
+    tag: "zero leakage",
     color: "red",
-    title: "Vibeguard secret defense",
-    body: "Every write — captures, profiles, imports, sync packets — passes a credential scanner covering 45+ key and token shapes. Secrets are refused before they ever touch disk.",
+    title: "Keeps secrets out",
+    body: "Every write — captures, imports, sync packets — is scanned for API keys, tokens and passwords. Anything that looks like a credential is refused before it lands in a file you might later commit.",
     stat: "45+ credential shapes",
   },
 ];
 
+/* ── Proof ─────────────────────────────────────────────────────────────── */
 const benchmarks = [
-  { label: "Lexical search latency", value: "sub-2ms", note: "SQLite FTS5 BM25" },
-  { label: "Hot cache entry lookup", value: "<50µs", note: "L0 in-process cache" },
-  { label: "Agent platforms", value: "80+", note: "auto-wired via MCP" },
-  { label: "Migrator formats", value: "24+", note: "Mem0, Letta, AgentMemory…" },
-  { label: "Tests passing", value: "527", note: "88 files, fully offline" },
-  { label: "External daemons", value: "0", note: "SQLite WAL in-process" },
+  { label: "Recall latency", value: "sub-2ms", note: "SQLite FTS5 BM25, in-process" },
+  { label: "Hot cache lookup", value: "<50µs", note: "L0 in-process cache" },
+  { label: "AI tools supported", value: "80+", note: "detected and wired over MCP" },
+  { label: "Import formats", value: "24+", note: "legacy memory systems" },
+  { label: "Tests passing", value: "527", note: "88 files, runs offline" },
+  { label: "Background services", value: "0", note: "nothing to keep running" },
 ];
-
-const flow = [
-  {
-    step: "01",
-    title: "Capture",
-    body: "As your agent works, it records decisions, fixes, constraints, and anti-patterns to avoid. Vibeguard scans every write; new entries enter the lifecycle as candidates.",
-  },
-  {
-    step: "02",
-    title: "Verify",
-    body: "Citations are verified against live code and structural hashes are stamped. When a new memory contradicts an old one, the conflict is opened explicitly — nothing is silently clobbered.",
-  },
-  {
-    step: "03",
-    title: "Consolidate",
-    body: "The distiller compresses raw observation streams into reviewable candidates, and rollups compound hundreds of micro-memories into the handful of facts that actually matter.",
-  },
-  {
-    step: "04",
-    title: "Recall",
-    body: "One call fuses active constraints, code anchors, ranked memories, and negative lessons into a token-budgeted context package — a sub-2ms local query, ready before your agent's first turn.",
-  },
-];
-
-const installCode = `# Zero-install, any agent
-npx musememory connect
-
-# Your agent now has:
-#   muse_context      — flagship fused recall
-#   muse_why          — "why is it built this way"
-#   muse_memory_for_code — file ↔ memory bridge
-#   ... 69 tools across 6 task profiles`;
 
 const trustChecks = [
-  { text: "Secret committed to memory", got: "write refused, fail-fast", color: "red" },
-  { text: "Citation to a deleted file", got: "anchor flagged orphaned, drift audited", color: "amber" },
-  { text: "Two contradicting facts", got: "conflicted state + resolution strategies", color: "cyan" },
-  { text: "Hallucinated anchor", got: "write rejected at the door", color: "violet" },
+  { text: "A secret gets captured", got: "write refused before it hits disk", color: "red" },
+  { text: "A note cites a deleted file", got: "flagged as orphaned, audited", color: "amber" },
+  { text: "Two facts contradict", got: "marked conflicted, with a way to resolve", color: "cyan" },
+  { text: "A citation was invented", got: "rejected at the door", color: "violet" },
 ];
 
+/* ── Glossary: literal term/definition pairs, so answer engines can parse
+   them without guessing, and a non-technical reader can keep up. ───────── */
+const glossary = [
+  {
+    term: "AI coding agent",
+    def: "An AI assistant that reads and edits code in your project — Claude Code, Cursor, Codex, Windsurf and similar tools.",
+  },
+  {
+    term: "Agent memory",
+    def: "What an assistant keeps between sessions: decisions, fixes and preferences it can look up later instead of rediscovering.",
+  },
+  {
+    term: "Context window",
+    def: "The fixed amount of text an assistant can consider at once. Anything outside it is invisible, which is why sessions forget.",
+  },
+  {
+    term: "MCP",
+    def: "Model Context Protocol — the standard way assistants connect to outside tools like Muse. You never have to use the acronym.",
+  },
+  {
+    term: "Local-first",
+    def: "The data lives and is processed on your own machine. No account, no upload, no service that can go down or change its pricing.",
+  },
+  {
+    term: "Code anchor",
+    def: "A pointer from a note to a specific file or function. Muse uses a structural fingerprint instead of a line number so refactors don't break it.",
+  },
+];
+
+/* ── FAQ: the questions a non-technical user actually asks ─────────────── */
 const faqs = [
   {
-    q: "Does Muse Memory need an LLM or an API key?",
-    a: "No. Capture, ranking, and recall run entirely in-process — SQLite FTS5 BM25 plus structural scoring — with no embedding API and no cloud call anywhere in the path. LLMs remain optional and are only ever invoked by you.",
+    q: "Do I need to know how to program to install it?",
+    a: "No, but you do need a terminal — the command is a single line you paste and run. If you can copy and paste one line of text, you can install Muse. There is no config file to write and no server to set up.",
   },
   {
-    q: "Will a memory engine slow my agent down?",
-    a: "No — recall is a sub-2ms local SQLite query with a hard token budget, and the L0 hot cache answers entry lookups in under 50µs. That is far cheaper than re-explaining your architecture to the agent every session.",
+    q: "Do I need an API key, an account, or a subscription?",
+    a: "No account, no API key, no subscription. Muse is free and open source under the MIT licence. It does not call an AI model: recall is a database query on your own machine, so there is nothing to bill and nothing to sign up for.",
   },
   {
-    q: "Where does my data live?",
-    a: "In your project: .memory/ locally and ~/.memory/ globally, as plain SQLite and YAML files you can read, back up, gitignore, or sync. There is no cloud, no telemetry, and no background daemon.",
+    q: "Where is my data stored?",
+    a: "In two folders on your computer: .memory/ inside each project, and ~/.memory/ for anything that applies everywhere. They are plain SQLite and YAML files you can read, edit, back up, ignore, or commit to git. Nothing is uploaded anywhere.",
   },
   {
-    q: "What happens when my code changes after a memory is stored?",
-    a: "The recall-time freshness gate catches it. Anchors are structural hashes rather than line numbers, so refactors survive; real drift is detected at recall time and stale memories are withheld with an explicit notice instead of being served.",
+    q: "Will it slow my assistant down?",
+    a: "No. A lookup runs in under two milliseconds locally, with a hard token budget, so it returns a short list rather than everything. That is far cheaper than re-explaining your architecture in every new session.",
   },
   {
-    q: "Can an agent hallucinate memories into the store?",
-    a: "Not citations. Every code anchor is verified against the live filesystem at write time, so a memory citing a file or symbol that doesn't exist is rejected before it is ever stored.",
+    q: "Does it work with the AI tools I already use?",
+    a: "Yes — Muse detects and connects 80+ tools, including Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes and OpenClaw. One command wires each of them; you keep working exactly as you do today.",
   },
   {
-    q: "How do I import my existing agent history?",
-    a: "The universal migrator imports 24+ formats — including Mem0, Letta, and AgentMemory — and transcript harvesters distill past JSONL session logs into candidate memories automatically.",
+    q: "What if it remembers something wrong?",
+    a: "Muse checks citations before storing them, and re-checks them at recall. If the code a note points at has changed or disappeared, the note is withheld and you are told why, rather than served as if it were still true. Contradictions are marked as conflicted rather than silently overwritten.",
+  },
+  {
+    q: "What happens to passwords and API keys?",
+    a: "They are refused. Every write is scanned for 45+ credential shapes — API keys, tokens, private keys, connection strings — and a suspected secret stops the write instead of being stored in a file you might later commit.",
+  },
+  {
+    q: "Can I bring my existing notes or another tool's history?",
+    a: "Yes. The importer reads 24+ formats from other memory systems, and existing session transcripts can be turned into candidate notes. Your memory starts populated rather than empty.",
+  },
+  {
+    q: "Is it really free?",
+    a: "Yes. Muse is MIT-licensed with no paid tier and no telemetry. The whole engine — capture, ranking and recall — runs in-process on your machine, so there is no hosted component to charge for.",
   },
 ];
 
+/* ── Structured data ───────────────────────────────────────────────────── */
 const faqJsonLd = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -141,7 +218,7 @@ const appJsonLd = JSON.stringify({
   operatingSystem: "macOS, Linux, Windows",
   softwareVersion: "2.3.0",
   description:
-    "Zero-daemon, sub-2ms persistent memory for AI coding agents. Citations verified at write time, stale memories withheld at recall time.",
+    "Persistent memory for AI coding agents that runs locally. Citations are verified at write time and stale memories are withheld at recall, so an assistant never acts on facts that are no longer true.",
   url: "https://harshsinghmp.github.io/musememory/",
   downloadUrl: "https://www.npmjs.com/package/musememory",
   codeRepository: "https://github.com/harshsinghmp/musememory",
@@ -151,15 +228,69 @@ const appJsonLd = JSON.stringify({
   featureList: [
     "Write-time citation verification",
     "In-process retrieval engine (sub-2ms recall)",
-    "One command, 80+ agent platforms",
+    "One command wires 80+ AI tools over MCP",
     "Deterministic lifecycle and forgetting",
-    "Structural code anchors (line-invariant)",
-    "Vibeguard secret defense on every write",
+    "Structural code anchors that survive refactors",
+    "Credential scanning on every write",
   ],
 });
+
+const howToJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  name: "How to add persistent memory to an AI coding agent",
+  description:
+    "Install Muse Memory in one command and give your AI coding assistant memory that survives between sessions.",
+  totalTime: "PT1M",
+  tool: [{ "@type": "HowToTool", name: "A terminal" }],
+  step: [
+    {
+      "@type": "HowToStep",
+      position: 1,
+      name: "Open a terminal in your project folder",
+      text: "Open any terminal in the project you want your assistant to remember. No installation or account is required first.",
+    },
+    {
+      "@type": "HowToStep",
+      position: 2,
+      name: "Run npx musememory connect",
+      text: "Run npx musememory connect. Muse detects the AI coding tools you already have and connects each one, so you do not configure them individually.",
+    },
+    {
+      "@type": "HowToStep",
+      position: 3,
+      name: "Keep working",
+      text: "Your assistant now has memory tools available, including muse_context for fused recall and muse_why for explaining why code is the way it is. It starts remembering from the next session.",
+    },
+  ],
+});
+
+const installCode = `# One command. No account, no API key.
+npx musememory connect
+
+# Your assistant now has:
+#   muse_context          — the right memories for this task
+#   muse_why              — "why is it built this way?"
+#   muse_memory_for_code  — file ↔ memory bridge
+#   … 69 tools across 6 task profiles`;
+
+const marqueeWords = [
+  "Remember",
+  "Check",
+  "Recall",
+  "Compile",
+  "Branch",
+  "Forget",
+  "Rehydrate",
+  "Sync",
+  "Repeat",
+];
 ---
 
-<Base>
+<Base
+  title="Muse Memory — Persistent memory for AI coding agents that verifies itself"
+  description="Muse Memory gives AI coding agents persistent memory that runs locally. Citations are verified before they are saved, stale notes are withheld at recall, and one command wires 80+ tools. No account, no API key, MIT."
+>
   <header class="nav">
     <div class="container nav-inner">
       <a class="brand" href={`${base}/`}>
@@ -174,61 +305,164 @@ const appJsonLd = JSON.stringify({
         </svg>
         Muse<span>Memory</span>
       </a>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Main">
+        <a href="#how-it-works">How it works</a>
         <a href="#pillars">Capabilities</a>
         <a href="#compare">Compare</a>
-        <a href={`${base}/docs`}>Docs</a>
         <a href="#faq">FAQ</a>
-        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
+        <a href={`${base}/docs`}>Docs</a>
       </nav>
       <a class="btn btn-primary" href="#install">Get started</a>
     </div>
   </header>
 
   <main>
-    <!-- HERO -->
-    <section class="hero">
-      <div class="synapse-orb" style="width:34rem;height:34rem;top:-12rem;left:8%;background:var(--violet);opacity:.16"></div>
-      <div class="synapse-orb" style="width:28rem;height:28rem;top:-6rem;right:6%;background:var(--cyan);opacity:.13;animation-delay:-7s"></div>
-      <div class="container">
-        <p class="hero-kicker">
-          <span class="pulse"></span> Zero-daemon · Local-first · MCP-native
-        </p>
-        <h1>
-          Give your agents a memory
-          <span class="grad">that verifies itself.</span>
-        </h1>
-        <p class="hero-sub">
-          A local-first cognitive memory engine for AI coding agents. Recall runs in
-          under 2ms against your own disk, every citation is verified at write time, and
-          nothing stale gets served — wired to 80+ platforms with one command.
-        </p>
-        <div class="hero-cta reveal" style="--reveal-delay:150ms">
-          <a class="btn btn-primary" href="#install">Install in one command</a>
-          <a class="btn btn-ghost" href="https://github.com/harshsinghmp/musememory" rel="noopener">
-            Star on GitHub ↗
-          </a>
-        </div>
-        <pre class="term" aria-label="terminal"><code>{installCode}<span class="caret"></span></code></pre>
+    <!-- ── HERO ──────────────────────────────────────────────────────────── -->
+    <section class="hero scene" aria-labelledby="hero-title">
+      <div class="parallax-layer" data-parallax data-speed="0.55" aria-hidden="true">
+        <div class="mesh"></div>
+      </div>
+      <div class="synapse-orb" style="width:34rem;height:34rem;top:-12rem;left:8%;background:var(--violet)"></div>
+      <div class="synapse-orb" style="width:28rem;height:28rem;top:-6rem;right:6%;background:var(--cyan);animation-delay:-7s"></div>
 
-        <div class="hero-strip reveal" style="--reveal-delay:300ms" aria-hidden="true">
-          {["recall", "verify", "consolidate", "forget", "rehydrate", "sync", "repeat"].map(
-            (w) => <span>{w}</span>,
-          )}
+      <div class="container hero-inner scene-planes">
+        <p class="hero-kicker layer z-1">
+          <span class="pulse" aria-hidden="true"></span> Runs on your computer · No account · MIT
+        </p>
+
+        <h1 id="hero-title" class="layer z-2">
+          <span class="hero-keyword">Persistent memory for AI coding agents</span>
+          <span class="hero-promise">Stop re-explaining your codebase.</span>
+        </h1>
+
+        <p class="hero-sub layer z-1">
+          Muse is a small program that lives on your computer and remembers what your AI
+          assistant worked out — the decisions, the fixes, the things that broke. Before it
+          hands anything back, it checks the note still matches your code.
+        </p>
+
+        <div class="hero-cta reveal" style="--reveal-delay:120ms">
+          <a class="btn btn-primary btn-lg" href="#install">Install in one command</a>
+          <a class="btn btn-ghost btn-lg" href="#how-it-works">New here? See how it works</a>
+        </div>
+
+        <pre class="term layer z-1" aria-label="Terminal: install command"><code>npx musememory connect</code></pre>
+
+        <!-- Live trust states: the whole product in three cards. -->
+        <ul class="hero-cards scene-planes" aria-label="What Muse does with a memory">
+          <li class="hero-card tilt z-1 card-sheen" data-tilt="5">
+            <span class="hc-badge hc-ok" aria-hidden="true">✓</span>
+            <p class="hc-title">Remembered</p>
+            <p class="hc-body"><code>auth uses jose, not jsonwebtoken</code></p>
+            <p class="hc-note">cited symbol exists — handed back next session</p>
+          </li>
+          <li class="hero-card tilt z-3 card-sheen" data-tilt="5">
+            <span class="hc-badge hc-no" aria-hidden="true">✕</span>
+            <p class="hc-title">Refused</p>
+            <p class="hc-body"><code>see src/legacy/auth.ts</code></p>
+            <p class="hc-note">file does not exist — never stored</p>
+          </li>
+          <li class="hero-card tilt z-2 card-sheen" data-tilt="5">
+            <span class="hc-badge hc-hold" aria-hidden="true">!</span>
+            <p class="hc-title">Withheld</p>
+            <p class="hc-body"><code>session store uses Redis</code></p>
+            <p class="hc-note">anchor drifted since last session — held back</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── MARQUEE ──────────────────────────────────────────────────────── -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        {[...marqueeWords, ...marqueeWords].map((w) => <span>{w}</span>)}
+      </div>
+    </div>
+
+    <!-- ── WHAT IS IT ───────────────────────────────────────────────────── -->
+    <section class="section scene" id="what-is-muse" aria-labelledby="what-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Start here</p>
+          <h2 id="what-title">What is Muse Memory?</h2>
+        </div>
+        <p class="answer">
+          Muse Memory is a memory system for AI coding assistants. It saves the decisions,
+          fixes and lessons from your work, then hands the right ones back in the next
+          session — after checking that what it saved is still true. It runs entirely on
+          your own computer.
+        </p>
+        <p class="plain">
+          <strong>The short version:</strong> your assistant is smart but forgetful. Muse is
+          the notebook it reads before it starts, with one rule — nothing goes in the
+          notebook unless it can be checked against your actual code.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── THE PROBLEM ──────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="problem" aria-labelledby="problem-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">The problem</p>
+          <h2 id="problem-title">Why do AI coding assistants forget?</h2>
+        </div>
+        <p class="answer">
+          An assistant only knows what fits in its context window. When the session ends
+          that context is discarded, so the next session starts from zero. Muse closes the
+          gap by keeping what mattered outside the model — in files on your disk — and
+          loading it back when it is relevant.
+        </p>
+        <div class="problem-grid">
+          {problems.map((p, i) => (
+            <article class="problem-card glass reveal" style={`--reveal-delay:${i * 80}ms`}>
+              <h3>{p.title}</h3>
+              <p>{p.body}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>
 
-    <!-- PILLARS -->
-    <section class="section" id="pillars">
+    <!-- ── HOW IT WORKS ─────────────────────────────────────────────────── -->
+    <section class="section scene" id="how-it-works" aria-labelledby="how-title">
+      <div class="parallax-layer" data-parallax data-speed="0.75" aria-hidden="true" style="opacity:.7">
+        <div class="mesh"></div>
+      </div>
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2 id="how-title">How does Muse Memory work?</h2>
+        </div>
+        <p class="answer">
+          Three steps on a loop: it records what happened, verifies each record against your
+          real code, and returns the useful ones when new work starts. If a saved fact no
+          longer matches your code, Muse leaves it out instead of serving it.
+        </p>
+
+        <ol class="steps scene-planes">
+          {steps.map((s, i) => (
+            <li class={`step glass tilt z-${(i % 3) + 1} reveal`} data-tilt="4" style={`--reveal-delay:${i * 110}ms`}>
+              <span class="step-num" aria-hidden="true">{s.step}</span>
+              <h3>{s.title}</h3>
+              <p class="step-plain">{s.plain}</p>
+              <p class="step-tech">{s.tech}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+
+    <!-- ── CAPABILITIES ─────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="pillars" aria-labelledby="pillars-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Capabilities</p>
-          <h2>Six pillars of AI agent memory you can trust</h2>
+          <h2 id="pillars-title">What can it actually do?</h2>
           <p>
-            Persistent memory for AI coding agents is not a vector dump with a search box.
-            Muse is a governed memory engine over MCP: every memory is captured, verified,
-            consolidated, and recalled locally under rules you can audit.
+            Six things, each with the everyday explanation first and the engineering detail
+            underneath. Together they are what makes this a memory you can trust rather than
+            a search box over old notes.
           </p>
         </div>
         <div class="bands">
@@ -249,13 +483,13 @@ const appJsonLd = JSON.stringify({
       </div>
     </section>
 
-    <!-- SHOWREEL -->
-    <section class="section section-alt" id="showreel">
+    <!-- ── SHOWREEL ─────────────────────────────────────────────────────── -->
+    <section class="section" id="showreel" aria-labelledby="reel-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Showreel</p>
-          <h2>Ten seconds, straight from the engine</h2>
-          <p>A motion-designed render of the engine's story — every number on screen is a measured benchmark, not a claim.</p>
+          <h2 id="reel-title">Ten seconds of the engine's story</h2>
+          <p>Every number on screen is a measured benchmark, not a claim.</p>
         </div>
         <figure class="reel reveal">
           <video
@@ -266,44 +500,28 @@ const appJsonLd = JSON.stringify({
             preload="metadata"
             poster={`${base}/showreel-poster.png`}
             src={`${base}/showreel.mp4`}
-          ></video>            <figcaption>The 10-second showreel — download public/showreel.mp4 for social embedding.</figcaption>
+          ></video>
+          <figcaption>The 10-second showreel — download public/showreel.mp4 for social embedding.</figcaption>
         </figure>
       </div>
     </section>
 
-    <!-- FLOW -->
-    <section class="section" id="flow">
+    <!-- ── PROOF ────────────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="proof" aria-labelledby="proof-title">
       <div class="container">
         <div class="section-head">
-          <p class="eyebrow">How it works</p>
-          <h2>A memory loop, not a storage bucket</h2>
-          <p>Knowledge moves through one deterministic pipeline — the same steps every time, auditable at every stage.</p>
+          <p class="eyebrow">Proof</p>
+          <h2 id="proof-title">How fast is it, really?</h2>
         </div>
-        <ol class="flow">
-          {flow.map((f, i) => (
-            <li class="flow-step reveal" style={`--reveal-delay:${i * 110}ms`}>
-              <span class="flow-num">{f.step}</span>
-              <div>
-                <h3>{f.title}</h3>
-                <p>{f.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-
-    <!-- BENCHMARKS -->
-    <section class="section" id="benchmarks">
-      <div class="container">
-        <div class="section-head">
-          <p class="eyebrow">Benchmarks</p>
-          <h2>Fast by architecture, not by cache luck</h2>
-          <p>Measured with the built-in "memory benchmark" suite: clean store, cold process, no network.</p>
-        </div>
-        <div class="bench-grid">
+        <p class="answer">
+          Recall takes under two milliseconds because it is a local database query, not an
+          API call. The hot cache answers a lookup in under 50 microseconds, and the whole
+          engine runs with no background service and no network access. These are measured
+          numbers from the built-in benchmark.
+        </p>
+        <div class="bench-grid scene-planes">
           {benchmarks.map((b, i) => (
-            <div class="bench reveal" style={`--reveal-delay:${i * 70}ms`}>
+            <div class={`bench glass tilt z-${(i % 3) + 1} reveal`} data-tilt="4" style={`--reveal-delay:${i * 70}ms`}>
               <p class="bench-value">{b.value}</p>
               <p class="bench-label">{b.label}</p>
               <p class="bench-note">{b.note}</p>
@@ -313,20 +531,24 @@ const appJsonLd = JSON.stringify({
       </div>
     </section>
 
-    <!-- TRUST -->
-    <section class="section section-alt" id="trust">
+    <!-- ── TRUST ────────────────────────────────────────────────────────── -->
+    <section class="section" id="trust" aria-labelledby="trust-title">
       <div class="container">
         <div class="section-head">
-          <p class="eyebrow">Trust gates</p>
-          <h2>What happens when a memory is wrong</h2>
-          <p>Most memory systems serve stale facts with total confidence. Muse gates every boundary — write, recall, sync — and refuses what it can't verify.</p>
+          <p class="eyebrow">Trust</p>
+          <h2 id="trust-title">What happens when a memory is wrong?</h2>
         </div>
+        <p class="answer">
+          Most memory tools serve whatever they stored, with full confidence. Muse gates
+          every boundary — at write, at recall, and at sync — and refuses what it cannot
+          verify. When it holds something back, it says so instead of staying quiet.
+        </p>
         <div class="trust-list">
           {trustChecks.map((t, i) => (
-            <div class="trust-row reveal" style={`--reveal-delay:${i * 90}ms`}>
-              <span class={`chip chip-${t.color}`}>✕</span>
+            <div class="trust-row glass reveal" style={`--reveal-delay:${i * 90}ms`}>
+              <span class={`chip chip-${t.color}`} aria-hidden="true">✕</span>
               <span class="trust-bad">{t.text}</span>
-              <span class="trust-arrow">→</span>
+              <span class="trust-arrow" aria-hidden="true">→</span>
               <span class={`trust-good good-${t.color}`}>{t.got}</span>
             </div>
           ))}
@@ -334,35 +556,56 @@ const appJsonLd = JSON.stringify({
       </div>
     </section>
 
-    <!-- STATS BAND -->
-    <section class="stats-band" aria-label="Proof points">
-      <div class="container stats-inner">
-        {[ 
-          ["527+", "tests passing, fully offline"],
-          ["24+", "migrator formats"],
-          ["69", "MCP tools, profiled"],
-          ["0", "cloud dependencies"],
-        ].map(([v, l], i) => (
-          <div class="stat reveal" style={`--reveal-delay:${i * 70}ms`}>
-            <p class="stat-v">{v}</p>
-            <p class="stat-l">{l}</p>
-          </div>
-        ))}
+    <!-- ── WHY VERSIONED MEMORY ───────────────────────────────────────────── -->
+    <section class="section" id="versioned" aria-labelledby="versioned-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Why versioned memory</p>
+          <h2 id="versioned-title">Why agents need versioned memory</h2>
+        </div>
+        <p class="answer">
+          An assistant that forgets between sessions loses days of learning. An assistant
+          whose memory ignores git state applies experimental rules to production code.
+          Muse solves both — and adds a third: every memory carries blame metadata so
+          nothing is ever silently corrupted. Muse is <strong>Git for AI memory</strong>:
+          it compiles observations into curatable memories, scopes them to your branch,
+          and verifies every note against your real code.
+        </p>
+        <p class="plain">
+          <strong>The short version:</strong> memory should work like your source code. Branches isolate experiments, blame traces who wrote what, and rollbacks undo mistakes — not a flat file that everyone edits.
+        </p>
+        <div class="versioned-grid">
+          {versionedReasons.map((r, i) => (
+            <article class="versioned-card glass reveal" style={`--reveal-delay:${i * 80}ms`}>
+              <h3>{r.title}</h3>
+              <p>{r.body}</p>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
 
-    <!-- COMPARISON -->
-    <section class="section section-alt" id="compare">
+    <!-- ── COMPARE ──────────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="compare" aria-labelledby="compare-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Landscape</p>
-          <h2>How Muse compares</h2>
-          <p>Vector stores optimize for similarity, graphs for relationships. Muse optimizes for what a coding agent actually needs: verified, code-grounded recall that never serves stale truth.</p>
+          <h2 id="compare-title">How is it different from other memory tools?</h2>
         </div>
+        <p class="answer">
+          Vector stores optimise for similarity and graph platforms for relationships. Muse
+          optimises for what a coding assistant actually needs: recall that is fast, local
+          and tied to your code, and that never passes off a stale fact as current.
+        </p>
         <div class="table-wrap reveal">
           <table class="compare">
             <thead>
-              <tr><th>Capability</th><th>Muse Memory</th><th>Vector stores<br/><span class="th-sub">Mem0 / Supermemory</span></th><th>Graph platforms<br/><span class="th-sub">Zep / Graphiti / Cognee</span></th></tr>
+              <tr>
+                <th>Capability</th>
+                <th>Muse Memory</th>
+                <th>Vector stores<br /><span class="th-sub">dense embedding-based</span></th>
+                <th>Graph platforms<br /><span class="th-sub">entity relationship-based</span></th>
+              </tr>
             </thead>
             <tbody>
               {[
@@ -372,10 +615,10 @@ const appJsonLd = JSON.stringify({
                 ["Write-time citation verification", true, false, false],
                 ["Recall-time freshness gate", true, false, false],
                 ["Deterministic lifecycle state machine", true, false, true],
-                ["Structural code anchors (line-invariant)", true, false, false],
-                ["Secret defense on every write", true, false, false],
-                ["Single command wires 80+ platforms", true, false, false],
-                ["Git-reviewable memory files", true, false, false],
+                ["Structural anchors that survive refactors", true, false, false],
+                ["Secret scanning on every write", true, false, false],
+                ["One command wires 80+ tools", true, false, false],
+                ["Memory files you can review in git", true, false, false],
               ].map(([cap, muse, vec, graph]: any) => (
                 <tr>
                   <td>{cap}</td>
@@ -387,20 +630,42 @@ const appJsonLd = JSON.stringify({
             </tbody>
           </table>
         </div>
-        <p class="table-note">Generalizations — each platform evolves quickly; check their docs. Comparison reflects Muse v2.3 capabilities.</p>
+        <p class="table-note">
+          Generalizations — each platform evolves quickly, so check their docs. Comparison
+          reflects Muse v2.3 capabilities.
+        </p>
       </div>
     </section>
 
-    <!-- FAQ -->
-    <section class="section" id="faq">
+    <!-- ── GLOSSARY ─────────────────────────────────────────────────────── -->
+    <section class="section" id="glossary" aria-labelledby="glossary-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Plain English</p>
+          <h2 id="glossary-title">Words in this page, explained</h2>
+          <p>No prior knowledge assumed. Skip it if you already live in a terminal.</p>
+        </div>
+        <dl class="glossary reveal">
+          {glossary.map((g) => (
+            <div>
+              <dt>{g.term}</dt>
+              <dd>{g.def}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+    <!-- ── FAQ ──────────────────────────────────────────────────────────── -->
+    <section class="section section-alt" id="faq" aria-labelledby="faq-title">
       <div class="container faq-wrap">
         <div class="section-head">
           <p class="eyebrow">FAQ</p>
-          <h2>Questions agents ask before installing</h2>
+          <h2 id="faq-title">Questions people ask before installing</h2>
         </div>
         <div class="faq">
           {faqs.map((f, i) => (
-            <details class="faq-item reveal" style={`--reveal-delay:${i * 60}ms`}>
+            <details class="faq-item reveal" style={`--reveal-delay:${i * 50}ms`}>
               <summary>{f.q}</summary>
               <p>{f.a}</p>
             </details>
@@ -411,35 +676,61 @@ const appJsonLd = JSON.stringify({
 
     <script is:inline type="application/ld+json" set:html={faqJsonLd} />
     <script is:inline type="application/ld+json" set:html={appJsonLd} />
+    <script is:inline type="application/ld+json" set:html={howToJsonLd} />
 
-    <!-- FINAL CTA -->
-    <section class="cta-final" id="install-cta">
-      <div class="container cta-inner reveal">
-        <h2>Stop re-explaining. Start remembering.</h2>
-        <p>One command wires every agent you run. The memory verifies itself from there.</p>
-        <div class="cta-actions">
-          <a class="btn btn-primary btn-lg" href="#install">Install now</a>
-          <a class="btn btn-ghost btn-lg" href="https://github.com/harshsinghmp/musememory" rel="noopener">Read the source ↗</a>
-        </div>
+    <!-- ── INSTALL ──────────────────────────────────────────────────────── -->
+    <section class="section scene" id="install" aria-labelledby="install-title">
+      <div class="parallax-layer" data-parallax data-speed="0.5" aria-hidden="true">
+        <div class="mesh"></div>
       </div>
-    </section>
-
-    <!-- INSTALL -->
-    <section class="section" id="install">
       <div class="container install-wrap">
         <div class="section-head">
           <p class="eyebrow">Get started</p>
-          <h2>One command. That's the whole setup.</h2>
+          <h2 id="install-title">One line. That's the whole setup.</h2>
           <p>
-            Muse detects every installed agent and wires itself in over MCP, profiled per
-            task: Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes,
-            OpenClaw and 70+ more get exactly the tools their task needs — nothing more.
+            Open a terminal in your project, paste the line, press enter. Muse finds the AI
+            tools you already have and connects each one over MCP, profiled per task:
+            Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes, OpenClaw and
+            70+ more.
           </p>
         </div>
-        <div class="install-grid">
-          <pre class="term"><code>npx musememory connect</code></pre>
-          <pre class="term"><code>memory capture "Auth uses jose, not jsonwebtoken" --type architecture</code></pre>
-          <pre class="term"><code>memory context --query "how does auth work" --budget 2000</code></pre>
+        <ol class="install-steps">
+          <li class="reveal">
+            <span class="is-num" aria-hidden="true">1</span>
+            <h3>Paste one line</h3>
+            <p>No install step, no config file, no account.</p>
+            <pre class="term"><code>npx musememory connect</code></pre>
+          </li>
+          <li class="reveal" style="--reveal-delay:80ms">
+            <span class="is-num" aria-hidden="true">2</span>
+            <h3>Muse wires your tools</h3>
+            <p>It detects what you have and connects each one with only the tools its task needs.</p>
+            <pre class="term"><code>memory hooks install   # optional: hands-free recall</code></pre>
+          </li>
+          <li class="reveal" style="--reveal-delay:160ms">
+            <span class="is-num" aria-hidden="true">3</span>
+            <h3>Keep working</h3>
+            <p>Ask your assistant why something is the way it is — it can now look it up.</p>
+            <pre class="term"><code>memory context --query "how does auth work" --budget 2000</code></pre>
+          </li>
+        </ol>
+        <p class="install-foot">
+          Everything stays on your machine. <a href={`${base}/docs`}>Read the docs</a> or
+          <a href="https://github.com/harshsinghmp/musememory" rel="noopener">read the source</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── FINAL CTA ────────────────────────────────────────────────────── -->
+    <section class="cta-final" aria-labelledby="cta-title">
+      <div class="container cta-inner reveal">
+        <h2 id="cta-title">Stop re-explaining. Start remembering.</h2>
+        <p>One command connects every assistant you use. The memory verifies itself from there.</p>
+        <div class="cta-actions">
+          <a class="btn btn-primary btn-lg" href="#install">Install now</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/harshsinghmp/musememory" rel="noopener">
+            Read the source ↗
+          </a>
         </div>
       </div>
     </section>
@@ -447,13 +738,12 @@ const appJsonLd = JSON.stringify({
 
   <footer class="footer">
     <div class="container footer-inner">
-      <p>
-        <strong>Muse Memory</strong> — autonomous cognitive memory for AI agents · MIT
-      </p>
-      <nav>
+      <p><strong>Muse Memory</strong> — persistent memory for AI coding agents · MIT</p>
+      <nav aria-label="Footer">
         <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub</a>
         <a href="https://www.npmjs.com/package/musememory" rel="noopener">npm</a>
-        <a href="https://github.com/harshsinghmp/musememory/blob/main/README.md" rel="noopener">Docs</a>
+        <a href={`${base}/docs`}>Docs</a>
+        <a href={`${base}/compare`}>Compare</a>
       </nav>
     </div>
   </footer>
@@ -461,10 +751,243 @@ const appJsonLd = JSON.stringify({
   <style>
     /* nav & footer chrome lives in global.css (shared across all pages) */
 
-    /* ── Editorial capability bands ────────────────────────────────────────
-       Replaces the uniform card grid: each pillar is a numbered band with an
-       oversized index numeral, a hairline rule, and an asymmetric two-column
-       split that alternates side to side. */
+    /* Parallax wrapper. The mesh inside animates its own transform, so the
+       scroll offset has to live on a parent to avoid fighting the drift. */
+    .parallax-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ── Hero: a lit stage, not a flat banner ─────────────────────────────── */
+    .hero {
+      position: relative;
+      padding: clamp(3.4rem, 9vw, 6.5rem) 0 3rem;
+      text-align: center;
+      isolation: isolate;
+    }
+    .hero-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55em;
+      font-size: var(--fs-small);
+      color: var(--text-dim);
+      border: 1px solid var(--line);
+      background: var(--bg-raised);
+      border-radius: 999px;
+      padding: 0.45em 1.1em;
+      margin-bottom: 1.5rem;
+    }
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5);
+      animation: pulse 2.2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5); }
+      70% { box-shadow: 0 0 0 9px rgba(95, 211, 154, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0); }
+    }
+
+    h1 {
+      font-size: var(--fs-hero);
+      font-weight: 800;
+      max-width: 22ch;
+      margin: 0 auto 1.1rem;
+      display: grid;
+      gap: 0.15em;
+    }
+    /* The keyword phrase sits in the h1 for search, at a size that does not
+       fight the promise underneath it. */
+    .hero-keyword {
+      display: block;
+      font-size: 0.34em;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: linear-gradient(92deg, var(--cyan), var(--violet));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-promise {
+      display: block;
+      letter-spacing: -0.03em;
+      background: linear-gradient(96deg, #fff 24%, var(--violet) 78%, var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-sub {
+      max-width: 46rem;
+      margin: 0 auto 2rem;
+      color: var(--text-dim);
+      font-size: clamp(1.02rem, 1.7vw, 1.18rem);
+    }
+    .hero-cta {
+      display: flex;
+      gap: 0.9rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .term {
+      text-align: left;
+      background: var(--bg-panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.3rem;
+      max-width: 640px;
+      margin: 0 auto;
+      overflow-x: auto;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    }
+    .hero > .container > .term { width: 100%; }
+    /* Wrap rather than scroll: a horizontally scrollable <pre> is not keyboard
+       reachable (axe scrollable-region-focusable, serious), and on a phone a
+       command that wraps is easier to read than one you have to drag. */
+    .term code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font-size: 0.92rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    /* ── Hero cards: three trust states, floating at different depths ─────── */
+    .hero-cards {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      width: 100%;
+      max-width: 940px;
+      margin: 3rem auto 0;
+      text-align: left;
+    }
+    .hero-card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 46%), var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.15rem;
+      box-shadow: inset 0 1px 0 var(--edge-light), 0 18px 40px var(--edge-dark);
+    }
+    .hc-badge {
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 0.7rem;
+    }
+    .hc-ok { background: var(--green-soft); color: var(--green); }
+    .hc-no { background: var(--red-soft); color: var(--red); }
+    .hc-hold { background: var(--amber-soft); color: var(--amber); }
+    .hc-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+    }
+    .hc-body {
+      font-size: 0.85rem;
+      margin-bottom: 0.55rem;
+      overflow-wrap: anywhere;
+    }
+    .hc-body code {
+      background: rgba(139, 124, 247, 0.1);
+      font-size: 0.82rem;
+    }
+    /* text-dim, not text-faint: these sit on a lit glass gradient, and the
+       lighter surface would push text-faint below AA. */
+    .hc-note {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    @media (max-width: 860px) {
+      .hero-cards { grid-template-columns: 1fr; max-width: 30rem; }
+      /* Depth offsets are decorative; at one column they only add noise. */
+      .hero-card.layer { transform: none; }
+    }
+
+    .section-alt {
+      background: var(--bg-raised);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* ── Problem cards ───────────────────────────────────────────────────── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .problem-card {
+      padding: 1.4rem 1.45rem;
+    }
+    .problem-card h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1.08rem;
+    }
+    .problem-card p {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+    }
+
+    /* ── Steps: three cards, each on its own depth plane ─────────────────── */
+    .steps {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.1rem;
+    }
+    .step {
+      padding: 1.5rem 1.4rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 46%), var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: inset 0 1px 0 var(--edge-light), 0 20px 44px var(--edge-dark);
+    }
+    .step-num {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.16em;
+      color: var(--cyan);
+    }
+    .step h3 {
+      margin: 0.6rem 0 0.55rem;
+      font-size: 1.2rem;
+    }
+    .step-plain {
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .step-tech {
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--line);
+      color: var(--text-dim);
+      font-size: 0.84rem;
+      line-height: 1.6;
+    }
+
+    /* ── Editorial capability bands ──────────────────────────────────────── */
     .bands { display: grid; gap: 0; margin-top: 1rem; }
     .band {
       display: grid;
@@ -493,14 +1016,14 @@ const appJsonLd = JSON.stringify({
     .band-green .band-index { color: var(--green); }
     .band-red .band-index { color: var(--red); }
     .band-lead h3 {
-      font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+      font-size: clamp(1.3rem, 2.3vw, 1.8rem);
       letter-spacing: -0.02em;
       margin: 0.7em 0 0;
-      max-width: 22ch;
+      max-width: 24ch;
     }
     .band-copy p {
       color: var(--text-dim);
-      font-size: 1.02rem;
+      font-size: 1.01rem;
       max-width: 52ch;
     }
     .band-stat {
@@ -521,116 +1044,6 @@ const appJsonLd = JSON.stringify({
       .band-copy { order: 2 !important; grid-column: 2; text-align: left !important; }
     }
 
-    .hero { padding: clamp(4rem, 10vw, 7.5rem) 0 2.5rem; text-align: center; }
-    .hero-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55em;
-      font-size: var(--fs-small);
-      color: var(--text-dim);
-      border: 1px solid var(--line);
-      background: var(--bg-raised);
-      border-radius: 999px;
-      padding: 0.45em 1.1em;
-      margin-bottom: 1.6rem;
-    }
-    .pulse {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5);
-      animation: pulse 2.2s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0.5); }
-      70% { box-shadow: 0 0 0 9px rgba(95, 211, 154, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(95, 211, 154, 0); }
-    }
-    h1 {
-      font-size: var(--fs-hero);
-      font-weight: 800;
-      max-width: 19ch;
-      margin: 0 auto 1.2rem;
-    }
-    .grad {
-      background: linear-gradient(92deg, var(--violet) 10%, var(--cyan) 90%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .hero-sub {
-      max-width: 44rem;
-      margin: 0 auto 2.2rem;
-      color: var(--text-dim);
-      font-size: clamp(1.02rem, 1.7vw, 1.16rem);
-    }
-    .hero-cta {
-      display: flex;
-      gap: 0.9rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 2.4rem;
-    }
-    .term {
-      text-align: left;
-      background: var(--bg-panel);
-      border: 1px solid var(--line-strong);
-      border-radius: var(--radius);
-      padding: 1.1rem 1.3rem;
-      max-width: 640px;
-      margin: 0 auto;
-      overflow-x: auto;
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-    }
-    .term code {
-      background: none; border: none; padding: 0;
-      color: var(--text);
-      font-size: 0.92rem;
-      line-height: 1.7;
-      white-space: pre;
-    }
-    .hero-strip {
-      display: flex;
-      gap: 0.7rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 2.2rem;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--text-faint);
-    }
-    .hero-strip span {
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 0.28em 0.95em;
-    }
-
-    .section-alt {
-      background: var(--bg-raised);
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-      gap: 1.1rem;
-    }
-    .card {
-      background: var(--bg-panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 1.5rem 1.5rem 1.3rem;
-      transition: transform 0.18s ease, border-color 0.18s ease;
-    }
-    .card:hover { transform: translateY(-3px); border-color: var(--line-strong); }
-    .card h3 { margin: 0.9rem 0 0.55rem; }
-    .card p { color: var(--text-dim); font-size: 0.95rem; }
-    .card-stat {
-      margin-top: 1rem !important;
-      font-family: var(--font-mono);
-      font-size: 0.8rem !important;
-      color: var(--text-faint) !important;
-    }
     .chip {
       display: inline-block;
       font-size: 0.72rem;
@@ -646,38 +1059,13 @@ const appJsonLd = JSON.stringify({
     .chip-green  { background: var(--green-soft);  color: var(--green); }
     .chip-red    { background: var(--red-soft);    color: var(--red); }
 
-    .flow {
-      list-style: none;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 1.1rem;
-      counter-reset: none;
-    }
-    .flow-step {
-      background: var(--bg-panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 1.4rem;
-      position: relative;
-    }
-    .flow-num {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--cyan);
-      letter-spacing: 0.12em;
-    }
-    .flow-step h3 { margin: 0.55rem 0 0.45rem; }
-    .flow-step p { color: var(--text-dim); font-size: 0.93rem; }
-
+    /* ── Benchmarks ──────────────────────────────────────────────────────── */
     .bench-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 1rem;
     }
     .bench {
-      background: var(--bg-panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
       padding: 1.3rem 1.2rem;
       text-align: center;
     }
@@ -690,22 +1078,39 @@ const appJsonLd = JSON.stringify({
       color: transparent;
     }
     .bench-label { color: var(--text); font-size: 0.9rem; margin-top: 0.35rem; font-weight: 600; }
-    .bench-note { color: var(--text-faint); font-size: 0.78rem; }
+    .bench-note { color: var(--text-dim); font-size: 0.78rem; }
+
+    /* ── Trust rows ──────────────────────────────────────────────────────── */
+    /* ── Versioned memory cards ──────────────────────────────────────────── */
+    .versioned-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .versioned-card {
+      padding: 1.4rem 1.45rem;
+    }
+    .versioned-card h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1.08rem;
+    }
+    .versioned-card p {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+    }
 
     .trust-list {
       display: grid;
       gap: 0.8rem;
-      max-width: 46rem;
+      max-width: 48rem;
     }
     .trust-row {
       display: flex;
       align-items: center;
       gap: 0.9rem;
       flex-wrap: wrap;
-      background: var(--bg-panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-sm);
       padding: 0.85rem 1.1rem;
+      border-radius: var(--radius-sm);
     }
     .trust-bad { color: var(--text-dim); }
     .trust-arrow { color: var(--text-faint); }
@@ -715,6 +1120,7 @@ const appJsonLd = JSON.stringify({
     .good-amber  { color: var(--amber); }
     .good-red    { color: var(--red); }
 
+    /* ── Showreel ────────────────────────────────────────────────────────── */
     .reel {
       max-width: 880px;
       margin: 0 auto;
@@ -732,19 +1138,32 @@ const appJsonLd = JSON.stringify({
       border-top: 1px solid var(--line);
     }
 
-    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-panel); }
+    /* ── Comparison table ────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+    }
     .compare { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 640px; }
     .compare th, .compare td { padding: 0.85rem 1.1rem; text-align: left; border-bottom: 1px solid var(--line); }
-    .compare thead th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); background: rgba(139,124,247,0.05); }
+    .compare thead th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      background: rgba(139, 124, 247, 0.05);
+    }
     .th-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 0.74rem; }
     .compare tbody tr:last-child td { border-bottom: none; }
-    .compare tbody tr:hover td { background: rgba(139,124,247,0.04); }
+    .compare tbody tr:hover td { background: rgba(139, 124, 247, 0.04); }
     .compare td:nth-child(2) { font-weight: 700; }
     .compare .yes { color: var(--green); font-weight: 600; }
     .compare .no { color: var(--text-faint); }
     .table-note { margin-top: 0.8rem; font-size: 0.8rem; color: var(--text-faint); }
 
-    .faq-wrap { max-width: 780px; }
+    /* ── FAQ ─────────────────────────────────────────────────────────────── */
+    .faq-wrap { max-width: 820px; }
     .faq { display: grid; gap: 0.75rem; }
     .faq-item {
       background: var(--bg-panel);
@@ -762,30 +1181,64 @@ const appJsonLd = JSON.stringify({
       justify-content: space-between;
       align-items: center;
       gap: 1rem;
+      /* SC 2.5.8: keep the whole row a comfortable target */
+      min-height: 32px;
     }
-    .faq-item summary::after { content: "+"; color: var(--cyan); font-size: 1.3rem; line-height: 1; transition: transform 0.2s ease; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after {
+      content: "+";
+      color: var(--cyan);
+      font-size: 1.3rem;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
     .faq-item[open] summary::after { transform: rotate(45deg); }
     .faq-item p { margin-top: 0.7rem; color: var(--text-dim); font-size: 0.95rem; }
 
-    .stats-band {
-      border-block: 1px solid var(--line);
-      background: linear-gradient(180deg, var(--bg-raised), var(--bg));
-      padding: 2.6rem 0;
+    /* ── Install steps ───────────────────────────────────────────────────── */
+    .install-wrap { text-align: center; }
+    .install-wrap .section-head { margin-inline: auto; }
+    .install-steps {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.1rem;
+      text-align: left;
+      margin-top: 0.5rem;
     }
-    .stats-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.4rem; text-align: center; }
-    .stat-v {
-      font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+    .install-steps li {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.3rem 1.3rem 1.4rem;
+    }
+    .is-num {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--violet-soft);
+      color: var(--violet);
       font-weight: 800;
-      background: linear-gradient(92deg, var(--violet), var(--cyan));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
     }
-    .stat-l { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.2rem; }
+    .install-steps h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+    .install-steps p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.9rem; }
+    .install-steps .term { margin: 0; max-width: none; padding: 0.85rem 1rem; }
+    .install-foot {
+      margin-top: 1.6rem;
+      color: var(--text-faint);
+      font-size: var(--fs-small);
+    }
 
+    /* ── Final CTA ───────────────────────────────────────────────────────── */
     .cta-final {
       padding: clamp(3.5rem, 9vw, 6.5rem) 0;
       text-align: center;
       background:
-        radial-gradient(40rem 20rem at 50% 120%, rgba(139,124,247,0.18), transparent 65%),
+        radial-gradient(40rem 20rem at 50% 120%, rgba(139, 124, 247, 0.18), transparent 65%),
         var(--bg-raised);
       border-top: 1px solid var(--line);
     }
@@ -794,15 +1247,11 @@ const appJsonLd = JSON.stringify({
     .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
     .btn-lg { padding: 1em 2em; font-size: 1rem; }
 
-    .install-wrap { text-align: center; }
-    .install-wrap .section-head { margin-inline: auto; }
-    .install-grid {
-      display: grid;
-      gap: 0.9rem;
-      max-width: 760px;
-      margin: 0 auto;
+    /* Depth is decoration: flatten it on phones, where translateZ costs
+       legibility and buys nothing. */
+    @media (max-width: 640px) {
+      .layer { transform: none; }
+      .step.layer, .bench.layer { transform: none; }
     }
-    .install-grid .term { max-width: none; margin: 0; }
-
   </style>
 </Base>

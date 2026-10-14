@@ -32,7 +32,9 @@ const motionScript = initMotion();
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogAbs} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Must go through BASE_URL: the site is served from /musememory/, so a
+         root-absolute /favicon.svg resolves on the domain root and 404s. -->
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}/favicon.svg`} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -175,6 +175,23 @@ function getFromYaml(store: Store, id: string): MemoryEntry | null {
   }
 }
 
+/** R23: Track access timestamp and count on retrieval (used by retention scoring). */
+export function recordAccess(store: Store, entry: MemoryEntry): MemoryEntry {
+  const now = nowIso();
+  const currentCount = entry.access_count ?? 0;
+  entry.last_accessed_at = now;
+  entry.access_count = currentCount + 1;
+  if (store.db) {
+    try {
+      store.db.run(
+        `UPDATE memories SET last_accessed_at = ?, access_count = ?, updated_at = ? WHERE id = ?`,
+        [now, entry.access_count, entry.updated_at, entry.id],
+      );
+    } catch {}
+  }
+  return entry;
+}
+
 export function get(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
   let fileMtime: number | undefined;
@@ -187,7 +204,7 @@ export function get(store: Store, id: string): MemoryEntry | null {
     // 1. Check L0 cache if mtime matches
     if (store.cache && fileMtime !== undefined) {
       const cached = store.cache.getEntry(id, fileMtime);
-      if (cached) return cached;
+      if (cached) return recordAccess(store, cached);
     }
 
     // 2. Parse YAML from disk (either cache miss or externally modified)
@@ -206,19 +223,19 @@ export function get(store: Store, id: string): MemoryEntry | null {
     if (store.cache) {
       store.cache.setEntry(fromYaml, undefined, fileMtime);
     }
-    return fromYaml;
+    return recordAccess(store, fromYaml);
   }
 
   // File does not exist on disk, check L0 cache then SQLite
   if (store.cache) {
     const cached = store.cache.getEntry(id);
-    if (cached) return cached;
+    if (cached) return recordAccess(store, cached);
   }
   if (store.db) {
     const dbEntry = getMemoryById(store.db, id);
     if (dbEntry) {
       if (store.cache) store.cache.setEntry(dbEntry);
-      return dbEntry;
+      return recordAccess(store, dbEntry);
     }
   }
 
@@ -410,6 +427,8 @@ export function propose(
     conflict_ids?: string[];
     dedup?: boolean;
     checkConflict?: boolean;
+    /** R23: Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry"). */
+    mem_path?: string;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -471,6 +490,7 @@ export function propose(
     temporal_mode,
     evidence: opts.evidence,
     conflict_ids: opts.conflict_ids,
+    mem_path: opts.mem_path,
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);

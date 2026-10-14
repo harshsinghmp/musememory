@@ -9,11 +9,13 @@
     "packages/*"
   ],
   "scripts": {
+    "bench:graph": "bun scripts/bench-graph.ts",
     "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
     "site:dev": "bun run --cwd apps/website dev",
     "site:build": "bun run --cwd apps/website build",
     "site:preview": "bun run --cwd apps/website preview",
     "site:showreel": "bun run --cwd apps/website scripts/build-showreel.ts",
+    "build:gif": "bun run --cwd apps/website scripts/build-readme-gif.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "validate": "bun run dist/index.js validate --dry-run",
