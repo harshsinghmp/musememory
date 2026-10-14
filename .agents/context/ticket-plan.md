@@ -305,7 +305,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-364 · RB-3 · unique-ID seam: `crypto.randomUUID` (or DB UNIQUE + collision retry) behind one id-generator; current `Date.now()` ids (adrs/engine.ts:104, pageindex/engine.ts:34) collide same-millisecond with no constraint to reject · blocks T-038, T-041, T-044, T-328 and every parallel-writer ticket · F
 - [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
 - [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
-- [ ] T-367 · RB-5 DECISION · zero-daemon charter vs reality: `daemon.ts` + `ui.ts` are two blocking HTTP servers (cli/ecosystem.ts:507, decisions.md:7 ADR-001 binding) — principal decision: amend charter, or daemon becomes opt-in-removable; until decided, every watch/HTTP/background ticket stacks onto a violated foundation · N (decision record)
+- [x] T-367 · **RESOLVED 2026-10-14 — principal decision: zero REQUIRED daemons, opt-in local services allowed.** Charter amends to: no feature may require a running service; `daemon.ts` + studio remain opt-in extras; team-server mode (T-150+) is opt-in per tenant. Residual: add T-379 — amend AGENTS.md + ADR-001 wording from "never depend on background servers" to the amended rule (docs-only) · N
 - [ ] T-368 · CRITICAL · migration mechanism: `memories` table is 14 columns + `data` JSON (sqlite.ts:137-155); ~20 D/C-wave tickets need real columns (idempotency_key, content_hash, decay_score, fact_provenance, linked_memory_ids, is_inference, parent_ids). One migration framework + one migration PR pattern (additive ALTER + backfill + test) · blocks the whole D-wave · F
 
 ## Findings from Nexus audit mode (new tickets T-336..T-362)
@@ -400,3 +400,4 @@ Source: read-only test audit (85 suites / 502 tests / 12,450 LOC). Suite hygiene
 | v1+v2+v3 | 238 |
 | v4 test integrity | 8 |
 | **Plan total** | **246** |
+- [ ] T-379 · amend AGENTS.md invariant "Zero External Daemons: Never depend on background servers" + decisions.md ADR-001 to: "no feature may REQUIRE a background service; local/team services are opt-in" (records the T-367 principal decision) · N
