@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { MeshNode, MeshTopology, WorkspaceType, MeshNodeType } from "./types.ts";
+import { resolveExternal } from "../paths.ts";
 
 const MESH_LINKS_FILE = "mesh_links.json";
 
@@ -26,7 +27,8 @@ export function listMeshLinks(memoryDir: string): string[] {
  * Add an explicit link to an external repository or package
  */
 export function addMeshLink(memoryDir: string, targetPath: string): boolean {
-  const resolved = path.resolve(targetPath);
+  // Linking an external repo is an explicit feature — normalize, don't confine.
+  const resolved = resolveExternal(targetPath);
   if (!fs.existsSync(resolved)) {
     throw new Error(`Target path does not exist: ${resolved}`);
   }
@@ -46,7 +48,7 @@ export function addMeshLink(memoryDir: string, targetPath: string): boolean {
  * Remove an explicit link from .memory/mesh_links.json
  */
 export function removeMeshLink(memoryDir: string, targetPath: string): boolean {
-  const resolved = path.resolve(targetPath);
+  const resolved = resolveExternal(targetPath);
   const current = listMeshLinks(memoryDir);
   const updated = current.filter((p) => p !== resolved);
   const filePath = path.join(memoryDir, MESH_LINKS_FILE);

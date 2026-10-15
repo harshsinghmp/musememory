@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, propose } from "../store.ts";
-import { compileWiki } from "./compiler.ts";
+import { compileWiki, getWikiPage } from "./compiler.ts";
 import type { WikiCompileOptions } from "./types.ts";
 
 describe("Wiki Compilation Engine", () => {
@@ -171,5 +171,20 @@ describe("Wiki Compilation Engine", () => {
     const pageFull = getWikiPage(memoryDir, firstSlug, "concept", "full");
     expect(pageFull).not.toBeNull();
     expect((pageFull as any).content.length).toBeGreaterThan(0);
+  });
+
+  it("getWikiPage rejects slugs that escape the wiki directory", () => {
+    createMemories(6);
+    compileWiki(store, memoryDir, { dryRun: false });
+
+    const outsideFile = join(testDir, "outside.md");
+    writeFileSync(outsideFile, "OUTSIDE-WIKI-MARKER");
+
+    expect(() => getWikiPage(memoryDir, "../../../../etc/passwd")).toThrow(/escap/i);
+    expect(() => getWikiPage(memoryDir, "concepts/../../../outside")).toThrow(/escap/i);
+    expect(() => getWikiPage(memoryDir, "concepts/../../../outside", "entity")).toThrow(/escap/i);
+
+    // Content outside the wiki base was neither returned nor consumed.
+    expect(readFileSync(outsideFile, "utf8")).toContain("OUTSIDE-WIKI-MARKER");
   });
 });

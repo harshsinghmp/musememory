@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, save, get, list } from "../src/store.ts";
@@ -347,6 +347,19 @@ describe("R14: Cross-Agent Knowledge Sync & P2P Gossip Protocol", () => {
       expect(poolRes.isError).toBeFalsy();
       const poolReport = JSON.parse(poolRes.content[0].text);
       expect(poolReport.broadcast_packet_id).toBeDefined();
+    });
+  });
+
+  describe("Pool Directory Path Safety", () => {
+    it("accepts an external absolute pool_dir and normalizes it (explicit feature)", () => {
+      const unnormalized = join(sharedPoolDir, "..", "muse-sync-pool-", "..", sharedPoolDir.split("/").pop()!);
+      const report = syncWithSharedPool(storeA, tmpRootA, unnormalized, "agent_ext_pool");
+      expect(report.pool_dir).toBe(sharedPoolDir);
+      expect(existsSync(sharedPoolDir)).toBe(true);
+    });
+
+    it("rejects a pool_dir containing a NUL byte", () => {
+      expect(() => syncWithSharedPool(storeA, tmpRootA, `${tmpRootA}/po\u0000ol`)).toThrow();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { list, slugifyId as slugify, type Store } from "../store.ts";
+import { resolveWithin } from "../paths.ts";
 import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../compounding/cluster.ts";
 import { extractEntitiesFromText } from "../entities/extractor.ts";
 import { tokenize } from "../retrieval.ts";
@@ -501,7 +502,7 @@ export function getWikiPage(
   }
 
   if (!type || type === "concept") {
-    const p = join(wikiDir, "concepts", `${slug}.md`);
+    const p = resolveWithin(wikiDir, "concepts", `${slug}.md`);
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
@@ -510,7 +511,7 @@ export function getWikiPage(
   }
 
   if (!type || type === "entity") {
-    const p = join(wikiDir, "entities", `${slug}.md`);
+    const p = resolveWithin(wikiDir, "entities", `${slug}.md`);
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { resolveWithin } from "../paths.ts";
 import { scanSecrets } from "../secrets.ts";
 import { tokenize } from "../retrieval.ts";
 import type { PageIndexDocument, PageIndexNode, PageIndexSearchResult } from "./types.ts";
@@ -10,6 +11,16 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
+}
+
+/**
+ * Rejects anything that is not a bare filename (`/`, `\`, `..`, NUL, leading dot).
+ * Defense-in-depth for index ids that reach the persist step.
+ */
+export function assertBareFilename(name: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
+    throw new Error(`indexId "${name}" is not a bare filename`);
+  }
 }
 
 export function buildPageIndex(
@@ -108,8 +119,10 @@ export function buildPageIndex(
 
   // 3. Persist if memoryDir provided and !dryRun
   if (options.memoryDir && !options.dryRun) {
-    const dir = join(options.memoryDir, "pageindex", project);
+    const dir = resolveWithin(options.memoryDir, "pageindex", project);
     mkdirSync(dir, { recursive: true });
+    // resolveWithin only guards `dir`; a traversal in the file name would still write outside it.
+    assertBareFilename(indexId);
     writeFileSync(join(dir, `${indexId}.json`), JSON.stringify(doc, null, 2), "utf8");
   }
 
@@ -202,7 +215,13 @@ export function loadPageIndex(
   project: string,
   indexId: string,
 ): PageIndexDocument | null {
-  const filePath = join(memoryDir, "pageindex", project, `${indexId}.json`);
+  // Hostile project/indexId are a miss, not a throw: load stays a read-only query.
+  let filePath: string;
+  try {
+    filePath = resolveWithin(memoryDir, "pageindex", project, `${indexId}.json`);
+  } catch {
+    return null;
+  }
   if (!existsSync(filePath)) return null;
   try {
     return JSON.parse(readFileSync(filePath, "utf8")) as PageIndexDocument;
@@ -237,7 +256,7 @@ export function deletePageIndex(
   project?: string,
   indexId?: string,
 ): { deletedCount: number } {
-  const base = join(memoryDir, "pageindex");
+  const base = resolveWithin(memoryDir, "pageindex");
   if (!existsSync(base)) return { deletedCount: 0 };
 
   let count = 0;
@@ -247,13 +266,13 @@ export function deletePageIndex(
   }
 
   if (project && !indexId) {
-    const pDir = join(base, project);
+    const pDir = resolveWithin(base, project);
     if (existsSync(pDir)) {
       rmSync(pDir, { recursive: true, force: true });
       count++;
     }
   } else if (project && indexId) {
-    const file = join(base, project, `${indexId}.json`);
+    const file = resolveWithin(base, project, `${indexId}.json`);
     if (existsSync(file)) {
       rmSync(file, { force: true });
       count++;

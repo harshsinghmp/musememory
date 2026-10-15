@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
+import { join, relative } from "node:path";
+import { assertBareFilename, buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
+import { resolveExternal, resolveWithin } from "../src/paths.ts";
 
 describe("PageIndex Native Engine", () => {
   let testDir: string;
@@ -85,5 +86,93 @@ Argon2id is used for password hashing.
     const del = deletePageIndex(memoryDir, "testproj", doc.id);
     expect(del.deletedCount).toBe(1);
     expect(listPageIndexes(memoryDir, "testproj").length).toBe(0);
+  });
+
+  it("loadPageIndex returns null instead of reading outside the pageindex base", () => {
+    const doc = buildPageIndex("# Hostile Doc\nSome text", { project: "testproj", memoryDir });
+    expect(loadPageIndex(memoryDir, "testproj", doc.id)).not.toBeNull();
+
+    expect(loadPageIndex(memoryDir, "../../etc", "passwd")).toBeNull();
+    expect(loadPageIndex(memoryDir, "testproj", "../../../etc/passwd")).toBeNull();
+  });
+
+  it("rejects traversal and absolute indexIds and writes nothing outside", () => {
+    for (const hostile of ["../../evil", "/abs", "a/b", "a\\b", "..", ".hidden", "evil\0.json"]) {
+      expect(() => assertBareFilename(hostile)).toThrow(/bare filename/i);
+    }
+    // Nothing was created anywhere by the rejected ids.
+    expect(existsSync(join(memoryDir, "pageindex", "evil.json"))).toBe(false);
+    expect(existsSync(join(testDir, "evil.json"))).toBe(false);
+
+    // A legit id still validates.
+    expect(() => assertBareFilename("my-doc_1")).not.toThrow();
+
+    // The real persist path still writes, and what it writes passes the guard.
+    const doc = buildPageIndex("# Ok Doc\ntext", { project: "testproj", memoryDir });
+    expect(() => assertBareFilename(doc.id)).not.toThrow();
+    expect(existsSync(join(memoryDir, "pageindex", "testproj", `${doc.id}.json`))).toBe(true);
+    expect(loadPageIndex(memoryDir, "testproj", doc.id)?.title).toBe(doc.title);
+  });
+
+  it("deletePageIndex refuses to delete a directory outside the pageindex base", () => {
+    buildPageIndex("# Hostile Doc\nSome text", { project: "testproj", memoryDir });
+
+    const evil = join(tmpdir(), "evil");
+    rmSync(evil, { recursive: true, force: true });
+    mkdirSync(evil, { recursive: true });
+    writeFileSync(join(evil, "precious.txt"), "precious");
+
+    try {
+      const traversal = relative(join(memoryDir, "pageindex"), evil);
+      expect(() => deletePageIndex(memoryDir, traversal)).toThrow(/escap/i);
+      expect(existsSync(join(evil, "precious.txt"))).toBe(true);
+    } finally {
+      rmSync(evil, { recursive: true, force: true });
+    }
+  });
+
+  it("deletePageIndex rejects '..' but still deletes a real pageindex base", () => {
+    buildPageIndex("# Temp Doc\nSome text", { project: "testproj", memoryDir });
+
+    expect(() => deletePageIndex(memoryDir, "..")).toThrow(/escap/i);
+    expect(listPageIndexes(memoryDir, "testproj").length).toBe(1);
+
+    expect(deletePageIndex(memoryDir).deletedCount).toBe(1);
+    expect(listPageIndexes(memoryDir).length).toBe(0);
+  });
+});
+
+describe("Path containment primitives", () => {
+  it("rejects NUL bytes in base, segment and external paths", () => {
+    expect(() => resolveWithin("/tmp/pi\0base", "a.md")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "a\0.md")).toThrow();
+    expect(() => resolveExternal("/tmp/pi-base/a\0.md")).toThrow();
+  });
+
+  it("rejects absolute segments inside the base but not for external paths", () => {
+    expect(() => resolveWithin("/tmp/pi-base", "/etc/passwd")).toThrow();
+    expect(resolveExternal("/etc/passwd")).toBe("/etc/passwd");
+  });
+
+  it("rejects traversal, including sibling prefixes of the base", () => {
+    expect(() => resolveWithin("/tmp/pi-base", "..")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "a", "..", "..", "b")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "../pi-base-evil/x.md")).toThrow();
+    expect(resolveWithin("/tmp/pi-base", "a", "b.md")).toBe("/tmp/pi-base/a/b.md");
+  });
+
+  it("treats a trailing separator on the base as the same directory", () => {
+    expect(resolveWithin("/tmp/pi-base/", "a.md")).toBe("/tmp/pi-base/a.md");
+    expect(() => resolveWithin("/tmp/pi-base/", "../pi-base-evil")).toThrow();
+  });
+
+  it("resolves a non-existent leaf without touching the filesystem", () => {
+    const leaf = "/tmp/pi-base/missing/deep/x.json";
+    expect(resolveWithin("/tmp/pi-base", "missing/deep/x.json")).toBe(leaf);
+    expect(existsSync(leaf)).toBe(false);
+  });
+
+  it("normalizes external paths", () => {
+    expect(resolveExternal("/tmp/a/../b/./c")).toBe("/tmp/b/c");
   });
 });
