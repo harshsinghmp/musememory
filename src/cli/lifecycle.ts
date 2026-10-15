@@ -8,6 +8,8 @@ import {
   markStale,
   reject,
   deleteEntry,
+  restoreEntry,
+  replayFromAudit,
 } from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
@@ -134,6 +136,47 @@ export async function handleDeleteCommand({ positional, flags }: ParsedArgs): Pr
     return fail(`no entry found with id ${id}`);
   }
   console.log(`deleted entry ${id}`);
+  return 0;
+}
+
+/**
+ * T-031/T-032: restore a tombstoned entry. `--replay` rebuilds the content from audit.jsonl,
+ * for entries whose row and YAML mirror are gone instead of merely tombstoned.
+ */
+export async function handleRestoreCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const id = positional[0];
+  if (!id) return usageError("restore requires <id>");
+  const replay = flags["replay"] !== undefined;
+
+  if (!replay) {
+    const out = restoreEntry(ctx.store, id, "cli_user");
+    if (out.ok) {
+      console.log(`restored entry ${id}`);
+      printEntry(out.entry);
+      return 0;
+    }
+    if (out.reason !== "not_found") return fail(`cannot restore ${id}: ${out.reason}`);
+    return fail(`no entry found with id ${id} (tombstone gone too — retry with --replay to rebuild from audit)`);
+  }
+
+  const dryRun = flags["apply"] !== "true";
+  const report = replayFromAudit(ctx.store, id, { apply: !dryRun });
+  if (!report.ok || !report.entry) {
+    return fail(`cannot replay ${id}: ${report.reason ?? "unknown reason"}`);
+  }
+  console.log(
+    `${dryRun ? "would replay" : "replayed"} ${id} from audit history (reconstructed: ${report.reconstructed.join(", ")})`,
+  );
+  console.log(`not reconstructable from audit: ${report.missing.join(", ")}`);
+  if (dryRun) {
+    printEntry(report.entry);
+    console.log("dry run — pass --apply to write this entry back");
+    return 0;
+  }
+  console.log(`restored entry ${id} from audit history`);
+  printEntry(report.entry);
   return 0;
 }
 
