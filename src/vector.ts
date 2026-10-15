@@ -2,7 +2,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { tokenize, isExpired } from "./retrieval.ts";
+import { tokenize, isExpired, safeMax } from "./retrieval.ts";
+import { softOrFusion } from "./retrieval/ranking.ts";
 import type { MemoryEntry } from "./types.ts";
 
 const DIMS = 256;
@@ -17,11 +18,15 @@ export interface IndexedEntry {
   /** Term frequencies over word tokens. */
   tf: Record<string, number>;
   /** Total term count (for BM25 length normalization). */
-  len: number;
+  len?: number;
+  magnitude?: number;
+  tokens?: string[];
 }
 
 export interface VectorIndex {
   version: 1;
+  updated_at?: string;
+  dimension?: number;
   entries: Record<string, IndexedEntry>;
 }
 
@@ -105,25 +110,45 @@ export function bm25Score(queryTf: Record<string, number>, entry: IndexedEntry, 
     const f = entry.tf[term];
     if (!f) continue;
     const idfTerm = idf[term] ?? 0;
-    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * (entry.len / Math.max(1, avgLen)))));
+    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * ((entry.len ?? 0) / Math.max(1, avgLen)))));
     void qCount;
   }
   return score;
 }
 
-function inverseDocumentFrequencies(index: VectorIndex): { idf: Record<string, number>; avgLen: number } {
-  const total = Object.keys(index.entries).length || 1;
+interface IdfCacheEntry {
+  updated_at?: string;
+  count: number;
+  result: { idf: Record<string, number>; avgLen: number };
+}
+
+const idfCache = new WeakMap<VectorIndex, IdfCacheEntry>();
+
+export function inverseDocumentFrequencies(index: VectorIndex): { idf: Record<string, number>; avgLen: number } {
+  const cached = idfCache.get(index);
+  const entryCount = Object.keys(index.entries).length;
+  if (cached && cached.updated_at === index.updated_at && cached.count === entryCount) {
+    return cached.result;
+  }
+
+  const total = entryCount || 1;
   const df: Record<string, number> = {};
   let lenSum = 0;
   for (const e of Object.values(index.entries)) {
-    lenSum += e.len;
+    lenSum += e.len ?? 0;
     for (const term of Object.keys(e.tf)) df[term] = (df[term] ?? 0) + 1;
   }
   const idf: Record<string, number> = {};
   for (const [term, count] of Object.entries(df)) {
     idf[term] = Math.log(1 + (total - count + 0.5) / (count + 0.5));
   }
-  return { idf, avgLen: lenSum / total };
+  const result = { idf, avgLen: lenSum / total };
+  idfCache.set(index, {
+    updated_at: index.updated_at,
+    count: entryCount,
+    result,
+  });
+  return result;
 }
 
 export interface HybridResult {
@@ -142,6 +167,8 @@ export interface HybridSearchOptions {
   includeExpired?: boolean;
   /** Clock for expiry evaluation; defaults to Date.now(). */
   now?: number;
+  /** Fusion strategy: 'linear' (default for legacy compatibility) or 'soft_or' (T-114). */
+  fusion?: "linear" | "soft_or";
 }
 
 /**
@@ -192,14 +219,18 @@ export function hybridSearch(
       bm25: bm25Score(qTf, indexed, idf, avgLen),
     });
   }
-  const maxBm25 = Math.max(...scored.map((s) => s.bm25), Number.EPSILON);
+  const maxBm25 = safeMax(scored.map((s) => s.bm25), Number.EPSILON);
 
+  const useSoftOr = options.fusion === "soft_or";
   for (const s of scored) {
+    const pv = Math.max(0, s.cosine);
+    const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
+    const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
     results.push({
       entry: s.entry,
       cosine: s.cosine,
       bm25: s.bm25,
-      score: 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25),
+      score,
     });
   }
 

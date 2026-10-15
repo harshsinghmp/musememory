@@ -14,6 +14,8 @@ import { hasSecret } from "./secrets.ts";
 export interface ScoredEntry {
   entry: MemoryEntry;
   score: number;
+  /** T-126: Deterministic reason tokens explaining why this memory was retrieved. */
+  why_retrieved?: string[];
 }
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
@@ -35,6 +37,8 @@ export interface SearchResult {
   totalTokensUsed?: number;
   /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
   withheld?: Array<{ id: string; reason: string }>;
+  /** T-117: High-water mark timestamp of the most recent memory in the store. */
+  watermark?: string;
 }
 
 export interface FormattedContext {
@@ -70,15 +74,165 @@ const STOPWORDS = new Set([
 ]);
 
 /**
- * Unicode-aware lowercase word/number tokens, split on everything else.
+ * T-061: Compound-token expansion.
+ * Splits camelCase (getUserProfile -> get, user, profile, getuserprofile),
+ * snake_case (auth_token -> auth, token, auth_token), and kebab-case.
+ * Returns unique array containing both the decomposed sub-tokens and the normalized full token.
+ */
+export function splitCompoundToken(token: string): string[] {
+  if (!token || typeof token !== "string") return [];
+  const results = new Set<string>();
+
+  const lowerFull = token.toLowerCase();
+  results.add(lowerFull);
+
+  const stripped = lowerFull.replace(/[_\-.]+/g, "");
+  if (stripped.length > 0) {
+    results.add(stripped);
+  }
+
+  // Split on camelCase/PascalCase boundaries and delimiter boundaries
+  const parts = token
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[\s_\-.]+/);
+
+  for (const p of parts) {
+    const clean = p.toLowerCase().trim();
+    if (clean.length > 0) {
+      results.add(clean);
+    }
+  }
+
+  return [...results];
+}
+
+/**
+ * Unicode-aware lowercase word/number tokens with compound token expansion (T-061, T-311).
  * `\p{L}\p{N}` keeps ASCII behavior identical while giving CJK, Cyrillic and
- * accented words whole tokens instead of fragments (T-311).
- * Shortcut: scripts without word delimiters (Han) yield one token per run, so
- * recall there relies on the entry containing the same run.
+ * accented words whole tokens. Compound tokens (camelCase, PascalCase) are expanded into sub-tokens.
  */
 export function tokenize(text: string): string[] {
   if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const rawMatches = text.match(/[\p{L}\p{N}]+/gu);
+  if (!rawMatches) return [];
+
+  const tokens: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawMatches) {
+    // Expand camelCase / PascalCase compound words (e.g., getUserProfile -> getuserprofile, get, user, profile)
+    if (/[a-z\p{Ll}][A-Z\p{Lu}]|[A-Z\p{Lu}]{2,}[a-z\p{Ll}]/u.test(raw)) {
+      const expanded = splitCompoundToken(raw);
+      for (const t of expanded) {
+        if (!seen.has(t)) {
+          seen.add(t);
+          tokens.push(t);
+        }
+      }
+    } else {
+      const lower = raw.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        tokens.push(lower);
+      }
+    }
+  }
+
+  return tokens;
+}
+
+const TRIVIAL_GREETINGS = new Set([
+  "hi", "hello", "hey", "hey there", "good morning", "good evening", "good afternoon",
+  "thank you", "thanks", "ok", "okay", "bye", "goodbye", "yo", "sup",
+]);
+
+/**
+ * T-070: IDF-weighted relevance gate before FTS5 search (0.3 threshold, identifier-decisive, greeting short-circuit).
+ * Returns whether query possesses sufficient informational signal to justify recall passes.
+ */
+export function evaluateQueryRelevance(query: string): {
+  relevant: boolean;
+  score: number;
+  reason?: string;
+} {
+  if (!query || typeof query !== "string") {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  // 1. Greeting short-circuit
+  const normalized = trimmed.toLowerCase().replace(/[!?.,;:]+$/g, "").trim();
+  if (TRIVIAL_GREETINGS.has(normalized)) {
+    return { relevant: false, score: 0.05, reason: "trivial_greeting" };
+  }
+
+  // 2. Identifier-decisive check: code syntax, paths, camelCase, backticks
+  const hasBackticks = /`[^`]+`/.test(trimmed);
+  const hasPath = /[\/\\]|\.[a-z0-9]{1,5}\b/i.test(trimmed);
+  const hasCamelOrSnake = /[a-z][A-Z]|[A-Z]{2,}[a-z]|_/.test(trimmed);
+
+  if (hasBackticks || hasPath || hasCamelOrSnake) {
+    return { relevant: true, score: 0.85 };
+  }
+
+  // 3. Informational density scoring over non-stopword tokens
+  const tokens = tokenize(trimmed);
+  const informativeTokens = tokens.filter((t) => !STOPWORDS.has(t));
+
+  if (informativeTokens.length === 0) {
+    return { relevant: false, score: 0.1, reason: "stopwords_only" };
+  }
+
+  const informativeRatio = informativeTokens.length / Math.max(1, tokens.length);
+  const avgLen = informativeTokens.reduce((sum, t) => sum + t.length, 0) / informativeTokens.length;
+
+  let score = 0.25 * informativeRatio + Math.min(0.5, (avgLen / 10) * 0.5);
+  if (informativeTokens.length >= 2) score += 0.15;
+  if (informativeTokens.length >= 4) score += 0.15;
+
+  const threshold = 0.30;
+  const relevant = score >= threshold;
+
+  return {
+    relevant,
+    score: Math.min(1.0, score),
+    reason: relevant ? undefined : "low_relevance_score",
+  };
+}
+
+/**
+ * T-035: Iterative safe maximum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMax(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let max = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val > max) {
+      max = val;
+    }
+  }
+  return max === -Infinity ? defaultValue : max;
+}
+
+/**
+ * T-035: Iterative safe minimum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMin(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let min = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val < min) {
+      min = val;
+    }
+  }
+  return min === Infinity ? defaultValue : min;
 }
 
 /** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
@@ -379,15 +533,129 @@ export function scoreEntry(
   return computeFactors(entry, queryTokens, { now, workspaceRoot, semanticScore }).totalScore;
 }
 
-/** Sort by score desc, tiebreak updated_at desc then created_at desc. */
+/**
+ * T-126: Derives deterministic reason tokens from contributing factors and memory attributes.
+ */
+export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): string[] {
+  const reasons: string[] = [];
+  if (factors.exactSymbolMatch > 0) reasons.push("exact_symbol_match");
+  if (factors.bm25Match > 0) reasons.push("bm25_fts_hit");
+  if (factors.semanticMatch > 0) reasons.push("semantic_vector_match");
+  if (factors.graphOverlap > 0) reasons.push("graph_symbol_overlap");
+  if (factors.pathMatch > 0) reasons.push("path_proximity");
+  if (factors.blastRadius > 0) reasons.push("blast_radius_impact");
+  if (factors.verificationBonus > 0 || (entry.verification?.level && entry.verification.level !== "unverified")) {
+    reasons.push("verified_memory");
+  }
+  if (factors.salienceBonus > 0) reasons.push("high_salience");
+  if (factors.reinforcementBonus > 0) reasons.push("reinforcement_bonus");
+  if (factors.dueBonus > 0) reasons.push("due_date_urgency");
+  if (factors.utilityBonus > 0) reasons.push("utility_reward");
+  if (
+    factors.negativeWarningBonus > 0 ||
+    entry.type === "negative" ||
+    entry.tags?.includes("anti-pattern") ||
+    entry.negative
+  ) {
+    reasons.push("negative_pattern_warning");
+  }
+  if (entry.type === "constraint") reasons.push("active_constraint");
+  if (entry.temporal_mode === "timeless") reasons.push("timeless_rule");
+  if (factors.recentAccessBoost > 0) reasons.push("recent_access");
+  if (factors.baseApplicability > 0) reasons.push("lexical_overlap");
+
+  return reasons.sort();
+}
+
+/**
+ * T-115: Checks whether top candidate scores lack discrimination (tightly clustered spread <= threshold).
+ */
+export function isLowDiscrimination(scores: number[], threshold: number = 0.04): boolean {
+  if (!scores || scores.length < 2) return false;
+  const topScore = scores[0];
+  const compareIdx = Math.min(2, scores.length - 1);
+  return Math.abs(topScore - scores[compareIdx]) <= threshold;
+}
+
+/**
+ * T-115: Conditional secondary reranking for candidates when primary scores are tightly clustered.
+ * Uses verification level, trust tier, recency, and historical access to break ties deterministically.
+ */
+export function conditionalRerank<T extends { entry: MemoryEntry; score: number }>(candidates: T[]): T[] {
+  if (!candidates || candidates.length < 2) return candidates;
+  const scores = candidates.map((c) => c.score);
+  if (!isLowDiscrimination(scores)) return candidates;
+
+  const vBonus = (e: MemoryEntry) =>
+    e.verification?.level === "authoritative" ||
+    e.verification?.level === "user-confirmed" ||
+    e.verification?.level === "independently-verified"
+      ? 0.05
+      : e.verification?.level && e.verification.level !== "unverified"
+      ? 0.03
+      : 0;
+  const tBonus = (e: MemoryEntry) => (e.trust === "trusted" ? 0.02 : e.trust === "untrusted" ? -0.05 : 0);
+  const recencyBonus = (e: MemoryEntry) => {
+    const ts = Date.parse(e.updated_at || e.created_at || "");
+    return Number.isNaN(ts) ? 0 : Math.min(0.01, (ts / 2e12) * 0.01);
+  };
+  const accessBonus = (e: MemoryEntry) => Math.min(0.005, (e.access_count ?? 0) * 0.001);
+
+  return candidates
+    .map((c) => {
+      const adj = vBonus(c.entry) + tBonus(c.entry) + recencyBonus(c.entry) + accessBonus(c.entry);
+      return {
+        ...c,
+        score: Number((c.score + adj).toFixed(5)),
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * T-117: Retrieves the data high-water mark timestamp from last_memory_seen_at / max(updated_at, created_at).
+ * Enables data-driven staleness tracking rather than relying on wall-clock drift.
+ */
+export function getStoreWatermark(store: Store): string {
+  if (store.db) {
+    try {
+      const row = store.db
+        .query<{ watermark: string }>(
+          `SELECT MAX(COALESCE(updated_at, created_at)) as watermark FROM memories WHERE (deleted_at IS NULL OR deleted_at = '')`,
+        )
+        .get();
+      if (row?.watermark) return row.watermark;
+    } catch {}
+  }
+  const entries = list(store);
+  if (entries.length === 0) return new Date(0).toISOString();
+  let maxTs = "";
+  for (const e of entries) {
+    const ts = e.updated_at || e.created_at || "";
+    if (ts > maxTs) maxTs = ts;
+  }
+  return maxTs || new Date(0).toISOString();
+}
+
+/** Sort by score desc, tiebreak updated_at desc then created_at desc, and apply conditional rerank. */
 export function sortCandidates(
   candidates: MemoryEntry[],
   queryTokens: string[],
   now: number,
   semanticScores?: Map<string, number>,
 ): ScoredEntry[] {
-  return candidates
-    .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now, undefined, semanticScores?.get(entry.id) ?? 0) }))
+  const scored = candidates
+    .map((entry) => {
+      const factors = computeFactors(entry, queryTokens, {
+        now,
+        semanticScore: semanticScores?.get(entry.id) ?? 0,
+      });
+      return {
+        entry,
+        score: factors.totalScore,
+        why_retrieved: deriveWhyRetrieved(factors, entry),
+      };
+    })
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const bU = Date.parse(b.entry.updated_at);
@@ -398,6 +666,8 @@ export function sortCandidates(
       const aC = Date.parse(a.entry.created_at);
       return (Number.isNaN(bC) ? 0 : bC) - (Number.isNaN(aC) ? 0 : aC);
     });
+
+  return conditionalRerank(scored);
 }
 
 /**
@@ -531,8 +801,31 @@ export function queryContext(
 
   if (options.tokenBudget !== undefined) {
     if (options.tokenBudget > 0) {
+      const packedIds = new Set<string>();
+      const isPriorityGuardrail = (e: MemoryEntry) =>
+        e.type === "constraint" ||
+        e.temporal_mode === "timeless" ||
+        e.type === "negative" ||
+        e.tags?.includes("anti-pattern") ||
+        e.negative;
+
+      // First pass: pack priority guardrails (constraints, timeless rules, negative anti-patterns)
       for (const item of scored) {
         if (results.length >= limit) break;
+        if (!isPriorityGuardrail(item.entry)) continue;
+        const tokens = estimateEntryTokens(item.entry);
+        if (totalTokensUsed + tokens <= options.tokenBudget) {
+          results.push(item);
+          packedIds.add(item.entry.id);
+          totalTokensUsed += tokens;
+          recordAccessFor(store, item.entry);
+        }
+      }
+
+      // Second pass: pack remaining highest-scoring entries
+      for (const item of scored) {
+        if (results.length >= limit) break;
+        if (packedIds.has(item.entry.id)) continue;
         const tokens = estimateEntryTokens(item.entry);
         if (totalTokensUsed + tokens <= options.tokenBudget) {
           results.push(item);
@@ -567,6 +860,7 @@ export function queryContext(
     stale: false,
     totalTokensUsed,
     withheld: withheld.length > 0 ? withheld : undefined,
+    watermark: getStoreWatermark(store),
   };
 }
 

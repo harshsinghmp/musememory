@@ -421,18 +421,58 @@ export function deleteMemoryById(db: SqliteDatabase, id: string): boolean {
 }
 
 /**
+ * T-060: Safely escapes and quotes an individual FTS5 token.
+ * Internal double quotes are escaped as `""`, and the token is enclosed in double quotes with prefix match `*`.
+ */
+export function escapeFtsToken(token: string): string {
+  if (!token || typeof token !== "string") return "";
+  const clean = token.replace(/[\x00-\x1F\x7F]/g, "").trim();
+  if (!clean) return "";
+  const escaped = clean.replace(/"/g, '""');
+  return `"${escaped}"*`;
+}
+
+/**
+ * T-060: Builds a syntax-safe FTS5 query string from user/agent input.
+ * Strips hostile operators and constructs quoted phrase/prefix terms combined with OR.
+ */
+export function buildSafeFtsQuery(rawQuery: string): string {
+  if (!rawQuery || typeof rawQuery !== "string") return "";
+
+  const rawTokens = rawQuery
+    .replace(/[(){}[\]:^~*+]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => {
+      if (!t) return false;
+      const lower = t.toLowerCase();
+      if (lower === "and" || lower === "or" || lower === "not" || lower.startsWith("near/")) {
+        return false;
+      }
+      return true;
+    });
+
+  if (rawTokens.length === 0) return "";
+
+  const terms = rawTokens
+    .map(escapeFtsToken)
+    .filter((t) => t.length > 0);
+
+  return terms.join(" OR ");
+}
+
+/**
  * High-speed BM25 full-text search directly inside SQLite using FTS5.
+ * Sanitizes and safely escapes all query tokens (T-060) and logs errors (T-312).
  */
 export function searchMemoriesFts(
   db: SqliteDatabase,
   query: string,
   filters?: { project?: string; type?: string; status?: string; limit?: number },
 ): { entry: MemoryEntry; rank: number }[] {
-  const cleanQuery = query.trim().replace(/['"*]/g, "");
-  if (!cleanQuery) return [];
+  const terms = buildSafeFtsQuery(query);
+  if (!terms) return [];
 
-  // Match tokens with prefix search
-  const terms = cleanQuery.split(/\s+/).filter(Boolean).map((t) => `"${t}"*`).join(" OR ");
   let sql = `
     SELECT m.*, bm25(memories_fts) as rank
     FROM memories_fts f
@@ -471,7 +511,9 @@ export function searchMemoriesFts(
       entry: rowToMemoryEntry(r),
       rank: r.rank,
     }));
-  } catch {
+  } catch (err) {
+    // T-312: Surface FTS failure instead of silent swallow
+    console.warn(`[FTS5] Search error for query "${query}": ${err instanceof Error ? err.message : String(err)}`);
     return [];
   }
 }
