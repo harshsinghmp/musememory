@@ -253,6 +253,10 @@ npx musememory connect cursor
 npx musememory connect antigravity
 npx musememory connect windsurf
 npx musememory connect opencode
+
+# Claude Code lives under ~/.claude*, so it needs an explicit harness opt-in.
+# Without this flag the Claude config is reported as skipped and nothing is written.
+npx musememory connect claude-code --harness claude
 ```
 
 ### 4️⃣ Clean Uninstallation & Removal
@@ -484,7 +488,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configs (and optionally purges `.memory/`). |
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory and SQLite database. |
 | `user` | `[get\|init\|set] [args] [--global]` | Manage `USER.md` persona & preferences across 5 clean archetypes. |
-| `connect` | `[agent] [--all] [--force] [--dry-run]` | Auto-wire MCP into detected installed agents with zero permissions. |
+| `connect` | `[agent] [--all] [--force] [--dry-run] [--harness H]` | Auto-wire MCP into detected installed agents with zero permissions. Harness-specific paths (e.g. `~/.claude*`) are only written with an explicit `--harness claude` opt-in. |
 | `agents` | *(none)* | Scan workstation for 80+ coding agents (Cursor, Claude Code, Antigravity, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
@@ -582,7 +586,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 576 pass, 0 fail, 2405 assertions across 92 files
+bun test          # 607 pass, 0 fail, 2657 assertions across 92 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
