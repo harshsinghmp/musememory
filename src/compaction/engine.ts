@@ -1,10 +1,110 @@
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { CompactionInvariants, CompactionEvaluation, HandoffResult } from "./types.ts";
+import type {
+  CompactionInvariants,
+  CompactionEvaluation,
+  HandoffResult,
+  HandoffOptions,
+  HarvestedMemory,
+} from "./types.ts";
 import { recordAuditEvent } from "../audit.ts";
+import type { Store } from "../store.ts";
+import { propose } from "../store.ts";
 
 export const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
 export const COMPACTION_THRESHOLD_PERCENT = 70;
+
+/**
+ * Validates that compaction invariants conform to the never-empty contract.
+ * Checkpoints must never be partial or empty.
+ */
+export function validateCompactionInvariants(invariants: CompactionInvariants): void {
+  if (!invariants.highLevelGoal || !invariants.highLevelGoal.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: highLevelGoal must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  if (!invariants.currentArchitecture || !invariants.currentArchitecture.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: currentArchitecture must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  if (!invariants.nextConcreteTask || !invariants.nextConcreteTask.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: nextConcreteTask must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  const completedCount = invariants.completedTasks?.length ?? 0;
+  const openCount = invariants.openTasks?.length ?? 0;
+  if (completedCount + openCount === 0) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: task list must contain at least one completed or open task. Checkpoints must never be partial or empty.",
+    );
+  }
+}
+
+/**
+ * Extracts durable architectural decisions and active constraints into memory entries
+ * before context compression or session handoff.
+ */
+export function extractInvariantsPreCompress(
+  invariants: CompactionInvariants,
+  store: Store,
+  options?: { project?: string; actor?: string },
+): HarvestedMemory[] {
+  const project = options?.project ?? "workspace";
+  const actor = options?.actor ?? "compaction_pre_compress";
+  const harvested: HarvestedMemory[] = [];
+
+  if (invariants.decisionsMade && invariants.decisionsMade.length > 0) {
+    for (const d of invariants.decisionsMade) {
+      if (!d.trim()) continue;
+      const title = d.slice(0, 100);
+      const entry = propose(store, {
+        title,
+        content: d,
+        project,
+        type: "decision",
+        source: actor,
+        confirmed: true,
+        tags: ["architecture", "decision", "pre-compress"],
+      });
+      harvested.push({
+        id: entry.id,
+        type: "decision",
+        title: entry.title,
+        content: entry.content,
+        source: actor,
+      });
+    }
+  }
+
+  if (invariants.activeConstraints && invariants.activeConstraints.length > 0) {
+    for (const c of invariants.activeConstraints) {
+      if (!c.trim()) continue;
+      const title = c.slice(0, 100);
+      const entry = propose(store, {
+        title,
+        content: c,
+        project,
+        type: "constraint",
+        temporal_mode: "timeless",
+        source: actor,
+        confirmed: true,
+        tags: ["constraint", "invariant", "pre-compress"],
+      });
+      harvested.push({
+        id: entry.id,
+        type: "constraint",
+        title: entry.title,
+        content: entry.content,
+        source: actor,
+      });
+    }
+  }
+
+  return harvested;
+}
 
 /**
  * Evaluates current context usage against the 70% threshold invariant.
@@ -124,18 +224,11 @@ export function generateResumptionPrompt(invariants: CompactionInvariants): stri
   return parts.join("\n");
 }
 
-/**
- * Commits an interruption-proof checkpoint handoff into CURRENT.md.
- */
-export function generateSessionHandoff(
+function commitHandoff(
   memoryDir: string,
   invariants: CompactionInvariants,
-  options?: { agent?: string; sessionId?: string; project?: string },
+  options?: HandoffOptions,
 ): HandoffResult {
-  if (!invariants.highLevelGoal || !invariants.nextConcreteTask) {
-    throw new Error("Cannot generate handoff: highLevelGoal and nextConcreteTask are mandatory");
-  }
-
   if (!existsSync(memoryDir)) {
     mkdirSync(memoryDir, { recursive: true });
   }
@@ -165,4 +258,35 @@ export function generateSessionHandoff(
     resumptionPrompt,
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Commits an interruption-proof checkpoint handoff into CURRENT.md.
+ * Triggers onPreCompress fact extraction if provided and validates all 5 core invariants.
+ */
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options: HandoffOptions & { onPreCompress: (invariants: CompactionInvariants, store?: any) => Promise<any> },
+): Promise<HandoffResult>;
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options?: HandoffOptions,
+): HandoffResult;
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options?: HandoffOptions,
+): HandoffResult | Promise<HandoffResult> {
+  validateCompactionInvariants(invariants);
+
+  if (options?.onPreCompress) {
+    const hookResult = options.onPreCompress(invariants, options.store);
+    if (hookResult instanceof Promise) {
+      return hookResult.then(() => commitHandoff(memoryDir, invariants, options));
+    }
+  }
+
+  return commitHandoff(memoryDir, invariants, options);
 }
