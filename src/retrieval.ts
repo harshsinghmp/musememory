@@ -81,6 +81,36 @@ export function tokenize(text: string): string[] {
   return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
+/**
+ * T-035: Iterative safe maximum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMax(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let max = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val > max) {
+      max = val;
+    }
+  }
+  return max === -Infinity ? defaultValue : max;
+}
+
+/**
+ * T-035: Iterative safe minimum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMin(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let min = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val < min) {
+      min = val;
+    }
+  }
+  return min === Infinity ? defaultValue : min;
+}
+
 /** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
 export function computeApplicability(entryTokens: Set<string>, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0.5; // neutral when no query

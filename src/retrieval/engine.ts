@@ -1,5 +1,4 @@
-import type { Store } from "../store.ts";
-import { list } from "../store.ts";
+import { list, countMemories } from "../store.ts";
 import { queryContext, formatPromptContext, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
 import { hybridSearch, rebuildIndex, saveIndex, indexFilePath } from "../vector.ts";
@@ -78,9 +77,9 @@ export class RetrievalEngine {
     // 2. Partitioned Tree Index Search
     const treeDir = join(memoryDir, "tree");
     const hasTree = existsSync(treeDir);
-    const allEntries = list(store);
+    const memCount = countMemories(store);
 
-    if (mode === "tree" || (mode === "auto" && hasTree && allEntries.length >= 500)) {
+    if (mode === "tree" || (mode === "auto" && hasTree && memCount >= 500)) {
       try {
         const treeIndex = loadTreeIndex(memoryDir);
         if (treeIndex) {
@@ -124,7 +123,7 @@ export class RetrievalEngine {
     const vecPath = indexFilePath(memoryDir);
     const hasVec = existsSync(vecPath);
 
-    if (mode === "hybrid" || (mode === "auto" && hasVec && allEntries.length > 100)) {
+    if (mode === "hybrid" || (mode === "auto" && hasVec && memCount > 100)) {
       try {
         const hybridResults = hybridSearch(store, memoryDir, query, {
           limit: options.limit ?? 10,

@@ -488,6 +488,27 @@ export function list(
   return entries;
 }
 
+/**
+ * T-037: Fast integer count of stored memories without loading, parsing, or allocating all entries.
+ */
+export function countMemories(store: Store): number {
+  if (store.circuit?.isDegraded() && store.cache) {
+    return store.cache.size();
+  }
+  if (store.db) {
+    try {
+      const row = store.db.query<{ count: number }>(
+        `SELECT COUNT(*) as count FROM memories WHERE (deleted_at IS NULL OR deleted_at = '')`,
+      ).get();
+      if (row && typeof row.count === "number") return row.count;
+    } catch {}
+  }
+  if (store.cache && store.cache.size() > 0) {
+    return store.cache.size();
+  }
+  return list(store).length;
+}
+
 /** Helper to extract all scannable text from a memory entry. */
 export function extractEntryText(entry: Partial<MemoryEntry>): string {
   const parts: string[] = [
