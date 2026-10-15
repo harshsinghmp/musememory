@@ -23,3 +23,7 @@
 ### ADR-005: Bun-First Runtime & Toolchain
 - **Decision**: Use Bun as the primary test runner, bundler, and local runtime, compiling to portable Node.js binaries for npm distribution.
 - **Rationale**: Instant test iteration (`bun test`) and seamless zero-dependency distribution.
+
+### ADR-006: Harness-Independent Hook Installation (Global Standard First)
+- **Decision**: `memory hooks install` resolves its target as explicit `settingsPath` → explicit `--harness` opt-in → global standard (project `.agents/hooks.json` when a `.agents/` directory exists, otherwise `~/.agents/hooks.json`). A harness path (e.g. `~/.claude/settings.json`) is never auto-selected, and `connectAgent` skips harness-specific agents without an explicit `--harness` opt-in.
+- **Rationale** (principal ruling, 2026-10-15): the runtime is vendor-neutral — hooks must not couple memory to one harness or create a harness directory unprompted. A pre-existing harness settings file does not imply consent; only `--harness claude` does.
