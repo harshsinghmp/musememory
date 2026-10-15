@@ -462,3 +462,44 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 T-204 + T-368 (one day) → T-150 + T-151 + T-386 (the transport, one branch pair) → T-153 (topology) → T-387 (docs). T-001/T-363 land first regardless — a 5-person attack surface makes the RCE and path-primitive tickets pre-reqs for the slice, not optional.
 
 **Team decisions locked (2026-10-15)**: hybrid reach (LAN + remote-ready transport, auth from day one); scoping = shared team store + personal stores, promotion is explicit. Server topology: single owner process, no shared network mounts.
+
+---
+
+# v8 — RESIDUAL-SURFACE AUDIT (2026-10-15)
+
+Source: focused residual hunt over surfaces never covered by R17/R17b/R18/v2/v3/v4 (routines, hooks, claims/provenance, settings, upgrade remainder, ui read routes, harvest schema). Two premises checked and rejected (ui.ts:517 is `/api/sync/broadcast`, not pageindex — zero pageindex calls in ui.ts; no `/api/graph` route exists — canvas feeds from `/api/memories`).
+
+Numbering note: explorer proposed T-386/T-387 — both taken by the v7 team slice (bearer auth / member wiring). Remapped to T-399/T-400. T-388..T-398 were free.
+
+## New tickets
+
+- [ ] T-399 · (was proposed T-386) HIGH · `memory routine` step allowlist + re-entrancy guard: `loadRoutines` rejects steps outside `{brief, nudge, recall, compact, distill, verify}`, rejects `-`-prefixed tokens, `runRoutine` throws on depth > 5 · src/routines.ts, src/cli/lifecycle.ts:454 · F (cron fires unattended; planted routines.yaml = host mutation via upgrade/connect/hooks steps; self-`routine run` = unbounded recursion)
+- [ ] T-400 · (was proposed T-387) MEDIUM · ui read routes return unprojected data: `/api/memories` (ui.ts:1436) ships full `MemoryEntry[]`, `/api/snapshot` ships `exportSnapshot` — add explicit field allowlist matching canvas needs · src/ui.ts · F
+- [ ] T-388 · HIGH · hook SessionStart `<muse-memory>` block must escape/strip delimiter + instruction markup from memory content before stdout (poisoned constraint breaks block, re-primes next session; T-058/T-339 don't cover this sink) · src/hooks/pack.ts:198-210, src/secrets.ts · F
+- [ ] T-389 · MEDIUM · `recordObservation` must scan `metadata` (JSON-stringified), not just summary+raw; fix false "Vibeguard-scanned" docstring at pack.ts:216 (tool_name/session_id from unvalidated stdin JSON) · src/learning/observation.ts:30, src/hooks/pack.ts · F
+- [ ] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
+- [ ] T-391 · HIGH · `recordClaim`/`addSource` validate `source_ids`/`memory_ids` against live registry at write time, derive `verified` instead of accepting caller assertion (forged citation provenance today) · src/claims.ts:36-63, src/provenance.ts, src/mcp.ts:2092-2102 · F
+- [ ] T-392 · HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + private/loopback/link-local block; SSRF via memory_settings_set → 169.254.169.254 today). Caveat: `cli/embed.ts:19` documents `http://127.0.0.1:8081/v1` as the intended local endpoint — needs explicit local opt-in flag, NOT a blanket reject (validateSafePath is the wrong tool) · src/settings/schema.ts:20-36, src/embedders.ts:55,137-143 · F
+- [ ] T-393 · MEDIUM · claims/provenance secret-scan gaps: concatenate array fields into scanSecrets template (3rd instance of the class: observation metadata, verify.ts, now claims.ts:45 + provenance.ts:46) · F
+- [ ] T-394 · LOW · decorative settings: `mcp.enabledTools` (types.ts:69) + `imports.secretScanEnabled` (types.ts:85) declared, defaulted, never read — enforce or delete (kill-switch that provably does nothing) · src/settings/, src/mcp.ts dispatch · F
+- [ ] T-395 · HIGH · upgrade failure signal: `playPandaLoader` swallows step throws (:276-284) yet prints LEVEL-UP COMPLETE + exit 0 — track failure, non-zero exit, no success banner (sequence after T-346 exit-code plumbing) · src/cli/upgrade.ts · F
+- [ ] T-396 · MEDIUM · `healBunGlobalConfig` rewrites host-global bun package.json with no .bak, errors swallowed (:419), fires implicitly — backup + surface errors + opt-in gate · src/cli/upgrade.ts:402-429 · F
+- [ ] T-397 · LOW · `getLatestNpmVersion` shell template `execSync(\`npm show ${packageName} version\`)` — unreachable today (only no-arg caller) but exported trap; one-line execFileSync · src/cli/upgrade.ts:150,166 · F
+- [ ] T-398 · MEDIUM · `memory_harvest` schema/handler mismatch: `all`/`auto` undeclared in inputSchema (:258-266) yet `!a.text` triggers full transcript sweep (:1722) — missing text must be validation error · src/mcp.ts · F
+
+## Non-findings (checked, rejected)
+
+- ui.ts:517 `body.project` → `broadcastKnowledge` (sync engine), not pageindex; post-T-363 resolveWithin throws ARE caught by mcp.ts:2591 outer catch → toolError. Only residue: :2592 returns err.message raw (absolute-path leak) — folded into T-363 acceptance, no separate ticket.
+- No `/api/graph` route among 34 ui.ts routes; R25 projection gap restated as T-400 against the real endpoints.
+
+## Lane ownership (disjoint)
+
+A routines (routines.ts/lifecycle/routines.test) · B hooks (hooks/pack.ts/observation/hooks.test) · C claims (claims/provenance/provenance_claims.test + mcp.ts:2092) · D settings (settings/schema+types/settings.test) · E upgrade (cli/upgrade.test) · F ui projection (ui/ui.test, after T-363 lane releases ui.ts). C↔T-398 both touch mcp.ts → sequence. B↔C share scan-template class → one pass or sequential.
+
+## v8 totals
+
+| Section | Tickets |
+|---|---|
+| v1+v2+v3+v4+v6+v7 | 251 (246 + T-380-385 + T-386/387 slice) |
+| v8 residual | 13 (T-388..T-400, T-390 decision-only) |
+| **Plan total** | **264** |
