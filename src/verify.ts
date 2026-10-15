@@ -190,9 +190,7 @@ export async function verifyEntry(
     // refusal leaves a forensic trace so an attacker probing the oracle is visible.
     if (memoryDir) {
       recordAuditEvent(memoryDir, {
-        // shortcut: `verify_refused` is not yet in the AuditOperation union (types.ts);
-        // drop the cast when that member lands.
-        operation: "verify_refused" as AuditOperation,
+        operation: "verify_refused",
         entry_id: id,
         project: entry.project,
         actor: "oracle",
