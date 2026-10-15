@@ -6,9 +6,14 @@
 ---
 
 ## ⏭️ Next Up (Realigned In-Line Feature Waves)
-- **Wave 0: Pre-Flight Integrity & Baseline Fixes (Immediate P0)**: `T-402` (initSchema column check), `T-403` (stored-command doctor sweep), `T-404` (stdin TTY decoupling), `T-401` (bunfig hardening), `T-370` (docs truth pass).
-- **Wave 1: Storage Engine, Outbox & Concurrency (In-Line Storage P0)**: `T-041` (outbox state machine via migration v3), `T-042` (stale locks), `T-044` (fsync JSONL + single-writer flock), `T-038` (idempotency keys), `T-040` (content_hash dedup).
-- **Wave 2: Write Admission, Trust & Anti-Poisoning (In-Line Trust P0/P1)**: `T-104` (scoreRetain 0.3 gate), `T-105` (corroboration promotion gate), `T-105b` (syntax-only promotion rule), `T-075` (ingest trust tiers), `T-058` (read-path re-validation).
+- **Wave 3: Retrieval Quality, Ranking & Token Economics (In-Line Retrieval P0/P1)**: `T-035` (re-rank budget allocation), `T-036` (exact keyword BM25 boost), `T-037` (negative lesson priority knapsack), `T-060` (adaptive token budgeting), `T-061` (disclosure depth tier tuning), `T-070` (cross-encoder reranker spike), `T-114` (soft-OR fusion), `T-115` (low_discrimination rerank), `T-117` (watermark staleness), `T-126` (ranking benchmarks).
+
+---
+
+## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 0: Pre-Flight Integrity & Baseline Fixes**: `T-402`, `T-403`, `T-404`, `T-401`, `T-370`.
+- [x] **Wave 1: Storage Engine, Outbox & Concurrency**: `T-041`, `T-042`, `T-044`, `T-038`, `T-039`, `T-040`, `T-055`, `T-056`.
+- [x] **Wave 2: Write Admission, Trust & Anti-Poisoning**: `T-104` (scoreRetain 0.3 gate), `T-075` (trust tiers + withholding), `T-058`/`T-059` (read-path re-validation), `T-103` (FTS index-time secret redaction), `T-105`/`T-105b` (corroboration & syntax promotion gates), `T-391` (citation validation against live registry).
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
 
 ---

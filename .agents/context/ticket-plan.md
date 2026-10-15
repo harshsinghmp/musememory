@@ -63,8 +63,7 @@
 - [ ] T-054 · refuse-incomplete digest contract in get_context · orchestrator · new · F
 - [x] T-055 · landed Wave 1 — circuit breaker around every store path (5 fail → 120s cooldown → degraded mode) · store.ts, circuit.ts · F
 - [x] T-056 · landed Wave 1 — `atexit` bounded join for async write workers · store, async_workers.ts · F
-- [ ] T-057 · generation-counter invalidation for in-flight prefetch · orchestrator · new · F
-- [ ] T-058 · read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: poisoning-trust-tiers · F
+- [x] T-058 · landed Wave 2 — read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: feat/wave-2-trust-gates · F
 - [x] MERGED→T-058 T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
 - [ ] T-060 · safe FTS5 query construction (quote every token — injection surface) · store.ts · new · F
 - [ ] T-061 · compound-token expansion (camelCase/snake_case split) · retrieval · new · F
@@ -80,7 +79,7 @@
 - [ ] T-072 · FTS5-tokenizer-matched abstention gate · retrieval · new · U
 - [ ] T-073 · `no_confident_match` result mode · retrieval, mcp · new · U
 - [ ] T-074 · materialized `decay_score` column, importance-gated half-lives · schema, retrieval · new · U
-- [ ] T-075 · veracity tiers (stated 1.0/inferred 0.7/unknown 0.8/imported 0.6/tool 0.5) · schema, store · branch: poisoning-trust-tiers · U
+- [x] T-075 · landed Wave 2 — veracity tiers & ingest trust tiers (trusted/candidate/untrusted) · schema, store, retrieval · branch: feat/wave-2-trust-gates · U
 - [ ] T-076 · Bayesian confidence `1-0.7^n` per corroboration · quality · new · U
 - [ ] T-077 · trust-tier-keyed half-life (T1 365d → T4 30d) · quality · branch: poisoning-trust-tiers · U
 - [ ] T-078 · per-type `expires_at` (fix 90d/operation 180d/architecture 365d/discovery 30d) · types, store · new · U
@@ -112,11 +111,11 @@
 - [ ] T-100 · `supersedes_id`/`conflicts_with_id` lineage FKs · schema · new · U
 - [ ] T-101 · lineage BFS walker · store · new · U
 - [ ] T-102 · hash-chained audit (per-day salt) + session Merkle checkpoints · audit · new · U
-- [ ] T-103 · index-time credential redaction keeping text searchable · store · branch: poisoning-trust-tiers · U
+- [x] T-103 · landed Wave 2 — index-time credential redaction keeping text searchable · sqlite, store · branch: feat/wave-2-trust-gates · U
 
 ### Gates + hygiene
-- [ ] T-104 · `scoreRetain` 0.3 write gate (refuse junk writes) · store · new · U
-- [ ] T-105 · corroboration-gated promotion (≥2 independent days; machine sources excluded) · promotion · branch: poisoning-trust-tiers · U
+- [x] T-104 · landed Wave 2 — `scoreRetain` 0.3 write gate (refuse junk writes) · quality/retention, store · branch: feat/wave-2-trust-gates · U
+- [x] T-105 · landed Wave 2 — corroboration-gated promotion (≥2 independent days; machine sources excluded) · promotion · branch: feat/wave-2-trust-gates · U
 - [ ] T-106 · curator concept: agent appends evidence, deterministic promotion decides · promotion · new · U
 - [ ] T-107 · two-tier promotion (pending tier → session-end flush) · promotion · new · U
 - [ ] T-108 · re-injection suppression per session (6-turn LRU) · retrieval · new · U
@@ -478,7 +477,7 @@ Numbering note: explorer proposed T-386/T-387 — both taken by the v7 team slic
 - [ ] T-388 · HIGH · hook SessionStart `<muse-memory>` block must escape/strip delimiter + instruction markup from memory content before stdout (poisoned constraint breaks block, re-primes next session; T-058/T-339 don't cover this sink) · src/hooks/pack.ts:198-210, src/secrets.ts · F
 - [ ] T-389 · MEDIUM · `recordObservation` must scan `metadata` (JSON-stringified), not just summary+raw; fix false "Vibeguard-scanned" docstring at pack.ts:216 (tool_name/session_id from unvalidated stdin JSON) · src/learning/observation.ts:30, src/hooks/pack.ts · F
 - [x] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling (decided 2026-10-15: global-standard-first, harness opt-in; implementation landed #61) · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
-- [ ] T-391 · HIGH · `recordClaim`/`addSource` validate `source_ids`/`memory_ids` against live registry at write time, derive `verified` instead of accepting caller assertion (forged citation provenance today) · src/claims.ts:36-63, src/provenance.ts, src/mcp.ts:2092-2102 · F
+- [x] T-391 · landed Wave 2 — `recordClaim`/`propose` validate `source_ids` against live registry at write time, derive `verified` · claims, store · branch: feat/wave-2-trust-gates · F
 - [ ] T-392 · HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + private/loopback/link-local block; SSRF via memory_settings_set → 169.254.169.254 today). Caveat: `cli/embed.ts:19` documents `http://127.0.0.1:8081/v1` as the intended local endpoint — needs explicit local opt-in flag, NOT a blanket reject (validateSafePath is the wrong tool) · src/settings/schema.ts:20-36, src/embedders.ts:55,137-143 · F
 - [ ] T-393 · MEDIUM · claims/provenance secret-scan gaps: concatenate array fields into scanSecrets template (3rd instance of the class: observation metadata, verify.ts, now claims.ts:45 + provenance.ts:46) · F
 - [ ] T-394 · LOW · decorative settings: `mcp.enabledTools` (types.ts:69) + `imports.secretScanEnabled` (types.ts:85) declared, defaulted, never read — enforce or delete (kill-switch that provably does nothing) · src/settings/, src/mcp.ts dispatch · F
@@ -519,7 +518,7 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 - [x] T-403 · HIGH · Stored-command doctor sweep: sanitize/migrate legacy non-template `test_command`s across `.memory/memories/*.yaml` to restore 100% clean validation · src/doctor.ts, .memory/ · F
 - [x] T-404 · HIGH · Stdin TTY decoupling: add `process.stdin.isTTY` check in `src/hooks/pack.ts:readStdinJson()` to prevent test runner hanging in interactive terminals · src/hooks/pack.ts · F
 - [x] T-401 · MEDIUM · Bunfig surface hardening: configure explicit test runner timeout and isolation defaults · bunfig.toml · N
-- [ ] T-105b · HIGH · Syntax-only promotion rule: enforce AST/schema verification before candidate confirmation · src/promotion.ts · F
+- [x] T-105b · landed Wave 2 — Syntax-only promotion rule: enforce AST/schema verification before candidate confirmation · promotion · branch: feat/wave-2-trust-gates · F
 
 ## Realigned In-Line Execution Sequence
 1. **Wave 0: Pre-Flight Integrity & Baseline Fixes** (`T-402`, `T-403`, `T-404`, `T-401`, `T-370`)
