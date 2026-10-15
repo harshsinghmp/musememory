@@ -85,3 +85,7 @@ apps/website/showreel-hf/renders/
 # README demo GIF intermediates (rebuilt via: bun run build:gif)
 # The committed deliverable is assets/muse-memory-demo.gif; this is scratch.
 apps/website/.gif-build/
+
+# git worktree lanes + docs content-hash scratch
+.worktrees/
+.docs.hash

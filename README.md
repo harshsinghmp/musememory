@@ -582,7 +582,7 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 576 tests across 92 files — 572 pass, 4 known-failing (root detection, blast radius); 2400 assertions
+bun test          # 576 pass, 0 fail, 2405 assertions across 92 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
