@@ -151,6 +151,24 @@ describe("T-031 restore", () => {
     expect(restoreEntry(store, entry.id)).toEqual({ ok: false, reason: "not_deleted" });
     cleanup(root);
   });
+
+  test("propose with an explicit id on a tombstoned row is refused, not resurrected", () => {
+    const { root, store } = newStore();
+    const entry = seed(store, "Do not resurrect");
+    expect(deleteEntry(store, entry.id, "gone", "cli_user")).toBe(true);
+    expect(() =>
+      propose(store, {
+        title: "Sneaky re-ingest",
+        content: "tombstone subject matter",
+        project: "tombstones",
+        type: "architecture",
+        id: entry.id,
+      }),
+    ).toThrow(/memory_restore/);
+    expect(get(store, entry.id)).toBeNull();
+    expect(restoreEntry(store, entry.id).ok).toBe(true);
+    cleanup(root);
+  });
 });
 
 describe("T-032 audit replay restore", () => {

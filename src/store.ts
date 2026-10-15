@@ -622,6 +622,12 @@ export function propose(
   entry.quality = opts.quality ?? determineQuality(entry);
   entry.utility = opts.utility ?? ensureUtility(entry);
 
+  // Resurrection guard: an explicit id colliding with a tombstoned row must go
+  // through memory_restore, not silently clear the marker via INSERT OR REPLACE.
+  if (opts.id && isTombstoned(store, entry.id)) {
+    throw new Error(`Entry ${entry.id} is deleted — use memory_restore to bring it back, not propose`);
+  }
+
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
 
@@ -933,7 +939,7 @@ export function restoreEntry(store: Store, id: string, actor = "agent"): Restore
 
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
-      operation: "rehydrate", // existing op for "bring this memory back into active knowledge"
+      operation: "restore",
       entry_id: id,
       project: entry.project,
       actor,
@@ -1018,7 +1024,7 @@ export function replayFromAudit(store: Store, id: string, options: { apply?: boo
     });
     if (store.memoryDir) {
       recordAuditEvent(store.memoryDir, {
-        operation: "rehydrate",
+        operation: "restore",
         entry_id: id,
         project: entry.project,
         actor: "audit_replay",
