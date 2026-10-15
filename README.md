@@ -120,6 +120,7 @@ Store working constraints, decisions, handoffs, and verified facts in one local 
 - 📐 **Real-Time Active Constraints (`CURRENT.md`)**: Bi-temporal working constraints and invariant tracking synchronized on every mutation to eliminate amnesia during task handoffs.
 - 💾 **SQLite Primary + Dual-Persisted YAML Mirror**: Sub-millisecond queries via SQLite with transparent human-readable `.yaml` files in `.memory/memories/` for seamless Git diffs.
 - ⚖️ **Token Knapsack Retrieval**: Multi-factor scoring (applicability, verification bonus, AST graph overlap, time decay, due date urgency) tightly packed under prompt token ceilings.
+- 🧭 **Optional Local Semantic Recall (`memory embed`)**: Point `retrieval.embedderUrl` at any OpenAI-compatible `/v1/embeddings` endpoint (llama.cpp server, Ollama, or hosted) to add a semantic cosine dimension to ranking. Embeddings are cached as float32 blobs inside SQLite, so nothing changes and no network call happens until you configure an endpoint.
 - 🌐 **Pluggable AST CodeGraph & Symbol Indexing**: Native CodeGraph & Graphify integration that indexes codebase AST symbols, auto-tags memories, and awards graph overlap bonuses.
 - 🌳 **Hierarchical Tree Retrieval & Progressive Disclosure**: Sharded tree partitions with 3-tier progressive disclosure (`L1` abstracts, `L2` summaries, `L3` full context) for massive knowledge bases.
 - 📚 **Obsidian Markdown Wiki & Entity Graph Compiler**: Dual-persistence knowledge compounding compiling linked Markdown pages (`wiki/concepts/`, `wiki/entities/`) with bidirectional `[[wikilinks]]`.
@@ -339,6 +340,8 @@ Retrieval dynamically ranks knowledge using a calibrated multi-factor formula:
 $$\text{Score} = 1.0 \times \text{Applicability} + \text{StatusBonus} + \text{VerificationBonus} + \text{GraphBonus} + \text{SalienceBonus} + 0.3 \times e^{-\frac{\Delta t}{90\text{ days}}}$$
 The engine greedily packs ranked memories up to the requested `--token-budget` to guarantee zero prompt overflow.
 
+When a local embedder is configured (`retrieval.embedderUrl`), a semantic cosine dimension (`0.5 ×` cosine similarity) joins the ranking, so paraphrases match even without shared trigrams. Leave the embedder unset and ranking is identical to the lexical behaviour above — no network calls, no new dependency.
+
 ### 4. Real-Time `CURRENT.md` Synchronization & Session Handoff
 - Active constraint memories automatically mirror into `CURRENT.md`.
 - In-flight task states, agent checkpoints, and active loops persist across terminal restarts, context compactions, and sudden interruptions.
@@ -462,7 +465,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (47 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (54 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -522,6 +525,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `checkout` | `<path\|id>` | **Version control (R23)**: retrieve a memory by its `mem_path` or entry id. |
 | `blame` | `<id>` | **Version control (R23)**: show access history, staleness score, and audit trail. |
 | `ls-branches` | `[--project P]` | List all registered branch references. |
+| `embed` | `status\|build\|reindex` | **Semantic embeddings (R21)**: inspect, build, or rebuild the local embedding index. `status` runs offline; `build`/`reindex` probe the configured endpoint. |
 | `mcp` | *(none)* | Start stdio MCP server (Protocol 2024-11-05). |
 
 </details>
@@ -578,11 +582,13 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 566 passed across 90 test files (2376 assertions)
+bun test          # 576 tests across 92 files — 572 pass, 4 known-failing (root detection, blast radius); 2400 assertions
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch/PR model, the per-commit gate, and the post-merge sequence.
 
 ---
 

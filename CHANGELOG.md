@@ -5,6 +5,18 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Optional Local Semantic Embeddings (R21)**: an OpenAI-compatible `/v1/embeddings` endpoint (llama.cpp server, Ollama, or hosted) can supply a semantic cosine dimension to multi-factor ranking. Configured with `retrieval.embedderUrl` / `retrieval.embedderModel`; unset means retrieval is unchanged.
+- **`memory embed [status|build|reindex]`**: embedding lifecycle CLI. `status` runs offline; `build` and `reindex` probe the configured endpoint. Embeddings are cached as float32 blobs in SQLite behind a pipeline fingerprint (model, dimensions, endpoint) — a changed pipeline refuses recall until you run `memory embed reindex`.
+- **Recall quality eval harness (R27)**: a golden-fixture suite that fails when recall@5 drops below its configured floor, so retrieval regressions break the build instead of shipping silently.
+- **Memory versioning CLI (R23)**: `memory branch`, `memory checkout`, `memory blame`, and `memory ls-branches` add Git-like variant tagging over memories.
+- **Access-weighted retention (R23)**: half-life decay curves where frequently accessed entries are retained longer.
+
+### Changed
+- **Ranking**: the semantic cosine dimension is opt-in and additive — with no embedder configured, scoring is unchanged.
+
 ## [2.3.0] - 2026-09-03
 
 ### Summary
