@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, propose } from "../store.ts";
-import { compileWiki, getWikiPage } from "./compiler.ts";
+import { compileWiki, getWikiPage, listWikiPages } from "./compiler.ts";
 import type { WikiCompileOptions } from "./types.ts";
 
 describe("Wiki Compilation Engine", () => {
@@ -180,11 +180,64 @@ describe("Wiki Compilation Engine", () => {
     const outsideFile = join(testDir, "outside.md");
     writeFileSync(outsideFile, "OUTSIDE-WIKI-MARKER");
 
+    // Each branch is pinned with an explicit `type`: without it the concept
+    // branch silently returns null and only the entity branch ever throws.
+    for (const type of ["concept", "entity"] as const) {
+      expect(() => getWikiPage(memoryDir, "../../../../etc/passwd", type)).toThrow(/escap/i);
+      expect(() => getWikiPage(memoryDir, "concepts/../../../outside", type)).toThrow(/escap/i);
+      expect(() => getWikiPage(memoryDir, "/etc/passwd", type)).toThrow(/relative|escap/i);
+      expect(() => getWikiPage(memoryDir, "bad\0slug", type)).toThrow(/NUL/i);
+    }
     expect(() => getWikiPage(memoryDir, "../../../../etc/passwd")).toThrow(/escap/i);
     expect(() => getWikiPage(memoryDir, "concepts/../../../outside")).toThrow(/escap/i);
-    expect(() => getWikiPage(memoryDir, "concepts/../../../outside", "entity")).toThrow(/escap/i);
 
     // Content outside the wiki base was neither returned nor consumed.
     expect(readFileSync(outsideFile, "utf8")).toContain("OUTSIDE-WIKI-MARKER");
+  });
+
+  it("getWikiPage still resolves legitimate slugs", () => {
+    createMemories(6);
+    compileWiki(store, memoryDir, { dryRun: false });
+
+    const concept = listWikiPages(memoryDir, { type: "concept", detailLevel: "l1" })[0];
+    expect(concept).toBeDefined();
+    expect(getWikiPage(memoryDir, concept.slug, "concept", "l1")).not.toBeNull();
+
+    const entity = listWikiPages(memoryDir, { type: "entity", detailLevel: "l1" })[0];
+    if (entity) expect(getWikiPage(memoryDir, entity.slug, "entity", "l1")).not.toBeNull();
+
+    // Reserved slugs are matched before containment, so they keep working.
+    expect(getWikiPage(memoryDir, "index", "index")).not.toBeNull();
+    expect(getWikiPage(memoryDir, "log", "log")).not.toBeNull();
+  });
+
+  it("compileWiki keeps hostile memory text from writing outside the wiki dir", () => {
+    const outsideFile = join(testDir, "outside.md");
+    writeFileSync(outsideFile, "OUTSIDE-WIKI-MARKER");
+
+    for (let i = 0; i < 6; i++) {
+      propose(store, {
+        content: `../../../../etc/passwd and concepts/../../../outside mention Payload-${i} React Server Components Next.js memory caching.`,
+        project: "test",
+        title: `../../../etc/passwd Test Memory ${i}`,
+        type: "fix",
+        confirmed: true,
+        tags: ["react", "nextjs"],
+      });
+    }
+
+    const beforeCompile = readdirSync(memoryDir);
+    compileWiki(store, memoryDir, { dryRun: false });
+
+    // Compiling adds no entry above the wiki dir — nothing escaped.
+    expect(readdirSync(memoryDir).sort()).toEqual([...beforeCompile].sort());
+    expect(readFileSync(outsideFile, "utf8")).toBe("OUTSIDE-WIKI-MARKER");
+    for (const section of ["concepts", "entities"]) {
+      for (const f of readdirSync(join(memoryDir, "wiki", section))) {
+        expect(f.endsWith(".md")).toBe(true);
+        expect(f).not.toContain("/");
+        expect(f).not.toContain("..");
+      }
+    }
   });
 });

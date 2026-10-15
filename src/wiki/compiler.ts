@@ -319,6 +319,14 @@ function buildLogPage(logEntries: LogEntry[]): LogPage {
   };
 }
 
+/**
+ * Every wiki page read/write goes through here, so a hostile name can never
+ * escape its section dir even if slugifyId is ever loosened.
+ */
+function pagePath(dir: string, slug: string): string {
+  return resolveWithin(dir, `${slug}.md`);
+}
+
 function stripFrontmatter(content: string): string {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   if (!match) return content;
@@ -332,7 +340,7 @@ function loadExistingConcepts(dir: string): Map<string, ConceptPage> {
     if (!file.endsWith(".md")) continue;
     const slug = file.slice(0, -3);
     try {
-      const content = readFileSync(join(dir, file), "utf8");
+      const content = readFileSync(pagePath(dir, slug), "utf8");
       const frontmatter = parseFrontmatter(content);
       map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as ConceptPage);
     } catch {}
@@ -347,7 +355,7 @@ function loadExistingEntities(dir: string): Map<string, EntityPage> {
     if (!file.endsWith(".md")) continue;
     const slug = file.slice(0, -3);
     try {
-      const content = readFileSync(join(dir, file), "utf8");
+      const content = readFileSync(pagePath(dir, slug), "utf8");
       const frontmatter = parseFrontmatter(content);
       map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as EntityPage);
     } catch {}
@@ -392,14 +400,14 @@ function parseFrontmatter(content: string): any {
 function writeConceptPages(map: Map<string, ConceptPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderConceptPage(page);
-    writeFileSync(join(dir, slug + ".md"), content, "utf8");
+    writeFileSync(pagePath(dir, slug), content, "utf8");
   }
 }
 
 function writeEntityPages(map: Map<string, EntityPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderEntityPage(page);
-    writeFileSync(join(dir, slug + ".md"), content, "utf8");
+    writeFileSync(pagePath(dir, slug), content, "utf8");
   }
 }
 
