@@ -23,6 +23,9 @@ import { recordAuditEvent } from "../audit.ts";
  * Hook commands: `memory hooks session-start` / `post-tool-use` / `stop`.
  * Every handler is fail-open: a memory failure must never break a coding
  * session, so errors go to stderr and the process still exits 0.
+ *
+ * The entry shape below is Claude Code's hook format, but the install target is
+ * harness-independent by default — see {@link resolveHookSettingsPath}.
  */
 
 export type MuseHookEvent = "SessionStart" | "PostToolUse" | "Stop";
@@ -54,21 +57,83 @@ export function buildHookEntry(event: MuseHookEvent): Record<string, any> {
   };
 }
 
+export interface HookPackOptions {
+  dryRun?: boolean;
+  /** Explicit target file. Wins over every other rule. */
+  settingsPath?: string;
+  /** Explicit harness opt-in. The ONLY way to reach a harness-specific path. */
+  harness?: string;
+}
+
 /**
- * Installs the Muse hook pack into Claude Code's settings.json, merging with
+ * Harnesses with a documented hooks settings file, as `<home>`-relative paths.
+ * Claude Code is the only hook-capable harness Muse Memory knows; every other
+ * agent opts in with an explicit `settingsPath`.
+ */
+const HARNESS_HOOK_PATHS: Record<string, string> = {
+  claude: ".claude/settings.json",
+  "claude-code": ".claude/settings.json",
+};
+
+/** True for a path inside the global-standard `.agents/` layout. */
+function isGlobalStandardPath(path: string): boolean {
+  return /(^|[\\/])\.agents[\\/]/.test(path);
+}
+
+/**
+ * Resolution order (constitution R1 — never create or touch `~/.claude/`
+ * unprompted, and stay harness-independent by default):
+ *
+ *  1. explicit `settingsPath`
+ *  2. explicit `harness` opt-in (the only path to `~/.claude/settings.json`)
+ *  3. global standard — project `<root>/.agents/hooks.json` when a `.agents/`
+ *     directory exists in the project, otherwise `~/.agents/hooks.json`
+ *
+ * A harness path is never auto-selected: a pre-existing `~/.claude/settings.json`
+ * does not opt the user in.
+ */
+export function resolveHookSettingsPath(
+  home: string = homedir(),
+  options: HookPackOptions = {},
+): string {
+  if (options.settingsPath) return options.settingsPath;
+
+  if (options.harness) {
+    const key = options.harness.toLowerCase().trim();
+    const rel = HARNESS_HOOK_PATHS[key];
+    if (!rel) {
+      throw new Error(
+        `Unknown harness '${options.harness}'. Hook-capable harnesses: ${[...new Set(Object.values(HARNESS_HOOK_PATHS))].join(", ")}. Pass settingsPath for any other target.`,
+      );
+    }
+    return join(home, ...rel.split("/"));
+  }
+
+  const projectRoot = findProjectRoot(process.cwd()).root;
+  if (projectRoot && existsSync(join(projectRoot, ".agents"))) {
+    return join(projectRoot, ".agents", "hooks.json");
+  }
+  return join(home, ".agents", "hooks.json");
+}
+
+/**
+ * Installs the Muse hook pack into the resolved settings file, merging with
  * any existing hooks and replacing only Muse-owned entries (idempotent).
+ * See {@link resolveHookSettingsPath} for the target resolution order.
  */
 export function installHookPack(
   home: string = homedir(),
-  options: { dryRun?: boolean; settingsPath?: string } = {},
+  options: HookPackOptions = {},
 ): { settingsPath: string; installed: HookPackReport[]; alreadyPresent: boolean } {
-  const settingsPath = options.settingsPath ?? join(home, ".claude", "settings.json");
+  const settingsPath = resolveHookSettingsPath(home, options);
   const installed: HookPackReport[] = [];
   let alreadyPresent = false;
 
-  if (!options.dryRun && !existsSync(dirname(settingsPath))) {
+  // Only the `.agents/` layout is created on demand; any other target must
+  // already exist on disk (never fabricate a harness directory).
+  if (!options.dryRun && !isGlobalStandardPath(settingsPath) && !existsSync(dirname(settingsPath))) {
     throw new Error(
-      `Claude Code settings directory not found at ${dirname(settingsPath)}. Install Claude Code first, or pass settingsPath explicitly.`,
+      `Settings directory not found at ${dirname(settingsPath)}. Install the harness first, or pass settingsPath explicitly.`,
     );
   }
 
@@ -108,14 +173,15 @@ export function installHookPack(
 }
 
 /**
- * Removes Muse-owned hook entries from Claude Code's settings.json.
- * Only entries whose command includes "memory hooks" are touched.
+ * Removes Muse-owned hook entries from the resolved settings file, using the
+ * same resolution order as {@link installHookPack}. Only entries whose command
+ * includes "memory hooks" are touched.
  */
 export function uninstallHookPack(
   home: string = homedir(),
-  options: { dryRun?: boolean; settingsPath?: string } = {},
+  options: HookPackOptions = {},
 ): { settingsPath: string; removed: MuseHookEvent[] } {
-  const settingsPath = options.settingsPath ?? join(home, ".claude", "settings.json");
+  const settingsPath = resolveHookSettingsPath(home, options);
   const removed: MuseHookEvent[] = [];
 
   if (!existsSync(settingsPath)) return { settingsPath, removed };

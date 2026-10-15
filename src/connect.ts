@@ -51,6 +51,28 @@ export const ALL_MEMORY_TOOLS = [
 
 export { ConnectOptions, ConnectReport };
 
+/**
+ * Harness opt-in. Claude Code's paths live under `~/.claude*`, so writing them
+ * requires naming the harness explicitly (`--harness claude`) — a pre-existing
+ * Claude config is never enough on its own (constitution R1).
+ */
+export interface HarnessOptIn {
+  harness?: string;
+}
+
+/** True when the caller explicitly opted in to this agent's harness. */
+function harnessOptedIn(agent: AgentDefinition, requested?: string): boolean {
+  const name = requested?.toLowerCase().trim();
+  if (!name) return false;
+  const lowerName = agent.name.toLowerCase();
+  return (
+    name === agent.id ||
+    name === agent.id.replace(/-cli$/, "") ||
+    name === lowerName.replace(/\s+/g, "-") ||
+    name === lowerName.split(" ")[0]
+  );
+}
+
 function safeReadJson(path: string): Record<string, any> {
   if (!existsSync(path)) return {};
   try {
@@ -111,7 +133,7 @@ function resolveAgentConfigFile(agent: AgentDefinition, home: string, foundConfi
 function wireAgentFormat(
   agent: AgentDefinition,
   home: string,
-  options: ConnectOptions = {},
+  options: ConnectOptions & HarnessOptIn = {},
   foundConfig?: string | null,
 ): ConnectReport {
   const configPath = resolveAgentConfigFile(agent, home, foundConfig);
@@ -133,6 +155,20 @@ function wireAgentFormat(
   try {
     switch (agent.mcpFormat) {
     case "claude-json": {
+      // Claude Code is harness-specific: never write ~/.claude* without an
+      // explicit opt-in, no matter what already exists on disk.
+      if (!harnessOptedIn(agent, options.harness)) {
+        return {
+          agent: agent.id,
+          agentName: agent.name,
+          configPath,
+          updated: false,
+          installed: false,
+          permissionAutoApproved: false,
+          message: `Skipped ${agent.name}: harness-specific paths need an explicit opt-in (pass --harness claude)`,
+        };
+      }
+
       const claudeJsonPath = join(home, ".claude.json");
       const settingsJsonPath = join(home, ".claude", "settings.json");
 
@@ -336,7 +372,7 @@ function wireAgentFormat(
 export function connectAgent(
   target: string = "all",
   home: string = homedir(),
-  options: ConnectOptions = {},
+  options: ConnectOptions & HarnessOptIn = {},
 ): ConnectReport[] {
   const targetLower = target.toLowerCase().trim();
   const detected = detectAgents(home);
@@ -382,7 +418,7 @@ export function connectAgent(
  * via connectAgent → wireAgentFormat.
  */
 function makeNamedConnector(agentId: string) {
-  return (home: string = homedir(), options: ConnectOptions = {}): ConnectReport =>
+  return (home: string = homedir(), options: ConnectOptions & HarnessOptIn = {}): ConnectReport =>
     connectAgent(agentId, home, options)[0];
 }
 
