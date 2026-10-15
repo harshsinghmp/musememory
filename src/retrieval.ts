@@ -66,10 +66,16 @@ const STOPWORDS = new Set([
   "yourself", "yourselves",
 ]);
 
-/** Lowercase alphanumeric-only tokens, split on non-alphanumeric. */
+/**
+ * Unicode-aware lowercase word/number tokens, split on everything else.
+ * `\p{L}\p{N}` keeps ASCII behavior identical while giving CJK, Cyrillic and
+ * accented words whole tokens instead of fragments (T-311).
+ * Shortcut: scripts without word delimiters (Han) yield one token per run, so
+ * recall there relies on the entry containing the same run.
+ */
 export function tokenize(text: string): string[] {
   if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
 /** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
@@ -155,16 +161,210 @@ export function filterByRelevanceThreshold(
   return entries.filter((e) => e.score >= minScore);
 }
 
+/** Inputs the single scorer accepts. Code-context signals are only supplied by muse_context. */
+export interface ScoreContext {
+  now: number;
+  workspaceRoot?: string;
+  /** Precomputed semantic cosine in [-1, 1] (R21 embedder), already looked up by entry id. */
+  semanticScore?: number;
+  activeFilePath?: string;
+  targetSymbol?: string;
+  ftsMatchIds?: Set<string>;
+  blastRadiusFiles?: Set<string>;
+}
+
+/** Every factor the unified scorer computes. One scorer, one factor set, one ordering (T-308). */
+export interface ScoreFactors {
+  /** Lexical applicability: matched query tokens / query tokens. */
+  baseApplicability: number;
+  exactSymbolMatch: number;
+  graphOverlap: number;
+  pathMatch: number;
+  bm25Match: number;
+  blastRadius: number;
+  statusPenalty: number;
+  verificationBonus: number;
+  salienceBonus: number;
+  reinforcementBonus: number;
+  dueBonus: number;
+  utilityBonus: number;
+  negativeWarningBonus: number;
+  timelessBoost: number;
+  recencyDecay: number;
+  trustAdjustment: number;
+  accessBoost: number;
+  recentAccessBoost: number;
+  zeroMatchPenalty: number;
+  semanticMatch: number;
+  totalScore: number;
+}
+
+/** Symbol-like identifiers an entry declares: AST symbols, single-word tags, backticked code. */
+function entrySymbols(entry: MemoryEntry): Set<string> {
+  const symbols = new Set<string>();
+  for (const s of entry.graph?.symbol_names ?? []) symbols.add(s.toLowerCase());
+  for (const tag of entry.tags ?? []) {
+    if (tag.length > 3 && !tag.includes("-") && !tag.includes(" ")) symbols.add(tag.toLowerCase());
+  }
+  for (const m of `${entry.title} ${entry.content}`.toLowerCase().match(/`([a-z0-9_$]+)`/g) ?? []) {
+    symbols.add(m.replace(/`/g, ""));
+  }
+  return symbols;
+}
+
+/** Files an entry touches: AST affected paths plus evidence sources. */
+function entryPaths(entry: MemoryEntry): Set<string> {
+  const paths = new Set<string>();
+  for (const p of entry.graph?.affected_paths ?? []) paths.add(p.toLowerCase());
+  for (const ev of entry.evidence ?? []) if (ev.source) paths.add(ev.source.toLowerCase());
+  return paths;
+}
+
 /**
- * Multi-factor score formula:
- * score = 1.0 * applicability + statusPenalty + verificationBonus + salienceBonus
- *       + reinforcementBonus + dueDateBonus + graphBonus + trustBonus + 0.3 * exp(-daysSince(decayBase)/90)
+ * The single multi-factor scorer behind every retrieval path (T-308).
+ * get_context scores through it via scoreEntry, muse_context through
+ * calculateMultiFactorScore — same store, same factors, same order.
  *
- * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
- * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
- * AST Graph: +0.2 bonus for matching indexed symbol names.
- * Runtime Trust (SOW-201): +0.15 for verified strong disk files, -0.4 for stale missing paths.
- * Semantic (R21): +0.5 * cosine when a precomputed score is supplied (opt-in embedder).
+ * score = applicability + exactSymbol + graphOverlap + pathMatch + bm25 + blastRadius
+ *       + statusPenalty + verificationBonus + salience + reinforcement + dueDate
+ *       + utility + negativeWarning + timeless + recencyDecay + trust + access
+ *       + recentAccess + zeroMatchPenalty + 0.5 * cosine
+ *
+ * Bi-temporal: recency decays from valid_from (event time) when set, else updated_at.
+ */
+export function computeFactors(
+  entry: MemoryEntry,
+  queryTokens: string[],
+  ctx: ScoreContext,
+): ScoreFactors {
+  const now = ctx.now;
+  const lowerTokens = queryTokens.map((t) => t.toLowerCase());
+
+  const baseApplicability = applicability(entry, queryTokens);
+  const symbols = entrySymbols(entry);
+  const pathList = [...entryPaths(entry)];
+
+  const exactSymbolMatch =
+    (ctx.targetSymbol ? symbols.has(ctx.targetSymbol.toLowerCase()) : false) ||
+    lowerTokens.some((t) => symbols.has(t))
+      ? 1.0
+      : 0;
+
+  let pathMatch = 0;
+  if (ctx.activeFilePath) {
+    const active = ctx.activeFilePath.toLowerCase();
+    if (pathList.some((p) => active.includes(p) || p.includes(active))) pathMatch = 0.4;
+  }
+  if (pathMatch === 0) {
+    for (const token of lowerTokens) {
+      if (token.includes("/") || /\.(ts|js|py)$/.test(token)) {
+        if (pathList.some((p) => p.includes(token))) {
+          pathMatch = 0.4;
+          break;
+        }
+      }
+    }
+  }
+
+  const graphOverlap = graphSymbolOverlapBonus(entry, queryTokens);
+  const bm25Match = ctx.ftsMatchIds?.has(entry.id) ? 0.3 : 0;
+  const blastRadius =
+    ctx.blastRadiusFiles && ctx.blastRadiusFiles.size > 0 && pathList.some((p) => ctx.blastRadiusFiles!.has(p))
+      ? 0.25
+      : 0;
+
+  const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
+  const verificationBonus = VERIFICATION_BONUS[entry.verification?.level ?? "unverified"] ?? 0;
+  const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
+  const reinforcement = entry.reinforcement ?? 0;
+  const reinforcementBonus = Math.sign(reinforcement) * 0.05 * Math.min(Math.abs(reinforcement), 5);
+  const dueBonus = dueDateBonus(entry, now);
+
+  let utilityBonus = 0;
+  if (entry.utility && entry.utility.application_count >= 1) {
+    const successRate = entry.utility.reuse_success_rate ?? 1.0;
+    if (successRate >= 0.75) utilityBonus = 0.25;
+    else if (successRate < 0.4) utilityBonus = -0.25;
+  }
+
+  const isNegative = entry.type === "negative" || entry.tags?.includes("anti-pattern") || entry.negative;
+  const negativeWarningBonus =
+    isNegative && (baseApplicability > 0 || exactSymbolMatch > 0 || pathMatch > 0) ? 0.3 : 0;
+  const timelessBoost = entry.temporal_mode === "timeless" || entry.type === "constraint" ? 0.2 : 0;
+
+  const recencyDecay =
+    entry.temporal_mode !== "timeless" && entry.type !== "constraint"
+      ? -0.05 * Math.min(Math.floor(daysSince(entry.valid_from ?? entry.updated_at, now) / 30), 6)
+      : 0;
+
+  // Runtime trust verdict bonus/penalty (SOW-201)
+  let trustAdjustment = 0;
+  if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
+    const { verifyRuntimeFiles } = require("./graph.ts");
+    const verdict = verifyRuntimeFiles(entry, ctx.workspaceRoot);
+    if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
+    else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
+  }
+
+  const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
+  const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
+
+  // A query whose tokens match nothing — including a degenerate query that tokenizes
+  // to nothing at all — is not evidence of relevance (SOW-202, T-311).
+  const zeroMatchPenalty = baseApplicability === 0 && graphOverlap === 0 ? -0.35 : 0;
+
+  const semanticMatch = ctx.semanticScore ?? 0;
+
+  const totalScore =
+    baseApplicability +
+    exactSymbolMatch +
+    graphOverlap +
+    pathMatch +
+    bm25Match +
+    blastRadius +
+    statusPenalty +
+    verificationBonus +
+    salienceBonus +
+    reinforcementBonus +
+    dueBonus +
+    utilityBonus +
+    negativeWarningBonus +
+    timelessBoost +
+    recencyDecay +
+    trustAdjustment +
+    accessBoost +
+    recentAccessBoost +
+    zeroMatchPenalty +
+    0.5 * semanticMatch;
+
+  return {
+    baseApplicability,
+    exactSymbolMatch,
+    graphOverlap,
+    pathMatch,
+    bm25Match,
+    blastRadius,
+    statusPenalty,
+    verificationBonus,
+    salienceBonus,
+    reinforcementBonus,
+    dueBonus,
+    utilityBonus,
+    negativeWarningBonus,
+    timelessBoost,
+    recencyDecay,
+    trustAdjustment,
+    accessBoost,
+    recentAccessBoost,
+    zeroMatchPenalty,
+    semanticMatch,
+    totalScore,
+  };
+}
+
+/**
+ * Total score for a single entry — the get_context entry point into computeFactors.
+ * Signature is unchanged; only the shared factor set behind it is (T-308).
  */
 export function scoreEntry(
   entry: MemoryEntry,
@@ -173,38 +373,7 @@ export function scoreEntry(
   workspaceRoot?: string,
   semanticScore: number = 0,
 ): number {
-  const app = applicability(entry, queryTokens);
-  const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
-  const vLevel = entry.verification?.level ?? "unverified";
-  const verificationBonus = VERIFICATION_BONUS[vLevel] ?? 0;
-  const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
-  const r = entry.reinforcement ?? 0;
-  const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
-  const dueBonus = dueDateBonus(entry, now);
-  const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
-  
-  // Runtime trust verdict bonus/penalty (SOW-201)
-  let trustAdjustment = 0;
-  if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
-    const { verifyRuntimeFiles } = require("./graph.ts");
-    const verdict = verifyRuntimeFiles(entry, workspaceRoot);
-    if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
-    else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
-  }
-
-  const decayBase = entry.valid_from ?? entry.updated_at;
-  const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
-  
-  // R23: Access-weighted retention boost (A15, A18)
-  // Each access gives diminishing returns; higher access_count => higher recall bonus
-  const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
-  // Recent access (within 7 days) gets additional freshness boost
-  const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
-  
-  // If query tokens exist but there is zero token/graph overlap, apply a relevance penalty (SOW-202)
-  const zeroMatchPenalty = queryTokens.length > 0 && app === 0 && graphBonus === 0 ? -0.35 : 0;
-
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + accessBoost + recentAccessBoost + zeroMatchPenalty + 0.5 * semanticScore;
+  return computeFactors(entry, queryTokens, { now, workspaceRoot, semanticScore }).totalScore;
 }
 
 /** Sort by score desc, tiebreak updated_at desc then created_at desc. */
