@@ -68,6 +68,7 @@ musememory/
 │   ├── mcp.ts              # Model Context Protocol stdio server (69 tools with profiles)
 │   ├── mesh/               # Multi-repo & monorepo workspace discovery, query resolver, contracts
 │   ├── orchestrator/       # Flagship muse_context fusion, bidirectional lookups, MCP profiles
+│   ├── paths.ts            # Strict path containment (resolveWithin) & intentional-external opt-out (resolveExternal)
 │   ├── promotion/          # 3-tier promotion ladder, 5x success rule, archival lifecycle
 │   ├── quality/            # Deduplication, semantic contradiction engine, utility & ROI
 │   ├── retrieval/          # 11-dimension multi-factor scoring & token knapsack packing
