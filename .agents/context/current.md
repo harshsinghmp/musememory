@@ -6,7 +6,7 @@
 ---
 
 ## ⏭️ Next Up (Realigned In-Line Feature Waves)
-- **Wave 5: Security Hardening & UI Protection**: `T-002` / `T-003` (UI XSS escaping for `p.title`, `p.slug`, `r.entry_id`, `r.actor`), `T-004` (UI optimizer gate dry-run default + localhost token check), `T-388` (Hook SessionStart `<muse-memory>` block escaping), `T-389` (`recordObservation` metadata JSON credential scanning), `T-399` (Memory routine step allowlist + re-entrancy recursion guard), `T-400` (UI read route projection allowlist), `T-380` (Unit test suite for `escapeHtml`).
+- **Wave 6: Semantic Embeddings & Eval Harness**: `T-381` (Embeddings spike validating llama-cpp local embeddings E2E), `T-071` (Local embeddings via llama-cpp binding), `T-136`–`T-139` (Embeddings engine fingerprint pinning, FTS5-floor fallback, brute-force cosine in SQLite BLOB, `stale_embedder` stamp), `T-140`–`T-143` (Recall-set grading harness, frozen benchmark corpus, p50 latency reporting, fixture promotion telemetry).
 
 ---
 
@@ -16,6 +16,7 @@
 - [x] **Wave 2: Write Admission, Trust & Anti-Poisoning**: `T-104` (scoreRetain 0.3 gate), `T-075` (trust tiers + withholding), `T-058`/`T-059` (read-path re-validation), `T-103` (FTS index-time secret redaction), `T-105`/`T-105b` (corroboration & syntax promotion gates), `T-391` (citation validation against live registry).
 - [x] **Wave 3: Retrieval Quality, Ranking & Token Economics**: `T-035` (iterative safeMax/safeMin scale safety), `T-036` (in-memory IDF caching via WeakMap), `T-037` (drop redundant full-list scans via countMemories), `T-060` (safe FTS5 query token escaping), `T-061` (compound-token expansion), `T-070` (IDF-weighted relevance gate 0.3), `T-114` (Soft-OR evidence fusion formula), `T-115` (low_discrimination conditional reranking), `T-117` (watermark staleness tracking), `T-126` (deterministic why_retrieved reason tokens), and priority knapsack packing for negative anti-pattern lessons.
 - [x] **Wave 4: Compaction, Ephemeral Observations & Distillation**: `T-305` (distillation body cap 1500 chars), `T-306` (atomic write + rotation + 256KB size cap for observations), `T-045` (`on_pre_compress` hook + `extractInvariantsPreCompress`), `T-047` (never-empty checkpoint contract), `T-046` (persisted SHA-256 digest dedup store), `T-053` (honest dual-measure token accounting), `T-054` (refuse-incomplete digest contract), `T-091` (compact context-pack formatter), `T-092` (never-drop context manifest TOC), `T-093` (truncation hierarchy with `[N omitted — budget M]`), `T-094` (reserved slots for USER.md profile).
+- [x] **Wave 5: Security Hardening & UI Protection**: `T-002`/`T-003` (UI XSS escaping for `p.title`, `p.slug`, `r.entry_id`, `r.actor`, checkpoints, and details), `T-004` (UI optimizer gate dry-run default + localhost/token check), `T-380` (unit test suite for `escapeHtml`), `T-388` (Hook SessionStart `<muse-memory>` block sanitization), `T-389` (`recordObservation` metadata JSON credential scanning), `T-399` (routine step allowlist, flag rejection, and depth > 5 re-entrancy recursion guard), `T-400` (UI read routes `/api/memories` and `/api/snapshot` projection allowlist).
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
 
 ---
