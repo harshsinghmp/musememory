@@ -1711,6 +1711,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           const mode = a.hybrid === true ? "hybrid" : a.tree === true ? "tree" : "auto";
           const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
             mode,
+            project: a.project ? String(a.project) : undefined,
             limit: typeof a.limit === "number" ? a.limit : 10,
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             includeSuperseded: a.include_superseded === true,

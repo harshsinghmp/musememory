@@ -119,7 +119,7 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
 
   // Hybrid vector+BM25 path (requires a built index)
   if (flags["hybrid"] === "true") {
-    const hybrid = hybridSearch(ctx.store, ctx.memoryDir, positional[0], { limit });
+    const hybrid = hybridSearch(ctx.store, ctx.memoryDir, positional[0], { limit, project: flags["project"] });
     if (!hybrid) {
       console.error("no vector index found — run 'memory reindex' first; falling back to live scoring");
     } else {
