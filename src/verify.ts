@@ -20,11 +20,71 @@ export interface VerifyOptions {
   now?: number;
 }
 
-function runCommand(command: string, cwd: string, timeoutSec: number): Promise<VerifyResult> {
+/** Executables the oracle may launch. Anything else is refused — there is no shell fallback. */
+const ALLOWED_BINARIES = new Set(["node", "bun", "bunx", "tsc"]);
+
+/** Shell syntax that must never reach the parser unquoted. */
+const SHELL_METACHARS = /[|;&$`><\r\n]/;
+
+export type ParsedCommand = { ok: true; argv: string[] } | { ok: false; error: string };
+
+/**
+ * Parse a test_command into argv for direct exec. There is no shell: quoted spans
+ * become inert argument text handed verbatim to the child, so a metacharacter only
+ * carries meaning when it appears unquoted. Fails closed on any unquoted shell
+ * syntax, an unterminated quote, an empty command, or a non-allowlisted binary.
+ */
+export function parseTestCommand(command: string): ParsedCommand {
+  const argv: string[] = [];
+  let current = "";
+  let hasCurrent = false;
+  let quote: '"' | "'" | null = null;
+
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+        continue;
+      }
+      current += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      hasCurrent = true;
+      continue;
+    }
+    if (ch === " " || ch === "\t") {
+      if (hasCurrent) {
+        argv.push(current);
+        current = "";
+        hasCurrent = false;
+      }
+      continue;
+    }
+    if (SHELL_METACHARS.test(ch)) {
+      return { ok: false, error: `shell metacharacter '${ch === "\n" ? "\\n" : ch}' is not allowed` };
+    }
+    current += ch;
+    hasCurrent = true;
+  }
+
+  if (quote) return { ok: false, error: "unterminated quote" };
+  if (hasCurrent) argv.push(current);
+
+  const binary = argv[0];
+  if (!binary) return { ok: false, error: "empty command" };
+  if (!ALLOWED_BINARIES.has(binary)) {
+    return { ok: false, error: `'${binary}' is not an allowed executable (allowed: ${[...ALLOWED_BINARIES].join(", ")})` };
+  }
+  return { ok: true, argv };
+}
+
+function runCommand(argv: string[], cwd: string, timeoutSec: number): Promise<VerifyResult> {
   return new Promise((resolve) => {
     execFile(
-      "/bin/sh",
-      ["-c", command],
+      argv[0],
+      argv.slice(1),
       { cwd, timeout: timeoutSec * 1000, killSignal: "SIGKILL", maxBuffer: 4 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (!err) {
@@ -77,7 +137,13 @@ export async function verifyEntry(
     return { ok: false, ran: false, message: `entry ${id} carries no test_command` };
   }
 
-  const result = await runCommand(entry.test_command.trim(), workspaceRoot, options.timeout ?? 60);
+  const parsed = parseTestCommand(entry.test_command.trim());
+  if (!parsed.ok) {
+    // Fail closed: nothing is executed, nothing is audit-logged as a run.
+    return { ok: false, ran: false, message: `refused test_command for ${id}: ${parsed.error}` };
+  }
+
+  const result = await runCommand(parsed.argv, workspaceRoot, options.timeout ?? 60);
   const nowIso = new Date(options.now ?? Date.now()).toISOString();
 
   if (result.ok) {
