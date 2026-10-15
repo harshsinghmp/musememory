@@ -62,7 +62,14 @@ function checkRelativePath(path: string, workspaceRoot?: string): string | null 
 
 /** Matches argv against the fixed templates; returns a refusal reason or null when it fits. */
 function checkTemplate(argv: string[], workspaceRoot?: string): string | null {
-  if (argv.length === 3 && argv[0] === "bun" && argv[1] === "test") return checkRelativePath(argv[2], workspaceRoot);
+  if (argv.length === 3 && argv[0] === "bun" && argv[1] === "test") {
+    const pathError = checkRelativePath(argv[2], workspaceRoot);
+    if (pathError) return pathError;
+    // The oracle runs the test suite — the target must be a test file, never an
+    // arbitrary script (`bun test ./evil.js` executes it).
+    if (!/\.(test|spec)\.[jt]s$/.test(argv[2])) return `'${argv[2]}' is not a test file (expected *.test.ts or *.spec.js)`;
+    return null;
+  }
   if (argv.length === 3 && argv[0] === "node" && argv[1] === "--check") return checkRelativePath(argv[2], workspaceRoot);
   // Pinned verbatim: no extra flags, no project override, no second package.
   if (argv.length === 3 && argv[0] === "bunx" && argv[1] === "tsc" && argv[2] === "--noEmit") return null;

@@ -197,9 +197,13 @@ describe("hostile test_command is refused fail-closed", () => {
     "bun test ../../outside.test.ts",
     "node --check ../evil.js",
     // Flag smuggling: `--flag=value` single-token forms bypass exact-match denylists.
+    // Flag smuggling: `--flag=value` single-token forms bypass exact-match denylists.
     "bun test --preload=./evil.js",
     "bun test --import=./evil.js",
     "node --check --import=./hook.mjs",
+    // Non-test files never execute, even inside the workspace root.
+    "bun test ./evil2.js",
+    "bun test notes.txt",
   ];
 
   test("every hostile command is refused without executing", async () => {
