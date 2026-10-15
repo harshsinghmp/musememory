@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Store } from "../store.ts";
 import type { PoolSyncReport, SyncPacket } from "./types.ts";
 import { broadcastKnowledge, ingestKnowledge, resolveLocalAgentId, loadPeers } from "./engine.ts";
@@ -16,12 +16,19 @@ export function syncWithSharedPool(
   localAgentId?: string
 ): PoolSyncReport {
   const agentId = resolveLocalAgentId(localAgentId);
-  const memoryDir = store.memoryDir || join(workspaceRoot, ".memory");
+  const memoryDir = resolve(store.memoryDir || join(workspaceRoot, ".memory"));
   // An external pool dir is an explicit feature — normalize it, don't confine it.
-  const poolDir = customPoolDir ? resolveExternal(customPoolDir) : join(memoryDir, "sync", "pool");
+  const poolDir = customPoolDir !== undefined ? resolveExternal(customPoolDir) : join(memoryDir, "sync", "pool");
+
+  // A custom pool inside our own store would be re-ingested as memories on the next read.
+  // shortcut: lexical containment only, no symlink resolution — revisit if the pool holds less-trusted packets
+  const rel = relative(memoryDir, poolDir);
+  if (customPoolDir !== undefined && (rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)))) {
+    throw new Error(`syncWithSharedPool: pool_dir "${poolDir}" must not resolve inside the memory store "${memoryDir}"`);
+  }
 
   if (!existsSync(poolDir)) {
-    mkdirSync(poolDir, { recursive: true });
+    mkdirSync(poolDir, { recursive: true, mode: 0o700 });
   }
 
   const peers = loadPeers(memoryDir);
