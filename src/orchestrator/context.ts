@@ -7,9 +7,10 @@ import { parseCurrentFile } from "../governor.ts";
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { gateCandidates } from "./freshness.ts";
 import type { MuseContextInput, FusedContextResult } from "./types.ts";
+import { validateDigestIntegrity, dualMeasureTokens } from "../compaction/tokens.ts";
 
 function estimateTokens(text: string): number {
-  return Math.max(1, Math.ceil(text.length / 4));
+  return dualMeasureTokens(text).conservativeTokens;
 }
 
 function estimateEntryTokens(entry: MemoryEntry): number {
@@ -42,29 +43,45 @@ export async function resolveMuseContext(
 
   // 2. Active Constraints & CURRENT.md
   const activeConstraints: Array<{ id: string; title: string; content: string }> = [];
+  const withheldDigestErrors: Array<{ id: string; reason: string; file_path: string; symbol_name?: string }> = [];
+  let digestRefusalReason: string | undefined;
   
   // Try loading CURRENT.md constraints & concurrent workstreams
   if (store.memoryDir) {
     try {
-      const currentData = parseCurrentFile(store.memoryDir);
-      if (currentData.constraints.length > 0) {
-        activeConstraints.push({
-          id: "current_md_constraints",
-          title: "Session Working Constraints",
-          content: currentData.constraints.join("\n"),
-        });
-      }
-      if (currentData.workstreams && currentData.workstreams.length > 0) {
-        const activeWs = currentData.workstreams.filter((w) => w.status === "IN-PROGRESS" || w.status === "BLOCKED");
-        if (activeWs.length > 0) {
-          const wsSummary = activeWs
-            .map((w) => `- Agent \`${w.agent}\` [${w.status}]: ${w.task}${w.targetScope ? ` (Scope: ${w.targetScope})` : ""}`)
-            .join("\n");
-          activeConstraints.push({
-            id: "concurrent_workstreams",
-            title: "Active Concurrent Agent Workstreams",
-            content: wsSummary,
+      const currentMdPath = join(store.memoryDir, "CURRENT.md");
+      if (existsSync(currentMdPath)) {
+        const rawCurrentMd = readFileSync(currentMdPath, "utf8");
+        const integrity = validateDigestIntegrity(rawCurrentMd);
+        if (!integrity.valid) {
+          digestRefusalReason = integrity.reason;
+          withheldDigestErrors.push({
+            id: "CURRENT.md",
+            reason: `corrupted_or_incomplete_digest: ${integrity.reason}`,
+            file_path: "CURRENT.md",
           });
+        } else {
+          const currentData = parseCurrentFile(store.memoryDir);
+          if (currentData.constraints.length > 0) {
+            activeConstraints.push({
+              id: "current_md_constraints",
+              title: "Session Working Constraints",
+              content: currentData.constraints.join("\n"),
+            });
+          }
+          if (currentData.workstreams && currentData.workstreams.length > 0) {
+            const activeWs = currentData.workstreams.filter((w) => w.status === "IN-PROGRESS" || w.status === "BLOCKED");
+            if (activeWs.length > 0) {
+              const wsSummary = activeWs
+                .map((w) => `- Agent \`${w.agent}\` [${w.status}]: ${w.task}${w.targetScope ? ` (Scope: ${w.targetScope})` : ""}`)
+                .join("\n");
+              activeConstraints.push({
+                id: "concurrent_workstreams",
+                title: "Active Concurrent Agent Workstreams",
+                content: wsSummary,
+              });
+            }
+          }
         }
       }
     } catch {}
@@ -251,6 +268,12 @@ export async function resolveMuseContext(
     );
   }
 
+  if (digestRefusalReason) {
+    suggestedNextSteps.push(
+      `Refused incomplete or corrupted CURRENT.md digest: ${digestRefusalReason} — re-generate with memory handoff or repair CURRENT.md`,
+    );
+  }
+
   const allWithheld = [
     ...gate.withheld.map((w) => ({
       id: w.memory_id,
@@ -259,6 +282,7 @@ export async function resolveMuseContext(
       symbol_name: w.symbol_name,
     })),
     ...withheldUntrusted,
+    ...withheldDigestErrors,
   ];
 
   return {
