@@ -1,10 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import yaml from "js-yaml";
 import { MemoryStoreCache, getOrCreateStoreCache, resetGlobalCache } from "../src/cache.ts";
-import { openStore, propose, get, list, save, deleteEntry } from "../src/store.ts";
-import { searchMemoriesFts } from "../src/sqlite.ts";
+import {
+  openStore,
+  propose,
+  get,
+  list,
+  save,
+  deleteEntry,
+  makeId,
+  preflightFtsQuery,
+  searchMemories,
+  FTS_MAX_QUERY_TERMS,
+  FTS_MAX_QUERY_CHARS,
+} from "../src/store.ts";
+import { searchMemoriesFts, insertOrReplaceMemory } from "../src/sqlite.ts";
 import { formatPromptContext } from "../src/retrieval.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
@@ -226,6 +239,60 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
     });
   });
 
+  // T-020: writes must invalidate the query cache; the dirMtime guard alone is not
+  // trustworthy (coarse FS mtimes, and SQLite-only writes never touch the dir).
+  describe("T-020 query cache invalidation on writes", () => {
+    it("keeps the list() query cache alive after L0 entry population", () => {
+      const store = openStore(memoryDir);
+      propose(store, { title: "Alpha", content: "alpha body", project: "t", confirmed: true });
+      propose(store, { title: "Beta", content: "beta body", project: "t", confirmed: true });
+
+      const first = list(store);
+      expect(first.length).toBe(2);
+
+      // Populating L0 entries must not destroy the query result just cached.
+      expect(store.cache?.getQuery("all")).toBeDefined();
+      expect(list(store).length).toBe(2);
+    });
+
+    it("invalidates cached results when a disk drop is reconciled into SQLite with a stale dir mtime", () => {
+      const store = openStore(memoryDir);
+      const a = propose(store, {
+        title: "Alpha",
+        content: "alpha body",
+        project: "t",
+        confirmed: true,
+      });
+
+      // Pin the dir mtime to a whole second so it can be restored exactly, modelling a
+      // filesystem whose directory mtime cannot resolve the drop.
+      const PIN = 1700000000;
+      utimesSync(store.dir, PIN, PIN);
+      expect(list(store).map((e) => e.id)).toEqual([a.id]); // populates the query cache
+
+      // Drop a new entry on disk and reconcile it into SQLite exactly like list() does,
+      // then restore the pre-drop dir mtime: the dirMtime guard cannot see this write.
+      const now = new Date().toISOString();
+      const bId = makeId("disk-drop");
+      const b: MemoryEntry = {
+        id: bId,
+        title: "Disk Dropped Beta",
+        content: "beta body",
+        project: "t",
+        status: "confirmed",
+        type: "discovery",
+        created_at: now,
+        updated_at: now,
+      };
+      writeFileSync(join(store.dir, `${bId}.yaml`), yaml.dump(b, { lineWidth: 120 }), "utf8");
+      insertOrReplaceMemory(store.db!, b);
+      utimesSync(store.dir, PIN, PIN);
+      expect(statSync(store.dir).mtimeMs).toBe(PIN * 1000);
+
+      expect(list(store).map((e) => e.id).sort()).toEqual([a.id, bId].sort());
+    });
+  });
+
   describe("SQLite FTS5 Full-Text Search", () => {
     it("indexes memories in FTS5 and performs high-speed BM25 search", () => {
       const store = openStore(memoryDir);
@@ -273,6 +340,33 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
       const frontendMatches = searchMemoriesFts(store.db!, "streaming", { project: "frontend" });
       expect(frontendMatches.length).toBe(1);
       expect(frontendMatches[0].entry.project).toBe("frontend");
+    });
+
+    // T-024: bound the work FTS5 can be asked to do before the query reaches the index.
+    it("rejects oversized FTS queries at the store preflight", () => {
+      const store = openStore(memoryDir);
+      propose(store, {
+        title: "Bounded Search",
+        content: "A marker term for bounded search checks.",
+        project: "search",
+        type: "architecture",
+        confirmed: true,
+      });
+
+      const tooManyTerms = Array.from({ length: FTS_MAX_QUERY_TERMS + 1 }, (_, i) => `t${i}`).join(" ");
+      expect(() => searchMemories(store, tooManyTerms)).toThrow(/FTS query rejected.*terms/);
+      expect(() => searchMemories(store, "x".repeat(FTS_MAX_QUERY_CHARS + 1))).toThrow(
+        /FTS query rejected.*characters/,
+      );
+      expect(() => searchMemories(store, "   ")).toThrow(/FTS query rejected/);
+
+      // Non-throwing preflight for callers that want to degrade instead of fail.
+      expect(preflightFtsQuery("bounded marker").ok).toBe(true);
+      expect(preflightFtsQuery(tooManyTerms).ok).toBe(false);
+      expect(preflightFtsQuery(tooManyTerms).terms).toBe(FTS_MAX_QUERY_TERMS + 1);
+
+      // In-bounds queries still search.
+      expect(searchMemories(store, "bounded marker").length).toBe(1);
     });
   });
 

@@ -23,6 +23,8 @@ interface CacheItem<T> {
   value: T;
   expiresAt: number;
   mtimeMs?: number;
+  /** Write generation the item was produced under (see setQuery/getQuery). */
+  generation?: number;
 }
 
 /**
@@ -133,7 +135,14 @@ export class MemoryStoreCache {
 
   // --- L0 Query Cache ---
 
-  public getQuery(key: string, currentDirMtime?: number): MemoryEntry[] | undefined {
+  /**
+   * Read a cached query result. `currentGeneration` is an optional write-generation
+   * stamp (the caller passes a counter that moves on every store write). T-020: the
+   * dirMtime guard alone cannot detect a write that did not touch the memories
+   * directory — coarse/stale FS mtimes, or SQLite-only writes — so a result produced
+   * under an older generation is dropped instead of served.
+   */
+  public getQuery(key: string, currentDirMtime?: number, currentGeneration?: number): MemoryEntry[] | undefined {
     const item = this.queryCache.get(key);
     if (!item) return undefined;
 
@@ -149,11 +158,23 @@ export class MemoryStoreCache {
       return undefined;
     }
 
+    if (currentGeneration !== undefined && item.generation !== undefined && item.generation !== currentGeneration) {
+      this.queryCache.delete(key);
+      this.stats.queryCount = this.queryCache.size;
+      return undefined;
+    }
+
     this.stats.hits++;
     return item.value;
   }
 
-  public setQuery(key: string, results: MemoryEntry[], ttlMs?: number, dirMtime?: number): void {
+  public setQuery(
+    key: string,
+    results: MemoryEntry[],
+    ttlMs?: number,
+    dirMtime?: number,
+    generation?: number,
+  ): void {
     if (this.queryCache.size >= this.maxQueries && !this.queryCache.has(key)) {
       const oldestKey = this.queryCache.keys().next().value;
       if (oldestKey !== undefined) {
@@ -166,6 +187,7 @@ export class MemoryStoreCache {
       value: results,
       expiresAt: Date.now() + (ttlMs ?? 60 * 1000), // 1 minute default for query results
       mtimeMs: dirMtime,
+      generation,
     });
     this.stats.queryCount = this.queryCache.size;
   }
