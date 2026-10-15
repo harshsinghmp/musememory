@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { assertBareFilename, buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
@@ -140,6 +140,34 @@ Argon2id is used for password hashing.
     expect(deletePageIndex(memoryDir).deletedCount).toBe(1);
     expect(listPageIndexes(memoryDir).length).toBe(0);
   });
+
+  it("rejects every hostile project/indexId shape on load and delete", () => {
+    const doc = buildPageIndex("# Guard Doc\ntext", { project: "testproj", memoryDir });
+
+    // A real directory outside the pageindex base that must survive every attempt.
+    const evilDir = mkdtempSync(join(tmpdir(), "musememory-evil-"));
+    const sentinel = join(evilDir, "precious.txt");
+    writeFileSync(sentinel, "precious");
+
+    const escape = relative(join(memoryDir, "pageindex"), evilDir);
+    for (const hostile of [escape, "../../tmp/evil", "..", evilDir]) {
+      // load stays a read-only query: hostile input is a miss, never a throw.
+      expect(loadPageIndex(memoryDir, hostile, doc.id)).toBeNull();
+      // delete refuses instead of resolving outside the base...
+      expect(() => deletePageIndex(memoryDir, hostile)).toThrow(/escap|relative/i);
+      // ...whether the traversal rides in the project or the indexId.
+      expect(() => deletePageIndex(memoryDir, hostile, doc.id)).toThrow(/escap|relative/i);
+      expect(() => deletePageIndex(memoryDir, "testproj", escape)).toThrow(/escap|relative/i);
+      expect(existsSync(sentinel)).toBe(true);
+    }
+
+    // Nothing escaped: the outside directory is still intact and empty of new entries.
+    expect(readdirSync(evilDir)).toEqual(["precious.txt"]);
+    // Established behavior kept: the real base still deletes.
+    expect(deletePageIndex(memoryDir).deletedCount).toBe(1);
+
+    rmSync(evilDir, { recursive: true, force: true });
+  });
 });
 
 describe("Path containment primitives", () => {
@@ -174,5 +202,20 @@ describe("Path containment primitives", () => {
 
   it("normalizes external paths", () => {
     expect(resolveExternal("/tmp/a/../b/./c")).toBe("/tmp/b/c");
+  });
+
+  it("listPageIndexes refuses a traversal project and still lists legit ones", () => {
+    const dir = mkdtempSync(join(tmpdir(), "musememory-pi-list-"));
+    const mem = join(dir, ".memory");
+    mkdirSync(join(mem, "pageindex"), { recursive: true });
+    const outside = mkdtempSync(join(tmpdir(), "musememory-pi-outside-"));
+    writeFileSync(join(outside, "loot.json"), '{"x":1}');
+    expect(() => listPageIndexes(mem, "../../tmp")).toThrow();
+    expect(() => listPageIndexes(mem, "..")).toThrow();
+    expect(existsSync(join(outside, "looted.json"))).toBe(false);
+    rmSync(outside, { recursive: true, force: true });
+    // Legit project list still works (empty store → empty list, no throw).
+    expect(listPageIndexes(mem, "testproj")).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
