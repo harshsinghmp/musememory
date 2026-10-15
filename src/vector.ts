@@ -18,11 +18,15 @@ export interface IndexedEntry {
   /** Term frequencies over word tokens. */
   tf: Record<string, number>;
   /** Total term count (for BM25 length normalization). */
-  len: number;
+  len?: number;
+  magnitude?: number;
+  tokens?: string[];
 }
 
 export interface VectorIndex {
   version: 1;
+  updated_at?: string;
+  dimension?: number;
   entries: Record<string, IndexedEntry>;
 }
 
@@ -106,7 +110,7 @@ export function bm25Score(queryTf: Record<string, number>, entry: IndexedEntry, 
     const f = entry.tf[term];
     if (!f) continue;
     const idfTerm = idf[term] ?? 0;
-    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * (entry.len / Math.max(1, avgLen)))));
+    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * ((entry.len ?? 0) / Math.max(1, avgLen)))));
     void qCount;
   }
   return score;

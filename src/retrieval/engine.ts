@@ -1,3 +1,4 @@
+import type { Store } from "../store.ts";
 import { list, countMemories } from "../store.ts";
 import { queryContext, formatPromptContext, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";

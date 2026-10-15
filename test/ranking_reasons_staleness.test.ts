@@ -41,7 +41,7 @@ describe("Wave 3 - Task 4: Conditional Reranking, Watermark Staleness & Reason T
         content: "Verified production architecture",
         project: "test",
         status: "confirmed",
-        verification: { level: "human", method: "code_review" },
+        verification: { level: "independently-verified", method: "code_review" },
         created_at: "2026-10-12T10:00:00.000Z",
         updated_at: "2026-10-12T10:00:00.000Z",
       };
@@ -97,7 +97,7 @@ describe("Wave 3 - Task 4: Conditional Reranking, Watermark Staleness & Reason T
         project: "test",
         type: "negative",
         status: "confirmed",
-        verification: { level: "machine" },
+        verification: { level: "reproducible" },
         temporal_mode: "timeless",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

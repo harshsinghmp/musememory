@@ -587,7 +587,9 @@ export function conditionalRerank<T extends { entry: MemoryEntry; score: number 
   if (!isLowDiscrimination(scores)) return candidates;
 
   const vBonus = (e: MemoryEntry) =>
-    e.verification?.level === "human"
+    e.verification?.level === "authoritative" ||
+    e.verification?.level === "user-confirmed" ||
+    e.verification?.level === "independently-verified"
       ? 0.05
       : e.verification?.level && e.verification.level !== "unverified"
       ? 0.03
@@ -799,8 +801,31 @@ export function queryContext(
 
   if (options.tokenBudget !== undefined) {
     if (options.tokenBudget > 0) {
+      const packedIds = new Set<string>();
+      const isPriorityGuardrail = (e: MemoryEntry) =>
+        e.type === "constraint" ||
+        e.temporal_mode === "timeless" ||
+        e.type === "negative" ||
+        e.tags?.includes("anti-pattern") ||
+        e.negative;
+
+      // First pass: pack priority guardrails (constraints, timeless rules, negative anti-patterns)
       for (const item of scored) {
         if (results.length >= limit) break;
+        if (!isPriorityGuardrail(item.entry)) continue;
+        const tokens = estimateEntryTokens(item.entry);
+        if (totalTokensUsed + tokens <= options.tokenBudget) {
+          results.push(item);
+          packedIds.add(item.entry.id);
+          totalTokensUsed += tokens;
+          recordAccessFor(store, item.entry);
+        }
+      }
+
+      // Second pass: pack remaining highest-scoring entries
+      for (const item of scored) {
+        if (results.length >= limit) break;
+        if (packedIds.has(item.entry.id)) continue;
         const tokens = estimateEntryTokens(item.entry);
         if (totalTokensUsed + tokens <= options.tokenBudget) {
           results.push(item);

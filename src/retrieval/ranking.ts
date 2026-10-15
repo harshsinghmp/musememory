@@ -158,12 +158,19 @@ export async function rankAndRetrieveMemories(
     const packed: MultiFactorScoreResult[] = [];
     let tokensUsed = 0;
 
-    // First pass: pack high-scoring critical constraints / timeless rules
-    const criticalConstraints = ranked.filter(
-      (s) => (s.entry.type === "constraint" || s.entry.temporal_mode === "timeless") && s.score > 0.5,
+    // First pass: pack high-scoring critical constraints / timeless rules / negative lessons
+    const isPriorityGuardrail = (e: MemoryEntry) =>
+      e.type === "constraint" ||
+      e.temporal_mode === "timeless" ||
+      e.type === "negative" ||
+      e.tags?.includes("anti-pattern") ||
+      e.negative;
+
+    const priorityGuardrails = ranked.filter(
+      (s) => isPriorityGuardrail(s.entry) && s.score > 0.4,
     );
 
-    for (const item of criticalConstraints) {
+    for (const item of priorityGuardrails) {
       if (packed.length >= limit) break;
       const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
       if (tokensUsed + tokens <= options.tokenBudget) {
