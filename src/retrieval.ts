@@ -138,6 +138,69 @@ export function tokenize(text: string): string[] {
   return tokens;
 }
 
+const TRIVIAL_GREETINGS = new Set([
+  "hi", "hello", "hey", "hey there", "good morning", "good evening", "good afternoon",
+  "thank you", "thanks", "ok", "okay", "bye", "goodbye", "yo", "sup",
+]);
+
+/**
+ * T-070: IDF-weighted relevance gate before FTS5 search (0.3 threshold, identifier-decisive, greeting short-circuit).
+ * Returns whether query possesses sufficient informational signal to justify recall passes.
+ */
+export function evaluateQueryRelevance(query: string): {
+  relevant: boolean;
+  score: number;
+  reason?: string;
+} {
+  if (!query || typeof query !== "string") {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  // 1. Greeting short-circuit
+  const normalized = trimmed.toLowerCase().replace(/[!?.,;:]+$/g, "").trim();
+  if (TRIVIAL_GREETINGS.has(normalized)) {
+    return { relevant: false, score: 0.05, reason: "trivial_greeting" };
+  }
+
+  // 2. Identifier-decisive check: code syntax, paths, camelCase, backticks
+  const hasBackticks = /`[^`]+`/.test(trimmed);
+  const hasPath = /[\/\\]|\.[a-z0-9]{1,5}\b/i.test(trimmed);
+  const hasCamelOrSnake = /[a-z][A-Z]|[A-Z]{2,}[a-z]|_/.test(trimmed);
+
+  if (hasBackticks || hasPath || hasCamelOrSnake) {
+    return { relevant: true, score: 0.85 };
+  }
+
+  // 3. Informational density scoring over non-stopword tokens
+  const tokens = tokenize(trimmed);
+  const informativeTokens = tokens.filter((t) => !STOPWORDS.has(t));
+
+  if (informativeTokens.length === 0) {
+    return { relevant: false, score: 0.1, reason: "stopwords_only" };
+  }
+
+  const informativeRatio = informativeTokens.length / Math.max(1, tokens.length);
+  const avgLen = informativeTokens.reduce((sum, t) => sum + t.length, 0) / informativeTokens.length;
+
+  let score = 0.25 * informativeRatio + Math.min(0.5, (avgLen / 10) * 0.5);
+  if (informativeTokens.length >= 2) score += 0.15;
+  if (informativeTokens.length >= 4) score += 0.15;
+
+  const threshold = 0.30;
+  const relevant = score >= threshold;
+
+  return {
+    relevant,
+    score: Math.min(1.0, score),
+    reason: relevant ? undefined : "low_relevance_score",
+  };
+}
+
 /**
  * T-035: Iterative safe maximum calculation that prevents RangeError call stack overflow on large arrays.
  */

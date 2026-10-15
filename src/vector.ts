@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 import { tokenize, isExpired, safeMax } from "./retrieval.ts";
+import { softOrFusion } from "./retrieval/ranking.ts";
 import type { MemoryEntry } from "./types.ts";
 
 const DIMS = 256;
@@ -162,6 +163,8 @@ export interface HybridSearchOptions {
   includeExpired?: boolean;
   /** Clock for expiry evaluation; defaults to Date.now(). */
   now?: number;
+  /** Fusion strategy: 'linear' (default for legacy compatibility) or 'soft_or' (T-114). */
+  fusion?: "linear" | "soft_or";
 }
 
 /**
@@ -214,12 +217,16 @@ export function hybridSearch(
   }
   const maxBm25 = safeMax(scored.map((s) => s.bm25), Number.EPSILON);
 
+  const useSoftOr = options.fusion === "soft_or";
   for (const s of scored) {
+    const pv = Math.max(0, s.cosine);
+    const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
+    const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
     results.push({
       entry: s.entry,
       cosine: s.cosine,
       bm25: s.bm25,
-      score: 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25),
+      score,
     });
   }
 

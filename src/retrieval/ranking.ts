@@ -1,11 +1,22 @@
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
-import { tokenize, computeFactors, type ScoreFactors } from "../retrieval.ts";
+import { tokenize, computeFactors, evaluateQueryRelevance, type ScoreFactors } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
 
 export type { ScoreFactors };
+
+/**
+ * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).
+ * Combines independent vector semantic probability (pv) and lexical/BM25 probability (pl)
+ * without artificial linear dilution.
+ */
+export function softOrFusion(pv: number, pl: number): number {
+  const clampedV = Math.max(0, Math.min(1, pv));
+  const clampedL = Math.max(0, Math.min(1, pl));
+  return 1 - (1 - clampedV) * (1 - clampedL);
+}
 
 export interface MultiFactorScoreResult {
   entry: MemoryEntry;
@@ -70,9 +81,10 @@ export async function rankAndRetrieveMemories(
   const now = options.now ?? Date.now();
   const workspaceRoot = store.dir;
 
-  // 1. Optional FTS5 BM25 match pre-flight
+  // 1. T-070: Relevance Gate before FTS5 search
   const ftsMatchIds = new Set<string>();
-  if (store.db && query.trim()) {
+  const relevance = evaluateQueryRelevance(query);
+  if (store.db && query.trim() && relevance.relevant) {
     try {
       const ftsResults = searchMemoriesFts(store.db, query);
       for (const res of ftsResults.slice(0, 15)) {
