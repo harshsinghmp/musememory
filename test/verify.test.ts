@@ -196,6 +196,10 @@ describe("hostile test_command is refused fail-closed", () => {
     // Escaping the workspace root through an allowed template.
     "bun test ../../outside.test.ts",
     "node --check ../evil.js",
+    // Flag smuggling: `--flag=value` single-token forms bypass exact-match denylists.
+    "bun test --preload=./evil.js",
+    "bun test --import=./evil.js",
+    "node --check --import=./hook.mjs",
   ];
 
   test("every hostile command is refused without executing", async () => {

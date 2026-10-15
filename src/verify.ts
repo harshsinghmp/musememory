@@ -43,6 +43,9 @@ export type ParsedCommand = { ok: true; argv: string[] } | { ok: false; error: s
 function checkRelativePath(path: string, workspaceRoot?: string): string | null {
   if (!path) return "path is empty";
   if (path.includes("\0")) return "path contains a null byte";
+  // A legitimate target is always a file path — a leading dash means flag
+  // smuggling (`--preload=./evil.js`, `--import=./hook.mjs`), not a file.
+  if (path.startsWith("-")) return `flag-like path '${path}' is not allowed — target must be a file`;
   if (path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(path)) {
     return `absolute path '${path}' is not allowed`;
   }
@@ -117,7 +120,9 @@ export function parseTestCommand(command: string, workspaceRoot?: string): Parse
   const binary = argv[0];
   if (!binary) return { ok: false, error: "empty command" };
   for (const arg of argv) {
-    if (CODE_EXEC_FLAGS.has(arg)) {
+    // Prefix-match on the `name` half so `--flag=value` single-token forms
+    // cannot slip past the denylist by string inequality.
+    if (CODE_EXEC_FLAGS.has(arg.split("=")[0])) {
       return { ok: false, error: `'${arg}' executes arbitrary code — not allowed in a test_command` };
     }
   }
