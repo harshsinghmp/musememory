@@ -2,9 +2,11 @@ import { existsSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
-import { openStore, list } from "./store.ts";
+import { openStore, list, getStorageLayout } from "./store.ts";
 import { validateStore } from "./schema.ts";
 import { getAuditTrail } from "./audit.ts";
+import { getSchemaVersion, LATEST_SCHEMA_VERSION } from "./migrate.ts";
+import { openDatabase } from "./sqlite.ts";
 import { detectAgents, findBinary } from "./agents/detect.ts";
 
 export interface DoctorReport {
@@ -50,6 +52,14 @@ export interface DoctorReport {
     binaryPath?: string;
     npxReady: boolean;
   };
+  /** T-368 parity: the store's `PRAGMA user_version` stamp vs the migrations this build ships. */
+  schema: {
+    /** Stamp found on disk before this run's open migrated the store. */
+    storeVersion: number;
+    /** LATEST_SCHEMA_VERSION in the running build. */
+    codeVersion: number;
+    upToDate: boolean;
+  };
 }
 
 /**
@@ -80,6 +90,8 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   let invalidCount = 0;
   let secretLeaksCount = 0;
   let brokenLinksCount = 0;
+  // Read before openStore: its runMigrations() normalises the stamp, so afterwards a mismatch is invisible.
+  let storeVersion = 0;
 
   if (isInitialized) {
     const currentPath = join(storagePath, "CURRENT.md");
@@ -88,6 +100,18 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       const content = readFileSync(currentPath, "utf8");
       currentMdLines = content.split("\n").filter((l) => l.trim().length > 0).length;
     }
+
+    try {
+      const dbPath = getStorageLayout(storagePath).dbPath;
+      if (existsSync(dbPath)) {
+        const raw = openDatabase(dbPath);
+        try {
+          storeVersion = getSchemaVersion(raw);
+        } finally {
+          raw.close();
+        }
+      }
+    } catch {}
 
     try {
       const store = openStore(storagePath);
@@ -189,6 +213,11 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       binaryPath: memBin || undefined,
       npxReady: true,
     },
+    schema: {
+      storeVersion,
+      codeVersion: LATEST_SCHEMA_VERSION,
+      upToDate: storeVersion >= LATEST_SCHEMA_VERSION,
+    },
   };
 }
 
@@ -263,8 +292,21 @@ export function printDoctorReport(report: DoctorReport): void {
   }
   console.log(`  [OK] NPX One-Line Command: 'npx musememory <command>' ready.`);
 
+  // Schema Version
+  console.log(`\n[SCHEMA] Store Migration Stamp (T-368):`);
+  if (report.schema.upToDate) {
+    console.log(`  [OK] Store schema v${report.schema.storeVersion} matches code schema v${report.schema.codeVersion}`);
+  } else {
+    console.log(`  [WARN] Store schema v${report.schema.storeVersion} != code schema v${report.schema.codeVersion}`);
+    if (report.schema.storeVersion < report.schema.codeVersion) {
+      console.log(`     -> Pending additive migrations were applied on open. Re-run 'memory doctor' to confirm.`);
+    } else {
+      console.log(`     -> Store is ahead of this build (likely an older install). Upgrade Muse Memory to the latest version.`);
+    }
+  }
+
   console.log(`\n====================================================`);
-  if (report.validation.valid && report.storage.initialized && report.agents.unwiredCount === 0) {
+  if (report.validation.valid && report.storage.initialized && report.schema.upToDate && report.agents.unwiredCount === 0) {
     console.log(`[SUCCESS] System Status: 100% HEALTHY & OPTIMAL\n`);
   } else {
     console.log(`[TIP] Recommended Action: Run 'memory connect --all' to wire any unwired coding agents.\n`);
