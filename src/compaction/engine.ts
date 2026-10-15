@@ -43,6 +43,8 @@ export function validateCompactionInvariants(invariants: CompactionInvariants): 
   }
 }
 
+import { isFactDigestRecorded, recordFactDigest } from "./dedup.ts";
+
 /**
  * Extracts durable architectural decisions and active constraints into memory entries
  * before context compression or session handoff.
@@ -54,11 +56,14 @@ export function extractInvariantsPreCompress(
 ): HarvestedMemory[] {
   const project = options?.project ?? "workspace";
   const actor = options?.actor ?? "compaction_pre_compress";
+  const memoryDir = store.memoryDir || store.dir;
   const harvested: HarvestedMemory[] = [];
 
   if (invariants.decisionsMade && invariants.decisionsMade.length > 0) {
     for (const d of invariants.decisionsMade) {
       if (!d.trim()) continue;
+      if (isFactDigestRecorded(memoryDir, d)) continue;
+
       const title = d.slice(0, 100);
       const entry = propose(store, {
         title,
@@ -69,6 +74,8 @@ export function extractInvariantsPreCompress(
         confirmed: true,
         tags: ["architecture", "decision", "pre-compress"],
       });
+      recordFactDigest(memoryDir, d, entry.id, "decision");
+
       harvested.push({
         id: entry.id,
         type: "decision",
@@ -82,6 +89,8 @@ export function extractInvariantsPreCompress(
   if (invariants.activeConstraints && invariants.activeConstraints.length > 0) {
     for (const c of invariants.activeConstraints) {
       if (!c.trim()) continue;
+      if (isFactDigestRecorded(memoryDir, c)) continue;
+
       const title = c.slice(0, 100);
       const entry = propose(store, {
         title,
@@ -93,6 +102,8 @@ export function extractInvariantsPreCompress(
         confirmed: true,
         tags: ["constraint", "invariant", "pre-compress"],
       });
+      recordFactDigest(memoryDir, c, entry.id, "constraint");
+
       harvested.push({
         id: entry.id,
         type: "constraint",
