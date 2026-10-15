@@ -203,4 +203,19 @@ describe("Path containment primitives", () => {
   it("normalizes external paths", () => {
     expect(resolveExternal("/tmp/a/../b/./c")).toBe("/tmp/b/c");
   });
+
+  it("listPageIndexes refuses a traversal project and still lists legit ones", () => {
+    const dir = mkdtempSync(join(tmpdir(), "musememory-pi-list-"));
+    const mem = join(dir, ".memory");
+    mkdirSync(join(mem, "pageindex"), { recursive: true });
+    const outside = mkdtempSync(join(tmpdir(), "musememory-pi-outside-"));
+    writeFileSync(join(outside, "loot.json"), '{"x":1}');
+    expect(() => listPageIndexes(mem, "../../tmp")).toThrow();
+    expect(() => listPageIndexes(mem, "..")).toThrow();
+    expect(existsSync(join(outside, "looted.json"))).toBe(false);
+    rmSync(outside, { recursive: true, force: true });
+    // Legit project list still works (empty store → empty list, no throw).
+    expect(listPageIndexes(mem, "testproj")).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

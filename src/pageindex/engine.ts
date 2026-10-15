@@ -238,7 +238,9 @@ export function listPageIndexes(memoryDir: string, project?: string): PageIndexD
   const projects = project ? [project] : readdirSync(base);
 
   for (const p of projects) {
-    const pDir = join(base, p);
+    // Caller-supplied `project` is untrusted — resolveWithin, not join.
+    // Names from readdirSync are single FS segments and pass through unchanged.
+    const pDir = resolveWithin(base, p);
     if (!existsSync(pDir)) continue;
     for (const f of readdirSync(pDir)) {
       if (f.endsWith(".json")) {
