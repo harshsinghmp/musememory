@@ -18,6 +18,7 @@ import {
   deleteMemoryById,
   type SqliteDatabase,
 } from "./sqlite.ts";
+import { runMigrations } from "./migrate.ts";
 import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
 import { initEmbedTables } from "./retrieval/embedders.ts";
 import {
@@ -70,7 +71,11 @@ export function openStore(memoryDir: string): Store {
 
   let db: SqliteDatabase | undefined;
   try {
-    db = openDatabase(layout.dbPath);
+    const opened = openDatabase(layout.dbPath);
+    // T-368: additive ALTERs for stores created by an older build. No rollback code —
+    // the YAML mirror (which openStore rehydrates into SQLite below) is the rollback.
+    runMigrations(opened);
+    db = opened;
   } catch (err) {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
