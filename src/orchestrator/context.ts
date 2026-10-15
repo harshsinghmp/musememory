@@ -147,11 +147,28 @@ export async function resolveMuseContext(
     }
   }
 
+  // T-075: Ingest trust tiers — untrusted memories withheld by default unless include_untrusted: true
+  const withheldUntrusted: Array<{ id: string; reason: string; file_path: string; symbol_name?: string }> = [];
+  let filteredCandidates = candidatePool;
+  if (!input.include_untrusted) {
+    filteredCandidates = candidatePool.filter((c) => {
+      if (c.trust === "untrusted") {
+        withheldUntrusted.push({
+          id: c.id,
+          reason: `untrusted_source (${c.source ?? "external"}) - opt-in via include_untrusted: true`,
+          file_path: "",
+        });
+        return false;
+      }
+      return true;
+    });
+  }
+
   // 4.5 Recall-time freshness gate (GAP-3): withhold memories whose code
   // citations no longer match the live workspace. Drifted/orphaned memories are
   // excluded from context by default and reported explicitly — never silently
   // dropped. Opt in via include_drifted to receive them with provenance warnings.
-  const gate = gateCandidates(store, workspaceRoot, candidatePool, {
+  const gate = gateCandidates(store, workspaceRoot, filteredCandidates, {
     enforce: input.include_drifted !== true,
     include_drifted: input.include_drifted === true,
   });
@@ -224,9 +241,25 @@ export async function resolveMuseContext(
 
   if (gate.withheldNotice) {
     suggestedNextSteps.push(
-      `${gate.withheld.length} memor${gate.withheld.length === 1 ? "y" : "ies"} withheld by the freshness gate — re-verify or supersede them if the drift is intentional`
+      `${gate.withheld.length} memor${gate.withheld.length === 1 ? "y" : "ies"} withheld by the freshness gate — re-verify or supersede them if the drift is intentional`,
     );
   }
+
+  if (withheldUntrusted.length > 0) {
+    suggestedNextSteps.push(
+      `${withheldUntrusted.length} untrusted memor${withheldUntrusted.length === 1 ? "y" : "ies"} withheld — pass include_untrusted: true to include them`,
+    );
+  }
+
+  const allWithheld = [
+    ...gate.withheld.map((w) => ({
+      id: w.memory_id,
+      reason: w.reason,
+      file_path: w.file_path,
+      symbol_name: w.symbol_name,
+    })),
+    ...withheldUntrusted,
+  ];
 
   return {
     active_constraints: activeConstraints,
@@ -236,14 +269,7 @@ export async function resolveMuseContext(
     tokens_used: usedBudget,
     token_budget: budget,
     suggested_next_steps: suggestedNextSteps,
-    withheld_memories: gate.withheld.length > 0
-      ? gate.withheld.map((w) => ({
-          id: w.memory_id,
-          reason: w.reason,
-          file_path: w.file_path,
-          symbol_name: w.symbol_name,
-        }))
-      : undefined,
+    withheld_memories: allWithheld.length > 0 ? allWithheld : undefined,
     freshness_notice: gate.withheldNotice ?? undefined,
     freshness_stats: gate.stats,
   };

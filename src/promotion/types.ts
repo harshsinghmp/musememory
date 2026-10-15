@@ -11,6 +11,8 @@ export interface PromotionEvaluation {
   conflicts: number;
   has_sufficient_evidence: boolean;
   is_generalizable: boolean;
+  is_corroborated?: boolean;
+  has_valid_syntax?: boolean;
   generalized_content?: string;
   reasons: string[];
 }

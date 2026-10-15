@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { MemoryEntry, MemoryType, MemoryStatus } from "./types.ts";
+import { redactSecrets } from "./secrets.ts";
 
 export interface SqliteDatabase {
   exec(sql: string): void;
@@ -336,12 +337,12 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
     }
   }
 
-  // Synchronize FTS5 virtual table
+  // Synchronize FTS5 virtual table with index-time credential redaction (T-103)
   try {
     db.run(`DELETE FROM memories_fts WHERE id = ?`, [entry.id]);
     db.run(
       `INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`,
-      [entry.id, entry.title, entry.content, (entry.tags ?? []).join(" ")],
+      [entry.id, redactSecrets(entry.title), redactSecrets(entry.content), (entry.tags ?? []).join(" ")],
     );
   } catch {}
 }
