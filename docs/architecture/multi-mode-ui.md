@@ -240,13 +240,13 @@ src/
 ```
 
 ## Configuration Persistence
+Settings live in `.memory/settings.json` — one versioned document with a `global` section plus per-project sections:
 ```json
-// .memory/settings.json
 {
   "version": 1,
-  "global": { ... },
+  "global": {},
   "projects": {
-    "musememory": { ... }
+    "musememory": {}
   }
 }
 ```
