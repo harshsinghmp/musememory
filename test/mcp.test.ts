@@ -167,6 +167,62 @@ describe("mcp tool handlers logic", () => {
     cleanup(root);
   });
 
+  test("get_context read purity: zero synchronous writes, deferred to the write queue (T-301)", async () => {
+    const { existsSync, readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { list } = await import("../src/store.ts");
+    const { createServer, flushPendingWrites } = await import("../src/mcp.ts");
+
+    // Snapshot of the store write path the handler owns: memories/, harvest ledger, audit log.
+    // (memory.db, wiki/ and CURRENT.md mtimes are churned by openStore/syncConstraints, not by the handler.)
+    const snapshot = (): Record<string, string> => {
+      const out: Record<string, string> = {};
+      const walk = (dir: string) => {
+        for (const name of readdirSync(dir)) {
+          const p = join(dir, name);
+          const st = statSync(p);
+          if (st.isDirectory()) walk(p);
+          else out[p.slice(memoryDir.length)] = `${st.size}:${st.mtimeMs}`;
+        }
+      };
+      walk(join(memoryDir, "memories"));
+      const ledger = join(memoryDir, "harvested-transcripts.json");
+      if (existsSync(ledger)) out["/harvested-transcripts.json"] = statSync(ledger).size.toString();
+      return out;
+    };
+
+    try {
+      const before = snapshot();
+      const entriesBefore = list(store).length;
+      const currentPath = join(memoryDir, "CURRENT.md");
+      const currentBefore = existsSync(currentPath) ? readFileSync(currentPath, "utf8") : "";
+
+      const server = createServer(root);
+      const callTool = (server as any)._requestHandlers.get("tools/call");
+      const res = await callTool({
+        method: "tools/call",
+        params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+      });
+      expect(res.isError).toBeFalsy();
+
+      // A read tool must never mutate the store: no transcript import, no propose/save, no CURRENT.md rewrite.
+      expect(snapshot()).toEqual(before);
+      expect(list(store).length).toBe(entriesBefore);
+      expect(existsSync(join(memoryDir, "harvested-transcripts.json"))).toBe(false);
+      expect(existsSync(currentPath) ? readFileSync(currentPath, "utf8") : "").toBe(currentBefore);
+
+      // Deferred writes still land — after the response, on flush.
+      flushPendingWrites();
+      expect(snapshot()).not.toEqual(before);
+      expect(existsSync(join(memoryDir, "harvested-transcripts.json"))).toBe(true);
+      expect(readFileSync(currentPath, "utf8")).toContain("deploy");
+    } finally {
+      cleanup(root);
+    }
+  });
+
   test("ensureProjectAgentInstructions writes and updates AGENTS.md with Muse Memory directive", async () => {
     const { ensureProjectAgentInstructions, MUSE_MEMORY_DIRECTIVE } = await import("../src/cli/ecosystem.ts");
     const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import("node:fs");

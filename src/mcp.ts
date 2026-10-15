@@ -126,6 +126,35 @@ import { verifyStrictIntegrity } from "./verify.ts";
 import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
 
+// --- T-301: in-process async write queue -------------------------------------
+// Read tools must never mutate the store synchronously. Handlers compute the
+// response from a consistent snapshot, enqueue their write side-effects, and the
+// queue is flushed after the response (scheduled task) or on process exit.
+const pendingWrites: Array<() => void> = [];
+let writeFlushScheduled = false;
+
+/** Apply every queued write in FIFO order. Safe to call when idle. */
+export function flushPendingWrites(): void {
+  writeFlushScheduled = false;
+  while (pendingWrites.length > 0) {
+    try {
+      pendingWrites.shift()!();
+    } catch {
+      // A deferred write must never break the response path.
+    }
+  }
+}
+
+function enqueueWrites(writes: Array<() => void>): void {
+  if (writes.length === 0) return;
+  pendingWrites.push(...writes);
+  if (writeFlushScheduled) return;
+  writeFlushScheduled = true;
+  setTimeout(flushPendingWrites, 0);
+}
+
+process.on("exit", flushPendingWrites);
+
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
@@ -1578,15 +1607,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "get_context": {
           const queryStr = String(a.query ?? "");
+          // T-301: every write side-effect is deferred to the async write queue so the
+          // response is served from a consistent, unmutated snapshot.
+          const deferredWrites: Array<() => void> = [];
           if (queryStr && activeMemoryDir) {
-            try {
+            deferredWrites.push(() => {
               updateSessionHandoff(activeMemoryDir, {
                 status: "IN-PROGRESS",
                 lastQuery: queryStr,
                 agent: a.agent ? String(a.agent) : process.env.AGENT_NAME || "AI Assistant",
                 task: a.task ? String(a.task) : queryStr,
               });
-            } catch {}
+            });
           }
           const tierOpt = typeof a.tier === "number" ? (a.tier as RetrievalTier) : undefined;
           const formatted = tierOpt !== undefined
@@ -1615,15 +1647,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           if (formatted.entries.length >= 2 && activeMemoryDir) {
             try {
               const { recordCoActivation } = await import("./plasticity.ts");
-              recordCoActivation(formatted.entries.map((e) => e.entry.id), activeMemoryDir);
+              const ids = formatted.entries.map((e) => e.entry.id);
+              deferredWrites.push(() => recordCoActivation(ids, activeMemoryDir));
             } catch {}
           }
 
-          // Auto-harvest recent agent transcripts in background (non-blocking)
+          // Auto-harvest recent agent transcripts (deferred: transcript crawl -> import -> propose -> save)
           if (activeMemoryDir) {
             try {
               const { harvestAllAgentTranscripts } = await import("./harvester.ts");
-              harvestAllAgentTranscripts(activeStore, { memoryDir: activeMemoryDir, maxFiles: 3 });
+              deferredWrites.push(() => {
+                harvestAllAgentTranscripts(activeStore, { memoryDir: activeMemoryDir, maxFiles: 3 });
+              });
             } catch {}
           }
 
@@ -1632,6 +1667,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             const { compressPromptContext } = await import("./compress.ts");
             finalMarkdown = compressPromptContext(finalMarkdown).compressed;
           }
+
+          enqueueWrites(deferredWrites);
 
           return toolResult({
             markdown: finalMarkdown,
