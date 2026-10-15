@@ -14,6 +14,8 @@ import {
   openDatabase,
   insertOrReplaceMemory,
   getMemoryById,
+  getMemoryByIdempotencyKey,
+  getMemoryByContentHash,
   listMemories,
   searchMemoriesFts,
   type SqliteDatabase,
@@ -23,6 +25,7 @@ import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
 import { initEmbedTables } from "./retrieval/embedders.ts";
 import {
   computeFingerprint,
+  computeContentHash,
   inferTemporalMode,
   determineQuality,
   ensureUtility,
@@ -31,6 +34,14 @@ import {
   detectConflict,
   flagConflict,
 } from "./quality/index.ts";
+import { recoverStaleLocks } from "./outbox.ts";
+export * from "./outbox.ts";
+import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } from "./lock.ts";
+export { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError };
+import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
+export { getStoreCircuitBreaker, CircuitBreaker };
+import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
+export { registerWriteWorker, drainWriteWorkers };
 import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
 
 export interface StorageLayout {
@@ -61,6 +72,21 @@ export interface Store {
   layout?: StorageLayout;
   db?: SqliteDatabase;
   cache?: MemoryStoreCache;
+  circuit?: CircuitBreaker;
+}
+
+export class IdempotencyConflictError extends Error {
+  constructor(
+    public readonly idempotencyKey: string,
+    public readonly existingEntryId: string,
+    message?: string,
+  ) {
+    super(
+      message ||
+        `Idempotency conflict: key '${idempotencyKey}' already used with divergent content for memory '${existingEntryId}'`,
+    );
+    this.name = "IdempotencyConflictError";
+  }
 }
 
 // --- T-030: tombstone marker ------------------------------------------------------
@@ -171,13 +197,18 @@ export function openStore(memoryDir: string): Store {
     // T-368: additive ALTERs for stores created by an older build. No rollback code —
     // the YAML mirror (which openStore rehydrates into SQLite below) is the rollback.
     runMigrations(opened);
+    // T-042: Stale-lock recovery sweep on store open (300s expiration)
+    try {
+      recoverStaleLocks(opened, 300);
+    } catch {}
     db = opened;
   } catch (err) {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
 
   const cache = getOrCreateStoreCache(memoryDir);
-  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache };
+  const circuit = getStoreCircuitBreaker(memoryDir);
+  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache, circuit };
 
   // R21: ensure the embedding vector + pipeline-fingerprint tables exist.
   if (db) {
@@ -297,10 +328,22 @@ export function recordAccess(store: Store, entry: MemoryEntry): MemoryEntry {
 }
 
 export function get(store: Store, id: string): MemoryEntry | null {
+  if (store.circuit?.isDegraded()) {
+    return store.cache?.getEntry(id) ?? null;
+  }
   // T-030: a tombstoned entry is invisible to reads even though its row and YAML survive.
   if (isTombstoned(store, id)) return null;
-  const entry = readEntry(store, id);
-  return entry ? recordAccess(store, entry) : null;
+  try {
+    const entry = readEntry(store, id);
+    if (entry) store.circuit?.recordSuccess();
+    return entry ? recordAccess(store, entry) : null;
+  } catch (err) {
+    store.circuit?.recordFailure(err);
+    if (store.circuit?.isDegraded()) {
+      return store.cache?.getEntry(id) ?? null;
+    }
+    throw err;
+  }
 }
 
 /** `get()` minus the tombstone gate and the access bookkeeping: the raw stored entry. */
@@ -368,6 +411,12 @@ export function list(
     try {
       dirMtime = statSync(store.dir).mtimeMs;
     } catch {}
+  }
+
+  // T-055: If circuit breaker is open (degraded mode), return cache without crashing
+  if (store.circuit?.isDegraded()) {
+    const cached = store.cache?.getQuery(cacheKey, dirMtime);
+    return cached ?? [];
   }
 
   // 1. Check L0 query cache. T-020: the write generation guards against writes the
@@ -453,38 +502,52 @@ export function extractEntryText(entry: Partial<MemoryEntry>): string {
 }
 
 /** Atomic write: SQLite primary database + dual YAML file sync. Validates secrets before writing. */
-export function save(store: Store, entry: MemoryEntry, options: { skipSecretCheck?: boolean } = {}): void {
-  if (!options.skipSecretCheck) {
-    const textToScan = extractEntryText(entry);
-    const secrets = scanSecrets(textToScan);
-    if (secrets.length > 0) {
-      throw new Error(`Secret detected during save: ${secrets.join(", ")}`);
+export function save(store: Store, entry: MemoryEntry, options: { skipSecretCheck?: boolean; lock?: boolean } = {}): void {
+  const doSave = () => {
+    if (!options.skipSecretCheck) {
+      const textToScan = extractEntryText(entry);
+      const secrets = scanSecrets(textToScan);
+      if (secrets.length > 0) {
+        throw new Error(`Secret detected during save: ${secrets.join(", ")}`);
+      }
     }
-  }
 
-  // 1. Primary write to SQLite database
-  if (store.db) {
-    // T-025: memories row + FTS delete/insert as a single commit.
-    withTransaction(store.db, () => insertOrReplaceMemory(store.db!, entry));
-  }
+    // 1. Primary write to SQLite database
+    if (store.db) {
+      try {
+        // T-025: memories row + FTS delete/insert as a single commit.
+        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, entry));
+        store.circuit?.recordSuccess();
+      } catch (err) {
+        store.circuit?.recordFailure(err);
+        throw err;
+      }
+    }
 
-  // 2. Dual write to YAML file for exportability
-  let mtimeMs: number | undefined;
-  try {
-    const file = fileForId(store, entry.id);
-    const tmp = `${file}.tmp`;
-    writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
-    renameSync(tmp, file);
+    // 2. Dual write to YAML file for exportability
+    let mtimeMs: number | undefined;
     try {
-      mtimeMs = statSync(file).mtimeMs;
-    } catch {}
-  } catch (err: unknown) {
-    console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
-  }
+      const file = fileForId(store, entry.id);
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
+      renameSync(tmp, file);
+      try {
+        mtimeMs = statSync(file).mtimeMs;
+      } catch {}
+    } catch (err: unknown) {
+      console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+    }
 
-  // 3. L0 Cache update with mtime
-  if (store.cache) {
-    store.cache.setEntry(entry, undefined, mtimeMs);
+    // 3. L0 Cache update with mtime
+    if (store.cache) {
+      store.cache.setEntry(entry, undefined, mtimeMs);
+    }
+  };
+
+  if (options.lock && store.memoryDir) {
+    withStoreLock(store.memoryDir, doSave);
+  } else {
+    doSave();
   }
 }
 
@@ -555,6 +618,10 @@ export function propose(
     checkConflict?: boolean;
     /** R23: Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry"). */
     mem_path?: string;
+    /** T-038: Unique idempotency key to prevent duplicate writes during retries. */
+    idempotency_key?: string;
+    /** T-040: Normalized content hash for fast SQLite deduplication. */
+    content_hash?: string;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -564,10 +631,34 @@ export function propose(
     throw new Error("Cannot propose memory entry with empty project");
   }
 
-  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
+  // T-038 & T-039: Idempotency key handling (retry -> 0 writes; divergent retry -> named conflict)
+  if (opts.idempotency_key && store.db) {
+    const existing = getMemoryByIdempotencyKey(store.db, opts.idempotency_key);
+    if (existing) {
+      const incomingHash = opts.content_hash ?? computeContentHash(opts.content);
+      const existingHash = existing.content_hash || computeContentHash(existing.content);
+      if (existingHash === incomingHash) {
+        return existing;
+      } else {
+        throw new IdempotencyConflictError(opts.idempotency_key, existing.id);
+      }
+    }
+  }
 
-  // Deduplication check: consolidate into canonical memory if exact duplicate exists
+  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
+  const content_hash = opts.content_hash ?? computeContentHash(opts.content);
+
+  // Deduplication check: consolidate into canonical memory if exact duplicate exists (T-040)
   if (opts.dedup) {
+    if (store.db) {
+      const dupe = getMemoryByContentHash(store.db, content_hash, opts.project);
+      if (dupe) {
+        return consolidateIntoCanonical(store, dupe.id, {
+          source: opts.source,
+          evidence: opts.evidence?.[0],
+        });
+      }
+    }
     const dupes = findDuplicates(store, { title, content: opts.content, project: opts.project });
     if (dupes.exact) {
       return consolidateIntoCanonical(store, dupes.exact.id, {
@@ -617,6 +708,8 @@ export function propose(
     evidence: opts.evidence,
     conflict_ids: opts.conflict_ids,
     mem_path: opts.mem_path,
+    idempotency_key: opts.idempotency_key,
+    content_hash,
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);
@@ -1193,5 +1286,24 @@ export function repairFtsIndex(store: Store): FtsParityReport {
     );
   });
   return { ...checkFtsParity(store), repaired: true };
+}
+
+/**
+ * T-056 & T-055: Gracefully closes store, awaiting all in-flight async write workers
+ * within a bounded join and running WAL checkpoint optimization to keep disk compact.
+ */
+export async function closeStore(store: Store): Promise<void> {
+  try {
+    await drainWriteWorkers(5000);
+  } catch {}
+
+  if (store.db) {
+    try {
+      store.db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+    } catch {}
+    try {
+      store.db.close();
+    } catch {}
+  }
 }
 

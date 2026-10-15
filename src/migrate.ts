@@ -56,6 +56,46 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_tombstone ON memories(deleted_at)`);
     },
   },
+  {
+    version: 3,
+    up(db) {
+      // T-038 & T-040: idempotency_key and content_hash columns
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("idempotency_key")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN idempotency_key TEXT`);
+      }
+      if (!memCols.includes("content_hash")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN content_hash TEXT`);
+      }
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_idempotency_key ON memories(idempotency_key) WHERE idempotency_key IS NOT NULL`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories(content_hash)`);
+
+      // T-041: durable write outbox state machine
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS outbox (
+          id TEXT PRIMARY KEY,
+          entry_id TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          status TEXT NOT NULL,
+          idempotency_key TEXT,
+          auto_replay INTEGER NOT NULL DEFAULT 1,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_attempt_at TEXT,
+          locked_at TEXT,
+          error TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_outbox_status_updated ON outbox(status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_outbox_idempotency_key ON outbox(idempotency_key);
+        CREATE INDEX IF NOT EXISTS idx_outbox_locked_at ON outbox(locked_at);
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

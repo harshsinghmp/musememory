@@ -228,6 +228,28 @@ export interface MemoryEntry {
   last_accessed_at?: string | null;
   /** Number of times this memory was accessed via recall / get_context. */
   access_count?: number;
+  /** T-038: Unique idempotency key to prevent duplicate writes during retries. */
+  idempotency_key?: string;
+  /** T-040: Normalized (whitespace/case folded) content hash for fast SQLite deduplication. */
+  content_hash?: string;
+}
+
+export type OutboxStatus = "pending" | "processing" | "sent" | "held" | "failed";
+
+export interface OutboxEntry {
+  id: string;
+  entry_id: string;
+  operation: string;
+  payload: string;
+  status: OutboxStatus;
+  idempotency_key?: string | null;
+  auto_replay: boolean;
+  attempts: number;
+  last_attempt_at?: string | null;
+  locked_at?: string | null;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {

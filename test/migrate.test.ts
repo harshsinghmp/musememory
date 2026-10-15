@@ -175,3 +175,38 @@ describe("T-030 tombstone migration", () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe("T-041 & T-038 migration v3 (idempotency, content_hash, and outbox)", () => {
+  test("adds idempotency_key, content_hash columns and outbox table to legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v3-"));
+    const { db } = legacyStore(root);
+
+    // Prior to migration, outbox table does not exist
+    expect(() => db.query(`SELECT count(*) FROM outbox`).get()).toThrow();
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBe(3);
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(memories)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("idempotency_key");
+    expect(cols).toContain("content_hash");
+
+    // Outbox table exists and is queryable
+    const count = db.query<{ count: number }>(`SELECT count(*) as count FROM outbox`).get();
+    expect(count?.count).toBe(0);
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(outbox)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_outbox_status_updated");
+    expect(indexes).toContain("idx_outbox_idempotency_key");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+

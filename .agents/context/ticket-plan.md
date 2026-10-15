@@ -44,13 +44,13 @@
 - [ ] T-035 · `Math.max(...arr)` spread crash at scale → iterative max · retrieval.ts · new · F
 - [ ] T-036 · IDF caching (stop recomputing per query) · retrieval.ts · new · F
 - [ ] T-037 · drop redundant full-list scan in hybridSearch · retrieval.ts · new · F
-- [ ] T-038 · `idempotency_key` column + UNIQUE index on capture · schema, store · branch: multi-writer-merge · F
-- [ ] T-039 · divergent-retry → named conflict naming existing id · store.ts · branch: multi-writer-merge · F
-- [ ] T-040 · `content_hash` normalize (whitespace/case) + dedup on propose · store.ts, quality · branch: multi-writer-merge · F
-- [ ] T-041 · write outbox states pending→processing→sent/held/failed · schema, store · branch: multi-writer-merge · F
-- [ ] T-042 · `recover_stale_locks` sweep (300s) on open · store.ts · branch: multi-writer-merge · F
-- [ ] T-043 · non-idempotent ops default `auto_replay=0` (held, manual replay) · store.ts · branch: multi-writer-merge · F
-- [ ] T-044 · append-only fsync JSONL event log + single-writer flock (fails loud) · store · branch: multi-writer-merge · F
+- [x] T-038 · landed Wave 1 — `idempotency_key` column + UNIQUE index on capture · schema, store · F
+- [x] T-039 · landed Wave 1 — divergent-retry → named conflict naming existing id · store.ts · F
+- [x] T-040 · landed Wave 1 — `content_hash` normalize (whitespace/case) + dedup on propose · store.ts, quality · F
+- [x] T-041 · landed Wave 1 — write outbox states pending→processing→sent/held/failed · schema, store, outbox.ts · F
+- [x] T-042 · landed Wave 1 — `recover_stale_locks` sweep (300s) on open · store.ts, outbox.ts · F
+- [x] T-043 · landed Wave 1 — non-idempotent ops default `auto_replay=0` (held, manual replay) · store.ts, outbox.ts · F
+- [x] T-044 · landed Wave 1 — append-only fsync JSONL event log + single-writer flock (fails loud) · store, lock.ts · F
 - [ ] T-045 · `on_pre_compress` hook in compaction engine (extract before compact) · compaction · new · F
 - [ ] T-046 · persisted digest-dedup set for extracted facts · compaction · new · F
 - [ ] T-047 · never-empty checkpoint contract (raise instead of emit partial) · compaction, orchestrator · new · F
@@ -61,8 +61,8 @@
 - [x] MERGED→T-051 T-052 · pressure alert in CLI (non-silent refusal) · cli · new · F
 - [ ] T-053 · honest dual-measure token accounting (harness + pessimistic model) · compaction · branch: io-budget-telemetry · F
 - [ ] T-054 · refuse-incomplete digest contract in get_context · orchestrator · new · F
-- [ ] T-055 · circuit breaker around every store path (5 fail → 120s cooldown → degraded mode) · store.ts · new · F
-- [ ] T-056 · `atexit` bounded join for async write workers · store · new · F
+- [x] T-055 · landed Wave 1 — circuit breaker around every store path (5 fail → 120s cooldown → degraded mode) · store.ts, circuit.ts · F
+- [x] T-056 · landed Wave 1 — `atexit` bounded join for async write workers · store, async_workers.ts · F
 - [ ] T-057 · generation-counter invalidation for in-flight prefetch · orchestrator · new · F
 - [ ] T-058 · read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: poisoning-trust-tiers · F
 - [x] MERGED→T-058 T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
