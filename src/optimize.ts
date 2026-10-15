@@ -21,6 +21,7 @@ export interface OptimizeOptions {
 
 export interface OptimizeReport {
   timestamp: string;
+  dryRun?: boolean;
   totalBefore: number;
   totalAfter: number;
   prunedNoise: number;
@@ -322,6 +323,7 @@ export function optimizeStore(store: Store, options: OptimizeOptions = {}): Opti
 
   const report: OptimizeReport = {
     timestamp: new Date().toISOString(),
+    dryRun: !!options.dryRun,
     totalBefore,
     totalAfter,
     prunedNoise: toDeleteNoise.length,
