@@ -48,7 +48,7 @@ export function addMeshLink(memoryDir: string, targetPath: string): boolean {
  * Remove an explicit link from .memory/mesh_links.json
  */
 export function removeMeshLink(memoryDir: string, targetPath: string): boolean {
-  const resolved = path.resolve(targetPath);
+  const resolved = resolveExternal(targetPath);
   const current = listMeshLinks(memoryDir);
   const updated = current.filter((p) => p !== resolved);
   const filePath = path.join(memoryDir, MESH_LINKS_FILE);

@@ -169,6 +169,23 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
     }
   });
 
+  test("removeMeshLink normalizes like addMeshLink and rejects NUL bytes", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      addMeshLink(fixture.appMemoryDir, fixture.extDir);
+
+      // Unlinking with dot-segments resolves to the same entry addMeshLink stored.
+      removeMeshLink(fixture.appMemoryDir, path.join(fixture.extDir, "..", path.basename(fixture.extDir)));
+      expect(listMeshLinks(fixture.appMemoryDir)).toEqual([]);
+
+      expect(() => removeMeshLink(fixture.appMemoryDir, `${fixture.extDir}\u0000evil`)).toThrow();
+      expect(listMeshLinks(fixture.appMemoryDir)).toEqual([]);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
   test("resolveMeshMemories executes cross-project queries across monorepo packages", () => {
     const fixture = setupMonorepoFixture();
     try {

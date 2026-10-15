@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
+import { assertBareFilename, buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
 import { resolveExternal, resolveWithin } from "../src/paths.ts";
 
 describe("PageIndex Native Engine", () => {
@@ -94,6 +94,24 @@ Argon2id is used for password hashing.
 
     expect(loadPageIndex(memoryDir, "../../etc", "passwd")).toBeNull();
     expect(loadPageIndex(memoryDir, "testproj", "../../../etc/passwd")).toBeNull();
+  });
+
+  it("rejects traversal and absolute indexIds and writes nothing outside", () => {
+    for (const hostile of ["../../evil", "/abs", "a/b", "a\\b", "..", ".hidden", "evil\0.json"]) {
+      expect(() => assertBareFilename(hostile)).toThrow(/bare filename/i);
+    }
+    // Nothing was created anywhere by the rejected ids.
+    expect(existsSync(join(memoryDir, "pageindex", "evil.json"))).toBe(false);
+    expect(existsSync(join(testDir, "evil.json"))).toBe(false);
+
+    // A legit id still validates.
+    expect(() => assertBareFilename("my-doc_1")).not.toThrow();
+
+    // The real persist path still writes, and what it writes passes the guard.
+    const doc = buildPageIndex("# Ok Doc\ntext", { project: "testproj", memoryDir });
+    expect(() => assertBareFilename(doc.id)).not.toThrow();
+    expect(existsSync(join(memoryDir, "pageindex", "testproj", `${doc.id}.json`))).toBe(true);
+    expect(loadPageIndex(memoryDir, "testproj", doc.id)?.title).toBe(doc.title);
   });
 
   it("deletePageIndex refuses to delete a directory outside the pageindex base", () => {

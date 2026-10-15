@@ -13,6 +13,16 @@ export function slugify(text: string): string {
     .slice(0, 50);
 }
 
+/**
+ * Rejects anything that is not a bare filename (`/`, `\`, `..`, NUL, leading dot).
+ * Defense-in-depth for index ids that reach the persist step.
+ */
+export function assertBareFilename(name: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
+    throw new Error(`indexId "${name}" is not a bare filename`);
+  }
+}
+
 export function buildPageIndex(
   content: string,
   options: {
@@ -111,6 +121,8 @@ export function buildPageIndex(
   if (options.memoryDir && !options.dryRun) {
     const dir = resolveWithin(options.memoryDir, "pageindex", project);
     mkdirSync(dir, { recursive: true });
+    // resolveWithin only guards `dir`; a traversal in the file name would still write outside it.
+    assertBareFilename(indexId);
     writeFileSync(join(dir, `${indexId}.json`), JSON.stringify(doc, null, 2), "utf8");
   }
 
