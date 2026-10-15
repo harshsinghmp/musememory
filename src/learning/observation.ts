@@ -95,8 +95,9 @@ export function recordObservation(
     throw new Error("Cannot record observation with empty raw content");
   }
 
-  // Intercept secrets
-  const secrets = scanSecrets(`${obs.summary ?? ""} ${obs.raw}`);
+  // Intercept secrets across summary, raw content, and stringified metadata (T-389)
+  const metaStr = obs.metadata ? JSON.stringify(obs.metadata) : "";
+  const secrets = scanSecrets(`${obs.summary ?? ""} ${obs.raw} ${metaStr}`);
   if (secrets.length > 0) {
     throw new Error(`Probable secret detected in observation: ${secrets.join(", ")}`);
   }

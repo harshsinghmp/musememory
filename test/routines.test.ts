@@ -63,16 +63,16 @@ describe("SOW-102b routines", () => {
   });
 
   test("runRoutine returns nonzero when any step fails but still runs the rest", async () => {
-    const { memoryDir } = setup(`routines:\n  daily:\n    schedule: "0 8 * * *"\n    run: ["a", "b"]\n`);
+    const { memoryDir } = setup(`routines:\n  daily:\n    schedule: "0 8 * * *"\n    run: ["brief", "nudge"]\n`);
     const calls: string[] = [];
     const code = await runRoutine(memoryDir, "daily", {
       exec: async (step) => {
         calls.push(step);
-        return step === "a" ? 1 : 0;
+        return step === "brief" ? 1 : 0;
       },
     });
     expect(code).toBe(1);
-    expect(calls).toEqual(["a", "b"]);
+    expect(calls).toEqual(["brief", "nudge"]);
   });
 
   test("runRoutine throws on unknown routine", async () => {

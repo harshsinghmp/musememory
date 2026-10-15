@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Store } from "./store.ts";
+import type { MemoryEntry } from "./types.ts";
 import { list, get, confirm, markStale, supersede, deleteEntry, propose } from "./store.ts";
 import { getCurrent, setCurrent, parseCurrentFile, writeCurrentFile, updateSessionHandoff, getSessionHandoff, WorkspaceGovernor } from "./governor.ts";
 import { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
@@ -32,6 +33,61 @@ export interface UiServerOptions {
   port?: number;
   memoryDir: string;
   store: Store;
+  token?: string;
+}
+
+/** Explicit projection contract for UI read routes (T-400). */
+export interface ProjectedUiMemory {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  status: string;
+  project?: string;
+  tags: string[];
+  salience?: number;
+  verification?: {
+    level?: string;
+    method?: string;
+    verified_at?: string;
+  };
+  related_memory_ids?: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Project raw MemoryEntry into safe UI allowlist schema (T-400). */
+export function projectMemoryForUi(entry: MemoryEntry): ProjectedUiMemory {
+  return {
+    id: entry.id,
+    title: entry.title,
+    content: entry.content,
+    type: entry.type || "discovery",
+    status: entry.status,
+    project: entry.project,
+    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+    salience: typeof entry.salience === "number" ? entry.salience : 0.5,
+    verification: entry.verification
+      ? {
+          level: entry.verification.level,
+          method: entry.verification.method,
+          verified_at: entry.verification.verified_at,
+        }
+      : undefined,
+    related_memory_ids: Array.isArray(entry.related_memory_ids) ? [...entry.related_memory_ids] : [],
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
+  };
+}
+
+/** Pure HTML escaping helper for strings without external DOM dependencies. */
+export function escapeHtml(str: string): string {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function startUiServer(opts: UiServerOptions): Promise<{ port: number; close: () => void }> {
@@ -80,8 +136,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // API Routes
       if (pathname === "/api/memories" && req.method === "GET") {
         const memories = list(opts.store);
+        const projected = memories.map(projectMemoryForUi);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(memories));
+        res.end(JSON.stringify(projected));
         return;
       }
 
@@ -117,8 +174,12 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       if (pathname === "/api/snapshot" && req.method === "GET") {
         const snapshot = exportSnapshot(opts.store);
+        const projectedSnapshot = {
+          ...snapshot,
+          entries: snapshot.entries.map(projectMemoryForUi),
+        };
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(snapshot));
+        res.end(JSON.stringify(projectedSnapshot));
         return;
       }
 
@@ -361,12 +422,35 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       if (pathname === "/api/optimize" && req.method === "POST") {
         try {
-          const { optimizeStore } = await import("./optimize.ts");
           const body = await parseJsonBody(req);
+          const dryRun = body.dryRun !== false; // Default to dryRun: true (T-004)
+
+          // Localhost / Token Gate (T-004)
+          const expectedToken = opts.token || process.env.MUSE_UI_TOKEN;
+          const remoteIp = req.socket?.remoteAddress;
+          const isLoopback = remoteIp === "127.0.0.1" || remoteIp === "::1" || remoteIp === "::ffff:127.0.0.1";
+          const headerToken = req.headers["x-muse-token"];
+          const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
+          const bearerToken = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader;
+          const providedToken = (typeof headerToken === "string" ? headerToken : undefined) || bearerToken;
+
+          if (expectedToken) {
+            if (providedToken !== expectedToken) {
+              res.writeHead(403, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Forbidden: Invalid or missing authentication token" }));
+              return;
+            }
+          } else if (!isLoopback && !dryRun) {
+            res.writeHead(403, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Forbidden: Non-dryRun optimization requires localhost origin or configured token" }));
+            return;
+          }
+
+          const { optimizeStore } = await import("./optimize.ts");
           const report = optimizeStore(opts.store, {
             memoryDir: opts.memoryDir,
             project: body.project ? String(body.project) : undefined,
-            dryRun: body.dryRun === true,
+            dryRun,
             force: body.force !== false,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -1477,7 +1561,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           let progHtml = '';
           if (h.progress && h.progress.length > 0) {
             progHtml += '<div style="font-weight:700; font-size:11px; color:var(--text-dim); margin-bottom:4px;">PROGRESS CHECKPOINTS:</div>';
-            h.progress.forEach(p => { progHtml += '<div style="font-size:12px; color:var(--text); margin-bottom:2px;">• ' + p + '</div>'; });
+            h.progress.forEach(p => { progHtml += '<div style="font-size:12px; color:var(--text); margin-bottom:2px;">• ' + escapeHtml(p) + '</div>'; });
           }
           document.getElementById('handoffProgressBox').innerHTML = progHtml;
         }
@@ -1507,7 +1591,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           const card = document.createElement('div');
           card.className = 'archetype-card';
           card.style.textAlign = 'left';
-          card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + p.title + '</div><div style="font-size:11px; color:var(--text-dim);">' + p.slug + '</div>';
+          card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + escapeHtml(p.title) + '</div><div style="font-size:11px; color:var(--text-dim);">' + escapeHtml(p.slug) + '</div>';
           card.onclick = async () => {
             const pageRes = await fetch('/api/wiki?page=' + encodeURIComponent(p.slug));
             const pageData = await pageRes.json();
@@ -1550,11 +1634,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           const tr = document.createElement('tr');
           const opColor = r.operation === 'confirm' ? 'var(--green)' : r.operation === 'delete' ? 'var(--red)' : 'var(--accent)';
           tr.innerHTML = \`
-            <td class="mono" style="font-size:11px;">\${new Date(r.timestamp).toLocaleTimeString()}</td>
-            <td><span class="op-badge" style="background:rgba(255,255,255,0.06); color:\${opColor};">\${r.operation}</span></td>
-            <td class="mono">\${r.entry_id}</td>
-            <td>\${r.actor || 'system'}</td>
-            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${JSON.stringify(r.details || r.reason || '')}</td>
+            <td class="mono" style="font-size:11px;">\${escapeHtml(new Date(r.timestamp).toLocaleTimeString())}</td>
+            <td><span class="op-badge" style="background:rgba(255,255,255,0.06); color:\${escapeHtml(opColor)};">\${escapeHtml(r.operation)}</span></td>
+            <td class="mono">\${escapeHtml(r.entry_id)}</td>
+            <td>\${escapeHtml(r.actor || 'system')}</td>
+            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${escapeHtml(JSON.stringify(r.details || r.reason || ''))}</td>
           \`;
           tbody.appendChild(tr);
         });
@@ -1586,7 +1670,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     }
 
     function escapeHtml(str) {
-      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function renderList() {
