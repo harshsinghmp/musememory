@@ -9,7 +9,7 @@
 
 ## Wave A — SECURITY (do first; outranks every feature)
 
-- [ ] T-001 · verify.ts exec: replace `/bin/sh -c` with `execFileSync` + allowlist parse · src verify.ts:23 · dep: — · new · F
+- [x] T-001 · landed #58 — template-gated test_command (fixed argv templates, no shell), `verify_refused` audit · src/verify.ts · F
 - [ ] T-002 · UI XSS: escape `p.title`/`p.slug` interpolation · ui.ts:1510 · new · F
 - [x] MERGED→T-002 T-003 · UI XSS: escape `r.entry_id`/`r.actor` interpolation · ui.ts:1557 · new · F
 - [ ] T-004 · UI optimizer gate: `POST /api/optimize` requires dry-run default + localhost/token check · ui.ts:362 · new · F
@@ -302,7 +302,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 
 ## Wave 0 — FOUNDATIONAL SEAMS (must land before dependent tickets)
 
-- [ ] T-363 · RB-1 CRITICAL · path-validation choke point: single `resolveWithin(base, ...segments)` primitive applied at every boundary (ui.ts:164,503,577; pageindex/engine.ts:111,205,250; wiki/compiler.ts:504; mesh/discovery.ts:29; sync/pool.ts:19). F-01/F-02/F-03/F-21/F-26 are four call sites of this one missing primitive — fixing per-endpoint guarantees reintroduction · blocks T-336, T-337, T-351, T-355 · F
+- [x] T-363 · landed #59 — `src/paths.ts` (`resolveWithin` strict + `resolveExternal` opt-out) applied at wiki/pageindex/pool/mesh boundaries · F
 - [ ] T-364 · RB-3 · unique-ID seam: `crypto.randomUUID` (or DB UNIQUE + collision retry) behind one id-generator; current `Date.now()` ids (adrs/engine.ts:104, pageindex/engine.ts:34) collide same-millisecond with no constraint to reject · blocks T-038, T-041, T-044, T-328 and every parallel-writer ticket · F
 - [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
 - [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
@@ -345,7 +345,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 ## New tickets from intended mode (claims ↔ evidence)
 
 - [ ] T-369 · benchmark threshold tests: "sub-50 µs" (benchmark/suite.ts:85) and "sub-2ms" claims have NO threshold assertions — `test/benchmark.test.ts:54,58` assert `>= 0`. Either assert real gates or remove the claims (feeds T-131 honesty) · F
-- [ ] T-370 · docs truth pass (replaces/extend T-015): 80+→52 platforms (×5 README places); "24+ formats"→22 detectors/3 adapters; "29 engines"→same; "61 tools/6 profiles"→107 tools/7 profiles; remove `profile_switch` (0 occurrences); daemon SSE≠WebSocket label; README body 497/84/2190→502/85/2224; current.md #32 "Linus hardening" is PARTIAL until T-001 lands (verify.ts:23 unpatched); capability #15 PARTIAL (`evaluateSessionOutcomes` 0 production callers); #21 PARTIAL (7 phantom profile names); #33 PARTIAL (`maybeAutoOptimize` 0 callers) · N
+- [ ] T-370 · docs truth pass (replaces/extend T-015): 80+→52 platforms (×5 README places); "24+ formats"→22 detectors/3 adapters; "29 engines"→same; "61 tools/6 profiles"→107 tools/7 profiles; remove `profile_switch` (0 occurrences); daemon SSE≠WebSocket label; README body 497/84/2190→502/85/2224; current.md #32 "Linus hardening" now complete (T-001 landed #58); capability #15 PARTIAL (`evaluateSessionOutcomes` 0 production callers); #21 PARTIAL (7 phantom profile names); #33 PARTIAL (`maybeAutoOptimize` 0 callers) · N
 
 ## v3 amendments to existing tickets
 
@@ -477,7 +477,7 @@ Numbering note: explorer proposed T-386/T-387 — both taken by the v7 team slic
 - [ ] T-400 · (was proposed T-387) MEDIUM · ui read routes return unprojected data: `/api/memories` (ui.ts:1436) ships full `MemoryEntry[]`, `/api/snapshot` ships `exportSnapshot` — add explicit field allowlist matching canvas needs · src/ui.ts · F
 - [ ] T-388 · HIGH · hook SessionStart `<muse-memory>` block must escape/strip delimiter + instruction markup from memory content before stdout (poisoned constraint breaks block, re-primes next session; T-058/T-339 don't cover this sink) · src/hooks/pack.ts:198-210, src/secrets.ts · F
 - [ ] T-389 · MEDIUM · `recordObservation` must scan `metadata` (JSON-stringified), not just summary+raw; fix false "Vibeguard-scanned" docstring at pack.ts:216 (tool_name/session_id from unvalidated stdin JSON) · src/learning/observation.ts:30, src/hooks/pack.ts · F
-- [x] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling (decided 2026-10-15: global-standard-first, harness opt-in) · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
+- [x] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling (decided 2026-10-15: global-standard-first, harness opt-in; implementation landed #61) · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
 - [ ] T-391 · HIGH · `recordClaim`/`addSource` validate `source_ids`/`memory_ids` against live registry at write time, derive `verified` instead of accepting caller assertion (forged citation provenance today) · src/claims.ts:36-63, src/provenance.ts, src/mcp.ts:2092-2102 · F
 - [ ] T-392 · HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + private/loopback/link-local block; SSRF via memory_settings_set → 169.254.169.254 today). Caveat: `cli/embed.ts:19` documents `http://127.0.0.1:8081/v1` as the intended local endpoint — needs explicit local opt-in flag, NOT a blanket reject (validateSafePath is the wrong tool) · src/settings/schema.ts:20-36, src/embedders.ts:55,137-143 · F
 - [ ] T-393 · MEDIUM · claims/provenance secret-scan gaps: concatenate array fields into scanSecrets template (3rd instance of the class: observation metadata, verify.ts, now claims.ts:45 + provenance.ts:46) · F
