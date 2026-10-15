@@ -1,11 +1,20 @@
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
-import { tokenize, computeFactors, evaluateQueryRelevance, type ScoreFactors } from "../retrieval.ts";
+import {
+  tokenize,
+  computeFactors,
+  evaluateQueryRelevance,
+  deriveWhyRetrieved,
+  isLowDiscrimination,
+  conditionalRerank,
+  type ScoreFactors,
+} from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
 
 export type { ScoreFactors };
+export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved };
 
 /**
  * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).
@@ -22,6 +31,7 @@ export interface MultiFactorScoreResult {
   entry: MemoryEntry;
   score: number;
   factors: ScoreFactors;
+  why_retrieved?: string[];
 }
 
 export interface MultiFactorRankingOptions {
@@ -55,7 +65,12 @@ export function calculateMultiFactorScore(
     blastRadiusFiles: options.blastRadiusFiles,
   });
 
-  return { entry, score: factors.totalScore, factors };
+  return {
+    entry,
+    score: factors.totalScore,
+    factors,
+    why_retrieved: deriveWhyRetrieved(factors, entry),
+  };
 }
 
 /**
@@ -127,13 +142,14 @@ export async function rankAndRetrieveMemories(
     }),
   );
 
-  // 5. Sort descending by totalScore
+  // 5. Sort descending by totalScore and apply conditional rerank (T-115)
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     const bU = Date.parse(b.entry.updated_at);
     const aU = Date.parse(a.entry.updated_at);
     return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
   });
+  const ranked = conditionalRerank(scored);
 
   const limit = options.limit ?? 10;
 
@@ -143,7 +159,7 @@ export async function rankAndRetrieveMemories(
     let tokensUsed = 0;
 
     // First pass: pack high-scoring critical constraints / timeless rules
-    const criticalConstraints = scored.filter(
+    const criticalConstraints = ranked.filter(
       (s) => (s.entry.type === "constraint" || s.entry.temporal_mode === "timeless") && s.score > 0.5,
     );
 
@@ -158,7 +174,7 @@ export async function rankAndRetrieveMemories(
 
     // Second pass: pack remaining highest-scoring entries
     const packedIds = new Set(packed.map((p) => p.entry.id));
-    for (const item of scored) {
+    for (const item of ranked) {
       if (packed.length >= limit) break;
       if (packedIds.has(item.entry.id)) continue;
       const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
@@ -171,5 +187,5 @@ export async function rankAndRetrieveMemories(
     return packed;
   }
 
-  return scored.slice(0, limit);
+  return ranked.slice(0, limit);
 }

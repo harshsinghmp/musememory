@@ -14,6 +14,8 @@ import { hasSecret } from "./secrets.ts";
 export interface ScoredEntry {
   entry: MemoryEntry;
   score: number;
+  /** T-126: Deterministic reason tokens explaining why this memory was retrieved. */
+  why_retrieved?: string[];
 }
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
@@ -35,6 +37,8 @@ export interface SearchResult {
   totalTokensUsed?: number;
   /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
   withheld?: Array<{ id: string; reason: string }>;
+  /** T-117: High-water mark timestamp of the most recent memory in the store. */
+  watermark?: string;
 }
 
 export interface FormattedContext {
@@ -529,15 +533,127 @@ export function scoreEntry(
   return computeFactors(entry, queryTokens, { now, workspaceRoot, semanticScore }).totalScore;
 }
 
-/** Sort by score desc, tiebreak updated_at desc then created_at desc. */
+/**
+ * T-126: Derives deterministic reason tokens from contributing factors and memory attributes.
+ */
+export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): string[] {
+  const reasons: string[] = [];
+  if (factors.exactSymbolMatch > 0) reasons.push("exact_symbol_match");
+  if (factors.bm25Match > 0) reasons.push("bm25_fts_hit");
+  if (factors.semanticMatch > 0) reasons.push("semantic_vector_match");
+  if (factors.graphOverlap > 0) reasons.push("graph_symbol_overlap");
+  if (factors.pathMatch > 0) reasons.push("path_proximity");
+  if (factors.blastRadius > 0) reasons.push("blast_radius_impact");
+  if (factors.verificationBonus > 0 || (entry.verification?.level && entry.verification.level !== "unverified")) {
+    reasons.push("verified_memory");
+  }
+  if (factors.salienceBonus > 0) reasons.push("high_salience");
+  if (factors.reinforcementBonus > 0) reasons.push("reinforcement_bonus");
+  if (factors.dueBonus > 0) reasons.push("due_date_urgency");
+  if (factors.utilityBonus > 0) reasons.push("utility_reward");
+  if (
+    factors.negativeWarningBonus > 0 ||
+    entry.type === "negative" ||
+    entry.tags?.includes("anti-pattern") ||
+    entry.negative
+  ) {
+    reasons.push("negative_pattern_warning");
+  }
+  if (entry.type === "constraint") reasons.push("active_constraint");
+  if (entry.temporal_mode === "timeless") reasons.push("timeless_rule");
+  if (factors.recentAccessBoost > 0) reasons.push("recent_access");
+  if (factors.baseApplicability > 0) reasons.push("lexical_overlap");
+
+  return reasons.sort();
+}
+
+/**
+ * T-115: Checks whether top candidate scores lack discrimination (tightly clustered spread <= threshold).
+ */
+export function isLowDiscrimination(scores: number[], threshold: number = 0.04): boolean {
+  if (!scores || scores.length < 2) return false;
+  const topScore = scores[0];
+  const compareIdx = Math.min(2, scores.length - 1);
+  return Math.abs(topScore - scores[compareIdx]) <= threshold;
+}
+
+/**
+ * T-115: Conditional secondary reranking for candidates when primary scores are tightly clustered.
+ * Uses verification level, trust tier, recency, and historical access to break ties deterministically.
+ */
+export function conditionalRerank<T extends { entry: MemoryEntry; score: number }>(candidates: T[]): T[] {
+  if (!candidates || candidates.length < 2) return candidates;
+  const scores = candidates.map((c) => c.score);
+  if (!isLowDiscrimination(scores)) return candidates;
+
+  const vBonus = (e: MemoryEntry) =>
+    e.verification?.level === "human"
+      ? 0.05
+      : e.verification?.level && e.verification.level !== "unverified"
+      ? 0.03
+      : 0;
+  const tBonus = (e: MemoryEntry) => (e.trust === "trusted" ? 0.02 : e.trust === "untrusted" ? -0.05 : 0);
+  const recencyBonus = (e: MemoryEntry) => {
+    const ts = Date.parse(e.updated_at || e.created_at || "");
+    return Number.isNaN(ts) ? 0 : Math.min(0.01, (ts / 2e12) * 0.01);
+  };
+  const accessBonus = (e: MemoryEntry) => Math.min(0.005, (e.access_count ?? 0) * 0.001);
+
+  return candidates
+    .map((c) => {
+      const adj = vBonus(c.entry) + tBonus(c.entry) + recencyBonus(c.entry) + accessBonus(c.entry);
+      return {
+        ...c,
+        score: Number((c.score + adj).toFixed(5)),
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * T-117: Retrieves the data high-water mark timestamp from last_memory_seen_at / max(updated_at, created_at).
+ * Enables data-driven staleness tracking rather than relying on wall-clock drift.
+ */
+export function getStoreWatermark(store: Store): string {
+  if (store.db) {
+    try {
+      const row = store.db
+        .query<{ watermark: string }>(
+          `SELECT MAX(COALESCE(updated_at, created_at)) as watermark FROM memories WHERE (deleted_at IS NULL OR deleted_at = '')`,
+        )
+        .get();
+      if (row?.watermark) return row.watermark;
+    } catch {}
+  }
+  const entries = list(store);
+  if (entries.length === 0) return new Date(0).toISOString();
+  let maxTs = "";
+  for (const e of entries) {
+    const ts = e.updated_at || e.created_at || "";
+    if (ts > maxTs) maxTs = ts;
+  }
+  return maxTs || new Date(0).toISOString();
+}
+
+/** Sort by score desc, tiebreak updated_at desc then created_at desc, and apply conditional rerank. */
 export function sortCandidates(
   candidates: MemoryEntry[],
   queryTokens: string[],
   now: number,
   semanticScores?: Map<string, number>,
 ): ScoredEntry[] {
-  return candidates
-    .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now, undefined, semanticScores?.get(entry.id) ?? 0) }))
+  const scored = candidates
+    .map((entry) => {
+      const factors = computeFactors(entry, queryTokens, {
+        now,
+        semanticScore: semanticScores?.get(entry.id) ?? 0,
+      });
+      return {
+        entry,
+        score: factors.totalScore,
+        why_retrieved: deriveWhyRetrieved(factors, entry),
+      };
+    })
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const bU = Date.parse(b.entry.updated_at);
@@ -548,6 +664,8 @@ export function sortCandidates(
       const aC = Date.parse(a.entry.created_at);
       return (Number.isNaN(bC) ? 0 : bC) - (Number.isNaN(aC) ? 0 : aC);
     });
+
+  return conditionalRerank(scored);
 }
 
 /**
@@ -717,6 +835,7 @@ export function queryContext(
     stale: false,
     totalTokensUsed,
     withheld: withheld.length > 0 ? withheld : undefined,
+    watermark: getStoreWatermark(store),
   };
 }
 
