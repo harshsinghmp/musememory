@@ -418,17 +418,17 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
   if (withHooks && !dryRun) {
     try {
       const { installHookPack } = await import("../hooks/pack.ts");
-      const hookResult = installHookPack();
+      const hookResult = installHookPack(undefined, { harness: flags["harness"] });
       for (const r of hookResult.installed) console.log(`  [HOOKS] ${r.message}`);
     } catch (err: any) {
       console.log(`  [HOOKS] Skipped: ${err.message}`);
     }
   } else if (withHooks && dryRun) {
-    console.log(`  [HOOKS] [DRY RUN] Would wire SessionStart/PostToolUse/Stop hooks into ~/.claude/settings.json`);
+    console.log(`  [HOOKS] [DRY RUN] Would wire SessionStart/PostToolUse/Stop hooks into the resolved settings path`);
   }
 
   try {
-    const reports = connectAgent(agent, undefined, { dryRun, force });
+    const reports = connectAgent(agent, undefined, { dryRun, force, harness: flags["harness"] });
     if (reports.length === 0) {
       console.log(`[INFO] No coding agents were detected on this machine.`);
       console.log(`Use 'memory connect <agent> --force' to configure a specific agent, or 'memory agents' to list all supported platforms.`);
