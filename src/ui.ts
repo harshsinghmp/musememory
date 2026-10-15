@@ -2470,6 +2470,9 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 
 export function exportStandaloneHtml(store: Store): string {
   const memories = list(store);
-  const script = `<script>window.STANDALONE_DATA = ${JSON.stringify(memories)};</script>`;
-  return EMBEDDED_HTML.replace("</head>", `${script}\n</head>`);
+  // Escape every `<` as its JSON unicode form so memory content cannot close the
+  // inline script block; replace() takes a function so `$&` in content stays literal.
+  const data = JSON.stringify(memories).replace(/</g, "\\u003c");
+  const script = `<script>window.STANDALONE_DATA = ${data};</script>`;
+  return EMBEDDED_HTML.replace("</head>", () => `${script}\n</head>`);
 }

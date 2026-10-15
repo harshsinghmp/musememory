@@ -1,8 +1,8 @@
 import { describe, test, expect } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { openStore } from "../src/store.ts";
-import { startUiServer } from "../src/ui.ts";
+import { openStore, save } from "../src/store.ts";
+import { startUiServer, exportStandaloneHtml } from "../src/ui.ts";
 import { setupFixtureRoot, cleanup, makeTempRoot } from "./helpers.ts";
 
 describe("embedded web UI server", () => {
@@ -234,6 +234,60 @@ describe("embedded web UI server", () => {
     expect(optStatus).toHaveProperty("shouldAutoOptimize");
 
     srv.close();
+    cleanup(root);
+  });
+});
+
+describe("standalone HTML export", () => {
+  function embeddedPayload(html: string): unknown {
+    const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
+    if (!m) throw new Error("STANDALONE_DATA script block not found");
+    return JSON.parse(m[1]);
+  }
+
+  function storeWith(content: string) {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    mkdirSync(join(memoryDir, "memories"), { recursive: true });
+    const store = openStore(memoryDir);
+    save(store, {
+      id: "m_1700000009500_xss",
+      title: "xss payload",
+      content,
+      project: "t342",
+      status: "confirmed",
+      type: "discovery",
+      created_at: "2026-08-12T10:00:00Z",
+      updated_at: "2026-08-12T10:00:00Z",
+    });
+    return { root, memoryDir, store };
+  }
+
+  test("T-342: escapes </script> in memory content so the payload stays inert", () => {
+    const { root, store } = storeWith("</script><script>alert(1)</script>");
+
+    const html = exportStandaloneHtml(store);
+    const block = html.match(/window\.STANDALONE_DATA = [\s\S]*?;<\/script>/)?.[0] ?? "";
+
+    // escaped form present
+    expect(block).toContain("\\u003c/script>");
+    // raw script terminator from the payload never reaches the document
+    expect(block).not.toContain("<script>alert(1)");
+    // payload still parses back to the original content
+    const parsed = embeddedPayload(html) as { content: string }[];
+    expect(parsed[0].content).toBe("</script><script>alert(1)</script>");
+
+    cleanup(root);
+  });
+
+  test("T-342: $& in memory content survives byte-identical (no replace-pattern corruption)", () => {
+    const { root, store } = storeWith("cost was $& and $` too");
+
+    const html = exportStandaloneHtml(store);
+    const parsed = embeddedPayload(html) as { content: string }[];
+
+    expect(parsed[0].content).toBe("cost was $& and $` too");
+
     cleanup(root);
   });
 });
