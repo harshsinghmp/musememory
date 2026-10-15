@@ -2,14 +2,15 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
-import { scanSecrets } from "./secrets.ts";
+import type { MemoryEntry, MemoryType, Verification, GraphMetadata, TrustTier } from "./types.ts";
+import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
 import { autoStampGraphMetadata } from "./graph.ts";
 import { workspaceRootFor } from "./root.ts";
+import { loadSources } from "./provenance.ts";
 import {
   openDatabase,
   insertOrReplaceMemory,
@@ -33,6 +34,7 @@ import {
   consolidateIntoCanonical,
   detectConflict,
   flagConflict,
+  calculateRetentionScore,
 } from "./quality/index.ts";
 import { recoverStaleLocks } from "./outbox.ts";
 export * from "./outbox.ts";
@@ -583,6 +585,25 @@ function closeOutValidity(entry: MemoryEntry): void {
   entry.reinforcement = (entry.reinforcement ?? 0) - 1;
 }
 
+/**
+ * T-075: Derives provenance trust tier from source or explicit parameter.
+ * - trusted: user, human, manual, direct, owner, admin, principal
+ * - untrusted: web, external, third-party, unknown, scrape, url, crawler
+ * - candidate: agent, transcript, inference, distillation, session, assistant
+ */
+export function deriveTrustTier(source?: string, explicitTrust?: TrustTier): TrustTier {
+  if (explicitTrust) return explicitTrust;
+  if (!source) return "candidate";
+  const s = source.toLowerCase().trim();
+  if (["user", "human", "manual", "direct", "owner", "admin", "principal"].includes(s)) {
+    return "trusted";
+  }
+  if (["web", "external", "third-party", "unknown", "scrape", "url", "crawler"].includes(s)) {
+    return "untrusted";
+  }
+  return "candidate";
+}
+
 /** Create a new entry. Defaults: status candidate, type discovery, verification unverified. */
 export function propose(
   store: Store,
@@ -622,6 +643,12 @@ export function propose(
     idempotency_key?: string;
     /** T-040: Normalized content hash for fast SQLite deduplication. */
     content_hash?: string;
+    /** T-075: Provenance trust tier override. */
+    trust?: TrustTier;
+    /** T-104: Skip retention gate for internal migrations or tests. */
+    skipRetentionGate?: boolean;
+    /** T-391: Citation source IDs referencing sources in sources.json. */
+    source_ids?: string[];
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -647,6 +674,29 @@ export function propose(
 
   const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
   const content_hash = opts.content_hash ?? computeContentHash(opts.content);
+
+  // T-104: Retention admission gate
+  const retention = calculateRetentionScore(opts.content, {
+    title,
+    tags: opts.tags,
+    salience: opts.salience,
+    type: opts.type,
+    confirmed: opts.confirmed,
+  });
+  if (!opts.skipRetentionGate && !retention.passed) {
+    throw new Error(`Retention gate rejected write (score ${retention.score.toFixed(2)} < 0.30): ${retention.reason}`);
+  }
+
+  // T-391: Citation grounding validation against live registry
+  if (opts.source_ids && opts.source_ids.length > 0) {
+    const existingSources = store.memoryDir ? loadSources(store.memoryDir) : [];
+    const existingIds = new Set(existingSources.map((s) => s.id));
+    for (const srcId of opts.source_ids) {
+      if (!existingIds.has(srcId)) {
+        throw new Error(`Grounding failure: unknown source_id "${srcId}" in memory citation`);
+      }
+    }
+  }
 
   // Deduplication check: consolidate into canonical memory if exact duplicate exists (T-040)
   if (opts.dedup) {
@@ -683,6 +733,7 @@ export function propose(
   const now = nowIso();
   const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
   const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
+  const trust = deriveTrustTier(opts.source, opts.trust);
 
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
@@ -710,6 +761,9 @@ export function propose(
     mem_path: opts.mem_path,
     idempotency_key: opts.idempotency_key,
     content_hash,
+    trust,
+    score_retain: retention.score,
+    source_ids: opts.source_ids,
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);
@@ -1280,10 +1334,15 @@ export function repairFtsIndex(store: Store): FtsParityReport {
   if (!db) return checkFtsParity(store);
   withTransaction(db, () => {
     db!.run(`DELETE FROM memories_fts`);
-    db!.run(
-      `INSERT INTO memories_fts (id, title, content, tags)
-       SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') FROM memories WHERE deleted_at IS NULL`,
-    );
+    const rows = db!.query<{ id: string; title: string; content: string; tags: string }>(
+      `SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') as tags FROM memories WHERE deleted_at IS NULL`,
+    ).all();
+    for (const r of rows) {
+      db!.run(
+        `INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`,
+        [r.id, redactSecrets(r.title), redactSecrets(r.content), r.tags],
+      );
+    }
   });
   return { ...checkFtsParity(store), repaired: true };
 }

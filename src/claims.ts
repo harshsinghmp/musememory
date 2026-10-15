@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { scanSecrets } from "./secrets.ts";
+import { loadSources } from "./provenance.ts";
 import type { ClaimEntry, ClaimConfidence } from "./types.ts";
 
 export type { ClaimEntry, ClaimConfidence };
@@ -40,6 +41,7 @@ export function recordClaim(
     verified?: boolean;
     id?: string;
     created_at?: string;
+    validate_sources?: boolean;
   },
 ): ClaimEntry {
   const textToScan = `${input.claim}\n${input.notes ?? ""}`;
@@ -47,6 +49,27 @@ export function recordClaim(
   if (secrets.length > 0) {
     throw new Error(`Vibeguard: Detected secret in claim: ${secrets.join(", ")}`);
   }
+
+  // T-391: Validate citations against live registry
+  const sources = loadSources(memoryDir);
+  const liveSourceIds = new Set(sources.map((s) => s.id));
+  if (input.source_ids && input.source_ids.length > 0) {
+    if (sources.length > 0 || input.validate_sources) {
+      for (const srcId of input.source_ids) {
+        if (!liveSourceIds.has(srcId)) {
+          throw new Error(`Grounding failure: unknown source_id "${srcId}" in claim citation`);
+        }
+      }
+    }
+  }
+
+  // T-391: Derive verified status from live registry citations rather than accepting blind caller assertion
+  const hasValidSources = Boolean(
+    input.source_ids &&
+      input.source_ids.length > 0 &&
+      input.source_ids.every((id) => liveSourceIds.has(id)),
+  );
+  const derivedVerified = Boolean(input.verified && hasValidSources);
 
   const claims = loadClaims(memoryDir);
   const id = input.id ?? `clm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -60,7 +83,7 @@ export function recordClaim(
     memory_ids: input.memory_ids ?? [],
     notes: input.notes,
     created_at,
-    verified: input.verified ?? false,
+    verified: derivedVerified,
   };
 
   const existingIdx = claims.findIndex((c) => c.id === id);

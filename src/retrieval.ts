@@ -9,6 +9,7 @@ import { formatCoreBlock } from "./core.ts";
 import type { MemoryEntry, SearchOptions } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
+import { hasSecret } from "./secrets.ts";
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -32,6 +33,8 @@ export interface SearchResult {
   source: "live";
   stale: boolean;
   totalTokensUsed?: number;
+  /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
+  withheld?: Array<{ id: string; reason: string }>;
 }
 
 export interface FormattedContext {
@@ -403,6 +406,38 @@ export function sortCandidates(
  */
 export const searchMemories = queryContext;
 
+const loggedRevalidationWarnings = new Set<string>();
+
+/**
+ * T-058 & T-059: Read-path re-validation defense-in-depth.
+ * Excludes prompt injection markup, leaked credentials, and invisible/bidi control characters.
+ * Logs a warning at most once per memory ID.
+ */
+export function validateRecalledEntry(entry: MemoryEntry): { valid: boolean; reason?: string } {
+  const text = `${entry.title}\n${entry.content}`;
+
+  // 1. Prompt injection / instruction override markup
+  if (
+    /(?:<system>|<\/system>|\[INST\]|\[\/INST\]|<memory-context>|<\/memory-context>|ignore previous instructions|disregard earlier instructions|system prompt override)/i.test(
+      text,
+    )
+  ) {
+    return { valid: false, reason: "prompt_injection_markup" };
+  }
+
+  // 2. Secret credential leak
+  if (hasSecret(entry.content) || hasSecret(entry.title)) {
+    return { valid: false, reason: "credential_leak" };
+  }
+
+  // 3. Invisible / bidi control characters
+  if (/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/.test(text)) {
+    return { valid: false, reason: "invisible_control_characters" };
+  }
+
+  return { valid: true };
+}
+
 export function queryContext(
   store: Store,
   query: string = "",
@@ -411,6 +446,32 @@ export function queryContext(
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
   let entries = list(store);
+  const withheld: Array<{ id: string; reason: string }> = [];
+
+  // T-075: Untrusted provenance filter (default excluded, opt-in with includeUntrusted: true)
+  if (!options.includeUntrusted) {
+    entries = entries.filter((e) => {
+      if (e.trust === "untrusted") {
+        withheld.push({ id: e.id, reason: "untrusted_source" });
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // T-058: Defense-in-depth read-path revalidation
+  entries = entries.filter((e) => {
+    const val = validateRecalledEntry(e);
+    if (!val.valid) {
+      if (!loggedRevalidationWarnings.has(e.id)) {
+        loggedRevalidationWarnings.add(e.id);
+        console.warn(`[ReadPathValidation] Withheld memory ${e.id}: detected ${val.reason}`);
+      }
+      withheld.push({ id: e.id, reason: val.reason! });
+      return false;
+    }
+    return true;
+  });
 
   if (options.project) {
     entries = entries.filter((e) => e.project === options.project);
@@ -505,6 +566,7 @@ export function queryContext(
     source: "live",
     stale: false,
     totalTokensUsed,
+    withheld: withheld.length > 0 ? withheld : undefined,
   };
 }
 

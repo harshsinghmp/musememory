@@ -20,6 +20,8 @@ export interface MuseContextInput {
   dir?: string;
   /** Recall-time freshness gate (GAP-3): withhold drifted/orphaned-anchor memories (default true). Pass false to include with warnings. */
   include_drifted?: boolean;
+  /** T-075: Include memories with untrusted provenance (filtered by default). */
+  include_untrusted?: boolean;
 }
 
 export interface FusedContextResult {
