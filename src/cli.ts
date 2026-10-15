@@ -144,9 +144,10 @@ Persona, Settings & Constraints Commands:
   core [tier] [--set T|--remove|--show] Manage CORE.md permanent partitions (identity|directives|conventions|context)
 
 Ecosystem, Migration & Connectivity:
-  connect [agent|all] [--force] [--with-hooks]
+  connect [agent|all] [--force] [--with-hooks] [--harness H]
                                  Auto-wire MCP into detected coding agents; --with-hooks also installs
-                                 the Claude Code lifecycle hook pack (SessionStart/PostToolUse/Stop)
+                                 the lifecycle hook pack (SessionStart/PostToolUse/Stop) into .agents/hooks.json;
+                                 --harness claude is the explicit opt-in for harness-specific paths like ~/.claude
   agents / detect-agents        Scan workstation for 80+ coding agent platforms
   detect                        Scan machine for 24+ external memory formats
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing

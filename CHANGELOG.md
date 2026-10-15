@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Ranking**: the semantic cosine dimension is opt-in and additive — with no embedder configured, scoring is unchanged.
+- **Hook pack install is harness-independent (T-390)**: `memory hooks install` and `memory connect --with-hooks` now target `<project>/.agents/hooks.json` (or `~/.agents/hooks.json`) instead of `~/.claude/settings.json`. Reaching `~/.claude/settings.json` requires an explicit `--harness claude`; a pre-existing Claude config no longer implies consent.
+- **Claude Code MCP wiring requires explicit opt-in (T-390)**: `memory connect` skips `~/.claude*` paths and reports the skip unless `--harness claude` is passed.
+
+### Security
+- **`test_command` is template-gated (T-001)**: `memory verify` no longer runs entry commands through a shell. A command must match one of three fixed templates — `bun test <relative *.test|*.spec path>`, `node --check <relative path>`, or `bunx tsc --noEmit` — and is executed as a direct argv with no shell. Shell metacharacters, absolute paths, `..` traversal, flag-smuggling paths, and code-execution flags (`-e`, `--import`, `--env-file`, …) are refused. Refusals execute nothing and are recorded in the audit trail as `verify_refused`, so probing attempts stay visible.
+- **`test_command` schema guard (T-001)**: `validateEntry` now rejects non-string, over-long (500 chars), or non-executable `test_command` values at both `/test_command` and `/verification/test_command`.
+- **Strict path containment (T-363)**: new `src/paths.ts` guards `.memory`-relative writes. Wiki concept/entity lookups and PageIndex build/load/delete resolve through `resolveWithin`, which rejects absolute segments, NUL bytes, and lexical escapes including sibling prefixes such as `../memory-evil`. PageIndex index ids must additionally be bare filenames.
+- **External paths stay explicit (T-363)**: shared-pool sync directories and `mesh link` targets are legitimately outside `.memory`; they now route through `resolveExternal`, which normalizes and rejects NUL bytes without confining them.
+
+### Fixed
+- **`connect` no longer writes a Claude config the user did not ask for (T-390)**: `~/.claude.json`, `~/.claude/settings.json`, and injected `allowedTools` are only touched with `--harness claude`.
+- **PageIndex reads fail soft on hostile ids (T-363)**: a traversing `project`/`indexId` is a miss (`null`), not an exception, so `loadPageIndex` stays a safe read-only query.
 
 ## [2.3.0] - 2026-09-03
 
