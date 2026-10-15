@@ -275,6 +275,7 @@ export type AuditOperation =
   | "transcript_import"
   | "verify"
   | "verify_refused"
+  | "restore"
   | "conflict_detected"
   | "conflict_resolved"
   | "application_outcome"

@@ -124,3 +124,54 @@ describe("schema migrations (T-368)", () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe("T-030 tombstone migration", () => {
+  test("adds deleted_at / deleted_by to a pre-tombstone store and leaves live rows unmarked", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-tombstone-"));
+    const { db, store } = legacyStore(root);
+    const e = entry();
+
+    // RED: the marker columns do not exist yet, so the migration is what makes them usable.
+    expect(getSchemaVersion(db)).toBe(0);
+    expect(() => db.query(`SELECT deleted_at, deleted_by FROM memories`).all()).toThrow();
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBe(LATEST_SCHEMA_VERSION);
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(memories)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("deleted_at");
+    expect(cols).toContain("deleted_by");
+
+    // Live rows must read as NOT tombstoned: NULL is the unmarked state, with no backfill.
+    expect(() => save(store, e)).not.toThrow();
+    const row = db
+      .query<{ deleted_at: string | null; deleted_by: string | null }>(
+        `SELECT deleted_at, deleted_by FROM memories WHERE id = ?`,
+      )
+      .get([e.id]);
+    expect(row?.deleted_at).toBeNull();
+    expect(row?.deleted_by).toBeNull();
+
+    // Idempotent: re-running neither errors nor changes the stamp.
+    expect(runMigrations(db)).toBe(LATEST_SCHEMA_VERSION);
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the tombstone index exists after migrating a pre-tombstone store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-tombstone-idx-"));
+    const { db } = legacyStore(root);
+    runMigrations(db);
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(memories)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_memories_tombstone");
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+});

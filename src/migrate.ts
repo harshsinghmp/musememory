@@ -13,6 +13,16 @@ const POST_V0_COLUMNS: { name: string; type: string; json: string }[] = [
   { name: "access_count", type: "INTEGER", json: "$.access_count" },
 ];
 
+/**
+ * T-030 tombstone marker. A soft-deleted row keeps its content and stays queryable by audit
+ * and replay, but every read path filters on `deleted_at`. No backfill from `data`: the marker
+ * is deliberately not an entry field, and NULL is the "not deleted" state.
+ */
+const TOMBSTONE_COLUMNS: { name: string; type: string }[] = [
+  { name: "deleted_at", type: "TEXT" },
+  { name: "deleted_by", type: "TEXT" },
+];
+
 /** Ordered by version; a new column gets a new migration appended here, never an edit to an old one. */
 export const MIGRATIONS: Migration[] = [
   {
@@ -27,6 +37,20 @@ export const MIGRATIONS: Migration[] = [
         // Old builds only ever persisted these inside `data`, so that blob is the backfill source.
         db.exec(`UPDATE memories SET ${col.name} = json_extract(data, '${col.json}') WHERE ${col.name} IS NULL`);
       }
+    },
+  },
+  {
+    version: 2,
+    up(db) {
+      for (const col of TOMBSTONE_COLUMNS) {
+        const has = db
+          .query<{ name: string }>(`PRAGMA table_info(memories)`)
+          .all()
+          .some((c) => c.name === col.name);
+        if (!has) db.exec(`ALTER TABLE memories ADD COLUMN ${col.name} ${col.type}`);
+      }
+      // Read paths probe the marker on every list/get; without this the probe is a table scan.
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_tombstone ON memories(deleted_at)`);
     },
   },
 ];

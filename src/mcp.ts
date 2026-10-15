@@ -17,6 +17,8 @@ import {
   markStale,
   reject,
   deleteEntry,
+  restoreEntry,
+  replayFromAudit,
   harvestMemories,
   type Store,
 } from "./store.ts";
@@ -355,12 +357,26 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_delete",
-        description: "Permanently delete a memory entry by ID and record audit event",
+        description: "Soft-delete a memory entry by ID (tombstone, reversible via memory_restore) and record audit event",
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string" },
             reason: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_restore",
+        description:
+          "Restore a tombstoned memory entry by ID. Fails on an unknown or never-deleted entry. Set replay=true to rebuild the content from the audit ledger when the row is gone, and apply=true to write it back",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            replay: { type: "boolean" },
+            apply: { type: "boolean" },
           },
           required: ["id"],
         },
@@ -1814,7 +1830,33 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const reason = a.reason ? String(a.reason) : undefined;
         const ok = deleteEntry(activeStore, id, reason, "mcp_agent");
         if (!ok) return toolError(`no entry found with id ${id}`);
-        return toolResult({ success: true, deleted_id: id });
+        return toolResult({ success: true, deleted_id: id, tombstoned: true });
+      }
+      case "memory_restore": {
+        const id = String(a.id);
+        if (a.replay === true) {
+          const report = replayFromAudit(activeStore, id, { apply: a.apply === true });
+          if (!report.ok || !report.entry) {
+            return toolError(`cannot replay ${id}: ${report.reason ?? "unknown reason"}`);
+          }
+          return toolResult({
+            success: true,
+            restored_id: id,
+            applied: a.apply === true,
+            reconstructed: report.reconstructed,
+            not_reconstructable: report.missing,
+            entry: report.entry,
+          });
+        }
+        const out = restoreEntry(activeStore, id, "mcp_agent");
+        if (!out.ok) {
+          return toolError(
+            out.reason === "not_found"
+              ? `no entry found with id ${id} (retry with replay=true to rebuild from the audit ledger)`
+              : `cannot restore ${id}: ${out.reason}`,
+          );
+        }
+        return toolResult({ success: true, restored_id: id, entry: out.entry });
       }
       case "memory_audit": {
         const trail = getAuditTrail(activeMemoryDir, {

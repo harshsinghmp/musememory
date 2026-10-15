@@ -4,7 +4,7 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
 import { scanSecrets } from "./secrets.ts";
-import { recordAuditEvent } from "./audit.ts";
+import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
@@ -15,7 +15,6 @@ import {
   insertOrReplaceMemory,
   getMemoryById,
   listMemories,
-  deleteMemoryById,
   searchMemoriesFts,
   type SqliteDatabase,
 } from "./sqlite.ts";
@@ -62,6 +61,53 @@ export interface Store {
   layout?: StorageLayout;
   db?: SqliteDatabase;
   cache?: MemoryStoreCache;
+}
+
+// --- T-030: tombstone marker ------------------------------------------------------
+// Shape: two nullable columns on `memories`, `deleted_at` / `deleted_by` (migration v2).
+// NULL = live. Set = soft-deleted: the row, its YAML mirror and its audit event all survive,
+// and only the read paths stop surfacing it. Deliberately NOT an entry field, so a tombstoned
+// row cannot leak the marker into schema.json validation or the YAML/JSON export shape.
+
+/** Ids carrying a tombstone marker. Empty without a SQLite primary (nothing can be tombstoned). */
+function tombstonedIds(store: Store): Set<string> {
+  if (!store.db) return new Set();
+  try {
+    return new Set(
+      store.db
+        .query<{ id: string }>(`SELECT id FROM memories WHERE deleted_at IS NOT NULL`)
+        .all()
+        .map((r) => r.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function isTombstoned(store: Store, id: string): boolean {
+  if (!store.db) return false;
+  try {
+    const row = store.db
+      .query<{ c: number }>(`SELECT count(*) AS c FROM memories WHERE id = ? AND deleted_at IS NOT NULL`)
+      .get([id]);
+    return (row?.c ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Write or clear the marker. Must run AFTER `save()` in the same transaction: INSERT OR
+ * REPLACE rewrites the row and drops any column the writer does not know about.
+ */
+function setTombstone(store: Store, id: string, marker: { at: string; by: string } | null): void {
+  if (!store.db) return;
+  store.db.run(
+    marker
+      ? `UPDATE memories SET deleted_at = ?, deleted_by = ? WHERE id = ?`
+      : `UPDATE memories SET deleted_at = NULL, deleted_by = NULL WHERE id = ?`,
+    marker ? [marker.at, marker.by, id] : [id],
+  );
 }
 
 const openWriteTx = new WeakSet<SqliteDatabase>();
@@ -251,6 +297,14 @@ export function recordAccess(store: Store, entry: MemoryEntry): MemoryEntry {
 }
 
 export function get(store: Store, id: string): MemoryEntry | null {
+  // T-030: a tombstoned entry is invisible to reads even though its row and YAML survive.
+  if (isTombstoned(store, id)) return null;
+  const entry = readEntry(store, id);
+  return entry ? recordAccess(store, entry) : null;
+}
+
+/** `get()` minus the tombstone gate and the access bookkeeping: the raw stored entry. */
+function readEntry(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
   let fileMtime: number | undefined;
 
@@ -262,7 +316,7 @@ export function get(store: Store, id: string): MemoryEntry | null {
     // 1. Check L0 cache if mtime matches
     if (store.cache && fileMtime !== undefined) {
       const cached = store.cache.getEntry(id, fileMtime);
-      if (cached) return recordAccess(store, cached);
+      if (cached) return cached;
     }
 
     // 2. Parse YAML from disk (either cache miss or externally modified)
@@ -282,19 +336,19 @@ export function get(store: Store, id: string): MemoryEntry | null {
     if (store.cache) {
       store.cache.setEntry(fromYaml, undefined, fileMtime);
     }
-    return recordAccess(store, fromYaml);
+    return fromYaml;
   }
 
   // File does not exist on disk, check L0 cache then SQLite
   if (store.cache) {
     const cached = store.cache.getEntry(id);
-    if (cached) return recordAccess(store, cached);
+    if (cached) return cached;
   }
   if (store.db) {
     const dbEntry = getMemoryById(store.db, id);
     if (dbEntry) {
       if (store.cache) store.cache.setEntry(dbEntry);
-      return recordAccess(store, dbEntry);
+      return dbEntry;
     }
   }
 
@@ -364,6 +418,11 @@ export function list(
     if (filters?.type) entries = entries.filter((e) => e.type === filters.type);
     if (filters?.status) entries = entries.filter((e) => e.status === filters.status);
   }
+
+  // T-030: tombstoned rows stay queryable for audit and replay but never surface here, which
+  // is also what keeps recall (queryContext), rankAndRetrieveMemories and hybridSearch out.
+  const tombstones = tombstonedIds(store);
+  if (tombstones.size > 0) entries = entries.filter((e) => !tombstones.has(e.id));
 
   if (store.cache) {
     for (const e of entries) {
@@ -562,6 +621,12 @@ export function propose(
 
   entry.quality = opts.quality ?? determineQuality(entry);
   entry.utility = opts.utility ?? ensureUtility(entry);
+
+  // Resurrection guard: an explicit id colliding with a tombstoned row must go
+  // through memory_restore, not silently clear the marker via INSERT OR REPLACE.
+  if (opts.id && isTombstoned(store, entry.id)) {
+    throw new Error(`Entry ${entry.id} is deleted — use memory_restore to bring it back, not propose`);
+  }
 
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
@@ -790,26 +855,36 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   return entry;
 }
 
-/** Delete an entry permanently from store and record audit event. */
+/**
+ * T-030: soft delete. The row, its YAML mirror and its audit event all survive; only the
+ * marker and the FTS text are removed, so no read path can surface it again.
+ * `restoreEntry` reverses this. Without a SQLite primary there is nowhere to persist the
+ * marker, so the degraded path still unlinks — shortcut: openStore always provides a db.
+ */
 export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
   const entry = get(store, id);
   if (!entry) return false;
+  const who = actor ?? "agent";
+
+  if (!store.db) {
+    const file = fileForId(store, id);
+    if (existsSync(file)) unlinkSync(file);
+    if (store.cache) store.cache.deleteEntry(id);
+    return true;
+  }
+
+  // T-025: row + marker + FTS eviction as one commit. save() first so a YAML-only entry
+  // gets a row to tombstone; the marker must follow save() because INSERT OR REPLACE
+  // rewrites the row and drops columns its writer does not know about.
+  withTransaction(store.db, () => {
+    save(store, entry);
+    setTombstone(store, id, { at: nowIso(), by: who });
+    store.db!.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
+  });
 
   // 1. Evict from L0 Cache
   if (store.cache) {
     store.cache.deleteEntry(id);
-  }
-
-  let deleted = false;
-  if (store.db) {
-    // T-025: FTS row + memory row removed in one commit.
-    deleted = withTransaction(store.db, () => deleteMemoryById(store.db!, id)) || deleted;
-  }
-
-  const file = fileForId(store, id);
-  if (existsSync(file)) {
-    unlinkSync(file);
-    deleted = true;
   }
 
   if (store.memoryDir && entry) {
@@ -817,8 +892,18 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
       operation: "delete",
       entry_id: id,
       project: entry.project,
-      actor: actor ?? "agent",
+      actor: who,
       reason,
+      // T-032: snapshot of what was tombstoned, so replayFromAudit can rebuild the content
+      // if the row and the YAML mirror are later lost. Reported as reconstruction gaps otherwise.
+      details: {
+        tombstone: true,
+        title: entry.title,
+        type: entry.type,
+        status: entry.status,
+        tags: entry.tags,
+        content: entry.content,
+      },
     });
     if (entry.type === "constraint") {
       try {
@@ -826,7 +911,128 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
       } catch {}
     }
   }
-  return deleted;
+  return true;
+}
+
+export type RestoreFailure = "not_found" | "not_deleted" | "no_store";
+export type RestoreOutcome = { ok: true; entry: MemoryEntry } | { ok: false; reason: RestoreFailure };
+
+/**
+ * T-031: clear a tombstone so the entry returns to every read path. Fails cleanly on an
+ * unknown id or an entry that was never deleted. The content is reused as-is; use
+ * `replayFromAudit` when the stored copy is gone.
+ */
+export function restoreEntry(store: Store, id: string, actor = "agent"): RestoreOutcome {
+  if (!store.db) return { ok: false, reason: "no_store" };
+  // Read the row, not the YAML mirror: readEntry() re-syncs rows with INSERT OR REPLACE, which
+  // drops the marker columns and would clear the tombstone we are about to test for.
+  const entry = getMemoryById(store.db, id);
+  if (!entry) return { ok: false, reason: "not_found" };
+  if (!isTombstoned(store, id)) return { ok: false, reason: "not_deleted" };
+
+  // Same ordering rule as deleteEntry: save() re-adds the FTS row, then the marker clears.
+  withTransaction(store.db, () => {
+    save(store, entry);
+    setTombstone(store, id, null);
+  });
+  if (store.cache) store.cache.deleteEntry(id);
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "restore",
+      entry_id: id,
+      project: entry.project,
+      actor,
+      details: { tombstone_restore: true, title: entry.title },
+    });
+    if (entry.type === "constraint") {
+      try {
+        syncConstraints(store.memoryDir, store);
+      } catch {}
+    }
+  }
+  return { ok: true, entry };
+}
+
+export interface ReplayReport {
+  ok: boolean;
+  entry: MemoryEntry | null;
+  /** Fields rebuilt from the audit ledger. */
+  reconstructed: string[];
+  /** Fields the ledger does not carry, left at defaults rather than invented. */
+  missing: string[];
+  reason?: string;
+}
+
+/**
+ * Fields the audit ledger never records, so a replay can always be expected to report them.
+ * `rehydrate`/`delete`/`supersede` events carry identifiers and lifecycle state, not payloads.
+ */
+const REPLAY_UNRECONSTRUCTABLE = [
+  "verification",
+  "fingerprint",
+  "quality",
+  "utility",
+  "evidence",
+  "graph",
+  "related_memory_ids",
+  "supersedes",
+] as const;
+
+/**
+ * T-032: best-effort rebuild of an entry from audit.jsonl. Needed when the tombstoned row and
+ * its YAML mirror are gone (purged, or written by a build that hard-deleted). Dry run by
+ * default: `apply: true` writes the rebuilt entry and clears the tombstone.
+ */
+export function replayFromAudit(store: Store, id: string, options: { apply?: boolean } = {}): ReplayReport {
+  const fail = (reason: string): ReplayReport => ({ ok: false, entry: null, reconstructed: [], missing: [], reason });
+  if (!store.memoryDir) return fail("store has no memory directory, so no audit ledger");
+
+  const trail = getAuditTrail(store.memoryDir, { entryId: id });
+  if (trail.length === 0) return fail(`no audit history for ${id}`);
+
+  // getAuditTrail is newest-first: the most recent snapshot wins, older events only fill gaps.
+  const snap = trail.find((e) => typeof e.details?.content === "string" && e.details.content)?.details;
+  if (!snap?.content) return fail(`audit history for ${id} carries no content snapshot`);
+
+  const oldest = trail[trail.length - 1];
+  const entry: MemoryEntry = {
+    id,
+    title: String(snap.title ?? `Reconstructed ${id}`),
+    content: String(snap.content),
+    project: String(snap.project ?? oldest.project ?? "unknown"),
+    status: (snap.status ?? "candidate") as MemoryEntry["status"],
+    type: (snap.type ?? "discovery") as MemoryEntry["type"],
+    created_at: oldest.timestamp,
+    updated_at: nowIso(),
+    source: "audit_replay",
+    tags: Array.isArray(snap.tags) ? snap.tags.map(String) : [],
+    verification: { level: "unverified", method: "audit_replay" },
+  };
+
+  const reconstructed = ["id", "content", "created_at", "updated_at", "status", "type", "source", "verification"];
+  if (snap.title) reconstructed.push("title");
+  if (snap.tags) reconstructed.push("tags");
+  const missing: string[] = [...REPLAY_UNRECONSTRUCTABLE];
+  if (!snap.title) missing.push("title");
+  if (!snap.tags) missing.push("tags");
+
+  if (options.apply) {
+    withTransaction(store.db, () => {
+      save(store, entry);
+      setTombstone(store, id, null);
+    });
+    if (store.memoryDir) {
+      recordAuditEvent(store.memoryDir, {
+        operation: "restore",
+        entry_id: id,
+        project: entry.project,
+        actor: "audit_replay",
+        details: { replay_restore: true, missing },
+      });
+    }
+  }
+  return { ok: true, entry, reconstructed, missing };
 }
 
 /**
@@ -908,7 +1114,11 @@ export function searchMemories(
   const preflight = preflightFtsQuery(query);
   if (!preflight.ok) throw new Error(`FTS query rejected: ${preflight.reason}`);
   if (!store.db) return [];
-  return searchMemoriesFts(store.db, query, filters);
+  const hits = searchMemoriesFts(store.db, query, filters);
+  // T-030: the delete path already evicts the FTS row; this holds the read path closed even if
+  // a row carries a marker without that eviction having run.
+  const tombstones = tombstonedIds(store);
+  return tombstones.size === 0 ? hits : hits.filter((h) => !tombstones.has(h.entry.id));
 }
 
 // --- T-026: FTS <-> row parity ----------------------------------------------------
@@ -951,7 +1161,10 @@ export function checkFtsParity(store: Store): FtsParityReport {
       .all([FTS_PARITY_SAMPLE])
       .map((r) => r.id);
 
-  const missingCount = count(`SELECT count(*) AS c FROM memories WHERE id NOT IN (SELECT id FROM memories_fts)`);
+  // T-030: a tombstoned row is intentionally absent from FTS, so it is not a desync.
+  const missingCount = count(
+    `SELECT count(*) AS c FROM memories WHERE deleted_at IS NULL AND id NOT IN (SELECT id FROM memories_fts)`,
+  );
   const orphanedCount = count(`SELECT count(*) AS c FROM memories_fts WHERE id NOT IN (SELECT id FROM memories)`);
   return {
     ok: missingCount === 0 && orphanedCount === 0,
@@ -959,14 +1172,15 @@ export function checkFtsParity(store: Store): FtsParityReport {
     indexedCount: count(`SELECT count(DISTINCT id) AS c FROM memories_fts`),
     missingCount,
     orphanedCount,
-    missing: missingCount > 0 ? ids(`SELECT id FROM memories WHERE id NOT IN (SELECT id FROM memories_fts) ORDER BY updated_at DESC LIMIT ?`) : [],
+    missing: missingCount > 0 ? ids(`SELECT id FROM memories WHERE deleted_at IS NULL AND id NOT IN (SELECT id FROM memories_fts) ORDER BY updated_at DESC LIMIT ?`) : [],
     orphaned: orphanedCount > 0 ? ids(`SELECT id FROM memories_fts WHERE id NOT IN (SELECT id FROM memories) LIMIT ?`) : [],
   };
 }
 
 /**
  * T-026: rebuild the FTS index from the memories table in one commit (drops orphaned
- * and duplicate index rows, re-adds missing ones), then re-report.
+ * and duplicate index rows, re-adds missing ones), then re-report. Tombstoned rows are
+ * left unindexed (T-030) — re-adding them would make deleted text searchable again.
  */
 export function repairFtsIndex(store: Store): FtsParityReport {
   const db = store.db;
@@ -975,7 +1189,7 @@ export function repairFtsIndex(store: Store): FtsParityReport {
     db!.run(`DELETE FROM memories_fts`);
     db!.run(
       `INSERT INTO memories_fts (id, title, content, tags)
-       SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') FROM memories`,
+       SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') FROM memories WHERE deleted_at IS NULL`,
     );
   });
   return { ...checkFtsParity(store), repaired: true };

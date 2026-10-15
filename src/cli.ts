@@ -43,6 +43,7 @@ import {
   handleMarkStaleCommand,
   handleRejectCommand,
   handleDeleteCommand,
+  handleRestoreCommand,
   handleAuditCommand,
   handleExportCommand,
   handleImportCommand,
@@ -101,7 +102,8 @@ Core Memory Lifecycle Commands:
   link <id> --related <id,...>  Link related memories bidirectionally
   mark-stale <id> [--reason R]  Deprecate decaying knowledge
   reject <id>                   Reject candidate entry
-  delete <id> [--reason R]      Permanently delete entry and log audit record
+  delete <id> [--reason R]      Tombstone entry (soft delete), log audit, restorable
+  restore <id> [--replay [--apply]]  Restore a tombstoned entry; --replay rebuilds content from audit.jsonl
   list / ls [--status S] [--type T] [--project P] List memory entries with multi-field filtering
   stats                         Display total memory counts and status/type distribution
   stale [--days N]              List entries exceeding staleness policy
@@ -280,6 +282,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleRejectCommand(parsed);
     case "delete":
       return handleDeleteCommand(parsed);
+    case "restore":
+      return handleRestoreCommand(parsed);
     case "audit":
       return handleAuditCommand(parsed);
     case "export":
