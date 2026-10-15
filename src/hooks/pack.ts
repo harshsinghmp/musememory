@@ -219,6 +219,7 @@ interface HookStdinPayload {
 
 function readStdinJson(): HookStdinPayload {
   try {
+    if (process.stdin.isTTY) return {};
     const raw = readFileSync(0, "utf8");
     return raw.trim() ? JSON.parse(raw) : {};
   } catch {

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
 import { openStore, list, getStorageLayout } from "./store.ts";
-import { validateStore } from "./schema.ts";
+import { validateStore, auditStoredCommands, type StoredCommandAuditResult } from "./schema.ts";
 import { getAuditTrail } from "./audit.ts";
 import { getSchemaVersion, LATEST_SCHEMA_VERSION } from "./migrate.ts";
 import { openDatabase } from "./sqlite.ts";
@@ -25,6 +25,7 @@ export interface DoctorReport {
     invalidCount: number;
     secretLeaksCount: number;
     brokenLinksCount: number;
+    storedCommandAudit?: StoredCommandAuditResult;
   };
   audit: {
     exists: boolean;
@@ -90,6 +91,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   let invalidCount = 0;
   let secretLeaksCount = 0;
   let brokenLinksCount = 0;
+  let storedCommandAudit: StoredCommandAuditResult | undefined;
   // Read before openStore: its runMigrations() normalises the stamp, so afterwards a mismatch is invisible.
   let storeVersion = 0;
 
@@ -127,6 +129,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       invalidCount = valReport.schemaErrors.length + valReport.integrityErrors.length;
       secretLeaksCount = valReport.secretErrors.length;
       brokenLinksCount = valReport.brokenLinks.length;
+      storedCommandAudit = auditStoredCommands(entries);
     } catch {
       valid = false;
     }
@@ -186,6 +189,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       invalidCount,
       secretLeaksCount,
       brokenLinksCount,
+      storedCommandAudit,
     },
     audit: {
       exists: auditExists,
@@ -246,6 +250,9 @@ export function printDoctorReport(report: DoctorReport): void {
   } else {
     console.log(`  [WARN] Schema / Integrity issues detected:`);
     if (report.validation.invalidCount > 0) console.log(`     - Invalid schema files: ${report.validation.invalidCount}`);
+    if (report.validation.storedCommandAudit && report.validation.storedCommandAudit.invalidCount > 0) {
+      console.log(`     - [SECURITY] Non-template test_commands detected: ${report.validation.storedCommandAudit.invalidCount}`);
+    }
     if (report.validation.secretLeaksCount > 0) console.log(`     - [SECURITY] Credential leaks found: ${report.validation.secretLeaksCount}`);
     if (report.validation.brokenLinksCount > 0) console.log(`     - Broken links: ${report.validation.brokenLinksCount}`);
   }

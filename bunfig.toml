@@ -1,0 +1,6 @@
+# Muse Memory Bun Configuration
+# Surface hardening for bun test and runtime execution
+
+[test]
+# Explicit global test timeout in milliseconds (prevents runner stalls)
+timeout = 15000

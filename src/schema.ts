@@ -212,3 +212,27 @@ export function validateStore(store: Store): StoreValidationReport {
     isValid: errorIdSet.size === 0,
   };
 }
+
+export interface StoredCommandAuditResult {
+  inspected: number;
+  invalidCount: number;
+  invalidEntries: { id: string; command: string }[];
+}
+
+/**
+ * T-403: Sweep stored memories for non-template test_commands.
+ */
+export function auditStoredCommands(entries: MemoryEntry[]): StoredCommandAuditResult {
+  const invalidEntries: { id: string; command: string }[] = [];
+  for (const entry of entries) {
+    if (entry.test_command && !parseTestCommand(entry.test_command).ok) {
+      invalidEntries.push({ id: entry.id, command: entry.test_command });
+    }
+  }
+  return {
+    inspected: entries.length,
+    invalidCount: invalidEntries.length,
+    invalidEntries,
+  };
+}
+

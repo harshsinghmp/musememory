@@ -37,6 +37,9 @@ export const MIGRATIONS: Migration[] = [
         // Old builds only ever persisted these inside `data`, so that blob is the backfill source.
         db.exec(`UPDATE memories SET ${col.name} = json_extract(data, '${col.json}') WHERE ${col.name} IS NULL`);
       }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_last_accessed_at ON memories(last_accessed_at)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_access_count ON memories(access_count)`);
     },
   },
   {
