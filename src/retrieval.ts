@@ -70,15 +70,72 @@ const STOPWORDS = new Set([
 ]);
 
 /**
- * Unicode-aware lowercase word/number tokens, split on everything else.
+ * T-061: Compound-token expansion.
+ * Splits camelCase (getUserProfile -> get, user, profile, getuserprofile),
+ * snake_case (auth_token -> auth, token, auth_token), and kebab-case.
+ * Returns unique array containing both the decomposed sub-tokens and the normalized full token.
+ */
+export function splitCompoundToken(token: string): string[] {
+  if (!token || typeof token !== "string") return [];
+  const results = new Set<string>();
+
+  const lowerFull = token.toLowerCase();
+  results.add(lowerFull);
+
+  const stripped = lowerFull.replace(/[_\-.]+/g, "");
+  if (stripped.length > 0) {
+    results.add(stripped);
+  }
+
+  // Split on camelCase/PascalCase boundaries and delimiter boundaries
+  const parts = token
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[\s_\-.]+/);
+
+  for (const p of parts) {
+    const clean = p.toLowerCase().trim();
+    if (clean.length > 0) {
+      results.add(clean);
+    }
+  }
+
+  return [...results];
+}
+
+/**
+ * Unicode-aware lowercase word/number tokens with compound token expansion (T-061, T-311).
  * `\p{L}\p{N}` keeps ASCII behavior identical while giving CJK, Cyrillic and
- * accented words whole tokens instead of fragments (T-311).
- * Shortcut: scripts without word delimiters (Han) yield one token per run, so
- * recall there relies on the entry containing the same run.
+ * accented words whole tokens. Compound tokens (camelCase, PascalCase) are expanded into sub-tokens.
  */
 export function tokenize(text: string): string[] {
   if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const rawMatches = text.match(/[\p{L}\p{N}]+/gu);
+  if (!rawMatches) return [];
+
+  const tokens: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawMatches) {
+    // Expand camelCase / PascalCase compound words (e.g., getUserProfile -> getuserprofile, get, user, profile)
+    if (/[a-z\p{Ll}][A-Z\p{Lu}]|[A-Z\p{Lu}]{2,}[a-z\p{Ll}]/u.test(raw)) {
+      const expanded = splitCompoundToken(raw);
+      for (const t of expanded) {
+        if (!seen.has(t)) {
+          seen.add(t);
+          tokens.push(t);
+        }
+      }
+    } else {
+      const lower = raw.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        tokens.push(lower);
+      }
+    }
+  }
+
+  return tokens;
 }
 
 /**
