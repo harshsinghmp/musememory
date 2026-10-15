@@ -6,7 +6,7 @@ import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
 import { parseCurrentFile } from "../governor.ts";
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { gateCandidates } from "./freshness.ts";
-import type { MuseContextInput, FusedContextResult } from "./types.ts";
+import type { MuseContextInput, FusedContextResult, ContextManifestItem } from "./types.ts";
 import { validateDigestIntegrity, dualMeasureTokens } from "../compaction/tokens.ts";
 
 function estimateTokens(text: string): number {
@@ -191,12 +191,51 @@ export async function resolveMuseContext(
   });
   const gatedPool = gate.entries;
 
-  // 5. Separate negative lessons & anti-patterns
+  // T-094: Reserved slots for global / USER.md guidelines
+  let userProfileReservedTokens: number | undefined;
+  const hasGlobalEntries = allEntries.some((e) => e.project === "global" || e.scope === "global");
+  if (hasGlobalEntries) {
+    userProfileReservedTokens = Math.min(Math.floor(budget * 0.20), 400);
+  }
+
+  // T-093: Truncation hierarchy (Pin > Provenance > Recency > Salience)
+  function getTruncationRank(e: MemoryEntry): number {
+    let rank = 0;
+    // 1. Pin / Guardrail
+    if (
+      e.type === "constraint" ||
+      e.temporal_mode === "timeless" ||
+      e.type === "negative" ||
+      e.tags?.some((t) => t.includes("anti-pattern") || t.includes("bug") || t.includes("negative")) ||
+      e.negative != null
+    ) {
+      rank += 1000;
+    }
+    // 2. Provenance
+    if (e.verification?.level === "authoritative") rank += 300;
+    else if (e.verification?.level === "user-confirmed" || e.verification?.level === "independently-verified") rank += 200;
+    else if (e.verification?.level && e.verification.level !== "unverified") rank += 100;
+
+    // 3. Recency bonus
+    const ts = new Date(e.updated_at || e.created_at).getTime();
+    if (!isNaN(ts)) {
+      const daysAgo = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+      if (daysAgo <= 30) rank += 50;
+    }
+
+    // 4. Salience
+    rank += (e.salience ?? 1) * 10;
+    return rank;
+  }
+
+  // 5. Separate negative lessons & anti-patterns with truncation ranking
+  const sortedGatedPool = [...gatedPool].sort((a, b) => getTruncationRank(b) - getTruncationRank(a));
   const negativeLessons: MemoryEntry[] = [];
   const relevantMemories: MemoryEntry[] = [];
 
-  for (const entry of gatedPool) {
+  for (const entry of sortedGatedPool) {
     if (
+      entry.type === "negative" ||
       entry.negative != null ||
       entry.tags?.some((t) => t.includes("anti-pattern") || t.includes("bug") || t.includes("negative"))
     ) {
@@ -206,15 +245,17 @@ export async function resolveMuseContext(
     }
   }
 
-  // 6. Token-budget knapsack packing
+  // 6. Token-budget knapsack packing with packed set tracking
   const packedNegative: MemoryEntry[] = [];
   const packedMemories: MemoryEntry[] = [];
+  const packedIds = new Set<string>();
 
   // Pack negative lessons first (defensive guardrails)
   for (const neg of negativeLessons) {
     const cost = estimateEntryTokens(neg);
     if (cost <= remainingBudget) {
       packedNegative.push(neg);
+      packedIds.add(neg.id);
       usedBudget += cost;
       remainingBudget -= cost;
     }
@@ -225,10 +266,26 @@ export async function resolveMuseContext(
     const cost = estimateEntryTokens(mem);
     if (cost <= remainingBudget) {
       packedMemories.push(mem);
+      packedIds.add(mem.id);
       usedBudget += cost;
       remainingBudget -= cost;
     }
   }
+
+  // T-093: [N omitted — budget M] marker
+  const totalCandidateCount = sortedGatedPool.length;
+  const packedCount = packedIds.size;
+  const omittedCount = Math.max(0, totalCandidateCount - packedCount);
+  const budgetNotice = omittedCount > 0 ? `[${omittedCount} omitted — budget ${budget} tokens]` : undefined;
+
+  // T-092: Never-drop manifest TOC listing all candidate memories
+  const context_manifest: ContextManifestItem[] = sortedGatedPool.map((entry) => ({
+    id: entry.id,
+    title: entry.title,
+    type: entry.type,
+    truncated: !packedIds.has(entry.id),
+    score: entry.salience,
+  }));
 
   // 7. Generate actionable suggested next steps
   const suggestedNextSteps: string[] = [];
@@ -296,5 +353,69 @@ export async function resolveMuseContext(
     withheld_memories: allWithheld.length > 0 ? allWithheld : undefined,
     freshness_notice: gate.withheldNotice ?? undefined,
     freshness_stats: gate.stats,
+    context_manifest,
+    budget_notice: budgetNotice,
+    user_profile_reserved_tokens: userProfileReservedTokens,
   };
+}
+
+/**
+ * T-091: Formats FusedContextResult into dense, structured compact context pack markdown.
+ */
+export function formatCompactContextPack(result: FusedContextResult): string {
+  const lines: string[] = [
+    "# 🧠 Muse Memory Context Pack",
+    `> Budget: ${result.tokens_used}/${result.token_budget} tokens used | Constraints: ${result.active_constraints.length} | Memories: ${result.relevant_memories.length}`,
+    "",
+  ];
+
+  if (result.budget_notice) {
+    lines.push(`> ⚠️ **Budget Constraint**: ${result.budget_notice}`, "");
+  }
+
+  if (result.context_manifest && result.context_manifest.length > 0) {
+    lines.push("## 📋 Manifest Table of Contents (TOC)");
+    for (const item of result.context_manifest) {
+      const status = item.truncated ? "omitted: budget" : "included";
+      lines.push(`- [${item.id}] [${item.type ?? "memory"}] ${item.title} (${status})`);
+    }
+    lines.push("");
+  }
+
+  if (result.active_constraints.length > 0) {
+    lines.push("## 🔒 Active Constraints & Invariants");
+    for (const c of result.active_constraints) {
+      lines.push(`### ${c.title}`);
+      lines.push(c.content);
+    }
+    lines.push("");
+  }
+
+  if (result.negative_lessons.length > 0) {
+    lines.push("## ❌ Negative Lessons & Anti-Patterns");
+    for (const n of result.negative_lessons) {
+      lines.push(`### ⚠️ ${n.title}`);
+      lines.push(n.content);
+    }
+    lines.push("");
+  }
+
+  if (result.relevant_memories.length > 0) {
+    lines.push("## 💡 Relevant Memories & Decisions");
+    for (const m of result.relevant_memories) {
+      lines.push(`### ${m.title}`);
+      lines.push(m.content);
+    }
+    lines.push("");
+  }
+
+  if (result.suggested_next_steps.length > 0) {
+    lines.push("## 🚀 Suggested Next Actions");
+    for (const step of result.suggested_next_steps) {
+      lines.push(`- ${step}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
