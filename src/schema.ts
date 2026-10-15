@@ -76,13 +76,14 @@ export function validateEntry(entry: unknown): ValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-/** Cap on a stored test_command; execution is argv-parsed, so this only bounds blast radius of junk. */
+/** Cap on a stored test_command; execution is template-gated to a fixed argv, so this only bounds blast radius of junk. */
 const MAX_TEST_COMMAND_LENGTH = 500;
 
 /**
  * Defense in depth for test_command: reject commands the oracle could never execute
  * anyway, so hostile strings fail at write/validate time instead of silently existing.
- * Authoritative enforcement stays in verify.ts parseTestCommand.
+ * Authoritative enforcement stays in verify.ts parseTestCommand, which additionally
+ * resolves the path against the workspace root at execution time.
  */
 function validateTestCommands(entry: unknown): string[] {
   const errors: string[] = [];

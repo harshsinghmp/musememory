@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
+import { resolve, sep } from "node:path";
 import type { Store } from "./store.ts";
 import { get, confirm, save } from "./store.ts";
 import { recordAuditEvent } from "./audit.ts";
-import type { MemoryEntry } from "./types.ts";
+import type { AuditOperation, MemoryEntry } from "./types.ts";
 
 export interface VerifyResult {
   ok: boolean;
@@ -20,21 +21,62 @@ export interface VerifyOptions {
   now?: number;
 }
 
-/** Executables the oracle may launch. Anything else is refused — there is no shell fallback. */
-const ALLOWED_BINARIES = new Set(["node", "bun", "bunx", "tsc"]);
-
 /** Shell syntax that must never reach the parser unquoted. */
 const SHELL_METACHARS = /[|;&$`><\r\n]/;
 
+/**
+ * Runtime flags that execute attacker-supplied code rather than checking anything.
+ * The templates below already exclude them; the explicit list only buys a precise
+ * refusal reason for the audit trail.
+ */
+const CODE_EXEC_FLAGS = new Set([
+  "-e", "--eval", "-p", "--print", "--input-type",
+  "-r", "--require", "--import", "--loader", "--experimental-loader", "--env-file",
+]);
+
+/** The only command shapes the oracle ever executes. Memory selects WHICH file, never WHAT code. */
+const ALLOWED_TEMPLATES = ["bun test <relative-path>", "bunx tsc --noEmit", "node --check <relative-path>"];
+
 export type ParsedCommand = { ok: true; argv: string[] } | { ok: false; error: string };
+
+/** A path is usable only if it is relative, free of `..`, and stays inside the workspace root. */
+function checkRelativePath(path: string, workspaceRoot?: string): string | null {
+  if (!path) return "path is empty";
+  if (path.includes("\0")) return "path contains a null byte";
+  if (path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(path)) {
+    return `absolute path '${path}' is not allowed`;
+  }
+  if (path.split(/[\\/]/).includes("..")) return `'..' traversal is not allowed in '${path}'`;
+  if (workspaceRoot) {
+    const root = resolve(workspaceRoot);
+    const full = resolve(root, path);
+    if (full !== root && !full.startsWith(root + sep)) {
+      return `path '${path}' resolves outside the workspace root`;
+    }
+  }
+  return null;
+}
+
+/** Matches argv against the fixed templates; returns a refusal reason or null when it fits. */
+function checkTemplate(argv: string[], workspaceRoot?: string): string | null {
+  if (argv.length === 3 && argv[0] === "bun" && argv[1] === "test") return checkRelativePath(argv[2], workspaceRoot);
+  if (argv.length === 3 && argv[0] === "node" && argv[1] === "--check") return checkRelativePath(argv[2], workspaceRoot);
+  // Pinned verbatim: no extra flags, no project override, no second package.
+  if (argv.length === 3 && argv[0] === "bunx" && argv[1] === "tsc" && argv[2] === "--noEmit") return null;
+  return `command does not match an allowed template (allowed: ${ALLOWED_TEMPLATES.join(", ")})`;
+}
 
 /**
  * Parse a test_command into argv for direct exec. There is no shell: quoted spans
  * become inert argument text handed verbatim to the child, so a metacharacter only
  * carries meaning when it appears unquoted. Fails closed on any unquoted shell
- * syntax, an unterminated quote, an empty command, or a non-allowlisted binary.
+ * syntax, an unterminated quote, an empty command, a code-execution flag, or any
+ * command that is not one of the fixed templates.
+ *
+ * `workspaceRoot`, when given, additionally requires a relative path to resolve
+ * inside it — the schema-time guard passes none and stays purely syntactic.
  */
-export function parseTestCommand(command: string): ParsedCommand {
+export function parseTestCommand(command: string, workspaceRoot?: string): ParsedCommand {
   const argv: string[] = [];
   let current = "";
   let hasCurrent = false;
@@ -74,9 +116,13 @@ export function parseTestCommand(command: string): ParsedCommand {
 
   const binary = argv[0];
   if (!binary) return { ok: false, error: "empty command" };
-  if (!ALLOWED_BINARIES.has(binary)) {
-    return { ok: false, error: `'${binary}' is not an allowed executable (allowed: ${[...ALLOWED_BINARIES].join(", ")})` };
+  for (const arg of argv) {
+    if (CODE_EXEC_FLAGS.has(arg)) {
+      return { ok: false, error: `'${arg}' executes arbitrary code — not allowed in a test_command` };
+    }
   }
+  const templateError = checkTemplate(argv, workspaceRoot);
+  if (templateError) return { ok: false, error: templateError };
   return { ok: true, argv };
 }
 
@@ -114,6 +160,7 @@ function runCommand(argv: string[], cwd: string, timeoutSec: number): Promise<Ve
  * executes a fix entry's test_command in the workspace root. Exit 0 promotes a
  * candidate to confirmed and stamps verification as independently-verified.
  * Non-zero leaves the entry untouched; both outcomes are audit-logged.
+ * A refused command executes nothing and is audit-logged as `verify_refused`.
  * Never executes without an explicit verify invocation.
  */
 export async function verifyEntry(
@@ -137,9 +184,22 @@ export async function verifyEntry(
     return { ok: false, ran: false, message: `entry ${id} carries no test_command` };
   }
 
-  const parsed = parseTestCommand(entry.test_command.trim());
+  const parsed = parseTestCommand(entry.test_command.trim(), workspaceRoot);
   if (!parsed.ok) {
-    // Fail closed: nothing is executed, nothing is audit-logged as a run.
+    // Fail closed: nothing is executed and no `verify` event is written, but the
+    // refusal leaves a forensic trace so an attacker probing the oracle is visible.
+    if (memoryDir) {
+      recordAuditEvent(memoryDir, {
+        // shortcut: `verify_refused` is not yet in the AuditOperation union (types.ts);
+        // drop the cast when that member lands.
+        operation: "verify_refused" as AuditOperation,
+        entry_id: id,
+        project: entry.project,
+        actor: "oracle",
+        reason: "refused test_command",
+        details: { error: parsed.error, command: entry.test_command },
+      });
+    }
     return { ok: false, ran: false, message: `refused test_command for ${id}: ${parsed.error}` };
   }
 
