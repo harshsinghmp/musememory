@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Store } from "../store.ts";
 import type { PoolSyncReport, SyncPacket } from "./types.ts";
 import { broadcastKnowledge, ingestKnowledge, resolveLocalAgentId, loadPeers } from "./engine.ts";
+import { resolveExternal } from "../paths.ts";
 
 /**
  * Synchronizes with an in-process / filesystem shared gossip pool directory.
@@ -16,7 +17,8 @@ export function syncWithSharedPool(
 ): PoolSyncReport {
   const agentId = resolveLocalAgentId(localAgentId);
   const memoryDir = store.memoryDir || join(workspaceRoot, ".memory");
-  const poolDir = customPoolDir || join(memoryDir, "sync", "pool");
+  // An external pool dir is an explicit feature — normalize it, don't confine it.
+  const poolDir = customPoolDir ? resolveExternal(customPoolDir) : join(memoryDir, "sync", "pool");
 
   if (!existsSync(poolDir)) {
     mkdirSync(poolDir, { recursive: true });

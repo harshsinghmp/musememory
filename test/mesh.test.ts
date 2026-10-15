@@ -154,6 +154,21 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
     }
   });
 
+  test("addMeshLink normalizes external paths and rejects NUL bytes", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      // External target is an explicit feature: relative and dot-segments normalize.
+      addMeshLink(fixture.appMemoryDir, path.join(fixture.extDir, "..", path.basename(fixture.extDir)));
+      expect(listMeshLinks(fixture.appMemoryDir)).toContain(path.resolve(fixture.extDir));
+
+      expect(() => addMeshLink(fixture.appMemoryDir, `${fixture.extDir}\u0000evil`)).toThrow();
+      expect(listMeshLinks(fixture.appMemoryDir)).not.toContain(`${path.resolve(fixture.extDir)}\u0000evil`);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
   test("resolveMeshMemories executes cross-project queries across monorepo packages", () => {
     const fixture = setupMonorepoFixture();
     try {
