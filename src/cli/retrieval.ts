@@ -267,8 +267,9 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
         const result = installHookPack(undefined, {
           dryRun,
           settingsPath: flags["settings"],
+          harness: flags["harness"],
         });
-        console.log(`${dryRun ? "[DRY RUN] " : ""}Claude Code hook pack -> ${result.settingsPath}`);
+        console.log(`${dryRun ? "[DRY RUN] " : ""}Hook pack -> ${result.settingsPath}`);
         for (const r of result.installed) console.log(`  * ${r.message}`);
         if (result.alreadyPresent) console.log("  (existing Muse hooks were refreshed in place)");
         console.log("\nMemory is now hands-free: context injects at SessionStart, tool results are captured at PostToolUse, sessions distill at Stop.");
@@ -281,6 +282,7 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
       const result = uninstallHookPack(undefined, {
         dryRun: flags["dry-run"] === "true",
         settingsPath: flags["settings"],
+        harness: flags["harness"],
       });
       if (result.removed.length === 0) {
         console.log(`No Muse hooks found in ${result.settingsPath}.`);
