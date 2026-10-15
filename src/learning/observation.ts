@@ -1,11 +1,80 @@
-import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "../store.ts";
 import type { ObservationEntry } from "../types.ts";
 import { scanSecrets } from "../secrets.ts";
 
+export const MAX_OBSERVATIONS_FILE_BYTES = 256 * 1024; // 256 KB default cap
+
 export function observationsFilePath(memoryDir: string): string {
   return join(memoryDir, "observations.jsonl");
+}
+
+function atomicWriteFileSync(filePath: string, content: string): void {
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  writeFileSync(tmpPath, content, "utf8");
+  renameSync(tmpPath, filePath);
+}
+
+/**
+ * Rotates observations.jsonl if it exceeds maxBytes:
+ * - Retains all unprocessed observations and recent processed ones in active file.
+ * - Rotates older processed observations to observations.1.jsonl.
+ */
+export function rotateObservationsIfNeeded(
+  memoryDir: string,
+  maxBytes: number = MAX_OBSERVATIONS_FILE_BYTES,
+): boolean {
+  const filePath = observationsFilePath(memoryDir);
+  if (!existsSync(filePath)) return false;
+
+  const currentSize = statSync(filePath).size;
+  if (currentSize <= maxBytes) return false;
+
+  const rawLines = readFileSync(filePath, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const entries: ObservationEntry[] = [];
+  for (const line of rawLines) {
+    try {
+      entries.push(JSON.parse(line));
+    } catch {}
+  }
+
+  const unprocessed = entries.filter((e) => !e.processed);
+  const processed = entries.filter((e) => e.processed);
+
+  // Unprocessed observations MUST be preserved in active log
+  const activeEntries: ObservationEntry[] = [...unprocessed];
+  let currentBytes = activeEntries.reduce((acc, e) => acc + JSON.stringify(e).length + 1, 0);
+
+  const archivedProcessed: ObservationEntry[] = [];
+  const keptProcessed: ObservationEntry[] = [];
+
+  // Take processed items from newest to oldest as long as they fit within maxBytes
+  for (let i = processed.length - 1; i >= 0; i--) {
+    const item = processed[i];
+    const itemBytes = JSON.stringify(item).length + 1;
+    if (currentBytes + itemBytes <= maxBytes) {
+      keptProcessed.unshift(item);
+      currentBytes += itemBytes;
+    } else {
+      archivedProcessed.unshift(item);
+    }
+  }
+
+  activeEntries.unshift(...keptProcessed);
+
+  if (archivedProcessed.length > 0) {
+    const archivePath = join(memoryDir, "observations.1.jsonl");
+    const archiveContent = archivedProcessed.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    appendFileSync(archivePath, archiveContent, "utf8");
+  }
+
+  const activeContent = activeEntries.length > 0
+    ? activeEntries.map((e) => JSON.stringify(e)).join("\n") + "\n"
+    : "";
+
+  atomicWriteFileSync(filePath, activeContent);
+  return true;
 }
 
 /**
@@ -52,6 +121,7 @@ export function recordObservation(
   };
 
   appendFileSync(filePath, `${JSON.stringify(entry)}\n`, "utf8");
+  rotateObservationsIfNeeded(memoryDir);
   return entry;
 }
 
@@ -116,7 +186,7 @@ export function markObservationProcessed(
   }
 
   if (updated) {
-    writeFileSync(filePath, `${newLines.join("\n")}\n`, "utf8");
+    atomicWriteFileSync(filePath, `${newLines.join("\n")}\n`);
   }
 
   return updated;

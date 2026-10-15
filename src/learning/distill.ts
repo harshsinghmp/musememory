@@ -10,16 +10,32 @@ export interface DistillationResult {
   processedCount: number;
 }
 
+export const MAX_DISTILLATION_BODY_CHARS = 1500;
+
+/**
+ * Truncates raw observation logs exceeding the distillation body limit.
+ */
+export function capDistillationBody(
+  text: string,
+  maxChars: number = MAX_DISTILLATION_BODY_CHARS,
+): string {
+  if (!text || text.length <= maxChars) return text;
+  const truncatedCount = text.length - maxChars;
+  return `${text.slice(0, maxChars)}\n... [truncated ${truncatedCount} characters from raw observation]`;
+}
+
 /**
  * Distills unprocessed raw observations into structured candidate memories and negative lessons.
  */
 export function distillObservationsToCandidates(
   store: Store,
   project: string,
+  options?: { maxBodyChars?: number },
 ): DistillationResult {
   const unprocessed = listObservations(store, { processed: false, project });
   const proposedCandidates: MemoryEntry[] = [];
   const negativeLessons: MemoryEntry[] = [];
+  const maxBodyChars = options?.maxBodyChars ?? MAX_DISTILLATION_BODY_CHARS;
 
   for (const obs of unprocessed) {
     const text = `${obs.summary ?? ""} ${obs.raw}`;
@@ -40,8 +56,8 @@ export function distillObservationsToCandidates(
       const negative = recordNegativeLesson(store, {
         project,
         title,
-        failed_approach: lines.slice(0, 3).join("\n"),
-        failure_reason: obs.raw.length > 200 ? obs.raw.slice(0, 300) : obs.raw,
+        failed_approach: capDistillationBody(lines.slice(0, 3).join("\n"), maxBodyChars),
+        failure_reason: capDistillationBody(obs.raw, maxBodyChars),
         alternative_recommended: obs.metadata?.alternative || "Refer to architectural standards",
         evidence_snippet: obs.metadata?.stack_trace || obs.raw.slice(0, 200),
         severity: obs.metadata?.severity ?? "medium",
@@ -64,7 +80,7 @@ export function distillObservationsToCandidates(
       const title = obs.summary || `Resolution: ${obs.raw.slice(0, 80)}`;
       const candidate = propose(store, {
         title,
-        content: obs.raw,
+        content: capDistillationBody(obs.raw, maxBodyChars),
         project,
         type: "fix",
         source: `distilled_${obs.source}`,
@@ -88,7 +104,7 @@ export function distillObservationsToCandidates(
       const title = obs.summary || `Convention: ${obs.raw.slice(0, 80)}`;
       const candidate = propose(store, {
         title,
-        content: obs.raw,
+        content: capDistillationBody(obs.raw, maxBodyChars),
         project,
         type: "architecture",
         source: `distilled_${obs.source}`,
