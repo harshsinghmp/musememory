@@ -16,6 +16,7 @@ import {
   getMemoryById,
   listMemories,
   deleteMemoryById,
+  searchMemoriesFts,
   type SqliteDatabase,
 } from "./sqlite.ts";
 import { runMigrations } from "./migrate.ts";
@@ -63,6 +64,55 @@ export interface Store {
   cache?: MemoryStoreCache;
 }
 
+const openWriteTx = new WeakSet<SqliteDatabase>();
+
+/**
+ * T-025: run a multi-statement write path as one SQLite commit instead of one commit
+ * per statement. Re-entrant per connection — a nested call (get() inside list()) or a
+ * caller-owned transaction (optimizeStore, health/reconcile) is joined, not restarted.
+ */
+function withTransaction<T>(db: SqliteDatabase | undefined, fn: () => T): T {
+  if (!db || openWriteTx.has(db)) return fn();
+  let began = false;
+  openWriteTx.add(db);
+  try {
+    try {
+      db.exec("BEGIN IMMEDIATE");
+      began = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/within a transaction/i.test(msg)) throw err;
+      began = false; // a transaction is already open on this connection — join it
+    }
+    const out = fn();
+    if (began) db.exec("COMMIT");
+    return out;
+  } catch (err) {
+    if (began) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {}
+    }
+    throw err;
+  } finally {
+    openWriteTx.delete(db);
+  }
+}
+
+/**
+ * T-020: SQLite's total change counter moves on every committed write, including
+ * writes that never touch the memories directory. Used as the query-cache write
+ * generation so a cached result is never served after a write.
+ */
+function dbWriteGeneration(db: SqliteDatabase | undefined): number | undefined {
+  if (!db) return undefined;
+  try {
+    return db.query<{ t: number }>(`SELECT total_changes() AS t`).get()?.t;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
 export function openStore(memoryDir: string): Store {
   const layout = getStorageLayout(memoryDir);
@@ -97,14 +147,17 @@ export function openStore(memoryDir: string): Store {
       const memCount = memCountRow?.count ?? 0;
       if (memCount === 0) {
         const yamlFiles = readdirSync(layout.memoriesDir).filter((f) => f.endsWith(".yaml"));
-        for (const f of yamlFiles) {
-          const yId = f.slice(0, -5);
-          const entry = getFromYaml(store, yId);
-          if (entry) {
-            insertOrReplaceMemory(db, entry);
-            cache.setEntry(entry);
+        // T-025: one commit for the whole rehydrate, not three per entry.
+        withTransaction(db, () => {
+          for (const f of yamlFiles) {
+            const yId = f.slice(0, -5);
+            const entry = getFromYaml(store, yId);
+            if (entry) {
+              insertOrReplaceMemory(db!, entry);
+              cache.setEntry(entry);
+            }
           }
-        }
+        });
       }
     } catch {}
   }
@@ -221,8 +274,9 @@ export function get(store: Store, id: string): MemoryEntry | null {
     }
 
     if (store.db) {
+      // T-025: row + FTS sync in one commit.
       try {
-        insertOrReplaceMemory(store.db, fromYaml);
+        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, fromYaml));
       } catch {}
     }
     if (store.cache) {
@@ -262,9 +316,10 @@ export function list(
     } catch {}
   }
 
-  // 1. Check L0 query cache
+  // 1. Check L0 query cache. T-020: the write generation guards against writes the
+  // dir mtime cannot see (coarse mtimes, SQLite-only writes).
   if (store.cache) {
-    const cached = store.cache.getQuery(cacheKey, dirMtime);
+    const cached = store.cache.getQuery(cacheKey, dirMtime, dbWriteGeneration(store.db));
     if (cached) return cached;
   }
 
@@ -276,24 +331,27 @@ export function list(
     if (existsSync(store.dir)) {
       const dbIds = new Set(entries.map((e) => e.id));
       const diskFiles = readdirSync(store.dir);
-      for (const f of diskFiles) {
-        if (f.endsWith(".yaml")) {
-          const diskId = f.slice(0, -5);
-          if (!dbIds.has(diskId)) {
-            const externalEntry = get(store, diskId);
-            if (externalEntry) {
-              try {
-                insertOrReplaceMemory(store.db, externalEntry);
-              } catch {}
-              let matches = true;
-              if (filters?.project && externalEntry.project !== filters.project) matches = false;
-              if (filters?.type && externalEntry.type !== filters.type) matches = false;
-              if (filters?.status && externalEntry.status !== filters.status) matches = false;
-              if (matches) entries.push(externalEntry);
+      // T-025: reconcile the whole batch as one commit instead of three per file.
+      withTransaction(store.db, () => {
+        for (const f of diskFiles) {
+          if (f.endsWith(".yaml")) {
+            const diskId = f.slice(0, -5);
+            if (!dbIds.has(diskId)) {
+              const externalEntry = get(store, diskId);
+              if (externalEntry) {
+                try {
+                  insertOrReplaceMemory(store.db!, externalEntry);
+                } catch {}
+                let matches = true;
+                if (filters?.project && externalEntry.project !== filters.project) matches = false;
+                if (filters?.type && externalEntry.type !== filters.type) matches = false;
+                if (filters?.status && externalEntry.status !== filters.status) matches = false;
+                if (matches) entries.push(externalEntry);
+              }
             }
           }
         }
-      }
+      });
     }
   } else {
     // Fallback: file scan if SQLite is unavailable
@@ -308,10 +366,13 @@ export function list(
   }
 
   if (store.cache) {
-    store.cache.setQuery(cacheKey, entries, undefined, dirMtime);
     for (const e of entries) {
       store.cache.setEntry(e);
     }
+    // Cache the query result last: setEntry() invalidates the query cache, so
+    // caching it first would self-destruct. Stamped with the post-write generation
+    // so results computed before a reconciliation write are never served (T-020).
+    store.cache.setQuery(cacheKey, entries, undefined, dirMtime, dbWriteGeneration(store.db));
   }
 
   return entries;
@@ -344,7 +405,8 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
 
   // 1. Primary write to SQLite database
   if (store.db) {
-    insertOrReplaceMemory(store.db, entry);
+    // T-025: memories row + FTS delete/insert as a single commit.
+    withTransaction(store.db, () => insertOrReplaceMemory(store.db!, entry));
   }
 
   // 2. Dual write to YAML file for exportability
@@ -740,7 +802,8 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
 
   let deleted = false;
   if (store.db) {
-    deleted = deleteMemoryById(store.db, id) || deleted;
+    // T-025: FTS row + memory row removed in one commit.
+    deleted = withTransaction(store.db, () => deleteMemoryById(store.db!, id)) || deleted;
   }
 
   const file = fileForId(store, id);
@@ -794,5 +857,127 @@ export function harvestMemories(
     }
   }
   return created;
+}
+
+// --- T-024: bounded FTS preflight -------------------------------------------------
+
+/** Max whitespace-separated terms accepted before an FTS query is rejected. */
+export const FTS_MAX_QUERY_TERMS = 32;
+/** Max raw query length accepted before an FTS query is rejected. */
+export const FTS_MAX_QUERY_CHARS = 512;
+
+export interface FtsPreflight {
+  ok: boolean;
+  terms: number;
+  reason?: string;
+}
+
+/**
+ * T-024: bound the work FTS5 can be asked to do. Each term becomes one OR branch of
+ * the MATCH expression, so an unbounded term list turns a lookup into a table scan
+ * per term. Returns a verdict instead of throwing so callers can degrade or report.
+ */
+export function preflightFtsQuery(query: string): FtsPreflight {
+  const raw = query ?? "";
+  const clean = raw.trim().replace(/['"*]/g, "");
+  if (!clean) return { ok: false, terms: 0, reason: "empty query" };
+  if (raw.length > FTS_MAX_QUERY_CHARS) {
+    return {
+      ok: false,
+      terms: 0,
+      reason: `query is ${raw.length} characters, limit is ${FTS_MAX_QUERY_CHARS}`,
+    };
+  }
+  const terms = clean.split(/\s+/).filter(Boolean);
+  if (terms.length > FTS_MAX_QUERY_TERMS) {
+    return {
+      ok: false,
+      terms: terms.length,
+      reason: `query has ${terms.length} terms, limit is ${FTS_MAX_QUERY_TERMS}`,
+    };
+  }
+  return { ok: true, terms: terms.length };
+}
+
+/** Store-level FTS read path: preflight the query, then BM25 search. */
+export function searchMemories(
+  store: Store,
+  query: string,
+  filters?: { project?: string; type?: string; status?: string; limit?: number },
+): { entry: MemoryEntry; rank: number }[] {
+  const preflight = preflightFtsQuery(query);
+  if (!preflight.ok) throw new Error(`FTS query rejected: ${preflight.reason}`);
+  if (!store.db) return [];
+  return searchMemoriesFts(store.db, query, filters);
+}
+
+// --- T-026: FTS <-> row parity ----------------------------------------------------
+
+/** Cap on ids reported per desync class so a broken index cannot flood a caller. */
+const FTS_PARITY_SAMPLE = 50;
+
+export interface FtsParityReport {
+  ok: boolean;
+  rowCount: number;
+  indexedCount: number;
+  /** Memory rows with no FTS index row. */
+  missingCount: number;
+  /** FTS index rows with no memory row. */
+  orphanedCount: number;
+  /** Sample of memory rows with no FTS index row. */
+  missing: string[];
+  /** Sample of FTS index rows with no memory row. */
+  orphaned: string[];
+  /** Set by repairFtsIndex() to record that a rebuild was performed. */
+  repaired?: boolean;
+}
+
+/** Compare the FTS index against the memories table without mutating anything. */
+export function checkFtsParity(store: Store): FtsParityReport {
+  const db = store.db;
+  if (!db) {
+    return { ok: true, rowCount: 0, indexedCount: 0, missingCount: 0, orphanedCount: 0, missing: [], orphaned: [] };
+  }
+  const count = (sql: string): number => {
+    try {
+      return db.query<{ c: number }>(sql).get()?.c ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const ids = (sql: string): string[] =>
+    db
+      .query<{ id: string }>(sql)
+      .all([FTS_PARITY_SAMPLE])
+      .map((r) => r.id);
+
+  const missingCount = count(`SELECT count(*) AS c FROM memories WHERE id NOT IN (SELECT id FROM memories_fts)`);
+  const orphanedCount = count(`SELECT count(*) AS c FROM memories_fts WHERE id NOT IN (SELECT id FROM memories)`);
+  return {
+    ok: missingCount === 0 && orphanedCount === 0,
+    rowCount: count(`SELECT count(*) AS c FROM memories`),
+    indexedCount: count(`SELECT count(DISTINCT id) AS c FROM memories_fts`),
+    missingCount,
+    orphanedCount,
+    missing: missingCount > 0 ? ids(`SELECT id FROM memories WHERE id NOT IN (SELECT id FROM memories_fts) ORDER BY updated_at DESC LIMIT ?`) : [],
+    orphaned: orphanedCount > 0 ? ids(`SELECT id FROM memories_fts WHERE id NOT IN (SELECT id FROM memories) LIMIT ?`) : [],
+  };
+}
+
+/**
+ * T-026: rebuild the FTS index from the memories table in one commit (drops orphaned
+ * and duplicate index rows, re-adds missing ones), then re-report.
+ */
+export function repairFtsIndex(store: Store): FtsParityReport {
+  const db = store.db;
+  if (!db) return checkFtsParity(store);
+  withTransaction(db, () => {
+    db!.run(`DELETE FROM memories_fts`);
+    db!.run(
+      `INSERT INTO memories_fts (id, title, content, tags)
+       SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') FROM memories`,
+    );
+  });
+  return { ...checkFtsParity(store), repaired: true };
 }
 
