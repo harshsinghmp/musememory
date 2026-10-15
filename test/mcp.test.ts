@@ -223,6 +223,41 @@ describe("mcp tool handlers logic", () => {
     }
   });
 
+  test("search forwards the request project into the hybrid path (T-303 follow-up)", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { rebuildIndex, saveIndex } = await import("../src/vector.ts");
+    const { createServer } = await import("../src/mcp.ts");
+
+    propose(store, {
+      title: "Session rotation policy",
+      content: "quantum ledger rotation policy runs nightly",
+      project: "alpha",
+      confirmed: true,
+    });
+    propose(store, {
+      title: "Session rotation policy borealis",
+      content: "quantum ledger rotation policy runs nightly",
+      project: "borealis",
+      confirmed: true,
+    });
+    saveIndex(rebuildIndex(store), memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+    const res = await callTool({
+      method: "tools/call",
+      params: { name: "search", arguments: { query: "quantum ledger rotation", hybrid: true, project: "alpha", dir: root } },
+    });
+    const payload = JSON.parse(res.content[0].text);
+
+    expect(payload.source).toBe("hybrid");
+    expect(payload.results.length).toBeGreaterThan(0);
+    expect(payload.results.map((r: any) => r.project)).toEqual(["alpha"]);
+
+    cleanup(root);
+  });
+
   test("ensureProjectAgentInstructions writes and updates AGENTS.md with Muse Memory directive", async () => {
     const { ensureProjectAgentInstructions, MUSE_MEMORY_DIRECTIVE } = await import("../src/cli/ecosystem.ts");
     const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import("node:fs");
