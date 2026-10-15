@@ -1,8 +1,10 @@
 import { describe, test, expect } from "bun:test";
-import { openStore, propose } from "../src/store.ts";
+import { join } from "node:path";
+import { openStore, propose, markSuperseded } from "../src/store.ts";
 import { setCurrent } from "../src/current.ts";
 import { queryContext, formatPromptContext } from "../src/retrieval.ts";
-import { setupFixtureRoot, cleanup } from "./helpers.ts";
+import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
+import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
 
 describe("unified context & retrieval engine", () => {
   test("queryContext ranks, filters, and applies token knapsack budget", () => {
@@ -72,6 +74,59 @@ describe("unified context & retrieval engine", () => {
     expect(formatted.markdown).toContain("API Timeout Limit");
     expect(formatted.markdown).toContain("5000ms");
     expect(formatted.markdown).toContain("Memory Directive: When learning durable facts");
+
+    cleanup(root);
+  });
+
+  test("hybridSearch filters superseded, expired, and cross-project candidate rows (T-303)", () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+
+    const live = propose(store, {
+      title: "Auth token rotation",
+      content: "auth session token rotation happens every 24 hours",
+      project: "aria",
+      type: "constraint",
+      confirmed: true,
+    });
+    const superseded = propose(store, {
+      title: "Auth token rotation legacy",
+      content: "auth session token rotation legacy interval",
+      project: "aria",
+      type: "constraint",
+      confirmed: true,
+    });
+    markSuperseded(store, superseded.id, "newer policy");
+    propose(store, {
+      title: "Auth token rotation retired",
+      content: "auth session token rotation expired policy",
+      project: "aria",
+      type: "constraint",
+      confirmed: true,
+      expiresAt: past,
+    });
+    propose(store, {
+      title: "Auth token rotation other project",
+      content: "auth session token rotation for borealis",
+      project: "borealis",
+      type: "constraint",
+      confirmed: true,
+    });
+
+    saveIndex(rebuildIndex(store), memoryDir);
+
+    const scoped = hybridSearch(store, memoryDir, "auth token rotation", { project: "aria", limit: 10 })!;
+    expect(scoped).not.toBeNull();
+    expect(scoped.map((r) => r.entry.id)).toEqual([live.id]);
+
+    // Escape hatches still honored, mirroring queryContext semantics.
+    const withSuperseded = hybridSearch(store, memoryDir, "auth token rotation", {
+      project: "aria",
+      includeSuperseded: true,
+    })!;
+    expect(withSuperseded.map((r) => r.entry.id).sort()).toEqual([live.id, superseded.id].sort());
 
     cleanup(root);
   });

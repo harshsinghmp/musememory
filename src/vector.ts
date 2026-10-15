@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { tokenize } from "./retrieval.ts";
+import { tokenize, isExpired } from "./retrieval.ts";
 import type { MemoryEntry } from "./types.ts";
 
 const DIMS = 256;
@@ -133,6 +133,30 @@ export interface HybridResult {
   bm25: number;
 }
 
+export interface HybridSearchOptions {
+  limit?: number;
+  /** Restrict candidate rows to this project (undefined = cross-project search). */
+  project?: string;
+  includeSuperseded?: boolean;
+  includeArchived?: boolean;
+  includeExpired?: boolean;
+  /** Clock for expiry evaluation; defaults to Date.now(). */
+  now?: number;
+}
+
+/**
+ * Row-level lifecycle/project gate (T-303). Applied to candidate rows BEFORE fusion so
+ * superseded/archived/expired and cross-project entries never influence ranking or context.
+ * Mirrors queryContext semantics so both backends expose the same behaviour.
+ */
+function passesRowFilter(entry: MemoryEntry, o: HybridSearchOptions, now: number): boolean {
+  if (o.project && entry.project !== o.project) return false;
+  if (!o.includeSuperseded && (entry.status === "superseded" || entry.status === "rejected")) return false;
+  if (!o.includeArchived && entry.status === "archived") return false;
+  if (!o.includeExpired && isExpired(entry, now)) return false;
+  return true;
+}
+
 /**
  * Hybrid search: 0.5 * cosine(hashed-trigram embedding) + 0.5 * bm25_norm.
  * Returns results sorted by fused score desc. Returns null when no index
@@ -142,11 +166,12 @@ export function hybridSearch(
   store: Store,
   memoryDir: string,
   query: string,
-  options: { limit?: number } = {},
+  options: HybridSearchOptions = {},
 ): HybridResult[] | null {
   const index = loadIndex(memoryDir);
   if (!index) return null;
 
+  const now = options.now ?? Date.now();
   const qVec = embed(query);
   const { tf: qTf } = termFrequencies(query);
   const { idf, avgLen } = inverseDocumentFrequencies(index);
@@ -159,6 +184,7 @@ export function hybridSearch(
   for (const [id, indexed] of Object.entries(index.entries)) {
     const entry = byId.get(id);
     if (!entry) continue;
+    if (!passesRowFilter(entry, options, now)) continue;
     scored.push({
       entry,
       indexed,

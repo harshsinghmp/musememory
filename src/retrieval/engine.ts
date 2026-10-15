@@ -128,6 +128,13 @@ export class RetrievalEngine {
       try {
         const hybridResults = hybridSearch(store, memoryDir, query, {
           limit: options.limit ?? 10,
+          // T-303: hybrid is scale-gated, so it must apply the same lifecycle/project
+          // row filter as the exact path or stale/cross-project rows leak into context.
+          project: options.project,
+          includeSuperseded: options.includeSuperseded,
+          includeArchived: options.includeArchived,
+          includeExpired: options.includeExpired,
+          now: options.now,
         });
 
         if (hybridResults && hybridResults.length > 0) {
