@@ -75,7 +75,7 @@
 
 ### Abstention + decay
 - [x] T-070 · landed Wave 3 — IDF-weighted relevance gate before FTS5 (0.3 threshold, identifier-decisive, greeting short-circuit) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
-- [ ] T-071 · dual calibrated thresholds (cosine max + BM25 min, engine-pinned constants) · retrieval · branch: local-embeddings-llama-cpp · U
+- [x] T-071 · landed Wave 6 — dual calibrated thresholds (cosine max + BM25 min, engine-pinned constants) · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
 - [ ] T-072 · FTS5-tokenizer-matched abstention gate · retrieval · new · U
 - [ ] T-073 · `no_confident_match` result mode · retrieval, mcp · new · U
 - [ ] T-074 · materialized `decay_score` column, importance-gated half-lives · schema, retrieval · new · U
@@ -146,14 +146,14 @@
 - [ ] T-133 · `degraded − notes` fault signal · retrieval · new · U
 - [ ] T-134 · ground-moved reporting for anchors (silent when undeterminable) · anchors · new · U
 - [ ] T-135 · tiered retrieval ladder labeling loosened matches · retrieval · new · U
-- [ ] T-136 · embeddings engine fingerprint pinning · intelligence/embed · branch: local-embeddings-llama-cpp · U
-- [ ] T-137 · FTS5-floor/vector-upgrade degradation path · retrieval · branch: local-embeddings-llama-cpp · U
-- [ ] T-138 · brute-force cosine in SQLite BLOB (no ANN daemon, ever) · retrieval · branch: local-embeddings-llama-cpp · U
-- [ ] T-139 · `stale_embedder` stamp on reindex-miss entries · store · branch: local-embeddings-llama-cpp · U
-- [ ] T-140 · recall-set grading: must/must-not return, abstention, noise-as-failure · test · branch: recall-eval-harness · U
-- [ ] T-141 · frozen benchmark corpus + drift discipline · test · branch: recall-eval-harness · U
-- [ ] T-142 · p50 latency reported beside recall scores · benchmark · branch: recall-eval-harness · U
-- [ ] T-143 · fixture promotion requires usage telemetry · quality · branch: recall-eval-harness · U
+- [x] T-136 · landed Wave 6 — embeddings engine fingerprint pinning · intelligence/embed · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-137 · landed Wave 6 — FTS5-floor/vector-upgrade degradation path · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-138 · landed Wave 6 — brute-force cosine in SQLite BLOB (no ANN daemon, ever) · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-139 · landed Wave 6 — `stale_embedder` stamp on reindex-miss entries · store · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-140 · landed Wave 6 — recall-set grading: must/must-not return, abstention, noise-as-failure · test · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-141 · landed Wave 6 — frozen benchmark corpus + drift discipline · test · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-142 · landed Wave 6 — p50 latency reported beside recall scores · benchmark · branch: feat/wave-6-embeddings-eval-harness · U
+- [x] T-143 · landed Wave 6 — fixture promotion requires usage telemetry · quality · branch: feat/wave-6-embeddings-eval-harness · U
 - [ ] T-144 · fix-pair mining (error→command→no-recurrence) → negative-memory candidates · harvester, learning · new · U
 
 ## Wave E — P2 TEAM / SERVER / UI
@@ -421,7 +421,7 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [x] **Branch-model reality**: repo default branch is `main`, NOT `master` — `git-workflow.md` lifecycle text does not match; agents must guard `main`/`dev` → decision D2.
 - [x] **T-371 lands BEFORE any Wave-0 security red test**: `security_hardening.test.ts:95` synthesized-500 + `:127` `if (store.db)` mean earlier red tests pass trivially.
 - [x] T-380 · landed Wave 5 — UI security tests WITHOUT a DOM dep: unit-test the pure `escapeHtml` (`ui.ts:1588`) with `<script>`/quote payloads · branch: feat/wave-5-security-ui-protection · U
-- [ ] T-381 · embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · F
+- [x] T-381 · landed Wave 6 — embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · branch: feat/wave-6-embeddings-eval-harness · F
 - [ ] T-382 · deprecation policy: `deprecated: true` metadata + alias retention + "removed in vX"; prerequisite for T-201/T-202/T-203 · N
 - [x] T-383 · landed #71 — R1 red test: legacy store + added column throws before YAML write, passes after runMigrations · test/migrate.test.ts · F
 - [ ] T-384 · R2 fixture: 120 memories / 3 projects / 30 superseded / 30 expired → assert `hybridSearch` returns only matching-project non-superseded rows. Baselines T-303 + T-308 + T-140 at once · F
@@ -527,13 +527,13 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 4. **Wave 3: Retrieval Quality, Ranking & Token Economics** (`T-035`, `T-036`, `T-037`, `T-060`, `T-061`, `T-070`, `T-114`, `T-115`, `T-117`, `T-126`)
 5. **Wave 4: Compaction, Ephemeral Observations & Distillation** (`T-045`, `T-046`, `T-047`, `T-053`, `T-054`, `T-091`, `T-092`, `T-093`, `T-094`, `T-305`, `T-306`)
 6. **Wave 5: Security Hardening & UI Protection** (`T-002`, `T-004`, `T-388`, `T-389`, `T-399`, `T-400`, `T-380`)
-7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`)
+7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`) — [x] Landed on dev
 8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`)
 
-## v9 Totals
+## v10 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 95 |
-| Active Remaining | 195 |
+| Landed on dev | 105 |
+| Active Remaining | 185 |
 

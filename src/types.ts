@@ -238,6 +238,8 @@ export interface MemoryEntry {
   score_retain?: number;
   /** T-391: Validated citation source IDs referencing live sources in sources.json. */
   source_ids?: string[];
+  /** T-139: True if entry failed or was missed during embedding reindex/build. */
+  stale_embedder?: boolean;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted";

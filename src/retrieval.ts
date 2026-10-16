@@ -470,7 +470,9 @@ export function computeFactors(
   // to nothing at all — is not evidence of relevance (SOW-202, T-311).
   const zeroMatchPenalty = baseApplicability === 0 && graphOverlap === 0 ? -0.35 : 0;
 
-  const semanticMatch = ctx.semanticScore ?? 0;
+  // T-071 & T-116: semantic threshold gate before fusion — zero out sub-threshold noise
+  const rawSemantic = ctx.semanticScore ?? 0;
+  const semanticMatch = rawSemantic >= 0.30 ? rawSemantic : 0;
 
   const totalScore =
     baseApplicability +

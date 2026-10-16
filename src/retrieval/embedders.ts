@@ -130,6 +130,19 @@ export function semanticCosine(a: Float32Array, b: Float32Array): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+/**
+ * T-071: Dual calibrated thresholds for hybrid semantic/lexical fusion.
+ * Prevents sub-threshold embedding noise from polluting exact matches.
+ */
+export const SEMANTIC_COSINE_MIN_THRESHOLD = 0.30;
+export const SEMANTIC_COSINE_MAX_THRESHOLD = 0.75;
+export const BM25_MIN_THRESHOLD = 0.25;
+
+export function calibrateSemanticScore(score: number): number {
+  if (score < SEMANTIC_COSINE_MIN_THRESHOLD) return 0;
+  return Math.min(1, score);
+}
+
 /** Reads retrieval.embedderUrl / retrieval.embedderModel from settings.json. */
 export function getConfiguredEmbedder(memoryDir?: string, fetchImpl?: FetchImpl): Embedder | null {
   if (!memoryDir) return null;
