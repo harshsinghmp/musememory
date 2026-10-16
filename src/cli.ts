@@ -224,7 +224,7 @@ export async function main(argv: string[]): Promise<number> {
     case "compress":
       return handleCompressCommand(parsed);
     case "mcp":
-      return handleMcpCommand();
+      return handleMcpCommand(parsed);
     case "daemon":
       return handleDaemonCommand(parsed);
 

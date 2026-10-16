@@ -505,7 +505,18 @@ export async function handleGraphCommand({ positional, flags }: ParsedArgs): Pro
   return usageError("graph requires 'status' or 'index'");
 }
 
-export async function handleMcpCommand(): Promise<number> {
+export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
+  const flags = args?.flags ?? {};
+  if (flags["http"] || flags["port"]) {
+    const port = flags["port"] ? parseInt(flags["port"], 10) : 31338;
+    const host = flags["host"] || "127.0.0.1";
+    const { startHttpMcpServer } = await import("../mcp.ts");
+    const handle = await startHttpMcpServer({ port, host });
+    console.log(`Muse Memory MCP Streamable HTTP Server listening at ${handle.url}`);
+    return new Promise<number>(() => {
+      // Run until process terminates
+    });
+  }
   const { runMcpServer } = await import("../mcp.ts");
   await runMcpServer();
   return 0;
