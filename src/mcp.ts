@@ -2690,12 +2690,20 @@ export async function runMcpServer(): Promise<void> {
   });
 }
 
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ["2024-11-05", "2025-06-18"];
+
 export interface HttpMcpServerOptions {
   port?: number;
   host?: string;
   endpoint?: string;
   stateless?: boolean;
   enableJsonResponse?: boolean;
+  /** T-151: Allowed Origin headers for CSRF protection. */
+  allowedOrigins?: string[];
+  /** T-151: Allowed Host headers for DNS rebinding protection. */
+  allowedHosts?: string[];
+  /** T-151: Enable strict DNS rebinding validation against allowedHosts. */
+  enableDnsRebindingProtection?: boolean;
 }
 
 export interface HttpMcpServerHandle {
@@ -2708,8 +2716,9 @@ export interface HttpMcpServerHandle {
 }
 
 /**
- * T-150: Start MCP Streamable HTTP transport server (2025-06-18 spec).
- * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming.
+ * T-150 & T-151: Start MCP Streamable HTTP transport server (2025-06-18 spec).
+ * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming,
+ * with strict Origin validation, DNS rebinding protection, and protocol version headers.
  */
 export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Promise<HttpMcpServerHandle> {
   const server = createServer();
@@ -2720,6 +2729,9 @@ export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Pr
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: options.stateless ? undefined : () => randomUUID(),
     enableJsonResponse: options.enableJsonResponse ?? true,
+    allowedOrigins: options.allowedOrigins,
+    allowedHosts: options.allowedHosts,
+    enableDnsRebindingProtection: options.enableDnsRebindingProtection,
   });
 
   await server.connect(transport);
@@ -2727,6 +2739,66 @@ export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Pr
   const httpServer = createHttpServer((req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname === endpoint || (endpoint === "/mcp" && url.pathname === "/")) {
+      // T-151: Protocol version header validation and echo
+      const clientProtoVersion = req.headers["mcp-protocol-version"];
+      if (typeof clientProtoVersion === "string") {
+        if (!SUPPORTED_MCP_PROTOCOL_VERSIONS.includes(clientProtoVersion)) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Unsupported protocol version: ${clientProtoVersion}. Supported: ${SUPPORTED_MCP_PROTOCOL_VERSIONS.join(", ")}`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+        res.setHeader("mcp-protocol-version", clientProtoVersion);
+      } else {
+        res.setHeader("mcp-protocol-version", "2024-11-05");
+      }
+
+      // T-151: Origin validation if allowedOrigins configured
+      const origin = req.headers["origin"];
+      if (options.allowedOrigins && options.allowedOrigins.length > 0 && typeof origin === "string") {
+        if (!options.allowedOrigins.includes(origin)) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Forbidden: Origin '${origin}' is not allowed`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+      }
+
+      // T-151: Allowed hosts check
+      if (options.allowedHosts && options.allowedHosts.length > 0) {
+        const hostHeader = (req.headers["host"] ?? "").split(":")[0];
+        if (!options.allowedHosts.includes(hostHeader)) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Forbidden: Host '${hostHeader}' is not allowed`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+      }
+
       transport.handleRequest(req, res);
       return;
     }

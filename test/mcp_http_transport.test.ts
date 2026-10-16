@@ -125,3 +125,242 @@ describe("T-150: MCP Streamable HTTP Transport (2025-06-18 spec)", () => {
     }
   });
 });
+
+describe("T-151: Origin validation, session ID enforcement, and protocol version headers", () => {
+  test("enforces Origin allowlist and rejects untrusted origins with 403", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+      allowedOrigins: ["https://trusted.agency.internal"],
+    });
+
+    try {
+      // 1. Untrusted origin rejected
+      const rejectedResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "origin": "https://attacker.site.xyz",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(rejectedResp.status).toBe(403);
+      const rejJson = (await rejectedResp.json()) as any;
+      expect(rejJson.error.message).toContain("Forbidden: Origin 'https://attacker.site.xyz' is not allowed");
+
+      // 2. Allowed origin accepted
+      const acceptedResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "origin": "https://trusted.agency.internal",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(acceptedResp.status).toBe(200);
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("enforces Host allowlist for DNS rebinding protection", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+      allowedHosts: ["127.0.0.1", "localhost"],
+    });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "host": "rebinding-target.attacker.com",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(resp.status).toBe(403);
+      const json = (await resp.json()) as any;
+      expect(json.error.message).toContain("Forbidden: Host 'rebinding-target.attacker.com' is not allowed");
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("validates and echoes mcp-protocol-version header, rejecting unsupported versions with 400", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    try {
+      // 1. Supported version 2025-06-18
+      const okResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(okResp.status).toBe(200);
+      expect(okResp.headers.get("mcp-protocol-version")).toBe("2025-06-18");
+
+      // 2. Unsupported version fails fast with 400
+      const badResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-protocol-version": "1999-01-01",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(badResp.status).toBe(400);
+      const badJson = (await badResp.json()) as any;
+      expect(badJson.error.message).toContain("Unsupported protocol version: 1999-01-01");
+    } finally {
+      await handle.close();
+    }
+
+    // 3. Omitted version on fresh server defaults to 2024-11-05
+    const defaultHandle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+    });
+    try {
+      const defaultResp = await fetch(defaultHandle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(defaultResp.status).toBe(200);
+      expect(defaultResp.headers.get("mcp-protocol-version")).toBe("2024-11-05");
+    } finally {
+      await defaultHandle.close();
+    }
+  });
+
+  test("enforces session ID presence and validity on subsequent requests", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    try {
+      // 1. Initialize session
+      const initResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+      expect(initResp.status).toBe(200);
+      const sessionId = initResp.headers.get("mcp-session-id");
+      expect(sessionId).toBeDefined();
+
+      // 2. Request without session ID rejected with 400
+      const missingSessionResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      expect(missingSessionResp.status).toBe(400);
+
+      // 3. Request with nonexistent session ID rejected with 404
+      const invalidSessionResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-session-id": "non-existent-session-xyz",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 3,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      expect(invalidSessionResp.status).toBe(404);
+
+      // 4. Request with valid session ID succeeds
+      const validSessionResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-session-id": sessionId!,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 4,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      expect(validSessionResp.status).toBe(200);
+    } finally {
+      await handle.close();
+    }
+  });
+});
+
