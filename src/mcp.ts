@@ -1,6 +1,9 @@
 import { basename } from "node:path";
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -2685,6 +2688,73 @@ export async function runMcpServer(): Promise<void> {
     process.stdin.on("end", () => resolve());
     process.stdin.on("close", () => resolve());
   });
+}
+
+export interface HttpMcpServerOptions {
+  port?: number;
+  host?: string;
+  endpoint?: string;
+  stateless?: boolean;
+  enableJsonResponse?: boolean;
+}
+
+export interface HttpMcpServerHandle {
+  server: HttpServer;
+  port: number;
+  host: string;
+  url: string;
+  endpoint: string;
+  close: () => Promise<void>;
+}
+
+/**
+ * T-150: Start MCP Streamable HTTP transport server (2025-06-18 spec).
+ * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming.
+ */
+export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Promise<HttpMcpServerHandle> {
+  const server = createServer();
+  const endpoint = options.endpoint ?? "/mcp";
+  const host = options.host ?? "127.0.0.1";
+  const port = options.port ?? 0;
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: options.stateless ? undefined : () => randomUUID(),
+    enableJsonResponse: options.enableJsonResponse ?? true,
+  });
+
+  await server.connect(transport);
+
+  const httpServer = createHttpServer((req, res) => {
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    if (url.pathname === endpoint || (endpoint === "/mcp" && url.pathname === "/")) {
+      transport.handleRequest(req, res);
+      return;
+    }
+    res.writeHead(404, { "content-type": "text/plain" });
+    res.end("Not Found");
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.listen(port, host, () => resolve());
+    httpServer.on("error", reject);
+  });
+
+  const address = httpServer.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
+  const actualUrl = `http://${host}:${actualPort}${endpoint}`;
+
+  return {
+    server: httpServer,
+    port: actualPort,
+    host,
+    url: actualUrl,
+    endpoint,
+    close: async () => {
+      await transport.close();
+      await server.close();
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    },
+  };
 }
 
 function toolResult(content: unknown) {
