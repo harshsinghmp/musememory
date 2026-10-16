@@ -383,6 +383,30 @@ export async function handleAgentsCommand(): Promise<number> {
 }
 
 export async function handleConnectCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  // T-387: Output client configuration recipes for remote/team MCP HTTP server
+  if (flags["recipe"] || flags["remote"]) {
+    const endpoint = flags["endpoint"] || "http://127.0.0.1:31338/mcp";
+    const token = flags["token"] || process.env.MUSE_BEARER_TOKEN || "<YOUR_BEARER_TOKEN>";
+    const peerId = flags["peer"] || flags["peer-id"];
+    const { generateClientConfigRecipe } = await import("../connect.ts");
+    const recipes = generateClientConfigRecipe(endpoint, token, peerId);
+
+    console.log(`\n=== Muse Memory Team Server Client Configuration Recipes (T-387) ===`);
+    console.log(`Endpoint:  ${recipes.endpoint}`);
+    console.log(`Transport: MCP Streamable HTTP (2025-06-18 spec)`);
+    console.log(`Auth:      Authorization: Bearer <token>\n`);
+
+    console.log(`1. Cursor (~/.cursor/mcp.json or .cursor/mcp.json):`);
+    console.log(JSON.stringify(recipes.cursor, null, 2));
+
+    console.log(`\n2. Opencode (~/.config/opencode/opencode.json):`);
+    console.log(JSON.stringify(recipes.opencode, null, 2));
+
+    console.log(`\n3. Claude Code / Antigravity / Windsurf (mcp_config.json):`);
+    console.log(JSON.stringify(recipes.claude, null, 2));
+    return 0;
+  }
+
   let agent = positional[0];
   const { connectAgent } = await import("../connect.ts");
   const { detectAgents } = await import("../agents/detect.ts");
