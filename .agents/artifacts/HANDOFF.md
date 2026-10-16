@@ -1,22 +1,22 @@
-# HANDOFF — 2026-10-15T20:45:00Z
-branch: dev @ 85e207f | phase: Wave 5 complete; dev green 774/0
+# HANDOFF — 2026-10-16T19:35:00Z
+branch: dev @ 776b650 | phase: Wave 6 complete; dev green 787/0
 
 ## Next Step
-Advance to Wave 6: Semantic Embeddings & Eval Harness (T-381, T-071, T-136–T-139, T-140–T-143).
+Advance to Wave 7: Team Slice (On-Demand / Opt-In) (T-150, T-151, T-386, T-153, T-387).
 
 ## In-Flight
-- Wave 5 landed on dev: T-002/003 (UI XSS escaping), T-004 (optimizer dryRun default + auth gate), T-380 (escapeHtml unit tests), T-388 (hook <muse-memory> sanitization), T-389 (metadata secret scan), T-399 (routine step allowlist & depth guard), T-400 (UI read projection allowlist).
-- Full suite green: 774 pass, 0 fail across 121 files; tsc + build clean; doctor 100% HEALTHY.
+- Wave 6 landed on dev: T-381 (llama-cpp spike), T-071 (calibrated thresholds), T-136–T-139 (fingerprint pinning, FTS5 fallback, SQLite BLOB cosine, stale_embedder stamp), T-140–T-143 (recall eval harness, frozen corpus drift discipline, latency percentiles, fixture promotion telemetry).
+- Full suite green: 787 pass, 0 fail across 124 files; tsc + build clean; doctor 100% HEALTHY.
 
 ## Ruled Out
-- Leaving HTML template interpolation unescaped in dashboard client rendering.
-- Permitting non-dryRun optimizer execution from non-localhost without token authorization.
-- Unconstrained routine steps permitting host binary or option flag injection.
+- Sub-0.30 cosine noise polluting lexical ranking (gated by SEMANTIC_COSINE_MIN_THRESHOLD).
+- External ANN daemons (brute-force cosine in SQLite BLOB raw floats).
+- Fixture promotion without production usage telemetry records.
 
 ## Decisions
-- POST /api/optimize defaults strictly to dryRun: true; live execution requires localhost or valid token.
-- /api/memories and /api/snapshot project only allowlisted UI fields via projectMemoryForUi.
-- Routines restrict commands to {brief, nudge, recall, compact, distill, verify} and throw on depth > 5.
+- Semantic thresholding: raw cosine < 0.30 zeroed out before Soft-OR fusion.
+- Fail-open vector degradation: offline embedder cleanly defaults to FTS5 BM25 floor.
+- Corpus drift discipline: SHA-256 integrity locks the golden benchmark corpus.
 
 ## Verify
-`bun test` 774/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
+`bun test` 787/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
