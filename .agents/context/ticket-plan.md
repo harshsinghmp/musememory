@@ -446,13 +446,13 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 
 ## Un-deferred slice (7 tickets)
 
-- [ ] T-150 · `memory serve`: MCP **Streamable HTTP transport** — one server process owns the store, stdio stays the solo default. **Remote-ready by design** (principal: reach undecided): no localhost hardcoding, TLS-frontable, bind host/port configurable · mcp.ts · F
-- [ ] T-151 · transport security headers: Origin validation + session id + protocol version (2025-06-18 spec) — scoped to the team server · F
-- [ ] T-386 · NEW · bearer-token auth + per-peer allowlist on the team server (required for BOTH LAN and remote per principal decision): sync gossip already has **no identity layer** (T-332) and CURRENT.md is a team-wide instruction surface — on a shared network, the Letta CURRENT.md injection defect (F-05) and any pool-write become 5-person poisoning. Not deferrable · F
-- [ ] T-153 · re-scoped: **team DB file + per-member local DBs**; the server process is the single writer to the team DB (WAL contention is in-process only; no network FS, no multi-writer cluster needed yet) · store, root · F
-- [ ] T-204 · promoted into the slice: DB-first read precedence now matters (server-side YAML mirror sync across members is the corruption path) · F
-- [ ] T-368 · promoted into the slice: schema stamp + backfill must land before multiple stores exist · F
-- [ ] T-387 · NEW · member wiring: docs + client-config recipe (MCP endpoint + token), and the **shared+personal scoping policy** (principal decision 2026-10-15): shared team store holds team facts; per-member local stores hold personal context; promotion to team scope is an explicit member action via the existing local→project→global ladder; CURRENT.md stays shared constraints — every member constraint write is a team-wide rule · N
+- [x] T-150 · `memory serve`: MCP **Streamable HTTP transport** — one server process owns the store, stdio stays the solo default. **Remote-ready by design** (principal: reach undecided): no localhost hardcoding, TLS-frontable, bind host/port configurable · mcp.ts · F
+- [x] T-151 · transport security headers: Origin validation + session id + protocol version (2025-06-18 spec) — scoped to the team server · F
+- [x] T-386 · NEW · bearer-token auth + per-peer allowlist on the team server (required for BOTH LAN and remote per principal decision): sync gossip already has **no identity layer** (T-332) and CURRENT.md is a team-wide instruction surface — on a shared network, the Letta CURRENT.md injection defect (F-05) and any pool-write become 5-person poisoning. Not deferrable · F
+- [x] T-153 · re-scoped: **team DB file + per-member local DBs**; the server process is the single writer to the team DB (WAL contention is in-process only; no network FS, no multi-writer cluster needed yet) · store, root · F
+- [x] T-204 · promoted into the slice: DB-first read precedence now matters (server-side YAML mirror sync across members is the corruption path) · F
+- [x] T-368 · promoted into the slice: schema stamp + backfill must land before multiple stores exist · F
+- [x] T-387 · NEW · member wiring: docs + client-config recipe (MCP endpoint + token), and the **shared+personal scoping policy** (principal decision 2026-10-15): shared team store holds team facts; per-member local stores hold personal context; promotion to team scope is an explicit member action via the existing local→project→global ladder; CURRENT.md stays shared constraints — every member constraint write is a team-wide rule · N
 
 **Explicitly NOT in the slice** (stays deferred): dashboard rehaul, per-tenant RLS, marketplace/forking, 28 remaining Wave-3 tickets, multi-writer merge cluster (T-038..T-043, T-328) — un-defer only when two *writers to the same store* are observed through the server.
 
@@ -528,12 +528,12 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 5. **Wave 4: Compaction, Ephemeral Observations & Distillation** (`T-045`, `T-046`, `T-047`, `T-053`, `T-054`, `T-091`, `T-092`, `T-093`, `T-094`, `T-305`, `T-306`)
 6. **Wave 5: Security Hardening & UI Protection** (`T-002`, `T-004`, `T-388`, `T-389`, `T-399`, `T-400`, `T-380`)
 7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`) — [x] Landed on dev
-8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`)
+8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`) — [x] Landed on dev
 
 ## v10 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 105 |
-| Active Remaining | 185 |
+| Landed on dev | 110 |
+| Active Remaining | 180 |
 
