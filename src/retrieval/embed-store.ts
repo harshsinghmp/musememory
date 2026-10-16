@@ -3,7 +3,7 @@
  * One funnel for the CLI (embed status|reindex) and the retrieval wiring.
  */
 import type { Store } from "../store.ts";
-import { list, extractEntryText } from "../store.ts";
+import { list, extractEntryText, save } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
 import {
   createEmbedder,
@@ -33,6 +33,8 @@ export interface EmbedStatus {
   endpoint?: string;
   model?: string;
   vectorCount: number;
+  staleEmbedderCount: number;
+  staleEmbedderIds: string[];
   pipeline: { fingerprint: string; model: string; dims: number; endpoint: string; updated_at: string } | null;
   /** True when configured embedder's identity differs from the stored pipeline. */
   mismatch: boolean;
@@ -43,8 +45,25 @@ export function embedStatus(store: Store): EmbedStatus {
   const db = store.db;
   const pipeline = db ? getEmbedPipeline(db) : null;
   const vectorCount = db ? countEmbeddings(db) : 0;
+  const entries = list(store);
+  const vectors = db ? loadEmbeddings(db) : new Map<string, Float32Array>();
+  const staleEmbedderIds: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.stale_embedder || (pipeline !== null && !vectors.has(entry.id))) {
+      staleEmbedderIds.push(entry.id);
+    }
+  }
+
   if (!embedder) {
-    return { configured: false, vectorCount, pipeline, mismatch: false };
+    return {
+      configured: false,
+      vectorCount,
+      staleEmbedderCount: staleEmbedderIds.length,
+      staleEmbedderIds,
+      pipeline,
+      mismatch: false,
+    };
   }
   // Without a probe we cannot know dims/model for certain; mismatch is only
   // decidable against the stored pipeline's endpoint+model string prefix.
@@ -57,6 +76,8 @@ export function embedStatus(store: Store): EmbedStatus {
     endpoint: embedder.endpoint,
     model: embedder.model ?? pipeline?.model,
     vectorCount,
+    staleEmbedderCount: staleEmbedderIds.length,
+    staleEmbedderIds,
     pipeline,
     mismatch,
   };
@@ -86,15 +107,54 @@ export async function buildEmbeddings(store: Store, embedder?: Embedder): Promis
 
   const entries = list(store);
   let count = 0;
+  const embeddedIds = new Set<string>();
+
   for (let i = 0; i < entries.length; i += EMBED_BATCH_SIZE) {
     const batch = entries.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((e) => extractEntryText(e));
-    const vectors = await emb.embed(texts);
-    for (let j = 0; j < batch.length; j++) {
-      saveEmbedding(store.db, batch[j].id, vectors[j]);
-      count++;
+    try {
+      const vectors = await emb.embed(texts);
+      for (let j = 0; j < batch.length; j++) {
+        saveEmbedding(store.db, batch[j].id, vectors[j]);
+        embeddedIds.add(batch[j].id);
+        count++;
+        if (batch[j].stale_embedder) {
+          batch[j].stale_embedder = undefined;
+          save(store, batch[j]);
+        }
+      }
+    } catch {
+      // If batch fails, fallback to individual embedding to salvage valid items
+      for (const entry of batch) {
+        try {
+          const [vector] = await emb.embed([extractEntryText(entry)]);
+          saveEmbedding(store.db, entry.id, vector);
+          embeddedIds.add(entry.id);
+          count++;
+          if (entry.stale_embedder) {
+            entry.stale_embedder = undefined;
+            save(store, entry);
+          }
+        } catch {
+          if (!entry.stale_embedder) {
+            entry.stale_embedder = true;
+            save(store, entry);
+          }
+        }
+      }
     }
   }
+
+  // Stamp stale_embedder on any entries in the store that were not embedded (reindex misses)
+  for (const entry of entries) {
+    if (!embeddedIds.has(entry.id)) {
+      if (!entry.stale_embedder) {
+        entry.stale_embedder = true;
+        save(store, entry);
+      }
+    }
+  }
+
   setEmbedPipeline(store.db, { fingerprint, model: probe.model, dims: probe.dims, endpoint: emb.endpoint });
   return { dims: probe.dims, model: probe.model, count };
 }

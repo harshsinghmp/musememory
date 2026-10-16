@@ -8,8 +8,15 @@ import { getAuditTrail } from "./audit.ts";
 import { getSchemaVersion, LATEST_SCHEMA_VERSION } from "./migrate.ts";
 import { openDatabase } from "./sqlite.ts";
 import { detectAgents, findBinary } from "./agents/detect.ts";
+import { embedStatus } from "./retrieval/embed-store.ts";
 
 export interface DoctorReport {
+  embeddings?: {
+    configured: boolean;
+    vectorCount: number;
+    staleEmbedderCount: number;
+    mismatch: boolean;
+  };
   storage: {
     type: "local" | "global" | "uninitialized";
     path: string;
@@ -173,7 +180,25 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   const memBin = findBinary("memory", home) || findBinary("musememory", home);
   const bunVer = typeof (globalThis as any).Bun !== "undefined" ? (globalThis as any).Bun.version : undefined;
 
+  // 6. Embeddings status
+  let embeddingsReport: DoctorReport["embeddings"] = undefined;
+  if (isInitialized) {
+    try {
+      const store = openStore(storagePath);
+      const es = embedStatus(store);
+      embeddingsReport = {
+        configured: es.configured,
+        vectorCount: es.vectorCount,
+        staleEmbedderCount: es.staleEmbedderCount ?? 0,
+        mismatch: es.mismatch,
+      };
+    } catch {
+      // ignore
+    }
+  }
+
   return {
+    embeddings: embeddingsReport,
     storage: {
       type: options.global ? "global" : (isInitialized ? "local" : "uninitialized"),
       path: storagePath,
@@ -240,6 +265,21 @@ export function printDoctorReport(report: DoctorReport): void {
   console.log(`  CURRENT.md: ${report.storage.currentMdExists ? `[OK] Active (${report.storage.currentMdLines} constraints)` : "[WARN] Missing"}`);
   console.log(`  Total Memory Units: ${report.storage.totalEntries}`);
   console.log(`    -> Confirmed: ${report.storage.statusCounts.confirmed || 0} | Candidate: ${report.storage.statusCounts.candidate || 0} | Stale: ${report.storage.statusCounts.stale || 0} | Superseded: ${report.storage.statusCounts.superseded || 0}`);
+
+  // Embeddings
+  if (report.embeddings) {
+    console.log(`\n[EMBEDDINGS] Semantic Vector Store:`);
+    console.log(`  Configured: ${report.embeddings.configured ? "[OK] Yes" : "[INFO] Not configured (using BM25/FTS5)"}`);
+    console.log(`  Vectors:    ${report.embeddings.vectorCount}`);
+    if (report.embeddings.staleEmbedderCount > 0) {
+      console.log(`  [WARN] Missing / Stale Embeddings: ${report.embeddings.staleEmbedderCount} (run 'memory embed reindex')`);
+    } else if (report.embeddings.configured) {
+      console.log(`  [OK] All entries have current embeddings`);
+    }
+    if (report.embeddings.mismatch) {
+      console.log(`  [WARN] Pipeline mismatch detected — run 'memory embed reindex'`);
+    }
+  }
 
   // Validation
   console.log(`\n[SECURITY] Store Integrity & Vibeguard Secret Scan:`);

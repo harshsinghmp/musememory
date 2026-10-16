@@ -1,74 +1,126 @@
-import { describe, test } from "bun:test";
+import { describe, test, expect } from "bun:test";
+import { join } from "node:path";
 import { openStore } from "../src/store.ts";
-import { queryContext } from "../src/retrieval.ts";
+import {
+  gradeRecallSet,
+  verifyCorpusIntegrity,
+  validateFixturePromotion,
+  RECALL5_FLOOR,
+  P50_BUDGET_MS,
+  P95_BUDGET_MS,
+  P99_BUDGET_MS,
+  MIN_PROMOTION_USAGE,
+  type GoldenQuery,
+} from "../src/quality/eval.ts";
 import { setupFixtureRoot, cleanup } from "./helpers.ts";
 
 /**
- * R27: recall quality gate. Runs the golden fixture over the standard corpus
- * with the default (lexical) engine and locks the measured baseline: any
- * future retrieval change that drops recall below the floor fails CI.
- *
- * Re-run with an embedder configured (retrieval.embedderUrl) and the
- * harness reports the semantic delta on the same fixture.
+ * R27 & Wave 6: recall quality gate & eval harness.
+ * T-140: Recall-set grading (must-return, must-not-return, abstention, noise-as-failure).
+ * T-141: Frozen benchmark corpus drift discipline.
+ * T-142: p50/p95/p99 latency reported beside recall scores.
+ * T-143: Fixture promotion requires usage telemetry.
  */
-
-/** recall@5 floor — the measured trigram baseline, rounded down. */
-const RECALL5_FLOOR = 0.8;
-/** p50 latency budget in ms (reported, not gated — speed regressions show in output). */
-const P50_BUDGET_MS = 25;
-
-interface GoldenQuery {
-  query: string;
-  relevant: string[];
-  distractors: string[];
-}
-
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx];
-}
-
-describe("recall eval (R27)", () => {
-  test("golden fixture recall@5 does not regress below the floor", () => {
+describe("recall eval harness (R27 & Wave 6: T-140, T-141, T-142, T-143)", () => {
+  test("T-140 & T-142: golden fixture recall@5 meets floor, discriminates distractors, and measures latency", () => {
     const { root, memoryDir } = setupFixtureRoot();
     try {
       const store = openStore(memoryDir);
       const fixture = require("./fixtures/recall-golden.json") as { queries: GoldenQuery[] };
 
-      let recallSum = 0;
-      let distractorViolations = 0;
-      const latencies: number[] = [];
-
-      for (const q of fixture.queries) {
-        const t0 = performance.now();
-        const results = queryContext(store, q.query, { limit: 10 });
-        latencies.push(performance.now() - t0);
-
-        const top5 = new Set(results.results.slice(0, 5).map((r) => r.entry.id));
-        if (q.relevant.length > 0) {
-          const hits = q.relevant.filter((id) => top5.has(id)).length;
-          recallSum += hits / q.relevant.length;
-        }
-        distractorViolations += q.distractors.filter((id) => top5.has(id)).length;
-      }
-
-      const recallAt5 = recallSum / fixture.queries.length;
-      const p50 = percentile([...latencies].sort((a, b) => a - b), 50);
+      const result = gradeRecallSet(store, fixture.queries, {
+        k: 5,
+        recallFloor: RECALL5_FLOOR,
+        distractorTolerance: 10,
+        p50BudgetMs: P50_BUDGET_MS,
+      });
 
       console.log(
-        `[recall-eval] queries=${fixture.queries.length} recall@5=${recallAt5.toFixed(3)} ` +
-          `floor=${RECALL5_FLOOR} distractor_violations=${distractorViolations} p50=${p50.toFixed(1)}ms ` +
-          `(budget ${P50_BUDGET_MS}ms)`,
+        `[recall-eval] queries=${result.totalQueries} recall@5=${result.recallAtK.toFixed(3)} ` +
+          `floor=${RECALL5_FLOOR} distractor_violations=${result.distractorViolations} ` +
+          `abstention_acc=${(result.abstentionAccuracy * 100).toFixed(1)}% ` +
+          `p50=${result.latency.p50}ms (budget ${P50_BUDGET_MS}ms) ` +
+          `p95=${result.latency.p95}ms (budget ${P95_BUDGET_MS}ms) ` +
+          `p99=${result.latency.p99}ms (budget ${P99_BUDGET_MS}ms)`,
       );
 
-      if (recallAt5 < RECALL5_FLOOR) {
-        throw new Error(
-          `recall@5 ${recallAt5.toFixed(3)} below floor ${RECALL5_FLOOR} — retrieval quality regressed`,
-        );
-      }
+      // Must meet recall@5 floor
+      expect(result.recallAtK).toBeGreaterThanOrEqual(RECALL5_FLOOR);
+
+      // Distractor violations must not regress beyond baseline tolerance
+      expect(result.distractorViolations).toBeLessThanOrEqual(10);
+
+      // Abstention queries must correctly reject irrelevant distractors (zero noise)
+      expect(result.totalAbstentionQueries).toBeGreaterThan(0);
+      expect(result.abstentionAccuracy).toBe(1.0);
+
+      // Latency budgets must be respected
+      expect(result.latency.p50).toBeLessThanOrEqual(P50_BUDGET_MS);
+      expect(result.latency.p95).toBeLessThanOrEqual(P95_BUDGET_MS);
+      expect(result.latency.p99).toBeLessThanOrEqual(P99_BUDGET_MS);
+
+      expect(result.passed).toBe(true);
     } finally {
       cleanup(root);
     }
+  });
+
+  test("T-141: frozen benchmark corpus integrity passes drift discipline", () => {
+    const fixturesDir = join(import.meta.dir, "fixtures");
+    const check = verifyCorpusIntegrity(fixturesDir);
+
+    expect(check.valid).toBe(true);
+    expect(check.hash).toBe(check.expected);
+  });
+
+  test("T-143: fixture promotion enforces usage telemetry validation", () => {
+    // 1. Rejects missing telemetry
+    const untelemetried = validateFixturePromotion({
+      query: "invented synthetic test query",
+      relevant: ["m_1"],
+      distractors: [],
+    });
+    expect(untelemetried.eligible).toBe(false);
+    expect(untelemetried.reason).toContain("telemetry");
+
+    // 2. Rejects sub-threshold usage frequency
+    const underused = validateFixturePromotion({
+      query: "rare single-use test query",
+      relevant: ["m_1"],
+      distractors: [],
+      telemetry: {
+        query_count: MIN_PROMOTION_USAGE - 1,
+        source: "agent_session",
+      },
+    });
+    expect(underused.eligible).toBe(false);
+    expect(underused.reason).toContain("promotion usage threshold");
+
+    // 3. Rejects missing source
+    const missingSource = validateFixturePromotion({
+      query: "frequent query with missing provenance",
+      relevant: ["m_1"],
+      distractors: [],
+      telemetry: {
+        query_count: 10,
+        source: "",
+      },
+    });
+    expect(missingSource.eligible).toBe(false);
+    expect(missingSource.reason).toContain("source");
+
+    // 4. Accepts valid query with sufficient usage telemetry
+    const validCandidate = validateFixturePromotion({
+      query: "production recurring issue with connection limits",
+      relevant: ["m_1700000000000_pool"],
+      distractors: ["m_1700000001000_auth"],
+      telemetry: {
+        query_count: 15,
+        source: "production_audit_log",
+        last_seen_at: new Date().toISOString(),
+      },
+    });
+    expect(validCandidate.eligible).toBe(true);
+    expect(validCandidate.reason).toBeUndefined();
   });
 });
