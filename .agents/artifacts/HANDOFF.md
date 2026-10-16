@@ -1,22 +1,22 @@
-# HANDOFF — 2026-10-15T19:15:00Z
-branch: dev @ cd0dfd7 | phase: Wave 3 complete; dev green 730/0
+# HANDOFF — 2026-10-15T20:20:00Z
+branch: dev @ 197664f | phase: Wave 4 complete; dev green 756/0
 
 ## Next Step
-Advance to Wave 4: Compaction, Distillation & Context Windows (T-045, T-046, T-047, T-053, T-054, T-091, T-092, T-093, T-094).
+Advance to Wave 5: Security Hardening & UI Protection (T-002, T-003, T-004, T-388, T-389, T-399, T-400, T-380).
 
 ## In-Flight
-- Wave 3 landed on dev: T-035 (safeMax/Min scale), T-036 (IDF cache), T-037 (countMemories scan skip), T-060 (safe FTS5 quoting), T-061 (compound token split), T-070 (0.3 relevance gate), T-114 (Soft-OR fusion), T-115 (conditional rerank), T-117 (watermark staleness), T-126 (why_retrieved reason tokens), negative lesson priority knapsack.
-- All 112 test suites green (730 pass, 0 fail); doctor reports 100% HEALTHY.
+- Wave 4 landed on dev: T-305 (distill cap 1500 chars), T-306 (atomic write + rotation + 256KB cap), T-045 (on_pre_compress hook), T-047 (never-empty contract), T-046 (digest dedup store), T-053 (dual-measure tokens), T-054 (refuse-incomplete digest), T-091 (context pack), T-092 (manifest TOC), T-093 (truncation hierarchy), T-094 (USER.md slots).
+- Full suite green: 756 pass, 0 fail across 117 files; tsc + build clean; doctor 100% HEALTHY.
 
 ## Ruled Out
-- Array spread Math.max(...arr) crashing on >65k items (replaced by safeMax/safeMin)
-- Raw unescaped FTS5 queries permitting syntax error or injection
-- Breaking alphanumeric word boundaries in camelCase/PascalCase compound splitting
+- Lexically repetitive test mocks failing scoreRetain 0.3 diversity gate.
+- Fixed-count observation log rotation (replaced by byte-budget rotation preserving all unprocessed entries).
+- Synchronous vs async handoff return ambiguity (resolved via function overloads).
 
 ## Decisions
-- De Morgan Soft-OR evidence fusion P = 1 - (1 - pv)(1 - pl) opt-in in hybridSearch
-- Trivial conversational greetings short-circuit before FTS5 search
-- Negative anti-pattern lessons and critical constraints packed with priority inside token budgets
+- Truncation hierarchy prioritizes Pin > Provenance > Recency > Salience with [N omitted — budget M].
+- Refuse-incomplete digest strictly withholds malformed CURRENT.md and surfaces in withheld_memories.
+- Distillation caps raw observation bodies at 1500 characters with truncation markers.
 
 ## Verify
-`bun test` 730/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
+`bun test` 756/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`

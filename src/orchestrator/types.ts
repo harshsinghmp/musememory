@@ -24,6 +24,14 @@ export interface MuseContextInput {
   include_untrusted?: boolean;
 }
 
+export interface ContextManifestItem {
+  id: string;
+  title: string;
+  type?: string;
+  truncated?: boolean;
+  score?: number;
+}
+
 export interface FusedContextResult {
   active_constraints: Array<{ id: string; title: string; content: string }>;
   relevant_memories: MemoryEntry[];
@@ -38,6 +46,12 @@ export interface FusedContextResult {
   freshness_notice?: string;
   /** Gate telemetry: checked / files_read / withheld / duration_ms. */
   freshness_stats?: { checked: number; files_read: number; withheld: number; duration_ms: number };
+  /** T-092: Never-drop manifest TOC listing all discovered candidate memories. */
+  context_manifest?: ContextManifestItem[];
+  /** T-093: Budget truncation marker, e.g. "[2 omitted — budget 1000 tokens]". */
+  budget_notice?: string;
+  /** T-094: Reserved token allocation for global/USER.md guidelines. */
+  user_profile_reserved_tokens?: number;
 }
 
 export interface CodeForMemoryResult {

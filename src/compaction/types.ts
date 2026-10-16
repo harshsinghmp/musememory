@@ -44,3 +44,16 @@ export interface HarvestedMemory {
   content: string;
   source: string;
 }
+
+export type PreCompressHook = (
+  invariants: CompactionInvariants,
+  store?: any,
+) => Promise<HarvestedMemory[] | void> | HarvestedMemory[] | void;
+
+export interface HandoffOptions {
+  agent?: string;
+  sessionId?: string;
+  project?: string;
+  store?: any;
+  onPreCompress?: PreCompressHook;
+}

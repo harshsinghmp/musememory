@@ -51,16 +51,16 @@
 - [x] T-042 · landed Wave 1 — `recover_stale_locks` sweep (300s) on open · store.ts, outbox.ts · F
 - [x] T-043 · landed Wave 1 — non-idempotent ops default `auto_replay=0` (held, manual replay) · store.ts, outbox.ts · F
 - [x] T-044 · landed Wave 1 — append-only fsync JSONL event log + single-writer flock (fails loud) · store, lock.ts · F
-- [ ] T-045 · `on_pre_compress` hook in compaction engine (extract before compact) · compaction · new · F
-- [ ] T-046 · persisted digest-dedup set for extracted facts · compaction · new · F
-- [ ] T-047 · never-empty checkpoint contract (raise instead of emit partial) · compaction, orchestrator · new · F
+- [x] T-045 · landed Wave 4 — `on_pre_compress` hook in compaction engine (extract before compact) · compaction · branch: feat/wave-4-compaction-distillation · F
+- [x] T-046 · landed Wave 4 — persisted digest-dedup set for extracted facts · compaction · branch: feat/wave-4-compaction-distillation · F
+- [x] T-047 · landed Wave 4 — never-empty checkpoint contract (raise instead of emit partial) · compaction, orchestrator · branch: feat/wave-4-compaction-distillation · F
 - [ ] T-048 · wake gate: background passes exit unless actionable-keys allowlist matches · optimize, cognition · new · F
 - [x] MERGED→T-048 T-049 · gate exit-0 contract (never blocks a turn) · optimize · new · F
 - [ ] T-050 · overnight loss guard: snapshot entry-head hashes; >25% loss → alert-only · optimize · new · F
 - [ ] T-051 · memory_pressure as first-class event (store near ceiling) · store.ts · new · F
 - [x] MERGED→T-051 T-052 · pressure alert in CLI (non-silent refusal) · cli · new · F
-- [ ] T-053 · honest dual-measure token accounting (harness + pessimistic model) · compaction · branch: io-budget-telemetry · F
-- [ ] T-054 · refuse-incomplete digest contract in get_context · orchestrator · new · F
+- [x] T-053 · landed Wave 4 — honest dual-measure token accounting (harness + pessimistic model) · compaction · branch: feat/wave-4-compaction-distillation · F
+- [x] T-054 · landed Wave 4 — refuse-incomplete digest contract in get_context · orchestrator · branch: feat/wave-4-compaction-distillation · F
 - [x] T-055 · landed Wave 1 — circuit breaker around every store path (5 fail → 120s cooldown → degraded mode) · store.ts, circuit.ts · F
 - [x] T-056 · landed Wave 1 — `atexit` bounded join for async write workers · store, async_workers.ts · F
 - [x] T-058 · landed Wave 2 — read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: feat/wave-2-trust-gates · F
@@ -99,10 +99,10 @@
 - [ ] T-090 · `src_ts` evidence-age stamping (memory only as fresh as evidence) · schema, store · new · U
 
 ### Packing + graph + provenance
-- [ ] T-091 · TOON-style row-wise context-pack compaction (verify 77.6% claim ourselves) · orchestrator · new · U
-- [ ] T-092 · never-drop manifest TOC + descending summary caps (entry line never omitted) · orchestrator · branch: io-budget-telemetry · U
-- [ ] T-093 · truncation order pin > provenance > recency > salience + `[N omitted — budget M]` marker · orchestrator · new · U
-- [ ] T-094 · reserved slots for global/USER.md-class entries · orchestrator · new · U
+- [x] T-091 · landed Wave 4 — TOON-style row-wise context-pack compaction (verify 77.6% claim ourselves) · orchestrator · branch: feat/wave-4-compaction-distillation · U
+- [x] T-092 · landed Wave 4 — never-drop manifest TOC + descending summary caps (entry line never omitted) · orchestrator · branch: feat/wave-4-compaction-distillation · U
+- [x] T-093 · landed Wave 4 — truncation order pin > provenance > recency > salience + `[N omitted — budget M]` marker · orchestrator · branch: feat/wave-4-compaction-distillation · U
+- [x] T-094 · landed Wave 4 — reserved slots for global/USER.md-class entries · orchestrator · branch: feat/wave-4-compaction-distillation · U
 - [ ] T-095 · `linked_memory_ids` write-time edges seeded during capture · schema, store · new · U
 - [ ] T-096 · supersede-not-delete + hidden-count-aware over-fetch · store, retrieval · branch: memory-tombstones · U
 - [ ] T-097 · `prefer_observations` recall-time dedup, top-2×budget scope · retrieval · new · U
@@ -230,8 +230,8 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 - [ ] T-302 · HIGH (B15) · `memory_capture` full passthrough: currently sets 7 of ~40 propose options (no evidence/source/verification/dedup/validFrom/expiresAt) — provenance tickets T-075/090/099/103/105 assume write-time capture that the flagship tool cannot express · mcp.ts:1692-1699 · dep: T-075 · F
 - [x] T-303 · landed #70 — CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories filtered at row level · F
 - [ ] T-304 · HIGH (B4) · vector index invalidation: `save()` never updates `index.json` (retrieval/engine.ts:124-127, store.ts:306); MCP hardcodes `stale:false` while serving ancient snapshots (mcp.ts:1683) · dep: T-064 · F
-- [ ] T-305 · HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,:91,:98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · F
-- [ ] T-306 · HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · F
+- [x] T-305 · landed Wave 4 — HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,:91,:98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · branch: feat/wave-4-compaction-distillation · F
+- [x] T-306 · landed Wave 4 — HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · branch: feat/wave-4-compaction-distillation · F
 - [ ] T-307 · HIGH (B2) · Hebbian graph is write-only O(n²) per recall (plasticity.ts:37-64, mcp.ts:1611): n(n-1) edges + full-file rewrite every get_context; loaders have zero production callers. Bound it, make it incremental, consume it (see T-316) — or delete · F
 
 ## Wave H — RANKING & FEEDBACK CORRECTNESS
@@ -525,7 +525,7 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 2. **Wave 1: Storage Engine, Outbox & Concurrency** (`T-041`, `T-042`, `T-044`, `T-038`, `T-040`, `T-056`, `T-055`)
 3. **Wave 2: Write Admission, Trust & Anti-Poisoning** (`T-104`, `T-105`, `T-105b`, `T-075`, `T-058`, `T-103`, `T-391`)
 4. **Wave 3: Retrieval Quality, Ranking & Token Economics** (`T-035`, `T-036`, `T-037`, `T-060`, `T-061`, `T-070`, `T-114`, `T-115`, `T-117`, `T-126`)
-5. **Wave 4: Compaction, Ephemeral Observations & Distillation** (`T-045`, `T-046`, `T-305`, `T-306`, `T-053`, `T-054`)
+5. **Wave 4: Compaction, Ephemeral Observations & Distillation** (`T-045`, `T-046`, `T-047`, `T-053`, `T-054`, `T-091`, `T-092`, `T-093`, `T-094`, `T-305`, `T-306`)
 6. **Wave 5: Security Hardening & UI Protection** (`T-002`, `T-004`, `T-388`, `T-389`, `T-399`, `T-400`, `T-380`)
 7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`)
 8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`)
@@ -533,7 +533,7 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 ## v9 Totals
 | Section | Tickets |
 |---|---|
-| Total Tracked Tickets | 269 |
-| Landed on dev | 21 |
-| Active Remaining | 248 |
+| Total Tracked Tickets | 290 |
+| Landed on dev | 88 |
+| Active Remaining | 202 |
 
