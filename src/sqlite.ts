@@ -166,9 +166,6 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
-    CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path);
-    CREATE INDEX IF NOT EXISTS idx_memories_last_accessed_at ON memories(last_accessed_at);
-    CREATE INDEX IF NOT EXISTS idx_memories_access_count ON memories(access_count);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
@@ -178,6 +175,18 @@ function initSchema(db: SqliteDatabase): void {
       tokenize = 'unicode61'
     );
   `);
+
+  // T-402: Only create indexes on post-v0 columns if those columns actually exist (or have been migrated)
+  try {
+    const cols = db.query<{ name: string }>(`PRAGMA table_info(memories)`).all().map((c) => c.name);
+    if (cols.includes("mem_path")) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path);
+        CREATE INDEX IF NOT EXISTS idx_memories_last_accessed_at ON memories(last_accessed_at);
+        CREATE INDEX IF NOT EXISTS idx_memories_access_count ON memories(access_count);
+      `);
+    }
+  } catch {}
 
   // Backfill FTS index if memories table has records but FTS table is empty
   try {

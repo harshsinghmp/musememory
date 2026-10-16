@@ -297,4 +297,77 @@ Full evidence: `.agents/research/retirement-audit-2026-10.md` (two-lane audit, r
 
 **Decisions deferred:** MCP profile default change to `core` (~5k tokens/session saved, but visible behavior change — belongs with the R17b P2 tool-packaging work); YAML full-delete (rejected, largest blast radius).
 
-**Exploded ticket plan:** `.agents/context/ticket-plan.md` — 168 atomic tickets (Wave A security 4 · B drift 6 · C P0 45 · D P1 75 · E P2 32 · F deprecations 6), each with source, dependency, existing-branch mapping, and gate. Critical path: T-001 → T-030 → T-041 → T-104/105 → T-114-121 → T-140+.
+---
+
+## 🏛️ v9: Realigned In-Line Feature Waves (2026-10-15)
+
+Full senior developer and security audit: `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
+Exploded ticket plan: `.agents/context/ticket-plan.md` (269 tracked tickets, 21 landed on `dev`, 248 active).
+
+### The In-Line Feature Waves
+1. **Wave 0: Pre-Flight Integrity & Baseline Fixes (Immediate P0)**
+   - `T-402`: `initSchema` column-order fix (prevents silent SQLite degradation on legacy stores)
+   - `T-403`: Stored-command doctor sweep (sanitizes legacy non-template `test_command`s)
+   - `T-404`: Stdin TTY decoupling in `src/hooks/pack.ts` (prevents terminal hangs)
+   - `T-401`: Bunfig surface hardening (`bunfig.toml` timeout & runner isolation)
+   - `T-370`: Documentation truth pass (52 platforms, 107 tools, version sync)
+
+2. **Wave 1: Storage Engine, Outbox & Concurrency (In-Line Storage P0)**
+   - `T-041`: Outbox state machine (`pending` → `processing` → `sent` / `held` / `failed`) via migration `v3`
+   - `T-042`: Stale lock recovery sweep (300s) on store open
+   - `T-044`: Append-only fsync JSONL event log + single-writer flock
+   - `T-038`: `idempotency_key` column + UNIQUE constraint on capture
+   - `T-040`: Normalized `content_hash` + dedup on propose
+   - `T-056`: `atexit` bounded join for async write queue workers
+   - `T-055`: Circuit breaker around store paths (5 failures → 120s cooldown)
+
+3. **Wave 2: Write Admission, Trust & Anti-Poisoning (In-Line Trust P0/P1)**
+   - `T-104`: `scoreRetain` 0.3 write gate (refuses junk writes with low informational density)
+   - `T-105`: Corroboration-gated promotion (≥2 independent days, non-synthetic sources)
+   - `T-105b`: Syntax-only promotion rule (AST syntax & invariant verification gate)
+   - `T-075`: Ingest trust tiers (`trusted` | `candidate` | `untrusted`) by source type
+   - `T-058`: Read-path re-validation (injection markup & credentials excluded from recall)
+   - `T-103`: Index-time credential redaction keeping text searchable without secret leakage
+   - `T-391`: Citation validation against live registry at write time
+
+4. **Wave 3: Retrieval Optimization, Ranking & Token Economics (In-Line Retrieval P1)**
+   - `T-035`: Replace `Math.max(...arr)` spread crash with iterative max
+   - `T-036`: In-memory IDF caching across queries
+   - `T-037`: Drop redundant full-list scan in `hybridSearch`
+   - `T-060`: Safe FTS5 query token escaping
+   - `T-061`: Compound-token expansion (camelCase / snake_case splitting)
+   - `T-070`: IDF-weighted relevance gate before FTS5
+   - `T-114`: Soft-OR evidence fusion formula `P = 1 - (1 - pv)(1 - pl)`
+   - `T-115`: Low-discrimination conditional rerank
+   - `T-117`: Watermark staleness tracking from `last_memory_seen_at`
+   - `T-126`: Deterministic `why_retrieved` reason tokens
+
+5. **Wave 4: Compaction, Ephemeral Observations & Distillation (In-Line Cognition P1)**
+   - `T-045`: `on_pre_compress` fact extraction hook in compaction engine
+   - `T-046`: Persisted digest-dedup set for extracted facts
+   - `T-305`: Distillation body cap (prevents raw logs from bloating memory content)
+   - `T-306`: Observation log atomic rotation and size cap in `observations.jsonl`
+   - `T-053`: Honest dual-measure token accounting
+   - `T-054`: Refuse-incomplete digest contract in `get_context`
+
+6. **Wave 5: Security Hardening & UI Protection (In-Line Security P1)**
+   - `T-002` / `T-003`: UI XSS escaping for `p.title`, `p.slug`, `r.entry_id`, `r.actor` interpolation
+   - `T-004`: UI optimizer gate (`POST /api/optimize` dry-run default + localhost token check)
+   - `T-388`: Hook `SessionStart` `<muse-memory>` block escaping
+   - `T-389`: `recordObservation` metadata JSON credential scanning
+   - `T-399`: Memory routine step allowlist + re-entrancy recursion guard
+   - `T-400`: UI read route projection allowlist
+   - `T-380`: Unit test suite for `escapeHtml`
+
+7. **Wave 6: Semantic Embeddings & Eval Harness (In-Line Evals P2)**
+   - `T-381`: Embeddings spike (validate local llama-cpp embedding generation E2E)
+   - `T-071` / `T-136`–`T-139`: Local embeddings engine + brute-force SQLite BLOB cosine similarity
+   - `T-140`–`T-143`: Recall evaluation harness (frozen corpus, precision/recall scoring, p50 latency)
+
+8. **Wave 7: Team Slice (On-Demand / Opt-In P2)**
+   - `T-150`: MCP Streamable HTTP transport
+   - `T-151`: Transport security headers
+   - `T-386`: Bearer-token authentication + per-peer allowlist
+   - `T-153`: Multi-DB topology (shared team store + personal DBs)
+   - `T-387`: Client configuration recipes & shared+personal scoping governance
+

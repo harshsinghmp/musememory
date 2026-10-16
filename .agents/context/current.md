@@ -1,14 +1,15 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.3.0`  
-> **Status**: Feature Release (Autonomous Memory Optimizer, UI Dashboard Controls & Concurrent Multi-Agent Workstream Tracking)
+> **Version**: `v2.3.1`  
+> **Status**: Feature Release (Tombstones Soft-Delete, Retrieval Unification, Read-Path Purity, Additive Migrations & Parity Hardening)
 
 ---
 
-## ⏭️ Next Up (planned, not shipped)
-- **v2.4.0 — Correctness & Performance Hardening (P0)**: 15 audit-driven fixes (~200 LOC) — query-cache self-destruction, ranking-loop stat storm + re-tokenization, `openStore` dirty-gating, bounded FTS preflight, single-transaction writes, FTS↔row parity, wiring of 4 dead features (`dedup`, `recordRetrievals`, `maybeAutoOptimize`, `touchActivity`), memory restore/soft-delete, `Math.max` spread crash at 100k.
-- **v2.5.0 — Semantic Retrieval, Verifiability & Evals (P1)**: local embeddings + FTS5 hybrid fusion, retrieval-set eval harness, hash-chained audit + session checkpoints, lineage walker, scoped invalidation, inference review queue, compaction-triggered consolidation, CAS writes.
-- Full evidence + ranked plans: `.agents/context/roadmap.md` and `.agents/research/research-brief-walrus-memory-architecture.md` (R17, 2026-10-14).
+## ⏭️ Next Up (Realigned In-Line Feature Waves)
+- **Wave 0: Pre-Flight Integrity & Baseline Fixes (Immediate P0)**: `T-402` (initSchema column check), `T-403` (stored-command doctor sweep), `T-404` (stdin TTY decoupling), `T-401` (bunfig hardening), `T-370` (docs truth pass).
+- **Wave 1: Storage Engine, Outbox & Concurrency (In-Line Storage P0)**: `T-041` (outbox state machine via migration v3), `T-042` (stale locks), `T-044` (fsync JSONL + single-writer flock), `T-038` (idempotency keys), `T-040` (content_hash dedup).
+- **Wave 2: Write Admission, Trust & Anti-Poisoning (In-Line Trust P0/P1)**: `T-104` (scoreRetain 0.3 gate), `T-105` (corroboration promotion gate), `T-105b` (syntax-only promotion rule), `T-075` (ingest trust tiers), `T-058` (read-path re-validation).
+- **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
 
 ---
 
@@ -54,6 +55,15 @@
   39. **HyperFrames Showreel (v2.3.1)**: The showreel is a motion-designed composition, not a screen capture — `apps/website/showreel-hf/index.html` (HyperFrames: HTML/CSS + one GSAP timeline on `window.__timelines`, self-hosted Inter/IBM Plex Mono), 4 scenes over 10s with only verifiable numbers (sub-2ms recall, <50µs L0, 0 daemons, 80+ platforms, 527 tests). Built via `bun run site:showreel` (`scripts/build-showreel.ts`: master render → 1280×720 H.264 → poster → ffprobe verify). `hyperframes check` is the composition gate (0 errors, 19/19 WCAG AA); CI hash covers composition+fonts+script and fails deploys on drift (manual dispatch can rebuild in CI). Decision: the HyperFrames *skill bundle* stays uninstalled — safe-skills hard-blocked it twice (prompt-injection, credential-file-pattern flags, judged false-positive-prone but unreviewed); the npm `hyperframes` CLI (devDependency) is used instead with public docs as reference.
 
   40. **Non-Technical Homepage & 3D Depth System (v2.3.1)**: `apps/website` rewritten for a mixed audience with SEO/AEO structure — question-shaped `h2`s, answer-first quotable blocks, a plain-English glossary (`<dl>` term/definition pairs), and FAQ questions phrased the way a non-user actually asks them. Structured data now covers three types (FAQPage, SoftwareApplication, HowTo) and the site gained `robots.txt` + a hand-written `sitemap.xml` (no new build dependency); the favicon link was root-absolute and 404'd under the `/musememory/` base path (now `BASE_URL`-relative). Layout uses a CSS 3D depth system in `global.css` — perspective scenes, layered `--z` planes, pointer tilt, scroll parallax on a wrapper (never on `.reveal`, since both own `transform`), a clipping marquee band, and a drifting gradient mesh — all disabled under `prefers-reduced-motion` and flattened below 640px. Text sitting on the new lit glass surfaces moved from `--text-faint` to `--text-dim` to hold AA. Two audit fixes: `audit-visual.ts` now skips elements inside a clipping ancestor (marquee tracks are deliberately oversized) and `<pre>` blocks wrap instead of scrolling (`scrollable-region-focusable` was a real axe failure). Gate: 4-page build + 24/24 contrast pairs + axe clean on 4 pages + visual review 9/9 viewports + 527 tests + tsc clean.
+  41. **Template-Gated Test Execution (`T-001`, PR #58)**: Strict template allowlist (`bun test <relative-test>`, `bunx tsc --noEmit`, `node --check <relative-path>`). Direct execution with zero shell invocation; eliminates RCE via memory-stored commands; audit-logged refusals (`verify_refused`).
+  42. **Strict Boundary Path Containment (`T-363`, PR #59)**: `resolveWithin` containment on all wiki, pageindex, pool, and mesh boundary paths, with `resolveExternal` explicit opt-out.
+  43. **Harness-Independent Hook Resolution (`T-390`, PR #61)**: Global standard first (`~/.agents`), explicit `--harness` opt-in.
+  44. **Read-Path Purity Engine (`T-301`, PR #69)**: Asynchronous non-blocking write queue in `mcp.ts` ensuring read operations (`get_context`, `muse_context`) never execute synchronous store mutations.
+  45. **Row-Level Lifecycle & Project Filtering (`T-303`, PR #70)**: `hybridSearch` row filters applied before vector/FTS fusion; eliminates superseded/archived/cross-project leakage at scale (>100 entries).
+  46. **Additive Schema Migrations Framework (`T-368`, PR #71)**: Ordered `MIGRATIONS` array with `PRAGMA user_version` stamps and automatic backfills from existing `data` JSON blobs.
+  47. **Store Invalidation & FTS Parity (`T-020`, `T-024`, `T-025`, `T-026`, PR #73)**: Query cache invalidation on writes, bounded FTS preflight token caps, single-transaction atomic batch writes, and automated FTS-to-row parity audits and repair.
+  48. **Authoritative Retrieval Unification & Unicode Tokenization (`T-308`, `T-311`, PR #74)**: Unified scoring model between `get_context` and `muse_context`; multilingual unicode-aware tokenization across CJK and accented scripts with non-lexical penalties.
+  49. **Tombstones, Memory Restoration & Audit Replay (`T-030`, `T-031`, `T-032`, PR #75)**: Soft-delete tombstone architecture (`deleted_at`, `deleted_by`) with automatic read-path exclusion; `memory restore` CLI and `memory_restore` MCP tool; and ledger rebuild from `audit.jsonl` via `replayFromAudit`.
 
 ---
 

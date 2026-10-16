@@ -20,9 +20,9 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-566%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-649%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
-![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
+![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
 
 **Persistent, local-first memory for AI agents and the projects they work on.**
@@ -125,7 +125,7 @@ Store working constraints, decisions, handoffs, and verified facts in one local 
 - 🌳 **Hierarchical Tree Retrieval & Progressive Disclosure**: Sharded tree partitions with 3-tier progressive disclosure (`L1` abstracts, `L2` summaries, `L3` full context) for massive knowledge bases.
 - 📚 **Obsidian Markdown Wiki & Entity Graph Compiler**: Dual-persistence knowledge compounding compiling linked Markdown pages (`wiki/concepts/`, `wiki/entities/`) with bidirectional `[[wikilinks]]`.
 - 🛡️ **Vibeguard Zero-Leakage Secret Scanner**: Regex-powered memory defense intercepting and rejecting API keys, AWS credentials, private keys, database URIs, and passwords before writes.
-- 🔌 **Zero-Permission Auto-Wiring (80+ Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
+- 🔌 **Zero-Permission Auto-Wiring (52 Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
 - 🔄 **Universal Memory Migrator (29 Engines)**: One-click migration from Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, and more with state preservation.
 - 🎨 **Cognitive Studio Visual Dashboard (`memory ui`)**: Embedded zero-dependency web interface featuring 3D force-directed knowledge graphs, live `CURRENT.md` monitor, wiki reader, and persona editor.
 - ⏰ **Proactive Nudges & Routines Scheduler**: Cron-invoked daily briefings, staleness policy tracking, and ambient open-loop trackers with zero resident background daemons.
@@ -191,7 +191,7 @@ npx musememory upgrade
 #### What `memory upgrade` automatically handles:
 1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
 2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
-3. **80+ Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
+3. **52 Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
 4. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
 
 ---
@@ -239,7 +239,7 @@ npx musememory stats
 npx musememory briefing
 ```
 
-### 3️⃣ Connect Coding Agents (80+ Platforms)
+### 3️⃣ Connect Coding Agents (52 Platforms)
 ```bash
 # Scan workstation for installed AI coding agents
 npx musememory agents
@@ -267,7 +267,7 @@ npx musememory connect claude-code --harness claude
 Muse Memory can be cleanly and completely removed with zero trace left on your machine.
 
 #### Step 1: Unwire Coding Agents (Zero-Trace MCP Cleanup)
-Remove the memory MCP server configuration from all 80+ detected agent config files (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
+Remove the memory MCP server configuration from all 52 detected agent config files (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
 
 ```bash
 # Preview changes before modifying any configuration
@@ -425,7 +425,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `muse_mesh_query` | **Cross-Project Query** | Queries memories across the entire workspace mesh with origin package provenance tags. |
 | `muse_mesh_audit` | **Contract Verification** | Audits cross-package dependency contracts, entrypoint exports, and cross-repo code anchors. |
 | `muse_mesh_link` | **Mesh Linking** | Explicitly links or unlinks external repository paths into the workspace mesh registry. |
-| `profile_list` / `profile_switch` | **Tool Management** | Lists and switches task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
+| `profile_list` | **Tool Management** | Lists task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
 | `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, active `CURRENT.md` constraints, and supports `--tier 0|1|2`. |
 | `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
 | `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
@@ -456,7 +456,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `memory_harvest` | **Session End** | Distills conversation turns into structured fix/outcome units. |
 | `memory_import_transcript` | **Transcript Sync** | Ingests `.jsonl` transcript and auto-binds memories to session nodes. |
 | `memory_audit` | **Governance** | Queries the append-only operational audit ledger. |
-| `memory_detect_agents` | **Onboarding** | Scans workstation for 80+ coding agent installations. |
+| `memory_detect_agents` | **Onboarding** | Scans workstation for 52 coding agent installations. |
 | `memory_connect` | **Setup** | Auto-wires MCP server into detected installed agents with zero permissions. |
 | `memory_detect_providers` | **Migration** | Scans machine for 29 external memory formats. |
 | `memory_migrate` | **Migration** | Ingests external memories with state preservation and secret scrubbing. |
@@ -489,7 +489,7 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory and SQLite database. |
 | `user` | `[get\|init\|set] [args] [--global]` | Manage `USER.md` persona & preferences across 5 clean archetypes. |
 | `connect` | `[agent] [--all] [--force] [--dry-run] [--harness H]` | Auto-wire MCP into detected installed agents with zero permissions. Harness-specific paths (e.g. `~/.claude*`) are only written with an explicit `--harness claude` opt-in. |
-| `agents` | *(none)* | Scan workstation for 80+ coding agents (Cursor, Claude Code, Antigravity, etc.). |
+| `agents` | *(none)* | Scan workstation for 52 coding agents (Cursor, Claude Code, Antigravity, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
 | `context` | `[query] [--token-budget N] [--limit N] [--tier 0\|1\|2]` | Retrieve Top-$K$ ranked active context for prompt injection. |
@@ -656,7 +656,7 @@ Muse Memory features are developed in structured sprints moving across 4 determi
 | ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
 | ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
 | ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
-| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Real-Time Agency SSE Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
 | ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
 | ✅ | Delete Deprecated `MemoryStore` Shim | [#8](https://github.com/harshsinghmp/musememory/issues/8) / v1.5.0 |
 | ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |

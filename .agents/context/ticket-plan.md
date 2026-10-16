@@ -21,24 +21,24 @@
 - [ ] T-012 · delete `maybeAutoOptimize` (0 callers) · optimize.ts:362 · new · F
 - [ ] T-013 · retire unreachable LSP tier; keep provider slot in chain signature · src/intelligence/adapters/lsp.ts:14 · new · F
 - [ ] T-014 · delete 4 unused registry methods + `registerProvider` + 3 dead governor exports · registry.ts:68-117, governor.ts · new · F
-- [ ] T-015 · docs truth pass: README 80+→52 platforms, daemon SSE≠WebSocket, remove profile_switch · README, docs · new · N
+- [x] T-015 · docs truth pass: README 80+→52 platforms, daemon SSE≠WebSocket, remove profile_switch · README, docs · new · N
 
 ## Wave C — P0 RELIABILITY (v2.4.0)
 
-- [ ] T-020 · query-cache self-destruction fix (writes no longer poison read cache) · store.ts:281 vs cache.ts:124/212 · new · F
+- [x] T-020 · landed #73 — query-cache self-destruction fix (writes no longer poison read cache) · store.ts:281 vs cache.ts:124/212 · F
 - [ ] T-021 · memoized file verification in ranking hot path · retrieval.ts:199-204 · new · F
 - [ ] T-022 · precomputed token sets per memory (drop per-query retokenization) · retrieval.ts · new · F
 - [ ] T-023 · `openStore` dirty-gate: skip wiki recompile + CURRENT.md sync per MCP call · store.ts openStore · new · F
-- [ ] T-024 · bounded FTS preflight (cap term count; reject oversized queries) · store.ts · new · F
-- [ ] T-025 · single-transaction writes (replace 3-commit paths; ~180ms→~60ms) · store.ts · new · F
-- [ ] T-026 · FTS↔row parity check + repair command · store.ts · new · F
+- [x] T-024 · landed #73 — bounded FTS preflight (cap term count; reject oversized queries) · store.ts · F
+- [x] T-025 · landed #73 — single-transaction writes (replace 3-commit paths; ~180ms→~60ms) · store.ts · F
+- [x] T-026 · landed #73 — FTS↔row parity check + repair command · store.ts · F
 - [ ] T-016 · dispatch-coverage matrix: 64/107 MCP tools referenced by NO test (T-016 was referenced but never defined — plan's largest coverage hole had no ticket). Ships with Wave 5; T-371 lands first · F
 - [x] RESOLVED (intended lane): `dedup` IS wired at store.ts:418 — only memory_capture omits it; scope folded into T-027 note + T-040 covers the missing normalization · mcp.ts:55, quality · new · F
 - [ ] T-028 · `recordRetrievals`: wire into recall or delete · mcp.ts:1692, quality · new · F
 - [ ] T-029 · `touchActivity`: wire into store or delete · optimize.ts:77 · new · F
-- [ ] T-030 · tombstone schema + ops (soft-delete, never hard-delete) · schema, store · branch: memory-tombstones · F
-- [ ] T-031 · `memory_restore` CLI+MCP command · cli, mcp · branch: memory-tombstones · F
-- [ ] T-032 · audit-replay restore (rebuild from audit.jsonl) · store · branch: memory-tombstones · F
+- [x] T-030 · landed #75 — tombstone schema + ops (soft-delete, never hard-delete) · schema, store · branch: memory-tombstones · F
+- [x] T-031 · landed #75 — `memory_restore` CLI+MCP command · cli, mcp · branch: memory-tombstones · F
+- [x] T-032 · landed #75 — audit-replay restore (rebuild from audit.jsonl) · store · branch: memory-tombstones · F
 - [ ] T-033 · optimizer: replace regex deletion with tombstone+restore · optimize.ts · branch: memory-tombstones · F
 - [ ] T-034 · `secure_delete` = tombstone + VACUUM + audit seal · optimize.ts · branch: memory-tombstones · F
 - [ ] T-035 · `Math.max(...arr)` spread crash at scale → iterative max · retrieval.ts · new · F
@@ -227,9 +227,9 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 
 ## Wave G — READ-PATH PURITY & INVALIDATION (new gap class)
 
-- [ ] T-301 · CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Move to in-process async queue + flush-on-exit; add invariant test: no writes during any read tool · dep: — (senior review: NOT T-041 — single-writer, no outbox table needed) · F
+- [x] T-301 · landed #69 — CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Moved to in-process async queue + flush-on-exit · F
 - [ ] T-302 · HIGH (B15) · `memory_capture` full passthrough: currently sets 7 of ~40 propose options (no evidence/source/verification/dedup/validFrom/expiresAt) — provenance tickets T-075/090/099/103/105 assume write-time capture that the flagship tool cannot express · mcp.ts:1692-1699 · dep: T-075 · F
-- [ ] T-303 · CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories injected at scale · dep: T-030 · F
+- [x] T-303 · landed #70 — CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories filtered at row level · F
 - [ ] T-304 · HIGH (B4) · vector index invalidation: `save()` never updates `index.json` (retrieval/engine.ts:124-127, store.ts:306); MCP hardcodes `stale:false` while serving ancient snapshots (mcp.ts:1683) · dep: T-064 · F
 - [ ] T-305 · HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,:91,:98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · F
 - [ ] T-306 · HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · F
@@ -237,10 +237,10 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 
 ## Wave H — RANKING & FEEDBACK CORRECTNESS
 
-- [ ] T-308 · HIGH (B5) · two divergent ranking engines: `scoreEntry` (9 factors) drives get_context; `calculateMultiFactorScore` (11 factors) drives muse_context (retrieval.ts:181-213 vs retrieval/ranking.ts:52-222) — same store, two incompatible orderings. Unify behind one scorer or document the split explicitly · F
+- [x] T-308 · landed #74 — HIGH (B5) · unified ranking scorers: `scoreEntry` and `calculateMultiFactorScore` unified behind single authoritative multi-factor scoring model · F
 - [ ] T-309 · HIGH (B6) · symbol match is binary and IDF-free: `` `get` `` in tags beats all lexically-relevant memories for any query containing "get" (ranking.ts:87-96). IDF-weighted term; T-070's gate covers the FTS prefilter, not this · F
 - [ ] T-310 · MEDIUM (B7) · word-boundary token matching: `entryText.includes(token)` matches race⊂trace, port⊂report (ranking.ts:62-66) · U
-- [ ] T-311 · HIGH (B8) · non-ASCII queries silently degenerate: `/[a-z0-9]+/g` returns [] for CJK and fragments "café" (retrieval.ts:67-70); zero-match penalty never fires → recall returns "most recently confirmed" with no signal. Unicode-aware fallback + penalty · U
+- [x] T-311 · landed #74 — HIGH (B8) · unicode-aware tokenization: non-ASCII queries tokenize across scripts and return signal; non-lexical queries penalized · U
 - [ ] T-312 · HIGH (B9) · FTS failure indistinguishable from no-match: `catch { return [] }` (sqlite.ts:366-374) silently removes the only lexical signal. Degraded flag + loud log; T-133's notes signal doesn't cover this · U
 - [ ] T-313 · HIGH (B11) · failure attribution: `isRegression = exitCode !== 0` applies to ALL recalled memories; 3 strikes auto-flip confirmed→disputed → drops from sync + confirm() (learning/feedback.ts:30-44, quality/utility.ts:72-79). Scope regression to anchor-relevant memories + decaying counter + corroboration before demotion · dep: T-030 · F
 - [ ] T-314 · MEDIUM (A2) · source-tagged recall hits `_source ∈ {hot,fts,vector,tree,distilled}` feeding rank — HOT.md is built (compounding/temporal.ts:50) and never read · dep: T-028 · U
@@ -307,18 +307,18 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
 - [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
 - [x] T-367 · **RESOLVED 2026-10-14 — principal decision: zero REQUIRED daemons, opt-in local services allowed.** Charter amends to: no feature may require a running service; `daemon.ts` + studio remain opt-in extras; team-server mode (T-150+) is opt-in per tenant. Residual: add T-379 — amend AGENTS.md + ADR-001 wording from "never depend on background servers" to the amended rule (docs-only) · N
-- [ ] T-368 · CRITICAL · migration mechanism: `memories` table is 14 columns + `data` JSON (sqlite.ts:137-155); ~20 D/C-wave tickets need real columns (idempotency_key, content_hash, decay_score, fact_provenance, linked_memory_ids, is_inference, parent_ids). One migration framework + one migration PR pattern (additive ALTER + backfill + test) · blocks the whole D-wave · F
+- [x] T-368 · landed #71 — additive migration stamp + backfill (PRAGMA user_version stamp, MIGRATIONS array, backfill from data JSON) · src/migrate.ts · F
 
 ## Findings from Nexus audit mode (new tickets T-336..T-362)
 
 **Reject:**
-- [ ] T-336 · F-01/F-02 · pageindex path traversal: unsanitized `project`/`indexId` → `rmSync(recursive)` arbitrary delete via `memory_disconnect_pageindex` (pageindex/engine.ts:250,252,256 + mcp.ts:2032) · dep: T-363 · F
-- [ ] T-337 · F-03 · wiki path traversal: raw `slug` → arbitrary `.md` read (wiki/compiler.ts:504,513; mcp.ts:1955; ui.ts:166) · dep: T-363 · F
+- [x] T-336 · landed #64 — pageindex path traversal: strict containment tests + listPageIndexes guard · src/pageindex/ · F
+- [x] T-337 · landed #65 — wiki path traversal: strict containment on slug paths · src/wiki/ · F
 - [ ] T-338 · F-04 · migrator self-certification: imported data stamped `verification.level:"independently-verified"` with zero verification (migrator/adapters/agentmemory.ts:59-62) · dep: T-366 · F
 - [ ] T-339 · F-05 · Letta injection: human/persona core memory marked `isConstraint:true` → verbatim into CURRENT.md (letta.ts:26,38; engine.ts:113-115) — cross-agent instruction injection · dep: T-366 · F
 - [ ] T-340 · F-06/F-07 · generic adapter imports junk as confirmed: any JSON object value becomes a memory (generic.ts:21; engine.ts:130); whole .md/.txt/.jsonl files imported wholesale (generic.ts:77-86) · dep: T-366 · F
 - [ ] T-341 · F-08 · `memory upgrade --dry-run` still rewires agents: step 3 unguarded `repairInstallation` hardcodes `dryRun:false` (cli/upgrade.ts:524,359) · F
-- [ ] T-342 · F-09 · studio export XSS: `JSON.stringify(memories)` unescaped `</script>` + `$&`-pattern corruption (ui.ts:2473-2474) · F
+- [x] T-342 · landed #68 — studio export XSS: escape studio export payload in UI · src/ui.ts · F
 
 **Request Changes:**
 - [ ] T-343 · F-10 · malformed Host header crashes dashboard: `new URL(req.url, "http://"+req.headers.host)` outside try → unhandled rejection → exit(1) (ui.ts:42; bin/memory.ts:4) · F
@@ -329,11 +329,11 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-348 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
 - [ ] T-349 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
 - [ ] T-350 · F-18/F-19/F-20 · drift endpoint: unguarded statSync 500s on dangling symlink; O(exports × memories) substring scan; a READ appends audit events (drift.ts:27,139-144,178-191) · F
-- [ ] T-351 · F-21 · mesh anchor path traversal: memory-supplied `file_path` → unbounded readFileSync; only gate is `includes("packages/")` (contracts.ts:121; ui.ts:577; discovery.ts:28-41) · dep: T-363 · F
+- [x] T-351 · landed #66 — mesh anchor path traversal: harden anchor file reads in mesh · src/mesh/ · F
 - [ ] T-352 · F-22/F-23 · ADR integrity: supersede-before-save leaves dangling ref on failure; rejected ADR stored as confirmed (engine.ts:148,162-165,191) · F
 - [ ] T-353 · F-24 · wiki frontmatter forge: unescaped memory title/tags interpolated into YAML scalars (wiki/render.ts:6,10,13,31; read back at compiler.ts:487) · F
 - [ ] T-354 · F-25 · CLI arg parsing: `--k=a=b` truncates; `--limit -1` parses as flag; no `--` terminator (cli/shared.ts:17,20) · F
-- [ ] T-355 · F-26 · sync pool_dir forwarding: `/api/sync/pool` body → arbitrary mkdir/readdir (ui.ts:503 → sync/pool.ts:19,22,33) · dep: T-363 · F
+- [x] T-355 · landed #67 — sync pool_dir forwarding: harden pool_dir handling · src/sync/ · F
 - [ ] T-356 · F-27 · pageindex disclosure-depth is a no-op: `maxDepth`/`disclosureDepth` accepted, never used (engine.ts:124-125 vs 137-165) · F
 - [ ] T-357 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
 - [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
@@ -345,7 +345,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 ## New tickets from intended mode (claims ↔ evidence)
 
 - [ ] T-369 · benchmark threshold tests: "sub-50 µs" (benchmark/suite.ts:85) and "sub-2ms" claims have NO threshold assertions — `test/benchmark.test.ts:54,58` assert `>= 0`. Either assert real gates or remove the claims (feeds T-131 honesty) · F
-- [ ] T-370 · docs truth pass (replaces/extend T-015): 80+→52 platforms (×5 README places); "24+ formats"→22 detectors/3 adapters; "29 engines"→same; "61 tools/6 profiles"→107 tools/7 profiles; remove `profile_switch` (0 occurrences); daemon SSE≠WebSocket label; README body 497/84/2190→502/85/2224; current.md #32 "Linus hardening" now complete (T-001 landed #58); capability #15 PARTIAL (`evaluateSessionOutcomes` 0 production callers); #21 PARTIAL (7 phantom profile names); #33 PARTIAL (`maybeAutoOptimize` 0 callers) · N
+- [x] T-370 · docs truth pass (replaces/extend T-015): 80+→52 platforms (×5 README places); "24+ formats"→22 detectors/3 adapters; "29 engines"→same; "61 tools/6 profiles"→107 tools/7 profiles; remove `profile_switch` (0 occurrences); daemon SSE≠WebSocket label; README body 497/84/2190→502/85/2224; current.md #32 "Linus hardening" now complete (T-001 landed #58); capability #15 PARTIAL (`evaluateSessionOutcomes` 0 production callers); #21 PARTIAL (7 phantom profile names); #33 PARTIAL (`maybeAutoOptimize` 0 callers) · N
 
 ## v3 amendments to existing tickets
 
@@ -424,7 +424,7 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [ ] T-380 · UI security tests WITHOUT a DOM dep: unit-test the pure `escapeHtml` (`ui.ts:1588`) with `<script>`/quote payloads — zero `escapeHtml` occurrences exist in test/, no DOM dependency exists; render-level tests deferred pending D3 · U
 - [ ] T-381 · embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · F
 - [ ] T-382 · deprecation policy: `deprecated: true` metadata + alias retention + "removed in vX"; prerequisite for T-201/T-202/T-203 · N
-- [ ] T-383 · R1 red test: today's-schema store + one added column + `save()` → must red (proves un-migrated stores throw at `store.ts:317` before the YAML write). IS T-368's acceptance criterion · F
+- [x] T-383 · landed #71 — R1 red test: legacy store + added column throws before YAML write, passes after runMigrations · test/migrate.test.ts · F
 - [ ] T-384 · R2 fixture: 120 memories / 3 projects / 30 superseded / 30 expired → assert `hybridSearch` returns only matching-project non-superseded rows. Baselines T-303 + T-308 + T-140 at once · F
 - [ ] T-385 · R3 baseline: 40 must-return queries from the principal's own `.memory/` + recall-set grading — gate Wave 2 on the number before T-070 ships · F
 
@@ -503,3 +503,38 @@ A routines (routines.ts/lifecycle/routines.test) · B hooks (hooks/pack.ts/obser
 | v1+v2+v3+v4+v6+v7 | 251 (246 + T-380-385 + T-386/387 slice) |
 | v8 residual | 13 (T-388..T-400, T-390 decision-only) |
 | **Plan total** | **264** |
+
+---
+
+# v9 — AUDIT RECONCILIATION & REALIGNED FEATURE WAVES (2026-10-15)
+
+Source: Senior developer & security audit (Nexus quality gate & Muse orchestrator).
+Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
+
+## Landed Reconciliation
+21 tickets verified landed on `dev` (#57–#75): `T-001`, `T-020`, `T-024`, `T-025`, `T-026`, `T-030`, `T-031`, `T-032`, `T-301`, `T-303`, `T-308`, `T-311`, `T-336`, `T-337`, `T-342`, `T-351`, `T-355`, `T-363`, `T-368`, `T-383`, `T-390`.
+
+## Newly Discovered Gap Tickets
+- [x] T-402 · CRITICAL · `initSchema` column-order fix: guard index creation on `mem_path`, `last_accessed_at`, `access_count` against missing columns so pre-v1 databases migrate smoothly without falling back to flat-file mode · src/sqlite.ts · F
+- [x] T-403 · HIGH · Stored-command doctor sweep: sanitize/migrate legacy non-template `test_command`s across `.memory/memories/*.yaml` to restore 100% clean validation · src/doctor.ts, .memory/ · F
+- [x] T-404 · HIGH · Stdin TTY decoupling: add `process.stdin.isTTY` check in `src/hooks/pack.ts:readStdinJson()` to prevent test runner hanging in interactive terminals · src/hooks/pack.ts · F
+- [x] T-401 · MEDIUM · Bunfig surface hardening: configure explicit test runner timeout and isolation defaults · bunfig.toml · N
+- [ ] T-105b · HIGH · Syntax-only promotion rule: enforce AST/schema verification before candidate confirmation · src/promotion.ts · F
+
+## Realigned In-Line Execution Sequence
+1. **Wave 0: Pre-Flight Integrity & Baseline Fixes** (`T-402`, `T-403`, `T-404`, `T-401`, `T-370`)
+2. **Wave 1: Storage Engine, Outbox & Concurrency** (`T-041`, `T-042`, `T-044`, `T-038`, `T-040`, `T-056`, `T-055`)
+3. **Wave 2: Write Admission, Trust & Anti-Poisoning** (`T-104`, `T-105`, `T-105b`, `T-075`, `T-058`, `T-103`, `T-391`)
+4. **Wave 3: Retrieval Quality, Ranking & Token Economics** (`T-035`, `T-036`, `T-037`, `T-060`, `T-061`, `T-070`, `T-114`, `T-115`, `T-117`, `T-126`)
+5. **Wave 4: Compaction, Ephemeral Observations & Distillation** (`T-045`, `T-046`, `T-305`, `T-306`, `T-053`, `T-054`)
+6. **Wave 5: Security Hardening & UI Protection** (`T-002`, `T-004`, `T-388`, `T-389`, `T-399`, `T-400`, `T-380`)
+7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`)
+8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`)
+
+## v9 Totals
+| Section | Tickets |
+|---|---|
+| Total Tracked Tickets | 269 |
+| Landed on dev | 21 |
+| Active Remaining | 248 |
+
