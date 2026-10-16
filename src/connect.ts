@@ -506,3 +506,61 @@ export function disconnectAllAgents(home: string = homedir(), options: ConnectOp
   }
   return reports;
 }
+
+export interface ClientConfigRecipes {
+  endpoint: string;
+  cursor: Record<string, any>;
+  opencode: Record<string, any>;
+  claude: Record<string, any>;
+  generic: Record<string, any>;
+}
+
+/**
+ * T-387: Generate client configuration recipes for remote/team MCP HTTP server endpoints.
+ */
+export function generateClientConfigRecipe(
+  endpoint = "http://127.0.0.1:31338/mcp",
+  token = "<YOUR_BEARER_TOKEN>",
+  peerId?: string,
+): ClientConfigRecipes {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (peerId) {
+    headers["mcp-peer-id"] = peerId;
+  }
+
+  return {
+    endpoint,
+    cursor: {
+      mcpServers: {
+        musememory: {
+          url: endpoint,
+          headers,
+        },
+      },
+    },
+    opencode: {
+      mcp: {
+        musememory: {
+          type: "remote",
+          url: endpoint,
+          headers,
+        },
+      },
+    },
+    claude: {
+      mcpServers: {
+        musememory: {
+          url: endpoint,
+          transport: "http",
+          headers,
+        },
+      },
+    },
+    generic: {
+      name: "musememory",
+      url: endpoint,
+      headers,
+    },
+  };
+}
+
