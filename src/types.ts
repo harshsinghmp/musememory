@@ -232,7 +232,15 @@ export interface MemoryEntry {
   idempotency_key?: string;
   /** T-040: Normalized (whitespace/case folded) content hash for fast SQLite deduplication. */
   content_hash?: string;
+  /** T-075: Ingest provenance trust tier (trusted = user/direct, candidate = agent/inference, untrusted = web/external). */
+  trust?: TrustTier;
+  /** T-104: Retention score computed at admission (must be >= 0.30 to pass write gate). */
+  score_retain?: number;
+  /** T-391: Validated citation source IDs referencing live sources in sources.json. */
+  source_ids?: string[];
 }
+
+export type TrustTier = "trusted" | "candidate" | "untrusted";
 
 export type OutboxStatus = "pending" | "processing" | "sent" | "held" | "failed";
 
@@ -342,6 +350,8 @@ export interface SearchOptions {
   tokenBudget?: number;
   includeArchived?: boolean;
   autoRehydrate?: boolean;
+  /** T-075: Include memories with untrusted provenance (filtered by default). */
+  includeUntrusted?: boolean;
 }
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;
