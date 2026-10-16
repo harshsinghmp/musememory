@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
+import { createServer as createHttpServer, type Server as HttpServer, type IncomingMessage } from "node:http";
 import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -2704,6 +2704,129 @@ export interface HttpMcpServerOptions {
   allowedHosts?: string[];
   /** T-151: Enable strict DNS rebinding validation against allowedHosts. */
   enableDnsRebindingProtection?: boolean;
+  /** T-386: Single bearer token or require auth flag. */
+  bearerToken?: string;
+  /** T-386: Map of token -> peer ID or peer ID -> token, or array of valid tokens. */
+  bearerTokens?: string[] | Record<string, string>;
+  /** T-386: Allowlist of authorized peer identifiers. */
+  allowedPeers?: string[];
+  /** T-386: Require authentication even if tokens are passed via env or settings. */
+  requireAuth?: boolean;
+}
+
+export interface HttpAuthResult {
+  authenticated: boolean;
+  peerId?: string;
+  status?: number;
+  errorMessage?: string;
+}
+
+/**
+ * T-386: Validate Bearer token authentication and per-peer allowlists on HTTP MCP requests.
+ */
+export function validateHttpAuth(
+  req: IncomingMessage,
+  options: HttpMcpServerOptions,
+): HttpAuthResult {
+  const tokenToPeer = new Map<string, string>();
+  const validTokens = new Set<string>();
+
+  if (options.bearerToken) {
+    validTokens.add(options.bearerToken);
+    tokenToPeer.set(options.bearerToken, "default");
+  }
+
+  if (Array.isArray(options.bearerTokens)) {
+    for (const t of options.bearerTokens) {
+      if (t.includes(":")) {
+        const [peer, tok] = t.split(":");
+        validTokens.add(tok.trim());
+        tokenToPeer.set(tok.trim(), peer.trim());
+      } else {
+        validTokens.add(t.trim());
+      }
+    }
+  } else if (options.bearerTokens && typeof options.bearerTokens === "object") {
+    for (const [k, v] of Object.entries(options.bearerTokens)) {
+      validTokens.add(v);
+      tokenToPeer.set(v, k);
+      validTokens.add(k);
+      tokenToPeer.set(k, v);
+    }
+  }
+
+  if (validTokens.size === 0) {
+    const envToken = process.env.MUSE_BEARER_TOKEN;
+    if (envToken) {
+      validTokens.add(envToken.trim());
+      tokenToPeer.set(envToken.trim(), "default");
+    }
+    const envTokens = process.env.MUSE_AUTH_TOKENS;
+    if (envTokens) {
+      for (const item of envTokens.split(",")) {
+        const trimmed = item.trim();
+        if (trimmed.includes(":")) {
+          const [peer, tok] = trimmed.split(":");
+          validTokens.add(tok.trim());
+          tokenToPeer.set(tok.trim(), peer.trim());
+        } else if (trimmed) {
+          validTokens.add(trimmed);
+        }
+      }
+    }
+  }
+
+  const isAuthRequired = options.requireAuth || validTokens.size > 0;
+  if (!isAuthRequired) {
+    return { authenticated: true };
+  }
+
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return {
+      authenticated: false,
+      status: 401,
+      errorMessage: "Unauthorized: Missing Bearer token in Authorization header",
+    };
+  }
+
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return {
+      authenticated: false,
+      status: 401,
+      errorMessage: "Unauthorized: Invalid Authorization header format. Expected 'Bearer <token>'",
+    };
+  }
+
+  const token = match[1].trim();
+  if (!validTokens.has(token)) {
+    return {
+      authenticated: false,
+      status: 403,
+      errorMessage: "Forbidden: Invalid Bearer token",
+    };
+  }
+
+  const mappedPeer = tokenToPeer.get(token);
+  const headerPeer = (req.headers["mcp-peer-id"] || req.headers["x-peer-id"]) as string | undefined;
+  const peerId = headerPeer || mappedPeer || "default";
+
+  if (options.allowedPeers && options.allowedPeers.length > 0) {
+    const isPeerAllowed =
+      options.allowedPeers.includes(peerId) ||
+      (mappedPeer ? options.allowedPeers.includes(mappedPeer) : false);
+
+    if (!isPeerAllowed) {
+      return {
+        authenticated: false,
+        status: 403,
+        errorMessage: `Forbidden: Peer '${peerId}' is not authorized`,
+      };
+    }
+  }
+
+  return { authenticated: true, peerId };
 }
 
 export interface HttpMcpServerHandle {
@@ -2716,9 +2839,10 @@ export interface HttpMcpServerHandle {
 }
 
 /**
- * T-150 & T-151: Start MCP Streamable HTTP transport server (2025-06-18 spec).
+ * T-150, T-151 & T-386: Start MCP Streamable HTTP transport server (2025-06-18 spec).
  * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming,
- * with strict Origin validation, DNS rebinding protection, and protocol version headers.
+ * with strict Bearer token authentication, per-peer allowlists, Origin validation,
+ * DNS rebinding protection, and protocol version headers.
  */
 export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Promise<HttpMcpServerHandle> {
   const server = createServer();
@@ -2737,8 +2861,42 @@ export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Pr
   await server.connect(transport);
 
   const httpServer = createHttpServer((req, res) => {
+    // Handle CORS OPTIONS pre-flight
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-origin": req.headers["origin"] ?? "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers":
+          "content-type, authorization, accept, mcp-session-id, mcp-protocol-version, mcp-peer-id, x-peer-id",
+        "access-control-max-age": "86400",
+      });
+      res.end();
+      return;
+    }
+
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname === endpoint || (endpoint === "/mcp" && url.pathname === "/")) {
+      // T-386: Bearer token auth + per-peer allowlist
+      const authResult = validateHttpAuth(req, options);
+      if (!authResult.authenticated) {
+        const status = authResult.status ?? 401;
+        const headers: Record<string, string> = { "content-type": "application/json" };
+        if (status === 401) {
+          headers["www-authenticate"] = 'Bearer error="invalid_token"';
+        }
+        res.writeHead(status, headers);
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: status === 401 ? -32002 : -32000,
+              message: authResult.errorMessage,
+            },
+            id: null,
+          }),
+        );
+        return;
+      }
       // T-151: Protocol version header validation and echo
       const clientProtoVersion = req.headers["mcp-protocol-version"];
       if (typeof clientProtoVersion === "string") {

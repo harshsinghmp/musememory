@@ -71,6 +71,15 @@ export interface MCPSettings {
   autoConnectAgents: boolean;
   defaultProject: string;
   permissionsAutoApprove: boolean;
+  /** T-386: Bearer token or token-to-peer mapping for HTTP MCP server */
+  bearerToken?: string;
+  bearerTokens?: Record<string, string> | string[];
+  /** T-386: Allowlist of authorized peer identifiers */
+  allowedPeers?: string[];
+  /** T-151: Allowed Origin headers for CSRF protection */
+  allowedOrigins?: string[];
+  /** T-151: Allowed Host headers for DNS rebinding protection */
+  allowedHosts?: string[];
 }
 
 export interface SkillSettings {
