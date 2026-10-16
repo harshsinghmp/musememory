@@ -129,6 +129,18 @@ export async function rankAndRetrieveMemories(
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
   }
 
+  // T-137: Vector-upgrade degradation path — resolve semantic scores if embedder configured
+  let semanticScores = options.semanticScores;
+  if (!semanticScores && store.db && query.trim()) {
+    try {
+      const { semanticScoresFor } = await import("./embed-store.ts");
+      semanticScores = (await semanticScoresFor(store, query)) ?? undefined;
+    } catch {
+      // Cleanly degrade to FTS5 floor without throwing
+      semanticScores = undefined;
+    }
+  }
+
   // 4. Score candidates
   const scored = entries.map((entry) =>
     calculateMultiFactorScore(entry, queryTokens, {
@@ -138,7 +150,7 @@ export async function rankAndRetrieveMemories(
       targetSymbol: options.targetSymbol,
       ftsMatchIds,
       blastRadiusFiles,
-      semanticScores: options.semanticScores,
+      semanticScores,
     }),
   );
 

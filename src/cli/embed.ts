@@ -31,6 +31,9 @@ export async function handleEmbedCommand(parsed: ParsedArgs): Promise<number> {
     if (s.mismatch) {
       console.log("  WARNING: configured endpoint differs from the stored pipeline — recall is refused until 'memory embed reindex'");
     }
+    if (s.staleEmbedderCount > 0) {
+      console.log(`  stale embedder entries: ${s.staleEmbedderCount} (run 'memory embed reindex')`);
+    }
     return 0;
   }
 
