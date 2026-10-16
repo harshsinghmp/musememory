@@ -10,9 +10,9 @@
 ## Wave A — SECURITY (do first; outranks every feature)
 
 - [x] T-001 · landed #58 — template-gated test_command (fixed argv templates, no shell), `verify_refused` audit · src/verify.ts · F
-- [ ] T-002 · UI XSS: escape `p.title`/`p.slug` interpolation · ui.ts:1510 · new · F
+- [x] T-002 · landed Wave 5 — UI XSS: escape `p.title`/`p.slug` interpolation · ui.ts:1510 · branch: feat/wave-5-security-ui-protection · F
 - [x] MERGED→T-002 T-003 · UI XSS: escape `r.entry_id`/`r.actor` interpolation · ui.ts:1557 · new · F
-- [ ] T-004 · UI optimizer gate: `POST /api/optimize` requires dry-run default + localhost/token check · ui.ts:362 · new · F
+- [x] T-004 · landed Wave 5 — UI optimizer gate: `POST /api/optimize` requires dry-run default + localhost/token check · ui.ts:362 · branch: feat/wave-5-security-ui-protection · F
 
 ## Wave B — DRIFT (free fixes; no runtime path changes)
 
@@ -420,7 +420,7 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [x] **Gate claim corrected**: `bunx tsc --noEmit` exits 0, `bun run build` = 374 modules/18ms, `bun test` 502/0/2224/3.29s — full gate runnable today, ~5s/ticket, ~20min total. NOT a blocker (earlier claim wrong).
 - [x] **Branch-model reality**: repo default branch is `main`, NOT `master` — `git-workflow.md` lifecycle text does not match; agents must guard `main`/`dev` → decision D2.
 - [x] **T-371 lands BEFORE any Wave-0 security red test**: `security_hardening.test.ts:95` synthesized-500 + `:127` `if (store.db)` mean earlier red tests pass trivially.
-- [ ] T-380 · UI security tests WITHOUT a DOM dep: unit-test the pure `escapeHtml` (`ui.ts:1588`) with `<script>`/quote payloads — zero `escapeHtml` occurrences exist in test/, no DOM dependency exists; render-level tests deferred pending D3 · U
+- [x] T-380 · landed Wave 5 — UI security tests WITHOUT a DOM dep: unit-test the pure `escapeHtml` (`ui.ts:1588`) with `<script>`/quote payloads · branch: feat/wave-5-security-ui-protection · U
 - [ ] T-381 · embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · F
 - [ ] T-382 · deprecation policy: `deprecated: true` metadata + alias retention + "removed in vX"; prerequisite for T-201/T-202/T-203 · N
 - [x] T-383 · landed #71 — R1 red test: legacy store + added column throws before YAML write, passes after runMigrations · test/migrate.test.ts · F
@@ -472,10 +472,10 @@ Numbering note: explorer proposed T-386/T-387 — both taken by the v7 team slic
 
 ## New tickets
 
-- [ ] T-399 · (was proposed T-386) HIGH · `memory routine` step allowlist + re-entrancy guard: `loadRoutines` rejects steps outside `{brief, nudge, recall, compact, distill, verify}`, rejects `-`-prefixed tokens, `runRoutine` throws on depth > 5 · src/routines.ts, src/cli/lifecycle.ts:454 · F (cron fires unattended; planted routines.yaml = host mutation via upgrade/connect/hooks steps; self-`routine run` = unbounded recursion)
-- [ ] T-400 · (was proposed T-387) MEDIUM · ui read routes return unprojected data: `/api/memories` (ui.ts:1436) ships full `MemoryEntry[]`, `/api/snapshot` ships `exportSnapshot` — add explicit field allowlist matching canvas needs · src/ui.ts · F
-- [ ] T-388 · HIGH · hook SessionStart `<muse-memory>` block must escape/strip delimiter + instruction markup from memory content before stdout (poisoned constraint breaks block, re-primes next session; T-058/T-339 don't cover this sink) · src/hooks/pack.ts:198-210, src/secrets.ts · F
-- [ ] T-389 · MEDIUM · `recordObservation` must scan `metadata` (JSON-stringified), not just summary+raw; fix false "Vibeguard-scanned" docstring at pack.ts:216 (tool_name/session_id from unvalidated stdin JSON) · src/learning/observation.ts:30, src/hooks/pack.ts · F
+- [x] T-399 · landed Wave 5 — HIGH · `memory routine` step allowlist + re-entrancy guard: `loadRoutines` rejects steps outside `{brief, nudge, recall, compact, distill, verify}`, rejects `-`-prefixed tokens, `runRoutine` throws on depth > 5 · src/routines.ts, src/cli/lifecycle.ts:454 · branch: feat/wave-5-security-ui-protection · F
+- [x] T-400 · landed Wave 5 — MEDIUM · ui read routes return projected data: `/api/memories` and `/api/snapshot` use explicit field allowlist matching canvas needs · src/ui.ts · branch: feat/wave-5-security-ui-protection · F
+- [x] T-388 · landed Wave 5 — HIGH · hook SessionStart `<muse-memory>` block escapes/strips delimiter + instruction markup from memory content before stdout · src/hooks/pack.ts · branch: feat/wave-5-security-ui-protection · F
+- [x] T-389 · landed Wave 5 — MEDIUM · `recordObservation` scans `metadata` (JSON-stringified) with scanSecrets; updated pack.ts docstrings · src/learning/observation.ts, src/hooks/pack.ts · branch: feat/wave-5-security-ui-protection · F
 - [x] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling (decided 2026-10-15: global-standard-first, harness opt-in; implementation landed #61) · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
 - [x] T-391 · landed Wave 2 — `recordClaim`/`propose` validate `source_ids` against live registry at write time, derive `verified` · claims, store · branch: feat/wave-2-trust-gates · F
 - [ ] T-392 · HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + private/loopback/link-local block; SSRF via memory_settings_set → 169.254.169.254 today). Caveat: `cli/embed.ts:19` documents `http://127.0.0.1:8081/v1` as the intended local endpoint — needs explicit local opt-in flag, NOT a blanket reject (validateSafePath is the wrong tool) · src/settings/schema.ts:20-36, src/embedders.ts:55,137-143 · F
@@ -534,6 +534,6 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 88 |
-| Active Remaining | 202 |
+| Landed on dev | 95 |
+| Active Remaining | 195 |
 

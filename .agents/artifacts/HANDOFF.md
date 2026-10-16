@@ -1,22 +1,22 @@
-# HANDOFF — 2026-10-15T20:20:00Z
-branch: dev @ 197664f | phase: Wave 4 complete; dev green 756/0
+# HANDOFF — 2026-10-15T20:45:00Z
+branch: dev @ 85e207f | phase: Wave 5 complete; dev green 774/0
 
 ## Next Step
-Advance to Wave 5: Security Hardening & UI Protection (T-002, T-003, T-004, T-388, T-389, T-399, T-400, T-380).
+Advance to Wave 6: Semantic Embeddings & Eval Harness (T-381, T-071, T-136–T-139, T-140–T-143).
 
 ## In-Flight
-- Wave 4 landed on dev: T-305 (distill cap 1500 chars), T-306 (atomic write + rotation + 256KB cap), T-045 (on_pre_compress hook), T-047 (never-empty contract), T-046 (digest dedup store), T-053 (dual-measure tokens), T-054 (refuse-incomplete digest), T-091 (context pack), T-092 (manifest TOC), T-093 (truncation hierarchy), T-094 (USER.md slots).
-- Full suite green: 756 pass, 0 fail across 117 files; tsc + build clean; doctor 100% HEALTHY.
+- Wave 5 landed on dev: T-002/003 (UI XSS escaping), T-004 (optimizer dryRun default + auth gate), T-380 (escapeHtml unit tests), T-388 (hook <muse-memory> sanitization), T-389 (metadata secret scan), T-399 (routine step allowlist & depth guard), T-400 (UI read projection allowlist).
+- Full suite green: 774 pass, 0 fail across 121 files; tsc + build clean; doctor 100% HEALTHY.
 
 ## Ruled Out
-- Lexically repetitive test mocks failing scoreRetain 0.3 diversity gate.
-- Fixed-count observation log rotation (replaced by byte-budget rotation preserving all unprocessed entries).
-- Synchronous vs async handoff return ambiguity (resolved via function overloads).
+- Leaving HTML template interpolation unescaped in dashboard client rendering.
+- Permitting non-dryRun optimizer execution from non-localhost without token authorization.
+- Unconstrained routine steps permitting host binary or option flag injection.
 
 ## Decisions
-- Truncation hierarchy prioritizes Pin > Provenance > Recency > Salience with [N omitted — budget M].
-- Refuse-incomplete digest strictly withholds malformed CURRENT.md and surfaces in withheld_memories.
-- Distillation caps raw observation bodies at 1500 characters with truncation markers.
+- POST /api/optimize defaults strictly to dryRun: true; live execution requires localhost or valid token.
+- /api/memories and /api/snapshot project only allowlisted UI fields via projectMemoryForUi.
+- Routines restrict commands to {brief, nudge, recall, compact, distill, verify} and throw on depth > 5.
 
 ## Verify
-`bun test` 756/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
+`bun test` 774/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`

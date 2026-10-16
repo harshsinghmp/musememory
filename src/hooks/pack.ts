@@ -248,6 +248,19 @@ function failOpen(scope: string, err: unknown): void {
   console.error(`[muse hooks] ${scope} (non-blocking): ${msg}`);
 }
 
+/**
+ * Strips/neutralizes <muse-memory> delimiters and pseudo-system instruction tags
+ * so malicious memory content cannot break out of prompt context blocks (T-388).
+ */
+export function sanitizeHookContextBlock(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/<\/muse-memory>/gi, "[/muse-memory]")
+    .replace(/<muse-memory>/gi, "[muse-memory]")
+    .replace(/<\/?instructions?(?:\s+[^>]*)?>/gi, "")
+    .replace(/<\/?(?:system-message|system)(?:\s+[^>]*)?>/gi, "");
+}
+
 /** SessionStart: emit a compact context block on stdout; Claude Code feeds it into the session. */
 export async function runSessionStartHook(): Promise<void> {
   try {
@@ -265,12 +278,16 @@ export async function runSessionStartHook(): Promise<void> {
     const lines: string[] = ["<muse-memory>"];
     if (current.constraints.length > 0) {
       lines.push("## Active constraints");
-      for (const c of current.constraints.slice(0, 5)) lines.push(`- ${c}`);
+      for (const c of current.constraints.slice(0, 5)) {
+        lines.push(`- ${sanitizeHookContextBlock(c)}`);
+      }
     }
     if (ranked.length > 0) {
       lines.push("", "## Relevant memories");
       for (const r of ranked) {
-        lines.push(`- [${r.entry.type}] ${r.entry.title}: ${r.entry.content.slice(0, 160)}`);
+        const title = sanitizeHookContextBlock(r.entry.title);
+        const content = sanitizeHookContextBlock(r.entry.content.slice(0, 160));
+        lines.push(`- [${r.entry.type}] ${title}: ${content}`);
       }
     }
     lines.push("</muse-memory>", "");
@@ -280,7 +297,7 @@ export async function runSessionStartHook(): Promise<void> {
   }
 }
 
-/** PostToolUse: capture the tool result as an ephemeral, Vibeguard-scanned observation. */
+/** PostToolUse: capture the tool result as an ephemeral, Vibeguard-scanned observation (including tool_name and session_id metadata). */
 export function runPostToolUseHook(): void {
   try {
     const payload = readStdinJson();
