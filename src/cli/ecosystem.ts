@@ -507,12 +507,36 @@ export async function handleGraphCommand({ positional, flags }: ParsedArgs): Pro
 
 export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
   const flags = args?.flags ?? {};
-  if (flags["http"] || flags["port"]) {
+  if (flags["http"] || flags["port"] || flags["serve"]) {
     const port = flags["port"] ? parseInt(flags["port"], 10) : 31338;
     const host = flags["host"] || "127.0.0.1";
+    const bearerToken = flags["token"] || process.env.MUSE_BEARER_TOKEN;
+    const rawTokens = flags["tokens"] || process.env.MUSE_AUTH_TOKENS;
+    const bearerTokens = rawTokens ? rawTokens.split(",").map((t: string) => t.trim()) : undefined;
+    const allowedPeers = flags["allowed-peers"]
+      ? flags["allowed-peers"].split(",").map((p: string) => p.trim())
+      : undefined;
+    const allowedOrigins = flags["allowed-origins"]
+      ? flags["allowed-origins"].split(",").map((o: string) => o.trim())
+      : undefined;
+    const allowedHosts = flags["allowed-hosts"]
+      ? flags["allowed-hosts"].split(",").map((h: string) => h.trim())
+      : undefined;
+
     const { startHttpMcpServer } = await import("../mcp.ts");
-    const handle = await startHttpMcpServer({ port, host });
+    const handle = await startHttpMcpServer({
+      port,
+      host,
+      bearerToken,
+      bearerTokens,
+      allowedPeers,
+      allowedOrigins,
+      allowedHosts,
+    });
     console.log(`Muse Memory MCP Streamable HTTP Server listening at ${handle.url}`);
+    if (bearerToken || bearerTokens) {
+      console.log(`[Auth] Bearer authentication active (${allowedPeers ? `${allowedPeers.length} allowed peers` : "allowlist open"})`);
+    }
     return new Promise<number>(() => {
       // Run until process terminates
     });
