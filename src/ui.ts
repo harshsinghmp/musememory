@@ -1940,7 +1940,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       const times = allMemories.map(m => Date.parse(m.updated_at || '')).filter(t => !Number.isNaN(t));
       if (times.length === 0) { slider.disabled = true; label.textContent = 'n/a'; return; }
       slider.disabled = false;
-      const min = Math.min(...times), max = Math.max(...times);
+      const min = times.reduce((a, b) => (b < a ? b : a), Infinity), max = times.reduce((a, b) => (b > a ? b : a), -Infinity);
       slider.oninput = () => {
         const t = parseInt(slider.value, 10) / 1000;
         if (t >= 1) { timelineCutoff = null; label.textContent = 'all'; }

@@ -41,9 +41,9 @@
 - [x] T-032 · landed #75 — audit-replay restore (rebuild from audit.jsonl) · store · branch: memory-tombstones · F
 - [ ] T-033 · optimizer: replace regex deletion with tombstone+restore · optimize.ts · branch: memory-tombstones · F
 - [ ] T-034 · `secure_delete` = tombstone + VACUUM + audit seal · optimize.ts · branch: memory-tombstones · F
-- [ ] T-035 · `Math.max(...arr)` spread crash at scale → iterative max · retrieval.ts · new · F
-- [ ] T-036 · IDF caching (stop recomputing per query) · retrieval.ts · new · F
-- [ ] T-037 · drop redundant full-list scan in hybridSearch · retrieval.ts · new · F
+- [x] T-035 · landed Wave 3 — `Math.max(...arr)` spread crash at scale → iterative safeMax/safeMin · retrieval.ts, vector.ts, ui.ts · branch: feat/wave-3-retrieval-ranking · F
+- [x] T-036 · landed Wave 3 — in-memory IDF caching via WeakMap across queries · vector.ts · branch: feat/wave-3-retrieval-ranking · F
+- [x] T-037 · landed Wave 3 — drop redundant full-list scan via countMemories · store.ts, cache.ts, engine.ts · branch: feat/wave-3-retrieval-ranking · F
 - [x] T-038 · landed Wave 1 — `idempotency_key` column + UNIQUE index on capture · schema, store · F
 - [x] T-039 · landed Wave 1 — divergent-retry → named conflict naming existing id · store.ts · F
 - [x] T-040 · landed Wave 1 — `content_hash` normalize (whitespace/case) + dedup on propose · store.ts, quality · F
@@ -65,8 +65,8 @@
 - [x] T-056 · landed Wave 1 — `atexit` bounded join for async write workers · store, async_workers.ts · F
 - [x] T-058 · landed Wave 2 — read-path re-validation: injection markup/credentials/invisible chars excluded from recall, logged once · retrieval · branch: feat/wave-2-trust-gates · F
 - [x] MERGED→T-058 T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
-- [ ] T-060 · safe FTS5 query construction (quote every token — injection surface) · store.ts · new · F
-- [ ] T-061 · compound-token expansion (camelCase/snake_case split) · retrieval · new · F
+- [x] T-060 · landed Wave 3 — safe FTS5 query construction (quote every token, prefix wildcards, T-312 error log) · sqlite.ts · branch: feat/wave-3-retrieval-ranking · F
+- [x] T-061 · landed Wave 3 — compound-token expansion (camelCase/PascalCase/snake_case split) · retrieval.ts · branch: feat/wave-3-retrieval-ranking · F
 - [ ] T-062 · clamp model-supplied `limit` values · mcp tools · new · F
 - [ ] T-063 · dry-run-by-default, point-id-only destructive ops · mcp, cli · new · F
 - [ ] T-064 · read-path `stale:true` provenance tag for degraded/cache reads · retrieval · new · F
@@ -74,7 +74,7 @@
 ## Wave D — P1 MEMORY QUALITY (v2.5.0)
 
 ### Abstention + decay
-- [ ] T-070 · IDF-weighted relevance gate before FTS5 (0.3, identifier-decisive, greeting short-circuit) · retrieval · new · U
+- [x] T-070 · landed Wave 3 — IDF-weighted relevance gate before FTS5 (0.3 threshold, identifier-decisive, greeting short-circuit) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [ ] T-071 · dual calibrated thresholds (cosine max + BM25 min, engine-pinned constants) · retrieval · branch: local-embeddings-llama-cpp · U
 - [ ] T-072 · FTS5-tokenizer-matched abstention gate · retrieval · new · U
 - [ ] T-073 · `no_confident_match` result mode · retrieval, mcp · new · U
@@ -124,10 +124,10 @@
 - [ ] T-111 · seen-chunk TTL · retrieval · new · U
 - [ ] T-112 · topic-overlap >0.6 prefetch skip · retrieval · new · U
 - [ ] T-113 · trivial-prompt gate (skip recall for greetings) · orchestrator · new · U
-- [ ] T-114 · soft-OR evidence fusion `P=1-(1-pv)(1-pl)` · retrieval · new · U
-- [ ] T-115 · `low_discrimination()` conditional rerank · retrieval · new · U
+- [x] T-114 · landed Wave 3 — soft-OR evidence fusion `P=1-(1-pv)(1-pl)` · ranking.ts, vector.ts · branch: feat/wave-3-retrieval-ranking · U
+- [x] T-115 · landed Wave 3 — `low_discrimination()` conditional rerank (tier/verification/recency tie-breaker) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [x] MERGED→T-071 T-116 · semantic threshold gate BEFORE BM25/entity fusion · retrieval · branch: local-embeddings-llama-cpp · U
-- [ ] T-117 · watermark staleness from `last_memory_seen_at` (data, not clock) · retrieval · new · U
+- [x] T-117 · landed Wave 3 — watermark staleness from `last_memory_seen_at` (max store timestamp) · retrieval.ts · branch: feat/wave-3-retrieval-ranking · U
 - [ ] T-118 · query-intent bias multipliers · retrieval · new · U
 - [ ] T-119 · `effective_score = base × reinforcement × decay` · retrieval · new · U
 - [ ] T-120 · RRF weight tuning + A/B · retrieval · branch: recall-eval-harness · U
@@ -136,7 +136,7 @@
 - [ ] T-123 · ratio-batched sidecar refresh · store · new · U
 - [ ] T-124 · resident INDEX route-map · orchestrator · branch: io-budget-telemetry · U
 - [ ] T-125 · tier budgets as named constants with provenance · retrieval, orchestrator · branch: io-budget-telemetry · U
-- [ ] T-126 · `why_retrieved` deterministic reason tokens · retrieval · new · U
+- [x] T-126 · landed Wave 3 — `why_retrieved` deterministic reason tokens · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [ ] T-127 · recall→usage telemetry join (`usage_rate` feeds ROI) · quality · branch: io-budget-telemetry · U
 - [ ] T-128 · `[DRAFT]` marking with separate confident-answer key · store · new · U
 - [ ] T-129 · config-honesty AST audit (WIRED/DORMANT/UNREAD, build-failing) · new module · new · U

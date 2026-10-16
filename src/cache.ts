@@ -254,6 +254,10 @@ export class MemoryStoreCache {
     this.stats.version = this.version;
   }
 
+  public size(): number {
+    return this.entries.size;
+  }
+
   public getStats(): CacheStats {
     return {
       ...this.stats,

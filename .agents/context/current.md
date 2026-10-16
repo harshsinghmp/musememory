@@ -6,7 +6,7 @@
 ---
 
 ## ⏭️ Next Up (Realigned In-Line Feature Waves)
-- **Wave 3: Retrieval Quality, Ranking & Token Economics (In-Line Retrieval P0/P1)**: `T-035` (re-rank budget allocation), `T-036` (exact keyword BM25 boost), `T-037` (negative lesson priority knapsack), `T-060` (adaptive token budgeting), `T-061` (disclosure depth tier tuning), `T-070` (cross-encoder reranker spike), `T-114` (soft-OR fusion), `T-115` (low_discrimination rerank), `T-117` (watermark staleness), `T-126` (ranking benchmarks).
+- **Wave 4: Compaction, Distillation & Context Windows**: `T-045` (on_pre_compress hook), `T-046` (digest dedup set), `T-047` (never-empty checkpoint contract), `T-053` (dual-measure token accounting), `T-054` (refuse-incomplete digest), `T-091` (context-pack compaction), `T-092` (manifest TOC), `T-093` (budget truncation order), `T-094` (reserved slots for USER.md).
 
 ---
 
@@ -14,6 +14,7 @@
 - [x] **Wave 0: Pre-Flight Integrity & Baseline Fixes**: `T-402`, `T-403`, `T-404`, `T-401`, `T-370`.
 - [x] **Wave 1: Storage Engine, Outbox & Concurrency**: `T-041`, `T-042`, `T-044`, `T-038`, `T-039`, `T-040`, `T-055`, `T-056`.
 - [x] **Wave 2: Write Admission, Trust & Anti-Poisoning**: `T-104` (scoreRetain 0.3 gate), `T-075` (trust tiers + withholding), `T-058`/`T-059` (read-path re-validation), `T-103` (FTS index-time secret redaction), `T-105`/`T-105b` (corroboration & syntax promotion gates), `T-391` (citation validation against live registry).
+- [x] **Wave 3: Retrieval Quality, Ranking & Token Economics**: `T-035` (iterative safeMax/safeMin scale safety), `T-036` (in-memory IDF caching via WeakMap), `T-037` (drop redundant full-list scans via countMemories), `T-060` (safe FTS5 query token escaping), `T-061` (compound-token expansion), `T-070` (IDF-weighted relevance gate 0.3), `T-114` (Soft-OR evidence fusion formula), `T-115` (low_discrimination conditional reranking), `T-117` (watermark staleness tracking), `T-126` (deterministic why_retrieved reason tokens), and priority knapsack packing for negative anti-pattern lessons.
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
 
 ---
