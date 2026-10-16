@@ -46,6 +46,41 @@ import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
 export { registerWriteWorker, drainWriteWorkers };
 import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
 
+export interface StorageLayoutOptions {
+  /** T-153: Optional tenant / member ID for per-tenant SQLite DB files (e.g. 'alice' -> 'tenant_alice.db') */
+  tenantId?: string;
+  /** T-153: Direct database filename or path override (e.g. 'custom.db') */
+  dbName?: string;
+  /** T-153: Designate as shared team store (uses 'team.db') */
+  isTeam?: boolean;
+}
+
+/**
+ * T-153: Map tenant options to target database filename.
+ * Defaults to 'memory.db', team mode to 'team.db', and tenants to 'tenant_<id>.db'.
+ */
+export function resolveDbFilename(options?: StorageLayoutOptions): string {
+  if (options?.dbName) {
+    const raw = options.dbName.trim();
+    return raw.endsWith(".db") ? raw : `${raw}.db`;
+  }
+  if (options?.isTeam) {
+    return "team.db";
+  }
+  if (options?.tenantId) {
+    const raw = options.tenantId.trim();
+    if (raw === "team") return "team.db";
+    return raw.startsWith("tenant_") ? (raw.endsWith(".db") ? raw : `${raw}.db`) : `tenant_${raw}.db`;
+  }
+  const envTenant = process.env.MUSE_TENANT_ID || process.env.MUSE_TENANT;
+  if (envTenant) {
+    const raw = envTenant.trim();
+    if (raw === "team") return "team.db";
+    return raw.startsWith("tenant_") ? (raw.endsWith(".db") ? raw : `${raw}.db`) : `tenant_${raw}.db`;
+  }
+  return "memory.db";
+}
+
 export interface StorageLayout {
   root: string;
   memoryDir: string;
@@ -54,19 +89,32 @@ export interface StorageLayout {
   currentMd: string;
   userMd: string;
   auditJsonl: string;
+  /** T-153: Active tenant or team identifier if operating in multi-DB mode. */
+  tenantId?: string;
 }
 
-export function getStorageLayout(memoryDir: string): StorageLayout {
+export function getStorageLayout(memoryDir: string, options?: StorageLayoutOptions): StorageLayout {
+  const dbFile = resolveDbFilename(options);
+  const tenantId = options?.tenantId ?? (options?.isTeam ? "team" : undefined);
+  const tenantSuffix = tenantId && tenantId !== "team" ? `_${tenantId.replace(/^tenant_/, "")}` : "";
+  const memoriesDir =
+    tenantId && tenantId !== "team"
+      ? join(memoryDir, `memories${tenantSuffix}`)
+      : join(memoryDir, "memories");
+
   return {
     root: workspaceRootFor(memoryDir),
     memoryDir,
-    memoriesDir: join(memoryDir, "memories"),
-    dbPath: join(memoryDir, "memory.db"),
+    memoriesDir,
+    dbPath: join(memoryDir, dbFile),
     currentMd: join(memoryDir, "CURRENT.md"),
     userMd: join(memoryDir, "USER.md"),
-    auditJsonl: join(memoryDir, "audit.jsonl"),
+    auditJsonl: join(memoryDir, tenantId ? `audit${tenantSuffix}.jsonl` : "audit.jsonl"),
+    tenantId,
   };
 }
+
+export interface StoreOptions extends StorageLayoutOptions {}
 
 export interface Store {
   dir: string;
@@ -75,6 +123,7 @@ export interface Store {
   db?: SqliteDatabase;
   cache?: MemoryStoreCache;
   circuit?: CircuitBreaker;
+  tenantId?: string;
 }
 
 export class IdempotencyConflictError extends Error {
@@ -187,9 +236,12 @@ function dbWriteGeneration(db: SqliteDatabase | undefined): number | undefined {
   }
 }
 
-/** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
-export function openStore(memoryDir: string): Store {
-  const layout = getStorageLayout(memoryDir);
+/**
+ * Open the memories directory & SQLite primary database for a memory dir, creating it if missing.
+ * T-153: Supports multi-DB topologies (e.g. options.tenantId, options.isTeam, options.dbName).
+ */
+export function openStore(memoryDir: string, options?: StoreOptions): Store {
+  const layout = getStorageLayout(memoryDir, options);
   mkdirSync(layout.memoriesDir, { recursive: true });
   mkdirSync(memoryDir, { recursive: true });
 
@@ -208,9 +260,19 @@ export function openStore(memoryDir: string): Store {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
 
-  const cache = getOrCreateStoreCache(memoryDir);
-  const circuit = getStoreCircuitBreaker(memoryDir);
-  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache, circuit };
+  // T-153: Key cache and circuit breaker by dbPath to isolate per-tenant and team databases
+  const cacheKey = layout.dbPath;
+  const cache = getOrCreateStoreCache(cacheKey);
+  const circuit = getStoreCircuitBreaker(cacheKey);
+  const store: Store = {
+    dir: layout.memoriesDir,
+    memoryDir,
+    layout,
+    db,
+    cache,
+    circuit,
+    tenantId: layout.tenantId,
+  };
 
   // R21: ensure the embedding vector + pipeline-fingerprint tables exist.
   if (db) {
