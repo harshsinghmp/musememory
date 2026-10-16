@@ -64,6 +64,7 @@
   47. **Store Invalidation & FTS Parity (`T-020`, `T-024`, `T-025`, `T-026`, PR #73)**: Query cache invalidation on writes, bounded FTS preflight token caps, single-transaction atomic batch writes, and automated FTS-to-row parity audits and repair.
   48. **Authoritative Retrieval Unification & Unicode Tokenization (`T-308`, `T-311`, PR #74)**: Unified scoring model between `get_context` and `muse_context`; multilingual unicode-aware tokenization across CJK and accented scripts with non-lexical penalties.
   49. **Tombstones, Memory Restoration & Audit Replay (`T-030`, `T-031`, `T-032`, PR #75)**: Soft-delete tombstone architecture (`deleted_at`, `deleted_by`) with automatic read-path exclusion; `memory restore` CLI and `memory_restore` MCP tool; and ledger rebuild from `audit.jsonl` via `replayFromAudit`.
+  50. **Storage Engine, Outbox State Machine & Concurrency (Wave 1: `T-041`, `T-042`, `T-044`, `T-038`, `T-039`, `T-040`, `T-055`, `T-056`)**: Durable SQLite `outbox` table via migration v3 (`pending` → `processing` → `sent` / `held` / `failed`), 300s stale-lock recovery sweep on store open, single-writer file flock (`.lock`) that fails loud, crash-durable `fsync` on every JSONL audit event, `idempotency_key` unique index with divergent-retry conflict detection, case/whitespace-normalized `content_hash` fast SQLite deduplication, store circuit breaker (5 failures → 120s cooldown → graceful degradation), and `beforeExit`/`closeStore` bounded join (5000ms max) for async write workers.
 
 ---
 

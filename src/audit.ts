@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditEntry, AuditOperation } from "./types.ts";
+import { appendJsonlWithFsync } from "./lock.ts";
 
 export function auditFilePath(memoryDir: string): string {
   return join(memoryDir, "audit.jsonl");
@@ -8,6 +9,7 @@ export function auditFilePath(memoryDir: string): string {
 
 /**
  * Appends a structured audit event to the append-only audit ledger (.memory/audit.jsonl).
+ * T-044: Guarantees fsync crash durability on every event line written.
  */
 export function recordAuditEvent(
   memoryDir: string,
@@ -35,7 +37,7 @@ export function recordAuditEvent(
     details: event.details,
   };
 
-  appendFileSync(auditPath, JSON.stringify(entry) + "\n", "utf8");
+  appendJsonlWithFsync(auditPath, JSON.stringify(entry));
   return entry;
 }
 

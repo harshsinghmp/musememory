@@ -218,6 +218,8 @@ export interface DbMemoryRow {
   mem_path: string | null;
   last_accessed_at: string | null;
   access_count: number | null;
+  idempotency_key?: string | null;
+  content_hash?: string | null;
   data: string;
   created_at: string;
   updated_at: string;
@@ -247,47 +249,92 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
     mem_path: row.mem_path !== null ? row.mem_path : parsedData.mem_path,
     last_accessed_at: row.last_accessed_at !== null ? row.last_accessed_at : parsedData.last_accessed_at,
     access_count: row.access_count !== null ? row.access_count : parsedData.access_count,
+    idempotency_key: row.idempotency_key !== undefined && row.idempotency_key !== null ? row.idempotency_key : parsedData.idempotency_key,
+    content_hash: row.content_hash !== undefined && row.content_hash !== null ? row.content_hash : parsedData.content_hash,
     created_at: row.created_at || parsedData.created_at || new Date().toISOString(),
     updated_at: row.updated_at || parsedData.updated_at || new Date().toISOString(),
   };
 }
 
 export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): void {
-  const sql = `
-    INSERT OR REPLACE INTO memories (
-      id, title, content, project, type, status, salience, reinforcement,
-      session_id, due_at, expires_at, valid_from, valid_to,
-      mem_path, last_accessed_at, access_count, data,
-      created_at, updated_at
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?
-    )
-  `;
+  try {
+    const sql = `
+      INSERT OR REPLACE INTO memories (
+        id, title, content, project, type, status, salience, reinforcement,
+        session_id, due_at, expires_at, valid_from, valid_to,
+        mem_path, last_accessed_at, access_count, idempotency_key, content_hash, data,
+        created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?
+      )
+    `;
 
-  db.run(sql, [
-    entry.id,
-    entry.title,
-    entry.content,
-    entry.project,
-    entry.type || "discovery",
-    entry.status,
-    typeof entry.salience === "number" ? entry.salience : null,
-    typeof entry.reinforcement === "number" ? entry.reinforcement : null,
-    entry.session_id ?? null,
-    entry.due_at ?? null,
-    entry.expires_at ?? null,
-    entry.valid_from ?? null,
-    entry.valid_to ?? null,
-    entry.mem_path ?? null,
-    entry.last_accessed_at ?? null,
-    typeof entry.access_count === "number" ? entry.access_count : null,
-    JSON.stringify(entry),
-    entry.created_at,
-    entry.updated_at,
-  ]);
+    db.run(sql, [
+      entry.id,
+      entry.title,
+      entry.content,
+      entry.project,
+      entry.type || "discovery",
+      entry.status,
+      typeof entry.salience === "number" ? entry.salience : null,
+      typeof entry.reinforcement === "number" ? entry.reinforcement : null,
+      entry.session_id ?? null,
+      entry.due_at ?? null,
+      entry.expires_at ?? null,
+      entry.valid_from ?? null,
+      entry.valid_to ?? null,
+      entry.mem_path ?? null,
+      entry.last_accessed_at ?? null,
+      typeof entry.access_count === "number" ? entry.access_count : null,
+      entry.idempotency_key ?? null,
+      entry.content_hash ?? null,
+      JSON.stringify(entry),
+      entry.created_at,
+      entry.updated_at,
+    ]);
+  } catch (err: any) {
+    if (err && String(err.message || err).includes("no column named")) {
+      const legacySql = `
+        INSERT OR REPLACE INTO memories (
+          id, title, content, project, type, status, salience, reinforcement,
+          session_id, due_at, expires_at, valid_from, valid_to,
+          mem_path, last_accessed_at, access_count, data,
+          created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
+      `;
+      db.run(legacySql, [
+        entry.id,
+        entry.title,
+        entry.content,
+        entry.project,
+        entry.type || "discovery",
+        entry.status,
+        typeof entry.salience === "number" ? entry.salience : null,
+        typeof entry.reinforcement === "number" ? entry.reinforcement : null,
+        entry.session_id ?? null,
+        entry.due_at ?? null,
+        entry.expires_at ?? null,
+        entry.valid_from ?? null,
+        entry.valid_to ?? null,
+        entry.mem_path ?? null,
+        entry.last_accessed_at ?? null,
+        typeof entry.access_count === "number" ? entry.access_count : null,
+        JSON.stringify(entry),
+        entry.created_at,
+        entry.updated_at,
+      ]);
+    } else {
+      throw err;
+    }
+  }
 
   // Synchronize FTS5 virtual table
   try {
@@ -303,6 +350,33 @@ export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | nul
   const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE id = ? LIMIT 1`).get([id]);
   if (!row) return null;
   return rowToMemoryEntry(row);
+}
+
+export function getMemoryByIdempotencyKey(db: SqliteDatabase, key: string): MemoryEntry | null {
+  try {
+    const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE idempotency_key = ? AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1`).get([key]);
+    if (!row) return null;
+    return rowToMemoryEntry(row);
+  } catch {
+    return null;
+  }
+}
+
+export function getMemoryByContentHash(db: SqliteDatabase, hash: string, project?: string): MemoryEntry | null {
+  try {
+    let sql = `SELECT * FROM memories WHERE content_hash = ? AND (deleted_at IS NULL OR deleted_at = '')`;
+    const params: unknown[] = [hash];
+    if (project) {
+      sql += ` AND project = ?`;
+      params.push(project);
+    }
+    sql += ` LIMIT 1`;
+    const row = db.query<DbMemoryRow>(sql).get(params);
+    if (!row) return null;
+    return rowToMemoryEntry(row);
+  } catch {
+    return null;
+  }
 }
 
 export function listMemories(

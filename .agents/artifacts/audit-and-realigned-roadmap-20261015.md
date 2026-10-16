@@ -69,13 +69,13 @@ flowchart TD
 ### Wave 1 — Storage Engine, Outbox & Concurrency (P0 · In-Line Storage)
 *Goal: Provide unbreakable queued writes, crash recovery, and multi-process file-locking without external daemons.*
 
-- [ ] **T-041** · Outbox state machine (`pending` → `processing` → `sent` / `held` / `failed`) via additive migration `v3` (`src/migrate.ts`, `src/store.ts`).
-- [ ] **T-042** · Stale-lock recovery sweep (300s) on store open (`src/store.ts`).
-- [ ] **T-044** · Append-only fsync JSONL event log + single-writer flock (`src/store.ts`).
-- [ ] **T-038** · `idempotency_key` column + UNIQUE constraint on capture (`src/migrate.ts`, `src/store.ts`).
-- [ ] **T-040** · Normalized `content_hash` (whitespace/case) + dedup on propose (`src/store.ts`, `src/quality.ts`).
-- [ ] **T-056** · `atexit` bounded join for async write workers (`src/store.ts`).
-- [ ] **T-055** · Circuit breaker around store paths (5 failures → 120s cooldown → degraded mode) (`src/store.ts`).
+- [x] **T-041** · Outbox state machine (`pending` → `processing` → `sent` / `held` / `failed`) via additive migration `v3` (`src/migrate.ts`, `src/store.ts`, `src/outbox.ts`).
+- [x] **T-042** · Stale-lock recovery sweep (300s) on store open (`src/store.ts`, `src/outbox.ts`).
+- [x] **T-044** · Append-only fsync JSONL event log + single-writer flock (`src/store.ts`, `src/lock.ts`).
+- [x] **T-038** · `idempotency_key` column + UNIQUE constraint on capture (`src/migrate.ts`, `src/store.ts`).
+- [x] **T-040** · Normalized `content_hash` (whitespace/case) + dedup on propose (`src/store.ts`, `src/quality.ts`).
+- [x] **T-056** · `atexit` bounded join for async write workers (`src/store.ts`, `src/async_workers.ts`).
+- [x] **T-055** · Circuit breaker around store paths (5 failures → 120s cooldown → degraded mode) (`src/store.ts`, `src/circuit.ts`).
 
 ---
 

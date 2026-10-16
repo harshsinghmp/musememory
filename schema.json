@@ -19,6 +19,8 @@
     "mem_path": { "type": "string" },
     "last_accessed_at": { "type": ["string", "null"], "format": "date-time" },
     "access_count": { "type": "number", "minimum": 0 },
+    "idempotency_key": { "type": ["string", "null"] },
+    "content_hash": { "type": ["string", "null"] },
     "due_at": { "type": "string", "format": "date-time" },
     "expires_at": { "type": "string", "format": "date-time" },
     "reinforcement": { "type": "integer" },
