@@ -8,7 +8,15 @@ export function getSettingsFilePath(memoryDir: string): string {
   return join(memoryDir, "settings.json");
 }
 
-export function loadSettings(memoryDir: string): SettingsStore {
+export function loadSettings(memoryDir?: string): SettingsStore {
+  if (!memoryDir) {
+    return {
+      version: 1,
+      global: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
+      projects: {},
+    };
+  }
+
   const filePath = getSettingsFilePath(memoryDir);
   if (!existsSync(filePath)) {
     return {
@@ -41,7 +49,7 @@ export function saveSettings(store: SettingsStore, memoryDir: string): void {
   writeFileSync(filePath, JSON.stringify(store, null, 2), "utf8");
 }
 
-export function getSettings(memoryDir: string): GlobalSettings {
+export function getSettings(memoryDir?: string): GlobalSettings {
   return loadSettings(memoryDir).global;
 }
 
