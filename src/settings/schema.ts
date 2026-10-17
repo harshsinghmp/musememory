@@ -14,6 +14,66 @@ export function validateSafePath(path: string, context = "Path"): void {
   }
 }
 
+/**
+ * T-392: Validate embedderUrl against SSRF, cloud metadata injection, and dangerous protocols.
+ * - Enforces http: or https:
+ * - Restricts plain http: to loopback addresses (localhost, 127.0.0.1, ::1, 0.0.0.0) unless allowInsecureHttp is set.
+ * - Blocks link-local metadata addresses (169.254.169.254, 169.254.0.0/16, metadata.google.internal).
+ */
+export function validateEmbedderUrl(
+  urlStr: string,
+  options: { allowInsecureHttp?: boolean } = {},
+): { valid: boolean; error?: string } {
+  if (!urlStr || typeof urlStr !== "string") {
+    return { valid: false, error: "embedderUrl must be a non-empty string" };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return { valid: false, error: `Invalid URL format: "${urlStr}"` };
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return {
+      valid: false,
+      error: `Invalid protocol: "${parsed.protocol}". Only 'http:' and 'https:' are allowed`,
+    };
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  // Cloud metadata & link-local address defense
+  if (
+    hostname === "169.254.169.254" ||
+    hostname.startsWith("169.254.") ||
+    hostname === "metadata.google.internal" ||
+    hostname.endsWith(".metadata.google.internal") ||
+    hostname.startsWith("fe80:")
+  ) {
+    return {
+      valid: false,
+      error: `Access to cloud metadata or link-local address "${hostname}" is forbidden`,
+    };
+  }
+
+  const isLoopback =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "0.0.0.0";
+
+  if (parsed.protocol === "http:" && !isLoopback && !options.allowInsecureHttp) {
+    return {
+      valid: false,
+      error: `Remote embedder endpoint "${urlStr}" must use HTTPS (plain HTTP is restricted to local loopback)`,
+    };
+  }
+
+  return { valid: true };
+}
+
 export function validateSettings(settings: Partial<GlobalSettings>): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -31,6 +91,13 @@ export function validateSettings(settings: Partial<GlobalSettings>): { valid: bo
     if (r.hybridVectorWeight !== undefined && r.hybridTreeWeight !== undefined) {
       if (Math.abs(r.hybridVectorWeight + r.hybridTreeWeight - 1.0) > 0.001) {
         errors.push(`retrieval weights (hybridVectorWeight + hybridTreeWeight) must sum to 1.0`);
+      }
+    }
+    // T-392: Validate embedderUrl
+    if (r.embedderUrl) {
+      const urlCheck = validateEmbedderUrl(r.embedderUrl);
+      if (!urlCheck.valid && urlCheck.error) {
+        errors.push(`retrieval.embedderUrl: ${urlCheck.error}`);
       }
     }
   }

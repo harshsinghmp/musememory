@@ -11,6 +11,7 @@
  */
 import type { SqliteDatabase } from "../sqlite.ts";
 import { getSettings } from "../settings/loader.ts";
+import { validateEmbedderUrl } from "../settings/schema.ts";
 
 export interface EmbedderProbe {
   dims: number;
@@ -44,7 +45,13 @@ export function createEmbedder(opts: {
   endpoint: string;
   model?: string;
   fetchImpl?: FetchImpl;
+  allowInsecureHttp?: boolean;
 }): Embedder {
+  const urlCheck = validateEmbedderUrl(opts.endpoint, { allowInsecureHttp: opts.allowInsecureHttp });
+  if (!urlCheck.valid && urlCheck.error) {
+    throw new Error(`Invalid embedder endpoint: ${urlCheck.error}`);
+  }
+
   const endpoint = opts.endpoint.replace(/\/+$/, "");
   const doFetch: FetchImpl = opts.fetchImpl ?? fetch;
 
