@@ -5,8 +5,8 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 7 Residual Waves)
-- **Residual Surface Audit & Wave 8**: Residual governance, routines allowlist, hook stdout injection, claim forgery hardening, and ecosystem integrations.
+## ⏭️ Next Up (Post-Wave 8 Focus)
+- **v10 Feature Waves & Deep Refinements**: Next planned wave execution, production hardening, and CLI ecosystem polish.
 
 ---
 
@@ -19,6 +19,7 @@
 - [x] **Wave 5: Security Hardening & UI Protection**: `T-002`/`T-003` (UI XSS escaping for `p.title`, `p.slug`, `r.entry_id`, `r.actor`, checkpoints, and details), `T-004` (UI optimizer gate dry-run default + localhost/token check), `T-380` (unit test suite for `escapeHtml`), `T-388` (Hook SessionStart `<muse-memory>` block sanitization), `T-389` (`recordObservation` metadata JSON credential scanning), `T-399` (routine step allowlist, flag rejection, and depth > 5 re-entrancy recursion guard), `T-400` (UI read routes `/api/memories` and `/api/snapshot` projection allowlist).
 - [x] **Wave 6: Semantic Embeddings & Eval Harness**: `T-381` (llama-cpp wire protocol embeddings spike), `T-071` (dual calibrated thresholds: `SEMANTIC_COSINE_MIN_THRESHOLD = 0.30`, `BM25_MIN_THRESHOLD = 0.25`), `T-136` (engine fingerprint pinning `model|dims|endpoint`), `T-137` (FTS5-floor / vector-upgrade degradation path), `T-138` (in-process brute-force cosine over SQLite `BLOB` raw floats), `T-139` (`stale_embedder` stamp on reindex misses and doctor reporting), `T-140` (recall-set grading: must-return, distractor discrimination, abstention, noise-as-failure), `T-141` (frozen benchmark corpus drift discipline), `T-142` (p50/p95/p99 latency reporting beside recall scores), `T-143` (fixture promotion requires usage telemetry).
 - [x] **Wave 7: Team Slice (On-Demand / Opt-In)**: `T-150` (MCP Streamable HTTP transport 2025-06-18 spec, PR #84, Closes #83), `T-151` (Origin validation + session ID + protocol version headers, PR #86, Closes #85), `T-386` (Bearer token auth with per-peer allowlist, PR #88, Closes #87), `T-153` (Multi-DB topology: shared team store `team.db` + per-member local DBs, PR #90, Closes #89), `T-387` (Member wiring docs, client config recipes, and shared vs personal scoping policy, PR #92, Closes #91).
+- [x] **Wave 8: Residual Surfaces Audit**: `T-392` (Embedder URL SSRF & metadata IP validator, PR #94, Closes #93), `T-393` (Claims & provenance array/metadata secret scan gaps, PR #96, Closes #95), `T-394` (Enforce decorative settings `mcp.enabledTools` allowlist & `imports.secretScanEnabled`, PR #98, Closes #97), `T-395` (Upgrade failure signal in `playPandaLoader` and non-zero exit, PR #100, Closes #99), `T-396` (`healBunGlobalConfig` safety, `.bak` backup, error surfacing, and opt-in gate, PR #102, Closes #101), `T-397` (`getLatestNpmVersion` command injection defense with `execFileSync`, PR #104, Closes #103), `T-398` (`memory_harvest` schema and handler alignment with validation error on missing text, PR #106, Closes #105).
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.
 
 ---

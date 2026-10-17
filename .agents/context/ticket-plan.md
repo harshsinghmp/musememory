@@ -478,13 +478,13 @@ Numbering note: explorer proposed T-386/T-387 — both taken by the v7 team slic
 - [x] T-389 · landed Wave 5 — MEDIUM · `recordObservation` scans `metadata` (JSON-stringified) with scanSecrets; updated pack.ts docstrings · src/learning/observation.ts, src/hooks/pack.ts · branch: feat/wave-5-security-ui-protection · F
 - [x] T-390 · DECISION (N) · `installHookPack` default target `~/.claude/settings.json` vs constitution R1 (never create `~/.claude/`) — needs principal ruling (decided 2026-10-15: global-standard-first, harness opt-in; implementation landed #61) · src/hooks/pack.ts:65, src/connect.ts, AGENTS.md
 - [x] T-391 · landed Wave 2 — `recordClaim`/`propose` validate `source_ids` against live registry at write time, derive `verified` · claims, store · branch: feat/wave-2-trust-gates · F
-- [ ] T-392 · HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + private/loopback/link-local block; SSRF via memory_settings_set → 169.254.169.254 today). Caveat: `cli/embed.ts:19` documents `http://127.0.0.1:8081/v1` as the intended local endpoint — needs explicit local opt-in flag, NOT a blanket reject (validateSafePath is the wrong tool) · src/settings/schema.ts:20-36, src/embedders.ts:55,137-143 · F
-- [ ] T-393 · MEDIUM · claims/provenance secret-scan gaps: concatenate array fields into scanSecrets template (3rd instance of the class: observation metadata, verify.ts, now claims.ts:45 + provenance.ts:46) · F
-- [ ] T-394 · LOW · decorative settings: `mcp.enabledTools` (types.ts:69) + `imports.secretScanEnabled` (types.ts:85) declared, defaulted, never read — enforce or delete (kill-switch that provably does nothing) · src/settings/, src/mcp.ts dispatch · F
-- [ ] T-395 · HIGH · upgrade failure signal: `playPandaLoader` swallows step throws (:276-284) yet prints LEVEL-UP COMPLETE + exit 0 — track failure, non-zero exit, no success banner (sequence after T-346 exit-code plumbing) · src/cli/upgrade.ts · F
-- [ ] T-396 · MEDIUM · `healBunGlobalConfig` rewrites host-global bun package.json with no .bak, errors swallowed (:419), fires implicitly — backup + surface errors + opt-in gate · src/cli/upgrade.ts:402-429 · F
-- [ ] T-397 · LOW · `getLatestNpmVersion` shell template `execSync(\`npm show ${packageName} version\`)` — unreachable today (only no-arg caller) but exported trap; one-line execFileSync · src/cli/upgrade.ts:150,166 · F
-- [ ] T-398 · MEDIUM · `memory_harvest` schema/handler mismatch: `all`/`auto` undeclared in inputSchema (:258-266) yet `!a.text` triggers full transcript sweep (:1722) — missing text must be validation error · src/mcp.ts · F
+- [x] T-392 · landed Wave 8 (#94) — HIGH · URL validator for `retrieval.embedderUrl` in `validateSettings` (https-only + loopback allowlist; blocks 169.254.169.254 metadata SSRF) · src/settings/schema.ts, src/retrieval/embedders.ts · branch: feat/T-392-embedder-ssrf-validator · F
+- [x] T-393 · landed Wave 8 (#96) — MEDIUM · claims/provenance secret-scan gaps: concatenate array fields and metadata objects into scanSecrets template · src/claims.ts, src/provenance.ts · branch: feat/T-393-claims-provenance-secrets · F
+- [x] T-394 · landed Wave 8 (#98) — LOW · decorative settings: enforce `mcp.enabledTools` allowlist in ListToolsRequest & CallToolRequest + enforce `imports.secretScanEnabled` in snapshot import · src/settings/, src/mcp.ts, src/snapshot.ts · branch: feat/T-394-enforce-decorative-settings · F
+- [x] T-395 · landed Wave 8 (#100) — HIGH · upgrade failure signal: `playPandaLoader` tracks step errors, returns PandaLoaderResult, renders [FAILED], handleUpgradeCommand exits 1 on failure · src/cli/upgrade.ts · branch: fix/T-395-upgrade-failure-signal · F
+- [x] T-396 · landed Wave 8 (#102) — MEDIUM · `healBunGlobalConfig` safety: create .bak backup before writing, surface errors via HealBunResult, gate behind explicit opt-in · src/cli/upgrade.ts · branch: fix/T-396-heal-bun-config · F
+- [x] T-397 · landed Wave 8 (#104) — LOW · `getLatestNpmVersion` shell injection defense: package name regex validation + one-line execFileSync without shell interpolation · src/cli/upgrade.ts · branch: fix/T-397-npm-version-exec · F
+- [x] T-398 · landed Wave 8 (#106) — MEDIUM · `memory_harvest` schema/handler alignment: declare all/auto boolean properties in inputSchema, reject missing text as validation error unless all/auto flag is set · src/mcp.ts · branch: fix/T-398-harvest-schema · F
 
 ## Non-findings (checked, rejected)
 
@@ -529,11 +529,12 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 6. **Wave 5: Security Hardening & UI Protection** (`T-002`, `T-004`, `T-388`, `T-389`, `T-399`, `T-400`, `T-380`)
 7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`) — [x] Landed on dev
 8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`) — [x] Landed on dev
+9. **Wave 8: Residual Surfaces Audit** (`T-392`, `T-393`, `T-394`, `T-395`, `T-396`, `T-397`, `T-398`) — [x] Landed on dev
 
 ## v10 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 110 |
-| Active Remaining | 180 |
+| Landed on dev | 117 |
+| Active Remaining | 173 |
 
