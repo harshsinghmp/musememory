@@ -44,7 +44,13 @@ export function recordClaim(
     validate_sources?: boolean;
   },
 ): ClaimEntry {
-  const textToScan = `${input.claim}\n${input.notes ?? ""}`;
+  const textToScan = [
+    input.claim,
+    input.notes ?? "",
+    input.id ?? "",
+    ...(input.source_ids ?? []),
+    ...(input.memory_ids ?? []),
+  ].join("\n");
   const secrets = scanSecrets(textToScan);
   if (secrets.length > 0) {
     throw new Error(`Vibeguard: Detected secret in claim: ${secrets.join(", ")}`);
