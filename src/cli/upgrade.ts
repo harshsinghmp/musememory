@@ -56,6 +56,11 @@ export interface PandaLoaderOptions {
   tickIntervalMs?: number;
 }
 
+export interface PandaLoaderResult {
+  success: boolean;
+  failedSteps: Array<{ step: UpgradeStep; error: any }>;
+}
+
 export const DEFAULT_PANDA_FRAMES = [
   "ʕ•ᴥ•ʔ",
   "ʕ •ᴥ•ʔ",
@@ -212,7 +217,7 @@ export function getUpgradeMilestones(): UpgradeMilestone[] {
 export async function playPandaLoader(
   steps: UpgradeStep[],
   options: PandaLoaderOptions = {},
-): Promise<void> {
+): Promise<PandaLoaderResult> {
   const stream = options.stream ?? process.stdout;
   const isTTY = options.isTTY ?? (typeof (stream as any).isTTY === "boolean" ? (stream as any).isTTY : process.stdout.isTTY ?? false);
   const width = options.width ?? 20;
@@ -227,6 +232,7 @@ export async function playPandaLoader(
 
   let frameIndex = 0;
   let currentPercent = 0;
+  const failedSteps: Array<{ step: UpgradeStep; error: any }> = [];
 
   for (let i = 0; i < total; i++) {
     const step = steps[i];
@@ -235,6 +241,7 @@ export async function playPandaLoader(
     currentPercent = stepStartPercent;
 
     let timer: ReturnType<typeof setInterval> | null = null;
+    let stepFailed = false;
 
     if (isTTY) {
       // Dynamic single-line ticking while action is in-flight
@@ -276,6 +283,8 @@ export async function playPandaLoader(
     try {
       await step.action();
     } catch (err: any) {
+      stepFailed = true;
+      failedSteps.push({ step, error: err });
       if (timer) clearInterval(timer);
       if (isTTY) {
         stream.write(`\n  [!] Warning during step "${step.title}": ${err.message || err}\n`);
@@ -296,9 +305,24 @@ export async function playPandaLoader(
         trailChar: options.trailChar,
         trackChar: options.trackChar,
       });
-      stream.write(`\r\x1b[K  ${bar} ✓ [${i + 1}/${total}] ${step.title} [OK]`);
+      if (stepFailed) {
+        stream.write(`\r\x1b[K  ${bar} ✗ [${i + 1}/${total}] ${step.title} [FAILED]\n`);
+      } else {
+        stream.write(`\r\x1b[K  ${bar} ✓ [${i + 1}/${total}] ${step.title} [OK]`);
+      }
       // Micro-pause for dynamic feel
       await new Promise((r) => setTimeout(r, 40));
+    } else {
+      if (stepFailed) {
+        const bar = formatPandaProgressBar(targetPercent, width, {
+          panda,
+          frame: i,
+          target,
+          trailChar: options.trailChar,
+          trackChar: options.trackChar,
+        });
+        stream.write(`  ${bar} ✗ [${i + 1}/${total}] ${step.title} [FAILED]\n`);
+      }
     }
   }
 
@@ -310,11 +334,26 @@ export async function playPandaLoader(
     trackChar: options.trackChar,
   });
 
-  if (isTTY) {
-    stream.write(`\r\x1b[K  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+  if (failedSteps.length > 0) {
+    const msg = `  ${finalBar} ⚠️ [${total - failedSteps.length}/${total}] Completed with ${failedSteps.length} error(s).\n\n`;
+    if (isTTY) {
+      stream.write(`\r\x1b[K${msg}`);
+    } else {
+      stream.write(msg);
+    }
   } else {
-    stream.write(`  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+    const msg = `  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`;
+    if (isTTY) {
+      stream.write(`\r\x1b[K${msg}`);
+    } else {
+      stream.write(msg);
+    }
   }
+
+  return {
+    success: failedSteps.length === 0,
+    failedSteps,
+  };
 }
 
 /**
@@ -538,7 +577,15 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
     },
   ];
 
-  await playGamifiedLoader(steps, { title: "SYSTEM LEVEL-UP & UPGRADE MATRIX" });
+  const loaderResult = await playGamifiedLoader(steps, { title: "SYSTEM LEVEL-UP & UPGRADE MATRIX" });
+
+  if (!loaderResult.success) {
+    console.error(`\n❌ [UPGRADE FAILED] One or more upgrade steps failed:`);
+    for (const f of loaderResult.failedSteps) {
+      console.error(`  ✗ ${f.step.title}: ${f.error?.message || f.error}`);
+    }
+    return 1;
+  }
 
   console.log(`🏆 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!`);
   if (repairInfo && repairInfo.actionsTaken.length > 0) {
