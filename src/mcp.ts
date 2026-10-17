@@ -1609,13 +1609,30 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
     ];
 
-    return { tools: filterToolsForProfile(allTools, activeProfile) };
+    const filteredByProfile = filterToolsForProfile(allTools, activeProfile);
+    // T-394: Enforce mcp.enabledTools from settings
+    const settings = getSettings(memoryDir);
+    const enabledTools = settings.mcp?.enabledTools;
+    const finalTools =
+      enabledTools && enabledTools.length > 0
+        ? filteredByProfile.filter((t) => enabledTools.includes(t.name))
+        : filteredByProfile;
+
+    return { tools: finalTools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
     const { activeStore, activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+
+    // T-394: Reject disabled tools per mcp.enabledTools
+    const settings = getSettings(activeMemoryDir);
+    if (settings.mcp?.enabledTools && settings.mcp.enabledTools.length > 0) {
+      if (!settings.mcp.enabledTools.includes(name)) {
+        return toolError(`Tool '${name}' is disabled by mcp.enabledTools settings configuration`);
+      }
+    }
 
     try {
       switch (name) {

@@ -8,6 +8,7 @@ import { validateEntry } from "./schema.ts";
 import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import type { MemoryEntry } from "./types.ts";
+import { getSettings } from "./settings.ts";
 
 /**
  * Export all entries from store into a portable JSON snapshot.
@@ -33,7 +34,7 @@ export function exportSnapshot(store: Store): {
 export function importSnapshot(
   store: Store,
   snapshot: { entries: MemoryEntry[] },
-  options: { overwrite?: boolean } = {},
+  options: { overwrite?: boolean; secretScanEnabled?: boolean } = {},
 ): { imported: number; skipped: number; errors: string[] } {
   if (!snapshot || !Array.isArray(snapshot.entries)) {
     return { imported: 0, skipped: 0, errors: ["Invalid snapshot format: missing entries array"] };
@@ -43,6 +44,10 @@ export function importSnapshot(
   let skipped = 0;
   const errors: string[] = [];
 
+  // T-394: Enforce imports.secretScanEnabled setting
+  const settings = getSettings(store.memoryDir);
+  const shouldScanSecrets = options.secretScanEnabled ?? settings.imports?.secretScanEnabled ?? true;
+
   for (const entry of snapshot.entries) {
     const validRes = validateEntry(entry);
     if (!validRes.valid) {
@@ -50,10 +55,12 @@ export function importSnapshot(
       continue;
     }
 
-    const secrets = scanSecrets(extractEntryText(entry));
-    if (secrets.length > 0) {
-      errors.push(`Secret detected in entry ${entry.id}: ${secrets.join(", ")}`);
-      continue;
+    if (shouldScanSecrets) {
+      const secrets = scanSecrets(extractEntryText(entry));
+      if (secrets.length > 0) {
+        errors.push(`Secret detected in entry ${entry.id}: ${secrets.join(", ")}`);
+        continue;
+      }
     }
 
     const existing = get(store, entry.id);
@@ -63,7 +70,7 @@ export function importSnapshot(
     }
 
     try {
-      save(store, entry);
+      save(store, entry, { skipSecretCheck: !shouldScanSecrets });
       imported++;
     } catch (err: unknown) {
       errors.push(`Failed to save ${entry.id}: ${err instanceof Error ? err.message : String(err)}`);

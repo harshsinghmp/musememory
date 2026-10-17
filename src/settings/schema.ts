@@ -137,6 +137,22 @@ export function validateSettings(settings: Partial<GlobalSettings>): { valid: bo
     }
   }
 
+  // T-394: Validate mcp settings
+  if (settings.mcp) {
+    const m = settings.mcp;
+    if (m.enabledTools !== undefined && !Array.isArray(m.enabledTools)) {
+      errors.push(`mcp.enabledTools must be an array of tool name strings`);
+    }
+  }
+
+  // T-394: Validate imports settings
+  if (settings.imports) {
+    const i = settings.imports;
+    if (i.secretScanEnabled !== undefined && typeof i.secretScanEnabled !== "boolean") {
+      errors.push(`imports.secretScanEnabled must be a boolean`);
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
