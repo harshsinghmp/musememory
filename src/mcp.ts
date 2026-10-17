@@ -292,11 +292,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         inputSchema: {
           type: "object",
           properties: {
-            text: { type: "string" },
-            project: { type: "string" },
-            confirmed: { type: "boolean" },
+            text: { type: "string", description: "Raw text or conversation block to harvest memories from" },
+            project: { type: "string", description: "Project name (default: 'default')" },
+            confirmed: { type: "boolean", description: "Whether to mark harvested entries as confirmed" },
+            all: { type: "boolean", description: "Harvest all detected agent transcripts across workspace" },
+            auto: { type: "boolean", description: "Auto-detect and harvest recent transcripts across workspace" },
           },
-          required: ["text", "project"],
         },
       },
       {
@@ -1793,7 +1794,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           }
         }
       case "memory_harvest": {
-        if (a.all === true || a.auto === true || !a.text) {
+        const isAll = a.all === true;
+        const isAuto = a.auto === true;
+
+        if (isAll || isAuto) {
           const { harvestAllAgentTranscripts } = await import("./harvester.ts");
           const harvestRes = harvestAllAgentTranscripts(activeStore, {
             memoryDir: activeMemoryDir,
@@ -1802,6 +1806,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           });
           return toolResult(harvestRes);
         }
+
+        if (a.text === undefined || a.text === null || typeof a.text !== "string" || !a.text.trim()) {
+          return toolError("memory_harvest requires 'text' parameter (or 'all'/'auto' flag to harvest agent transcripts)");
+        }
+
         const created = harvestMemories(activeStore, {
           text: String(a.text),
           project: String(a.project || "default"),
