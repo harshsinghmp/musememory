@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -149,10 +149,16 @@ export function detectPackageManager(): "bun" | "npm" | "pnpm" | "yarn" {
   return "npm";
 }
 
+const SAFE_NPM_NAME_REGEX = /^(?:@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
+
 /**
  * Fetches the latest published release version from npm registry.
  */
 export async function getLatestNpmVersion(packageName: string = "musememory"): Promise<string | null> {
+  if (!packageName || typeof packageName !== "string" || !SAFE_NPM_NAME_REGEX.test(packageName)) {
+    return null;
+  }
+
   try {
     const res = await fetch(`https://registry.npmjs.org/${packageName}/latest`, {
       headers: { Accept: "application/json" },
@@ -166,9 +172,9 @@ export async function getLatestNpmVersion(packageName: string = "musememory"): P
     }
   } catch {}
 
-  // Fallback to npm view
+  // Fallback to npm view via execFileSync (no shell interpolation)
   try {
-    const out = execSync(`npm show ${packageName} version`, {
+    const out = execFileSync("npm", ["show", packageName, "version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
