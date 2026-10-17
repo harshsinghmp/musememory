@@ -431,41 +431,113 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
   };
 }
 
+export interface HealBunOptions {
+  enabled?: boolean;
+  backup?: boolean;
+  packagePath?: string;
+}
+
+export interface HealBunResult {
+  healed: boolean;
+  backupCreated: boolean;
+  skipped: boolean;
+  reason?: string;
+  error?: string;
+}
+
 /**
  * Sanitizes ~/.bun/install/global/package.json from empty/corrupted dependency keys.
+ * Gated behind explicit opt-in (enabled: true or MUSE_HEAL_BUN_CONFIG=true).
+ * Creates a .bak backup before writing changes and surfaces errors cleanly.
  */
-export function healBunGlobalConfig(): void {
+export function healBunGlobalConfig(options: HealBunOptions = {}): HealBunResult {
+  const isOptedIn =
+    options.enabled === true ||
+    process.env.MUSE_HEAL_BUN_CONFIG === "1" ||
+    process.env.MUSE_HEAL_BUN_CONFIG === "true";
+
+  if (!isOptedIn) {
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: true,
+      reason: "Opt-in required via enabled: true or MUSE_HEAL_BUN_CONFIG=true",
+    };
+  }
+
+  const globalPkgPath =
+    options.packagePath ||
+    (() => {
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      return home ? join(home, ".bun", "install", "global", "package.json") : "";
+    })();
+
+  if (!globalPkgPath || !existsSync(globalPkgPath)) {
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: true,
+      reason: `Global bun package.json not found at ${globalPkgPath || "unknown"}`,
+    };
+  }
+
   try {
-    const home = process.env.HOME || process.env.USERPROFILE || "";
-    if (!home) return;
-    const globalPkgPath = join(home, ".bun", "install", "global", "package.json");
-    if (existsSync(globalPkgPath)) {
-      const raw = readFileSync(globalPkgPath, "utf-8");
-      const pkg = JSON.parse(raw);
-      let changed = false;
-      if (pkg.dependencies && typeof pkg.dependencies === "object") {
-        for (const key of Object.keys(pkg.dependencies)) {
-          if (!key || key.trim() === "") {
-            delete pkg.dependencies[key];
-            changed = true;
-          }
+    const raw = readFileSync(globalPkgPath, "utf-8");
+    const pkg = JSON.parse(raw);
+    let changed = false;
+
+    if (pkg.dependencies && typeof pkg.dependencies === "object") {
+      for (const key of Object.keys(pkg.dependencies)) {
+        if (!key || key.trim() === "") {
+          delete pkg.dependencies[key];
+          changed = true;
         }
       }
-      if (changed) {
-        writeFileSync(globalPkgPath, JSON.stringify(pkg, null, 2), "utf-8");
-      }
     }
-  } catch {}
+
+    if (changed) {
+      if (options.backup !== false) {
+        writeFileSync(`${globalPkgPath}.bak`, raw, "utf-8");
+      }
+      writeFileSync(globalPkgPath, JSON.stringify(pkg, null, 2), "utf-8");
+      return {
+        healed: true,
+        backupCreated: options.backup !== false,
+        skipped: false,
+      };
+    }
+
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: false,
+      reason: "No corrupt empty keys found in package.json",
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: false,
+      error: `Failed to heal bun global package.json: ${errorMsg}`,
+    };
+  }
 }
 
 /**
  * Executes a package manager update command.
  */
-export function executePackageUpgrade(pm: "bun" | "npm" | "pnpm" | "yarn", dryRun: boolean = false): string {
+export function executePackageUpgrade(
+  pm: "bun" | "npm" | "pnpm" | "yarn",
+  dryRun: boolean = false,
+  options: { healBunConfig?: boolean } = {},
+): string {
   let cmd = "";
   switch (pm) {
     case "bun":
-      healBunGlobalConfig();
+      if (options.healBunConfig) {
+        healBunGlobalConfig({ enabled: true });
+      }
       cmd = "bun add -g musememory@latest";
       break;
     case "pnpm":
