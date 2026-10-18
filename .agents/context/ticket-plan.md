@@ -19,8 +19,8 @@
 - [x] T-010 · landed #112 — profiles.ts: align profile tool definitions with live registered MCP tools (replace 7 phantom tool names) · orchestrator/profiles.ts · new · F
 - [x] T-011 · landed #114 — connect.ts: align ALL_MEMORY_TOOLS with live registered MCP tools (108 tools, eliminates 3 phantoms and auto-approves all 71 missing tools) · connect.ts:9-50 · new · F
 - [x] T-012 · landed #116 — delete dead zero-caller `maybeAutoOptimize` · optimize.ts:362 · new · F
-- [ ] T-013 · retire unreachable LSP tier; keep provider slot in chain signature · src/intelligence/adapters/lsp.ts:14 · new · F
-- [ ] T-014 · delete 4 unused registry methods + `registerProvider` + 3 dead governor exports · registry.ts:68-117, governor.ts · new · F
+- [x] T-013 · landed #128 · retire unreachable LSP tier; keep provider slot in chain signature · src/intelligence/adapters/lsp.ts:14 · F
+- [x] T-014 · landed #130 · delete 4 unused registry methods + `registerProvider` + 3 dead governor exports · registry.ts:68-117, governor.ts · F
 - [x] T-015 · docs truth pass: README 80+→52 platforms, daemon SSE≠WebSocket, remove profile_switch · README, docs · new · N
 
 ## Wave C — P0 RELIABILITY (v2.4.0)
@@ -324,20 +324,20 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [x] T-344 · landed #124 — F-11 · reject Origin: null in CORS and CSRF checks to prevent sandboxed iframe bypass · ui.ts · F
 - [ ] T-345 · F-12/F-13 · daemon hardening: no `server.on("error")` (EADDRINUSE crashes), `/publish` no origin check, client sockets leaked (daemon.ts:36-78,87), shared debounce collapses watcher events, watchers never re-armed · F
 - [ ] T-346 · F-14 · upgrade CLI exit codes: zero non-zero exits in 558 LOC; CI cannot distinguish success from failure (cli/upgrade.ts:498) · F
-- [ ] T-347 · F-15 · port-handling contract broken: auto-increment path dead (ecosystem.ts:443 always passes port); `--port abc` → NaN → random port (ui.ts:613) · F
+- [x] T-347 · landed #132 · F-15 · port-handling contract: integer range validation (1-65535), port 0 ephemeral, auto-increment on collision when port omitted · ui.ts, ecosystem.ts · F
 - [ ] T-348 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
 - [ ] T-349 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
 - [ ] T-350 · F-18/F-19/F-20 · drift endpoint: unguarded statSync 500s on dangling symlink; O(exports × memories) substring scan; a READ appends audit events (drift.ts:27,139-144,178-191) · F
 - [x] T-351 · landed #66 — mesh anchor path traversal: harden anchor file reads in mesh · src/mesh/ · F
 - [ ] T-352 · F-22/F-23 · ADR integrity: supersede-before-save leaves dangling ref on failure; rejected ADR stored as confirmed (engine.ts:148,162-165,191) · F
-- [ ] T-353 · F-24 · wiki frontmatter forge: unescaped memory title/tags interpolated into YAML scalars (wiki/render.ts:6,10,13,31; read back at compiler.ts:487) · F
-- [ ] T-354 · F-25 · CLI arg parsing: `--k=a=b` truncates; `--limit -1` parses as flag; no `--` terminator (cli/shared.ts:17,20) · F
+- [x] T-353 · landed #134 · F-24 · wiki frontmatter forge: YAML scalar escaping with JSON.stringify for title, tags, and relations · wiki/render.ts · F
+- [x] T-354 · landed #136 · F-25 · CLI arg parsing: POSIX `--` terminator, split on first `=` only, negative numbers parsed as values · cli/shared.ts · F
 - [x] T-355 · landed #67 — sync pool_dir forwarding: harden pool_dir handling · src/sync/ · F
 - [ ] T-356 · F-27 · pageindex disclosure-depth is a no-op: `maxDepth`/`disclosureDepth` accepted, never used (engine.ts:124-125 vs 137-165) · F
 - [ ] T-357 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
 - [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
 - [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
-- [ ] T-360 · F-31/F-35 · UI shutdown + numeric validation: keep-alive sockets block close (ui.ts:626); unvalidated parseInt limits (ui.ts:209,613) · F
+- [x] T-360 · landed #138 · F-31/F-35 · UI shutdown + numeric validation: destroy active sockets on close, bound /api/audit limit & /api/search tokenBudget · ui.ts · F
 - [x] T-361 · landed #126 — F-32 · sanitize priority badge class with alphanumeric filter and HTML-escape item.priority in remediation table · ui.ts:2184-2186 · F
 - [ ] T-362 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
 
@@ -530,11 +530,13 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 7. **Wave 6: Semantic Embeddings & Eval Harness** (`T-381`, `T-071`, `T-136`–`T-139`, `T-140`–`T-143`) — [x] Landed on dev
 8. **Wave 7: Team Slice (On-Demand / Opt-In)** (`T-150`, `T-151`, `T-386`, `T-153`, `T-387`) — [x] Landed on dev
 9. **Wave 8: Residual Surfaces Audit** (`T-392`, `T-393`, `T-394`, `T-395`, `T-396`, `T-397`, `T-398`) — [x] Landed on dev
+10. **Wave 9: Runtime Integrity, Seams & Drift Elimination** (`T-010`, `T-011`, `T-012`, `T-364`, `T-341`, `T-343`, `T-344`, `T-361`) — [x] Landed on dev
+11. **Wave 10: CLI Rigor, Governance & Hardened Parsers** (`T-013`, `T-014`, `T-347`, `T-353`, `T-354`, `T-360`) — [x] Landed on dev
 
 ## v10 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 117 |
-| Active Remaining | 173 |
+| Landed on dev | 131 |
+| Active Remaining | 159 |
 

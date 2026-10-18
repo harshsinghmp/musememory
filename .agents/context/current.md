@@ -5,8 +5,8 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 9 Focus)
-- **v10 Feature Waves & Deep Refinements**: Next planned wave execution, production hardening, and CLI ecosystem polish.
+## ⏭️ Next Up (Post-Wave 10 Focus)
+- **v10 / v11 Feature Waves & Deep Refinements**: Next planned wave execution, production hardening, and CLI ecosystem polish.
 
 ---
 
@@ -29,6 +29,13 @@
   - `T-343`: Guard against malformed Host header crashes with HTTP 400 (PR #122, Closes #121)
   - `T-344`: Reject Origin: null in CORS and CSRF defense (PR #124, Closes #123)
   - `T-361`: Sanitize priority badge class & escape item.priority in remediation UI (PR #126, Closes #125)
+- [x] **Wave 10: CLI Rigor, Governance & Hardened Parsers**:
+  - `T-013`: Formally retire unreachable LSP tier while keeping provider slot in chain signature (PR #128, Closes #127)
+  - `T-014`: Delete dead registry methods, registerProvider, and unused governor exports (PR #130, Closes #129)
+  - `T-347`: UI Port contract validation & auto-increment on collision when port omitted (PR #132, Closes #131)
+  - `T-353`: Wiki frontmatter YAML scalar escaping via JSON.stringify (PR #134, Closes #133)
+  - `T-354`: CLI argument parsing hardening (POSIX `--` terminator, split on first `=`, negative values) (PR #136, Closes #135)
+  - `T-360`: Clean Web Studio keep-alive socket destruction & numeric parameter clamping (PR #138, Closes #137)
 - [x] **Team Onboarding & Documentation**: `docs(team)` Dedicated team getting started guide in `docs/team-getting-started.md` and README team setup section (PR #108, Closes #107).
 - [x] **User Documentation Suite**: `docs(user)` Core Concepts (`docs/concepts.md` via ACCA) and Developer Daily User Guide (`docs/user-guide.md` via QUEST) with README documentation hub (PR #110, Closes #109).
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.

@@ -1,30 +1,27 @@
-# HANDOFF — 2026-10-18T10:35:00Z
-branch: dev @ 14b4ebb | phase: Wave 9 complete; dev green 857/0
+# HANDOFF — 2026-10-18T11:06:00Z
+branch: dev @ de10ffa | phase: Wave 10 complete; dev green 871/0
 
 ## Next Step
-Advance to Wave 10 / Next Roadmap Milestone Waves (read-path purity, ranking refinements, or migrator hardening).
+Advance to Wave 11 (Migrator hardening & quarantined intake) or next roadmap wave.
 
 ## In-Flight
-- Wave 9 landed on dev via Ticket=Issue=Branch=PR=Merge:
-  - T-010: Profile tools alignment with registered MCP tools (Issue #111, PR #112)
-  - T-011: ALL_MEMORY_TOOLS alignment with 108 MCP tools (Issue #113, PR #114)
-  - T-012: Delete dead maybeAutoOptimize (Issue #115, PR #116)
-  - T-364: Unique-ID collision prevention via randomUUID (Issue #117, PR #118)
-  - T-341: Upgrade repairInstallation respects dryRun (Issue #119, PR #120)
-  - T-343: Malformed Host header handling with HTTP 400 (Issue #121, PR #122)
-  - T-344: Reject Origin: null in CORS and CSRF defense (Issue #123, PR #124)
-  - T-361: Sanitize priority badge class & escape priority (Issue #125, PR #126)
-- Full suite green: 857 pass, 0 fail across 141 files; tsc + build clean.
+- Wave 10 landed on dev via Ticket=Issue=Branch=PR=Merge:
+  - T-013: Retire unreachable LSP tier; dormant slot preserved (Issue #127, PR #128)
+  - T-014: Delete dead registry fallbacks & governor exports (Issue #129, PR #130)
+  - T-347: UI port contract validation & collision auto-increment (Issue #131, PR #132)
+  - T-353: Wiki frontmatter YAML scalar escaping via JSON.stringify (Issue #133, PR #134)
+  - T-354: CLI arg parsing hardening (POSIX `--`, first `=`, negatives) (Issue #135, PR #136)
+  - T-360: UI keep-alive socket destruction & numeric validation (Issue #137, PR #138)
+- Full suite green: 871 pass, 0 fail across 145 files; tsc + build clean.
 
 ## Ruled Out
-- Stale or phantom tool definitions in profiles or connect allowlists.
-- Same-millisecond ID collisions in ADRs and PageIndex documents.
-- Unsanitized HTML or CSS attribute injections via item.priority in Web Studio.
+- Unescaped YAML characters in wiki frontmatter generation.
+- Dangling keep-alive sockets hanging Web Studio process exit.
+- Dead zero-caller fallbacks in code intelligence registry.
 
 ## Decisions
-- ID Generation: Suffix Date.now() with crypto.randomUUID().replace(/-/g, "").slice(0, 8).
-- Security: Reject Origin: null and return HTTP 400 on malformed Host headers.
-- Parity: Sync ALL_MEMORY_TOOLS directly with all 108 live registered MCP tools.
+- CLI parsing: preserve `=` in values, parse negative numbers correctly, support `--`.
+- Web Studio: validate ports (1–65535, 0 ephemeral), destroy sockets on close.
 
 ## Verify
-`bun test` 857/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
+`bun test` 871/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
