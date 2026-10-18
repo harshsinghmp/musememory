@@ -605,31 +605,38 @@ export function getCurrentVersion(): string {
  * Main CLI handler for `memory upgrade` and `memory update`.
  */
 export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<number> {
-  const isGlobal = flags["global"] === "true" || flags["g"] === "true";
-  const dryRun = flags["dry-run"] === "true";
-  const force = flags["force"] === "true";
-  const checkOnly = flags["check"] === "true";
+  try {
+    const isGlobal = flags["global"] === "true" || flags["g"] === "true";
+    const dryRun = flags["dry-run"] === "true";
+    const force = flags["force"] === "true";
+    const checkOnly = flags["check"] === "true";
+    const failOnUpdate = flags["fail-on-update"] === "true" || flags["strict"] === "true";
 
-  const pm = detectPackageManager();
-  const currentVersion = getCurrentVersion();
+    const pm = detectPackageManager();
+    const currentVersion = getCurrentVersion();
 
-  console.log(`[Upgrade] Checking for updates (detected package manager: ${pm})...`);
-  const latestVersion = await getLatestNpmVersion();
+    console.log(`[Upgrade] Checking for updates (detected package manager: ${pm})...`);
+    const latestVersion = await getLatestNpmVersion();
 
-  if (latestVersion) {
-    console.log(`  * Installed version: v${currentVersion}`);
-    console.log(`  * Latest release:    v${latestVersion}`);
-  }
-
-  if (checkOnly) {
-    if (latestVersion && latestVersion !== currentVersion) {
-      console.log(`\n💡 Update available: v${currentVersion} ➔ v${latestVersion}`);
-      console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
-    } else {
-      console.log(`\n✓ Muse Memory is up to date (v${currentVersion}).`);
+    if (latestVersion) {
+      console.log(`  * Installed version: v${currentVersion}`);
+      console.log(`  * Latest release:    v${latestVersion}`);
     }
-    return 0;
-  }
+
+    if (checkOnly) {
+      if (!latestVersion) {
+        console.error(`\n❌ Failed to check for updates: Could not reach registry or resolve latest version.`);
+        return 1;
+      }
+      if (latestVersion !== currentVersion) {
+        console.log(`\n💡 Update available: v${currentVersion} ➔ v${latestVersion}`);
+        console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
+        return failOnUpdate ? 1 : 0;
+      } else {
+        console.log(`\n✓ Muse Memory is up to date (v${currentVersion}).`);
+        return 0;
+      }
+    }
 
   let repairInfo: RepairResult | undefined;
 
@@ -695,5 +702,10 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
   console.log(`  • NPX:   npx musememory@latest`);
   console.log(`  • Auto:  memory upgrade\n`);
 
-  return 0;
+    return 0;
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`\n❌ [UPGRADE FAILED] ${errorMsg}`);
+    return 1;
+  }
 }

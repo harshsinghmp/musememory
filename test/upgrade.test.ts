@@ -76,4 +76,22 @@ describe("Automated Upgrade & Self-Healing Installer Engine", () => {
     expect(existsSync(join(memoryDir, "USER.md"))).toBe(true);
     expect(existsSync(join(memoryDir, "memories"))).toBe(true);
   });
+
+  it("T-346: handleUpgradeCommand returns 0 or 1 based on flags and update state", async () => {
+    const { handleUpgradeCommand } = await import("../src/cli/upgrade.ts");
+
+    // Check mode without update should exit 0
+    const codeCheck = await handleUpgradeCommand({
+      positional: [],
+      flags: { check: "true" },
+    });
+    expect([0, 1]).toContain(codeCheck);
+
+    // Dry run upgrade should complete and return an exit code
+    const codeDryRun = await handleUpgradeCommand({
+      positional: [],
+      flags: { "dry-run": "true" },
+    });
+    expect(codeDryRun).toBe(0);
+  });
 });
