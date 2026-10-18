@@ -7,9 +7,10 @@ import type {
 } from "../types.ts";
 
 /**
- * Optional Language Server Protocol (LSP) Provider.
- * Connects to background LSP servers or agent-lsp when active.
- * Degrades gracefully if no LSP server is active.
+ * Retired/Dormant Language Server Protocol (LSP) Provider (T-013).
+ * Retained in the provider fallback chain signature for structural parity.
+ * Remains dormant (isAvailable returns false) as active LSP connections
+ * are handled via external MCP tools (agent-lsp) rather than internal sockets.
  */
 export class LspProvider implements CodeIntelligenceProvider {
   readonly name = "lsp";
@@ -20,7 +21,7 @@ export class LspProvider implements CodeIntelligenceProvider {
   }
 
   isAvailable(_workspaceDir: string): boolean {
-    return this._lspActive;
+    return false;
   }
 
   setLspActive(active: boolean): void {
