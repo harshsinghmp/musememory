@@ -18,6 +18,7 @@ import {
   calculateSymbolSpecificity,
   GENERIC_COMMON_SYMBOLS,
   computeFactors,
+  matchesWordBoundary,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { RetrievalEngine } from "../src/retrieval/engine.ts";
@@ -533,6 +534,35 @@ describe("unified context & retrieval engine", () => {
       targetSymbol: "get",
     });
     expect(factorsExplicit.exactSymbolMatch).toBe(1.0);
+  });
+
+  test("T-310: matchesWordBoundary prevents substring false positives (race⊂trace, port⊂report)", () => {
+    // 1. Exact vs substring containment
+    expect(matchesWordBoundary("Fix stack trace in logger", "race")).toBe(false);
+    expect(matchesWordBoundary("Fix async race condition in lock", "race")).toBe(true);
+
+    expect(matchesWordBoundary("Generate quarterly report", "port")).toBe(false);
+    expect(matchesWordBoundary("Bind server to port 8080", "port")).toBe(true);
+
+    expect(matchesWordBoundary("Deadlock prevention in sqlite", "lock")).toBe(false);
+    expect(matchesWordBoundary("Acquire mutex lock on file", "lock")).toBe(true);
+    expect(matchesWordBoundary("Avoid blocking main thread", "lock")).toBe(false);
+
+    // 2. Boundary edge cases: string start, string end, punctuation
+    expect(matchesWordBoundary("race condition", "race")).toBe(true);
+    expect(matchesWordBoundary("the race", "race")).toBe(true);
+    expect(matchesWordBoundary("a 'race' hazard", "race")).toBe(true);
+    expect(matchesWordBoundary("race: fix immediately", "race")).toBe(true);
+
+    // 3. Case insensitivity
+    expect(matchesWordBoundary("Fix Race Condition", "race")).toBe(true);
+    expect(matchesWordBoundary("fix race condition", "Race")).toBe(true);
+
+    // 4. Empty / invalid arguments
+    expect(matchesWordBoundary("", "race")).toBe(false);
+    expect(matchesWordBoundary("race condition", "")).toBe(false);
+    expect(matchesWordBoundary(null as any, "race")).toBe(false);
+    expect(matchesWordBoundary("race condition", null as any)).toBe(false);
   });
 });
 

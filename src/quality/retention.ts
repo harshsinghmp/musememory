@@ -6,6 +6,8 @@
  * and low-density junk before persistence to prevent memory store bloat.
  */
 
+import { matchesWordBoundary } from "../retrieval.ts";
+
 export interface RetentionScoreOptions {
   title?: string;
   tags?: string[];
@@ -219,10 +221,10 @@ export function calculateRetentionScore(
   if (/^\s*[-*#\d.]\s+/m.test(trimmed)) structureScore += 0.1;
   structureScore = Math.min(0.25, structureScore);
 
-  // 8. Technical keyword bonus
+  // 8. Technical keyword bonus (T-310: word-boundary matching)
   let keywordMatches = 0;
   for (const kw of TECHNICAL_KEYWORDS) {
-    if (fullText.includes(kw)) keywordMatches++;
+    if (matchesWordBoundary(fullText, kw)) keywordMatches++;
   }
   const keywordBonus = Math.min(0.2, keywordMatches * 0.05);
 

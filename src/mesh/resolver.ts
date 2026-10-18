@@ -4,6 +4,7 @@ import type { Store } from "../store.ts";
 import { openStore, list, propose } from "../store.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
 import type { MeshTopology, MeshQueryResult, MeshNode } from "./types.ts";
+import { matchesWordBoundary } from "../retrieval.ts";
 
 function closeStoreSafe(store: Store): void {
   try {
@@ -22,7 +23,7 @@ export interface MeshQueryOptions {
 }
 
 /**
- * Compute fuzzy relevance score between a query and memory entry
+ * Compute fuzzy relevance score between a query and memory entry (T-310: word-boundary matching)
  */
 function scoreEntryRelevance(query: string, entry: MemoryEntry): number {
   if (!query) return 1.0;
@@ -35,9 +36,9 @@ function scoreEntryRelevance(query: string, entry: MemoryEntry): number {
 
   let matches = 0;
   for (const term of qTerms) {
-    if (titleLower.includes(term)) matches += 2.0;
-    else if (contentLower.includes(term)) matches += 1.0;
-    else if (tagsLower.some((t) => t.includes(term))) matches += 1.5;
+    if (matchesWordBoundary(titleLower, term)) matches += 2.0;
+    else if (matchesWordBoundary(contentLower, term)) matches += 1.0;
+    else if (tagsLower.some((t) => t === term || matchesWordBoundary(t, term))) matches += 1.5;
   }
 
   const maxPossible = qTerms.length * 2.0;

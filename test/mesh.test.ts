@@ -240,6 +240,32 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
     }
   });
 
+  test("T-310: resolveMeshMemories does not false-match substring words (race⊂trace)", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      // Add entry with "trace" to coreStore
+      propose(fixture.coreStore, {
+        title: "Stack trace logging format",
+        content: "Ensure forensic stack traces are emitted on internal uncaught rejections.",
+        project: "@mesh/core",
+        type: "decision",
+        confirmed: true,
+        tags: ["logging", "trace"],
+      });
+
+      const topology = discoverWorkspaceMesh(fixture.appDir, fixture.appMemoryDir);
+
+      // Query for "race" should NOT match "Stack trace logging format"
+      const raceResults = resolveMeshMemories(fixture.appStore, topology, {
+        query: "race",
+      });
+      expect(raceResults.some((r) => r.memory.title === "Stack trace logging format")).toBe(false);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
   test("propagateConstraintToMesh broadcasts shared invariants across all package stores", () => {
     const fixture = setupMonorepoFixture();
     try {
