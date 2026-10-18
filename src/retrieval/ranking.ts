@@ -9,13 +9,14 @@ import {
   isLowDiscrimination,
   conditionalRerank,
   clampLimit,
+  matchesWordBoundary,
   type ScoreFactors,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
 
 export type { ScoreFactors };
-export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved };
+export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved, matchesWordBoundary };
 
 /**
  * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).

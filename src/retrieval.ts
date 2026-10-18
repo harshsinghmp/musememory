@@ -146,6 +146,19 @@ export function tokenize(text: string): string[] {
   return tokens;
 }
 
+/**
+ * T-310: Matches a query token against text using Unicode-aware word boundaries.
+ * Prevents substring false positives such as "race" matching "trace" or "port" matching "report".
+ */
+export function matchesWordBoundary(text: string, term: string): boolean {
+  if (!text || !term) return false;
+  const trimmedTerm = term.trim();
+  if (!trimmedTerm) return false;
+  const escaped = trimmedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}([^\\p{L}\\p{N}_]|$)`, "iu");
+  return regex.test(text);
+}
+
 const TRIVIAL_GREETINGS = new Set([
   "hi", "hello", "hey", "hey there", "good morning", "good evening", "good afternoon",
   "thank you", "thanks", "ok", "okay", "bye", "goodbye", "yo", "sup",
