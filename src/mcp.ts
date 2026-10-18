@@ -129,7 +129,7 @@ import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
 import { verifyStrictIntegrity } from "./verify.ts";
 import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
-import type { MemoryEntry, MemoryType } from "./types.ts";
+import type { MemoryEntry, MemoryType, TrustTier } from "./types.ts";
 
 // --- T-301: in-process async write queue -------------------------------------
 // Read tools must never mutate the store synchronously. Handlers compute the
@@ -248,13 +248,38 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         inputSchema: {
           type: "object",
           properties: {
-            content: { type: "string" },
-            project: { type: "string" },
+            content: { type: "string", description: "Memory content / body text" },
+            project: { type: "string", description: "Project name (default: workspace root basename)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
-            title: { type: "string" },
-            tags: { type: "array", items: { type: "string" } },
-            type: { type: "string" },
-            confirmed: { type: "boolean" },
+            title: { type: "string", description: "Optional short title (derived from content if omitted)" },
+            tags: { type: "array", items: { type: "string" }, description: "Tags for categorization and search" },
+            type: { type: "string", description: "Memory type (discovery, decision, constraint, pattern, etc.)" },
+            confirmed: { type: "boolean", description: "Whether to mark entry as confirmed (default: false)" },
+            source: { type: "string", description: "Origin URI, transcript path, or agent name" },
+            evidence: {
+              type: "array",
+              description: "Supporting evidence items backing this memory",
+              items: { type: "object" },
+            },
+            verification: {
+              type: "object",
+              description: "Verification metadata (level, method, verified_by, test_command)",
+            },
+            dedup: { type: "boolean", description: "Whether to run similarity deduplication before write" },
+            valid_from: { type: "string", description: "Valid-time start ISO timestamp" },
+            valid_to: { type: "string", description: "Valid-time end ISO timestamp" },
+            due_at: { type: "string", description: "Due date or reminder ISO timestamp" },
+            expires_at: { type: "string", description: "Expiration ISO timestamp" },
+            salience: { type: "number", description: "Initial importance score (0-1)" },
+            test_command: { type: "string", description: "Command to verify this memory" },
+            trust: {
+              type: "string",
+              enum: ["trusted", "candidate", "untrusted"],
+              description: "Provenance trust tier",
+            },
+            mem_path: { type: "string", description: "Semantic dotted-path addressing (e.g. 'auth.session.jwt')" },
+            idempotency_key: { type: "string", description: "Unique idempotency key to prevent duplicate writes during retries" },
+            source_ids: { type: "array", items: { type: "string" }, description: "Referenced citation IDs in sources.json" },
           },
           required: ["content"],
         },
@@ -1794,6 +1819,20 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
               type: a.type ? (String(a.type) as MemoryType) : undefined,
               confirmed: a.confirmed === true,
+              source: a.source ? String(a.source) : undefined,
+              evidence: Array.isArray(a.evidence) ? (a.evidence as any) : undefined,
+              verification: typeof a.verification === "object" && a.verification !== null ? (a.verification as any) : undefined,
+              dedup: a.dedup === true,
+              valid_from: a.valid_from ? String(a.valid_from) : (a.validFrom ? String(a.validFrom) : undefined),
+              valid_to: a.valid_to ? String(a.valid_to) : (a.validTo ? String(a.validTo) : undefined),
+              due_at: a.due_at ? String(a.due_at) : (a.dueAt ? String(a.dueAt) : undefined),
+              expires_at: a.expires_at ? String(a.expires_at) : (a.expiresAt ? String(a.expiresAt) : undefined),
+              salience: typeof a.salience === "number" ? a.salience : undefined,
+              test_command: a.test_command ? String(a.test_command) : undefined,
+              trust: a.trust ? (String(a.trust) as TrustTier) : undefined,
+              mem_path: a.mem_path ? String(a.mem_path) : undefined,
+              idempotency_key: a.idempotency_key ? String(a.idempotency_key) : undefined,
+              source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
             });
             if (a.type === "constraint") {
               try {

@@ -416,6 +416,81 @@ describe("mcp tool handlers logic", () => {
 
     cleanup(root);
   });
+
+  test("T-302: memory_capture passes through full propose options (evidence, verification, trust, valid_from, expires_at, idempotency_key)", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    const captureRes = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          content: "Always rotate database service account keys every 90 days",
+          title: "Database Key Rotation Policy",
+          type: "decision",
+          tags: ["security", "database", "rotation"],
+          source: "security-audit-2026.md",
+          trust: "trusted",
+          salience: 0.95,
+          valid_from: "2026-01-01T00:00:00.000Z",
+          expires_at: "2027-01-01T00:00:00.000Z",
+          mem_path: "sec.db.key-rotation",
+          idempotency_key: "audit-2026-key-rotation-001",
+          evidence: [
+            {
+              id: "ev-001",
+              type: "doc",
+              source: "compliance.pdf",
+              timestamp: "2026-01-01T00:00:00.000Z",
+              excerpt: "SOC2 rule 4.1",
+            },
+          ],
+          verification: {
+            level: "authoritative",
+            verified_by: "SecurityLead",
+            verified_at: "2026-01-02T00:00:00.000Z",
+          },
+          dir: root,
+        },
+      },
+    });
+
+    expect(captureRes.isError).toBeFalsy();
+    const entry = JSON.parse(captureRes.content[0].text);
+    expect(entry.id).toBeDefined();
+    expect(entry.title).toBe("Database Key Rotation Policy");
+    expect(entry.source).toBe("security-audit-2026.md");
+    expect(entry.trust).toBe("trusted");
+    expect(entry.salience).toBe(0.95);
+    expect(entry.valid_from).toBe("2026-01-01T00:00:00.000Z");
+    expect(entry.expires_at).toBe("2027-01-01T00:00:00.000Z");
+    expect(entry.mem_path).toBe("sec.db.key-rotation");
+    expect(entry.idempotency_key).toBe("audit-2026-key-rotation-001");
+    expect(entry.evidence?.length).toBe(1);
+    expect(entry.evidence[0].excerpt).toBe("SOC2 rule 4.1");
+    expect(entry.verification?.level).toBe("authoritative");
+
+    // Test idempotency replay
+    const replayRes = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          content: "Always rotate database service account keys every 90 days",
+          idempotency_key: "audit-2026-key-rotation-001",
+          dir: root,
+        },
+      },
+    });
+    expect(replayRes.isError).toBeFalsy();
+    const replayEntry = JSON.parse(replayRes.content[0].text);
+    expect(replayEntry.id).toBe(entry.id);
+
+    cleanup(root);
+  });
 });
 
 
