@@ -10,6 +10,7 @@ import type { MemoryEntry, SearchOptions } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
+import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -328,6 +329,10 @@ export interface ScoreContext {
   targetSymbol?: string;
   ftsMatchIds?: Set<string>;
   blastRadiusFiles?: Set<string>;
+  /** T-021: Memoized cache of verified entry verdicts across candidate ranking. */
+  fileVerificationCache?: Map<string, RuntimeVerificationVerdict>;
+  /** T-021: Memoized cache of individual file existence checks. */
+  filePathCache?: Map<string, boolean>;
 }
 
 /** Every factor the unified scorer computes. One scorer, one factor set, one ordering (T-308). */
@@ -454,11 +459,19 @@ export function computeFactors(
       ? -0.05 * Math.min(Math.floor(daysSince(entry.valid_from ?? entry.updated_at, now) / 30), 6)
       : 0;
 
-  // Runtime trust verdict bonus/penalty (SOW-201)
+  // Runtime trust verdict bonus/penalty (SOW-201, T-021 memoized)
   let trustAdjustment = 0;
   if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
-    const { verifyRuntimeFiles } = require("./graph.ts");
-    const verdict = verifyRuntimeFiles(entry, ctx.workspaceRoot);
+    let verdict: RuntimeVerificationVerdict;
+    const cacheKey = ctx.fileVerificationCache ? `${ctx.workspaceRoot || ""}:${entry.id}` : undefined;
+    if (cacheKey && ctx.fileVerificationCache?.has(cacheKey)) {
+      verdict = ctx.fileVerificationCache.get(cacheKey)!;
+    } else {
+      verdict = verifyRuntimeFiles(entry, ctx.workspaceRoot, ctx.filePathCache);
+      if (cacheKey && ctx.fileVerificationCache) {
+        ctx.fileVerificationCache.set(cacheKey, verdict);
+      }
+    }
     if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
     else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
   }
@@ -645,12 +658,19 @@ export function sortCandidates(
   queryTokens: string[],
   now: number,
   semanticScores?: Map<string, number>,
+  workspaceRoot?: string,
 ): ScoredEntry[] {
+  const fileVerificationCache = new Map<string, RuntimeVerificationVerdict>();
+  const filePathCache = new Map<string, boolean>();
+
   const scored = candidates
     .map((entry) => {
       const factors = computeFactors(entry, queryTokens, {
         now,
+        workspaceRoot,
         semanticScore: semanticScores?.get(entry.id) ?? 0,
+        fileVerificationCache,
+        filePathCache,
       });
       return {
         entry,
@@ -778,7 +798,7 @@ export function queryContext(
     entries = entries.filter((e) => !isExpired(e, now));
   }
 
-  const scored = sortCandidates(entries, queryTokens, now, options.semanticScores);
+  const scored = sortCandidates(entries, queryTokens, now, options.semanticScores, options.workspaceRoot);
 
   // R23: Record access for top results (updates last_accessed_at and access_count)
   const limit = options.limit ?? 10;

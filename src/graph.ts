@@ -285,6 +285,7 @@ export interface RuntimeVerificationVerdict {
 export function verifyRuntimeFiles(
   entry: MemoryEntry,
   workspaceRoot?: string,
+  pathCache?: Map<string, boolean>,
 ): RuntimeVerificationVerdict {
   const root = workspaceRoot || process.cwd();
   const affected = entry.graph?.affected_paths || [];
@@ -297,7 +298,16 @@ export function verifyRuntimeFiles(
 
   for (const relPath of affected) {
     const fullPath = isAbsolute(relPath) ? relPath : join(root, relPath);
-    if (existsSync(fullPath)) {
+    let exists: boolean;
+    if (pathCache && pathCache.has(fullPath)) {
+      exists = pathCache.get(fullPath)!;
+    } else {
+      exists = existsSync(fullPath);
+      if (pathCache) {
+        pathCache.set(fullPath, exists);
+      }
+    }
+    if (exists) {
       existingPaths.push(relPath);
     } else {
       missingPaths.push(relPath);

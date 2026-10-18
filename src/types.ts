@@ -355,6 +355,8 @@ export interface SearchOptions {
   autoRehydrate?: boolean;
   /** T-075: Include memories with untrusted provenance (filtered by default). */
   includeUntrusted?: boolean;
+  /** T-021: Optional workspace root for memoized runtime file verification. */
+  workspaceRoot?: string;
 }
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;
