@@ -131,4 +131,88 @@ describe("real-time agency hub (SSE)", () => {
     await hub.close();
     cleanup(root);
   });
+
+  test("T-345: rejects startHub on port collision without crashing process", async () => {
+    const root = makeTempRoot();
+    const hub = await startHub(0);
+    expect(hub.port).toBeGreaterThan(0);
+
+    // Attempting to bind the same port must reject the promise
+    await expect(startHub(hub.port)).rejects.toThrow();
+
+    await hub.close();
+    cleanup(root);
+  });
+
+  test("T-345: origin validation on /publish blocks cross-origin and null origins", async () => {
+    const root = makeTempRoot();
+    const hub = await startHub(0);
+
+    const postWithOrigin = (originHeader: string) =>
+      new Promise<{ status: number; json: any }>((resolve, reject) => {
+        const req = httpRequest(
+          {
+            host: "127.0.0.1",
+            port: hub.port,
+            path: "/publish",
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              origin: originHeader,
+            },
+          },
+          (res) => {
+            let data = "";
+            res.on("data", (c) => (data += c));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0, json: JSON.parse(data) }));
+          },
+        );
+        req.on("error", reject);
+        req.end(JSON.stringify({ type: "test.event", payload: {} }));
+      });
+
+    // Untrusted external origin -> 403
+    const evilRes = await postWithOrigin("https://evil-site.com");
+    expect(evilRes.status).toBe(403);
+    expect(evilRes.json.error).toContain("cross-origin");
+
+    // Null origin (sandboxed iframe) -> 403
+    const nullRes = await postWithOrigin("null");
+    expect(nullRes.status).toBe(403);
+    expect(nullRes.json.error).toContain("cross-origin");
+
+    // Localhost origin -> 200
+    const localRes = await postWithOrigin("http://localhost:3000");
+    expect(localRes.status).toBe(200);
+
+    // 127.0.0.1 origin -> 200
+    const ipRes = await postWithOrigin("http://127.0.0.1:8080");
+    expect(ipRes.status).toBe(200);
+
+    await hub.close();
+    cleanup(root);
+  });
+
+  test("T-345: active sockets are destroyed on hub.close()", async () => {
+    const root = makeTempRoot();
+    const hub = await startHub(0);
+
+    const { connect } = await import("node:net");
+    const socket = connect({ port: hub.port, host: "127.0.0.1" });
+    await new Promise<void>((resolve) => socket.on("connect", resolve));
+
+    socket.write("GET /events HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n");
+
+    let socketClosed = false;
+    socket.on("close", () => {
+      socketClosed = true;
+    });
+
+    await new Promise<void>((resolve) => socket.once("data", () => resolve()));
+    await hub.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(socketClosed).toBe(true);
+    cleanup(root);
+  });
 });
