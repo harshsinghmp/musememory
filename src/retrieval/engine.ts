@@ -21,6 +21,8 @@ export interface UnifiedSearchResult {
   explanation?: string;
   stale?: boolean;
   fromCache?: boolean;
+  confidence_mode?: "confident_match" | "no_confident_match";
+  no_confident_match?: boolean;
 }
 
 export interface ReindexReport {
@@ -68,6 +70,9 @@ export class RetrievalEngine {
             },
             score: r.score,
           }));
+          const minScore = options.minScoreThreshold ?? 0.45;
+          const hasConfidentMatch =
+            mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
           return {
             mode: "pageindex",
             results: mapped,
@@ -75,6 +80,8 @@ export class RetrievalEngine {
             explanation: pageResults.reasoning,
             stale: isDegraded,
             fromCache: false,
+            confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+            no_confident_match: !hasConfidentMatch,
           };
         } else if (mode === "pageindex") {
           fallbackStale = true;
@@ -120,6 +127,9 @@ export class RetrievalEngine {
               score: sn.score,
             }));
 
+            const minScore = options.minScoreThreshold ?? 0.45;
+            const hasConfidentMatch =
+              mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
             return {
               mode: "tree",
               results: mapped,
@@ -127,6 +137,8 @@ export class RetrievalEngine {
               explanation: `Tree search evaluated ${treeRes.shardsSearched} shards with progressive disclosure ${options.depth ?? "L2"}`,
               stale: isDegraded,
               fromCache: false,
+              confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+              no_confident_match: !hasConfidentMatch,
             };
           }
         }
@@ -174,6 +186,10 @@ export class RetrievalEngine {
             }
           } catch {}
 
+          const minScore = options.minScoreThreshold ?? 0.45;
+          const hasConfidentMatch =
+            mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
+
           return {
             mode: "hybrid",
             results: mapped,
@@ -183,6 +199,8 @@ export class RetrievalEngine {
               : `Hybrid BM25 + Vector search retrieved ${mapped.length} entries`,
             stale: isDegraded || isVectorStale,
             fromCache: false,
+            confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+            no_confident_match: !hasConfidentMatch,
           };
         }
         if (mode === "hybrid") {
@@ -206,6 +224,8 @@ export class RetrievalEngine {
       stale: isDegraded || fallbackStale || exact.stale,
       fromCache: exact.fromCache ?? false,
       explanation: fallbackExplanation ?? (isDegraded ? "Degraded read: circuit breaker is open" : undefined),
+      confidence_mode: exact.mode,
+      no_confident_match: exact.no_confident_match,
     };
   }
 
