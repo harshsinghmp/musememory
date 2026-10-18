@@ -1,16 +1,23 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.3.1`  
-> **Status**: Feature Release (Tombstones Soft-Delete, Retrieval Unification, Read-Path Purity, Additive Migrations & Parity Hardening)
+> **Version**: `v2.4.0`  
+> **Status**: Feature Release (Invalidation, Attribution & Ranking Rigor, Retrieval Performance & Store Hot-Paths, Read-Path Purity)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 13 Focus)
-- **Wave 14: Invalidation, Attribution & Ranking Rigor**: `T-302` (`memory_capture` full passthrough options), `T-304` (vector index invalidation on `save()`), `T-307` (Hebbian graph bounded incremental updates), `T-309` (IDF-weighted symbol matching), `T-310` (word-boundary token matching), `T-312` (FTS failure degraded signal).
+## ⏭️ Next Up (Post-Wave 14 Focus)
+- **Wave 15: Expiry, Decay & Confidence Hardening**: `T-072` (FTS5-tokenizer-matched abstention gate), `T-073` (`no_confident_match` result mode), `T-074` (materialized `decay_score` column), `T-076` (Bayesian confidence corroboration), `T-077` (trust-tier-keyed half-life), `T-078`–`T-081` (per-type expiry & decay policies).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 14: Invalidation, Attribution & Ranking Rigor**:
+  - `T-302`: `memory_capture` full propose options passthrough (evidence, source, verification, dedup, valid_from/to, due_at, expires_at, salience, trust, mem_path, idempotency_key, source_ids) (PR #188, Closes #187)
+  - `T-304`: Incremental vector index synchronization on `save()` (`upsertIndexEntry`) and `deleteEntry()` (`removeIndexEntry`) (PR #190, Closes #189)
+  - `T-307`: Bounded Hebbian plasticity co-activation (8 seeds, 30 edges/node, 500 nodes max), atomic `.tmp` swap, candidate expansion in retrieval (PR #192, Closes #191)
+  - `T-309`: IDF-weighted symbol matching downweighting generic verbs (`get`, `set`) to 0.05 and rewarding distinctive compound identifiers (`SessionManager`, `auth_token`) with 1.0 (PR #194, Closes #193)
+  - `T-310`: Word-boundary token matching (`matchesWordBoundary`) preventing substring false positives (`race⊂trace`, `port⊂report`, `lock⊂deadlock`) (PR #196, Closes #195)
+  - `T-312`: FTS failure degraded signal distinguishing genuine zero-match from SQLite execution errors with loud `[FTS5_DEGRADED]` logging (PR #198, Closes #197)
 - [x] **Wave 13: Retrieval Performance & Store Hot-Paths**:
   - `T-021`: Memoized runtime file verification in ranking hot path (PR #172, Closes #171)
   - `T-022`: Precomputed token sets per memory to drop per-query retokenization (PR #174, Closes #173)

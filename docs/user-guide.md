@@ -208,6 +208,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 
 ### Related Documentation
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
+- 🎯 **[Invalidation, Attribution & Ranking Rigor](retrieval-ranking-and-invalidation.md)** — Incremental vector index sync, bounded Hebbian plasticity, IDF-weighted symbol matching, word boundaries, and FTS failure signals.
 - ⚡ **[Retrieval Performance & Guardrails](retrieval-performance-and-limits.md)** — Hot-path WeakMaps, memoized anchors, dirty-gating, limit clamping, and dry-run safety.
 - 🏛️ **[Living Architecture & Drift Auditing](living-architecture-and-drift.md)** — Binding ADRs to structural code anchors and automated drift sentry.
 - ⚡ **[Real-Time Daemon & Observability](daemon-and-observability.md)** — SSE event bus, CI upgrade gates, and PageIndex depth controls.

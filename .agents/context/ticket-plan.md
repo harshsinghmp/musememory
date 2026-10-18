@@ -227,20 +227,20 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 ## Wave G — READ-PATH PURITY & INVALIDATION (new gap class)
 
 - [x] T-301 · landed #69 — CRITICAL (B1) · get_context read-purity: transcript crawl + `importTranscript`→`propose`→`save` + CURRENT.md rewrite are synchronous inside the read handler (mcp.ts:1611-1624, :1579). Moved to in-process async queue + flush-on-exit · F
-- [ ] T-302 · HIGH (B15) · `memory_capture` full passthrough: currently sets 7 of ~40 propose options (no evidence/source/verification/dedup/validFrom/expiresAt) — provenance tickets T-075/090/099/103/105 assume write-time capture that the flagship tool cannot express · mcp.ts:1692-1699 · dep: T-075 · F
+- [x] T-302 · landed Wave 14 — HIGH (B15) · `memory_capture` full passthrough: passes evidence, source, verification, dedup, valid_from/to, due_at, expires_at, salience, trust, mem_path, idempotency_key, source_ids · mcp.ts · PR #188 · F
 - [x] T-303 · landed #70 — CRITICAL (B3) · `hybridSearch` applies no lifecycle/project filter at >100 entries (vector.ts:159-181, retrieval/engine.ts:127-148) — superseded/archived/expired/cross-project memories filtered at row level · F
-- [ ] T-304 · HIGH (B4) · vector index invalidation: `save()` never updates `index.json` (retrieval/engine.ts:124-127, store.ts:306); MCP hardcodes `stale:false` while serving ancient snapshots (mcp.ts:1683) · dep: T-064 · F
+- [x] T-304 · landed Wave 14 — HIGH (B4) · vector index invalidation: `save()` incrementally syncs `index.json` via `upsertIndexEntry` and `deleteEntry()` via `removeIndexEntry` · vector.ts, store.ts · PR #190 · F
 - [x] T-305 · landed Wave 4 — HIGH (B17) · distillation body cap: `content: obs.raw` stores whole logs as memory bodies (learning/distill.ts:67,:91,:98); `get_context` defaults token_budget to undefined → up to 5 full logs injected · dep: T-092 · branch: feat/wave-4-compaction-distillation · F
 - [x] T-306 · landed Wave 4 — HIGH (B16) · observations.jsonl: non-atomic whole-file rewrite per observation (tmp+rename like store.save), rotation + size cap (learning/observation.ts:100-119) · branch: feat/wave-4-compaction-distillation · F
-- [ ] T-307 · HIGH (B2) · Hebbian graph is write-only O(n²) per recall (plasticity.ts:37-64, mcp.ts:1611): n(n-1) edges + full-file rewrite every get_context; loaders have zero production callers. Bound it, make it incremental, consume it (see T-316) — or delete · F
+- [x] T-307 · landed Wave 14 — HIGH (B2) · Hebbian graph bounded co-activation (8 seeds, 30 edges/node, 500 nodes max), atomic .tmp rename, candidate expansion in retrieval · plasticity.ts, retrieval/ranking.ts · PR #192 · F
 
 ## Wave H — RANKING & FEEDBACK CORRECTNESS
 
 - [x] T-308 · landed #74 — HIGH (B5) · unified ranking scorers: `scoreEntry` and `calculateMultiFactorScore` unified behind single authoritative multi-factor scoring model · F
-- [ ] T-309 · HIGH (B6) · symbol match is binary and IDF-free: `` `get` `` in tags beats all lexically-relevant memories for any query containing "get" (ranking.ts:87-96). IDF-weighted term; T-070's gate covers the FTS prefilter, not this · F
-- [ ] T-310 · MEDIUM (B7) · word-boundary token matching: `entryText.includes(token)` matches race⊂trace, port⊂report (ranking.ts:62-66) · U
+- [x] T-309 · landed Wave 14 — HIGH (B6) · symbol match is IDF-weighted: downweights generic verbs (get, set) to 0.05, rewards distinctive compound identifiers (SessionManager, auth_token) with 1.0 · retrieval.ts · PR #194 · F
+- [x] T-310 · landed Wave 14 — MEDIUM (B7) · word-boundary token matching: matchesWordBoundary prevents substring false matches (race⊂trace, port⊂report, lock⊂deadlock) · retrieval.ts, mesh/resolver.ts, quality/retention.ts · PR #196 · U
 - [x] T-311 · landed #74 — HIGH (B8) · unicode-aware tokenization: non-ASCII queries tokenize across scripts and return signal; non-lexical queries penalized · U
-- [ ] T-312 · HIGH (B9) · FTS failure indistinguishable from no-match: `catch { return [] }` (sqlite.ts:366-374) silently removes the only lexical signal. Degraded flag + loud log; T-133's notes signal doesn't cover this · U
+- [x] T-312 · landed Wave 14 — HIGH (B9) · FTS failure distinguished from zero-match: returns degraded: true with loud [FTS5_DEGRADED] logging on failure vs degraded: false on 0-hit · sqlite.ts, store.ts, ranking.ts · PR #198 · U
 - [ ] T-313 · HIGH (B11) · failure attribution: `isRegression = exitCode !== 0` applies to ALL recalled memories; 3 strikes auto-flip confirmed→disputed → drops from sync + confirm() (learning/feedback.ts:30-44, quality/utility.ts:72-79). Scope regression to anchor-relevant memories + decaying counter + corroboration before demotion · dep: T-030 · F
 - [ ] T-314 · MEDIUM (A2) · source-tagged recall hits `_source ∈ {hot,fts,vector,tree,distilled}` feeding rank — HOT.md is built (compounding/temporal.ts:50) and never read · dep: T-028 · U
 - [ ] T-315 · MEDIUM (A3) · frequency as first-class rank axis (LangMem) · dep: T-028 · U

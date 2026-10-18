@@ -1,25 +1,23 @@
-# HANDOFF — 2026-10-18T18:40:00Z
-branch: dev @ 6d12e9e | phase: Wave 13 complete; dev green 902/0
+# HANDOFF — 2026-10-18T19:08:00Z
+branch: dev @ 454b29c | phase: Wave 14 complete; dev green 908/0
 
 ## Next Step
-Advance to Wave 14 (Invalidation, Attribution & Ranking Rigor: T-302, T-304, T-307, T-309, T-310, T-312).
+Advance to Wave 15 (Expiry, Decay & Confidence Hardening: T-072, T-073, T-074, T-076, T-077, T-078-T-081).
 
 ## In-Flight
-- Wave 13 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #172-#186):
-  - T-021: Memoized file verification in ranking hot path (PR #172)
-  - T-022: Precomputed token sets per memory (PR #174)
-  - T-023: openStore dirty-gate skips redundant wiki recompile & CURRENT.md sync (PR #176)
-  - T-028: recordRetrievals wired to get_context deferred writes & recall (PR #178)
-  - T-029: touchActivity wired to save() with 1s throttling (PR #180)
-  - T-062: Clamped model-supplied limit values (PR #182)
-  - T-063: Dry-run-by-default & point-ID-only validation for deletions (PR #184)
-  - T-064: Read-path stale: true provenance tags for degraded reads (PR #186)
-- Docs pass completed: retrieval-performance-and-limits.md (QUEST), user-guide.md & README updated.
-- Full suite green: 902 pass, 0 fail; tsc + build clean.
+- Wave 14 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #188-#198):
+  - T-302: memory_capture full propose options passthrough (PR #188)
+  - T-304: Incremental index.json vector sync on save() & deleteEntry() (PR #190)
+  - T-307: Bounded Hebbian plasticity (8 seeds, 30 edges, 500 nodes) (PR #192)
+  - T-309: IDF-weighted symbol matching (generic 0.05 vs compound 1.0) (PR #194)
+  - T-310: Word-boundary token matching blocks race⊂trace, port⊂report (PR #196)
+  - T-312: FTS failure degraded signal distinguishes 0-match from error (PR #198)
+- Docs pass completed: docs/retrieval-ranking-and-invalidation.md (ACCA), user-guide.md updated.
+- Full suite green: 908 pass, 0 fail; tsc + build clean.
 
 ## Decisions
-- Fingerprint memories (count + max(updated_at)) to dirty-gate wiki recompiles.
-- Clamp model limits to safe bounds [1, max] and default deletions to dry-run previews.
+- Downweight generic symbols (get/set) to 0.05, compound identifiers (SessionManager) to 1.0.
+- FTS5 returns degraded: true with loud [FTS5_DEGRADED] logs on SQL/engine execution failure.
 
 ## Verify
-`bun test` 902/0 + `bunx tsc --noEmit` + `bun run build`
+`bun test` 908/0 + `bunx tsc --noEmit` + `bun run build`
