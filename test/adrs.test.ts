@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, save, get } from "../src/store.ts";
@@ -250,6 +250,24 @@ describe("R11: Architecture Decision Records (ADRs) & Documentation Drift Engine
       const staleItem = report.items.find((i) => i.claimed_path === "src/old.ts");
       expect(staleItem).toBeDefined();
       expect(staleItem?.drift_state).toBe("STALE");
+    });
+
+    it("T-350: ignores dangling symlinks and preserves read purity without appending audit events", () => {
+      const { symlinkSync } = require("node:fs");
+      const brokenLink = join(codeDir, "dangling.ts");
+      try {
+        symlinkSync(join(codeDir, "non_existent_file.ts"), brokenLink);
+      } catch {}
+
+      const auditPath = join(store.memoryDir!, "audit.jsonl");
+      const auditBefore = existsSync(auditPath) ? readFileSync(auditPath, "utf-8") : "";
+
+      // Must not throw on dangling symlink
+      const report = detectDocumentationCodeDrift(store, tmpDir);
+      expect(report).toBeDefined();
+
+      const auditAfter = existsSync(auditPath) ? readFileSync(auditPath, "utf-8") : "";
+      expect(auditAfter).toBe(auditBefore); // Pure read: no audit records appended
     });
   });
 
