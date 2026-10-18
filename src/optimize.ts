@@ -75,10 +75,17 @@ export function writeOptimizationMetadata(memoryDir: string, meta: OptimizationM
   } catch {}
 }
 
-export function touchActivity(memoryDir: string): void {
+const lastTouchedMap = new Map<string, number>();
+
+export function touchActivity(memoryDir: string, force: boolean = false): void {
   try {
+    const now = Date.now();
+    const last = lastTouchedMap.get(memoryDir) ?? 0;
+    if (!force && now - last < 1000) return;
+    lastTouchedMap.set(memoryDir, now);
+
     const meta = readOptimizationMetadata(memoryDir);
-    meta.last_activity_at = new Date().toISOString();
+    meta.last_activity_at = new Date(now).toISOString();
     writeOptimizationMetadata(memoryDir, meta);
   } catch {}
 }

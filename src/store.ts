@@ -44,6 +44,7 @@ import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
 export { getStoreCircuitBreaker, CircuitBreaker };
 import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
 export { registerWriteWorker, drainWriteWorkers };
+import { touchActivity } from "./optimize.ts";
 import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
 
 export interface StorageLayoutOptions {
@@ -713,6 +714,11 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
     withStoreLock(store.memoryDir, doSave);
   } else {
     doSave();
+  }
+
+  // T-029: Touch optimization activity on store writes
+  if (store.memoryDir) {
+    touchActivity(store.memoryDir);
   }
 }
 
