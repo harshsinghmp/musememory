@@ -361,12 +361,14 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_delete",
-        description: "Soft-delete a memory entry by ID (tombstone, reversible via memory_restore) and record audit event",
+        description: "Soft-delete a memory entry by single point ID (tombstone, reversible via memory_restore). Dry-run by default unless confirm: true or dry_run: false.",
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string" },
-            reason: { type: "string" },
+            id: { type: "string", description: "Exact single memory ID (point ID only, no wildcards)" },
+            reason: { type: "string", description: "Audit reason for tombstoning" },
+            dry_run: { type: "boolean", description: "Simulate tombstoning without mutating (default: true)" },
+            confirm: { type: "boolean", description: "Set to true to apply deletion" },
           },
           required: ["id"],
         },
@@ -1869,11 +1871,30 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(entry);
       }
       case "memory_delete": {
-        const id = String(a.id);
+        const id = String(a.id ?? "").trim();
+        if (!id) return toolError("memory_delete requires 'id' parameter");
+        if (id.includes("*") || id.includes("%") || id.includes("?") || id.includes(",") || id.toLowerCase() === "all") {
+          return toolError("memory_delete requires a single point ID; bulk or wildcard patterns are forbidden");
+        }
+        const entry = get(activeStore, id);
+        if (!entry) return toolError(`no entry found with id ${id}`);
+
+        const isDryRun = a.dry_run !== false && a.confirm !== true && a.apply !== true && a.force !== true;
+        if (isDryRun) {
+          return toolResult({
+            dry_run: true,
+            deleted: false,
+            id,
+            title: entry.title,
+            project: entry.project,
+            message: `[dry-run] Would tombstone memory '${id}' (${entry.title || entry.project}). Pass confirm: true or dry_run: false to apply.`,
+          });
+        }
+
         const reason = a.reason ? String(a.reason) : undefined;
         const ok = deleteEntry(activeStore, id, reason, "mcp_agent");
-        if (!ok) return toolError(`no entry found with id ${id}`);
-        return toolResult({ success: true, deleted_id: id, tombstoned: true });
+        if (!ok) return toolError(`failed to tombstone entry ${id}`);
+        return toolResult({ success: true, deleted_id: id, tombstoned: true, dry_run: false });
       }
       case "memory_restore": {
         const id = String(a.id);
