@@ -55,6 +55,12 @@ describe("Wave 5 - Task 1: UI XSS Escaping & Unit Test Suite (T-380, T-002, T-00
       // Handoff progress checkpoints must be escaped
       expect(html).toContain("escapeHtml(p)");
 
+      // T-361: Health checklist remediation items must sanitize priority class and escape priority label
+      expect(html).toContain("const safePriority = escapeHtml(rawPriority);");
+      expect(html).toContain("replace(/[^a-z0-9_-]/g, '')");
+      expect(html).toContain("[${safePriority}]");
+      expect(html).not.toContain("[${item.priority}]");
+
       srv.close();
       cleanup(root);
     });
