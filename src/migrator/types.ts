@@ -102,13 +102,12 @@ export function validateMigratedRecord(raw: unknown): MigratedRecord | null {
 
   const type = normalizeMemoryType(typeof item.type === "string" ? item.type : undefined);
 
-  // RB-6: Strip self-certified independently-verified from unverified migrations
+  // F-04 / T-338: Strip self-certified independently-verified from unverified migrations
   let verification = item.verification;
-  if (verification && verification.level === "independently-verified") {
-    verification = {
-      ...verification,
-      level: "observed",
-    };
+  if (verification) {
+    if (verification.level === "independently-verified" && !verification.test_result) {
+      verification = undefined;
+    }
   }
 
   const tags = Array.isArray(item.tags)
