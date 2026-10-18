@@ -26,6 +26,7 @@ export interface RepairOptions {
   memoryDir?: string;
   global?: boolean;
   skipAgentConnect?: boolean;
+  dryRun?: boolean;
 }
 
 export interface RepairResult {
@@ -373,59 +374,74 @@ export const playGamifiedLoader = playPandaLoader;
 export async function repairInstallation(options: RepairOptions = {}): Promise<RepairResult> {
   const root = options.workspaceRoot || process.cwd();
   const isGlobal = options.global === true;
+  const isDryRun = options.dryRun === true;
   const memoryDir = options.memoryDir || (isGlobal ? getGlobalMemoryDir() : resolveMemoryDir({ root }));
   const actionsTaken: string[] = [];
 
   // 1. Ensure .memory directory and memories folder exist
   const memoriesDir = join(memoryDir, "memories");
   if (!existsSync(memoriesDir)) {
-    mkdirSync(memoriesDir, { recursive: true });
-    actionsTaken.push(`Created missing memories directory: ${memoriesDir}`);
+    if (!isDryRun) {
+      mkdirSync(memoriesDir, { recursive: true });
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would create missing memories directory: ${memoriesDir}` : `Created missing memories directory: ${memoriesDir}`);
   }
 
   // 2. Ensure CURRENT.md exists
   const currentPath = join(memoryDir, "CURRENT.md");
   if (!existsSync(currentPath)) {
-    writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
-    actionsTaken.push(`Recovered missing CURRENT.md at ${currentPath}`);
+    if (!isDryRun) {
+      writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would recover missing CURRENT.md at ${currentPath}` : `Recovered missing CURRENT.md at ${currentPath}`);
   }
 
   // 3. Ensure USER.md exists
   const uPath = userFilePath(memoryDir);
   if (!existsSync(uPath)) {
-    initUserProfile(memoryDir, "developer", false, !isGlobal);
-    actionsTaken.push(`Recovered missing USER.md profile at ${uPath}`);
+    if (!isDryRun) {
+      initUserProfile(memoryDir, "developer", false, !isGlobal);
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would recover missing USER.md profile at ${uPath}` : `Recovered missing USER.md profile at ${uPath}`);
   }
 
   // 4. Re-wire agents if not skipped
   let agentsConnected = 0;
   if (!options.skipAgentConnect) {
     try {
-      const reports = connectAgent("all", undefined, { dryRun: false, force: false });
+      const reports = connectAgent("all", undefined, { dryRun: isDryRun, force: false });
       agentsConnected = reports.filter((r) => r.updated || r.installed).length;
       if (agentsConnected > 0) {
-        actionsTaken.push(`Auto-wired ${agentsConnected} detected agent platform(s)`);
+        actionsTaken.push(isDryRun ? `[dry-run] Would auto-wire ${agentsConnected} detected agent platform(s)` : `Auto-wired ${agentsConnected} detected agent platform(s)`);
       }
     } catch {}
   }
 
   // 5. Re-index AST symbols if provider exists
   if (!isGlobal && existsSync(root)) {
-    try {
-      const index = indexGraph(root, memoryDir);
-      if (index.symbolCount > 0) {
-        actionsTaken.push(`Indexed ${index.symbolCount} AST symbols from ${index.provider}`);
-      }
-    } catch {}
+    if (!isDryRun) {
+      try {
+        const index = indexGraph(root, memoryDir);
+        if (index.symbolCount > 0) {
+          actionsTaken.push(`Indexed ${index.symbolCount} AST symbols from ${index.provider}`);
+        }
+      } catch {}
+    } else {
+      actionsTaken.push(`[dry-run] Would re-index AST symbols from active provider`);
+    }
 
     // Check git pre-commit hook
     if (existsSync(join(root, ".git"))) {
-      try {
-        const hookRes = installGitHook(root);
-        if (hookRes.installed) {
-          actionsTaken.push(`Installed Git pre-commit transcript harvester hook`);
-        }
-      } catch {}
+      if (!isDryRun) {
+        try {
+          const hookRes = installGitHook(root);
+          if (hookRes.installed) {
+            actionsTaken.push(`Installed Git pre-commit transcript harvester hook`);
+          }
+        } catch {}
+      } else {
+        actionsTaken.push(`[dry-run] Would install Git pre-commit transcript harvester hook`);
+      }
     }
   }
 
@@ -638,7 +654,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       level: 3,
       title: "Synaptic Storage & Schema Alignment",
       action: async () => {
-        repairInfo = await repairInstallation({ global: isGlobal });
+        repairInfo = await repairInstallation({ global: isGlobal, dryRun });
       },
     },
     {
