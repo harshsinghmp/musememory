@@ -37,7 +37,7 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     });
     expect(withInvalidStatus?.status).toBe("candidate");
 
-    // 4. Strips self-certified independently-verified level to observed
+    // 4. Strips self-certified independently-verified level to undefined
     const withSelfCertified = validateMigratedRecord({
       title: "Unverified Claim",
       content: "Some claim without proof",
@@ -47,10 +47,10 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
         verified_by: "migrator:agentmemory",
       },
     });
-    expect(withSelfCertified?.verification?.level).toBe("observed");
+    expect(withSelfCertified?.verification).toBeUndefined();
   });
 
-  test("AgentMemoryAdapter does not self-certify with independently-verified", () => {
+  test("AgentMemoryAdapter does not self-certify with verification metadata", () => {
     const root = temp();
     const jsonPath = join(root, "standalone.json");
     writeFileSync(
@@ -71,8 +71,7 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
 
     const records = AgentMemoryAdapter.extract(jsonPath);
     expect(records.length).toBe(1);
-    expect(records[0].verification?.level).not.toBe("independently-verified");
-    expect(records[0].verification?.level).toBe("observed");
+    expect(records[0].verification).toBeUndefined();
 
     rmSync(root, { recursive: true, force: true });
   });

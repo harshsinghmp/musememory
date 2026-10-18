@@ -56,10 +56,6 @@ export const AgentMemoryAdapter: ProviderAdapter = {
           type,
           tags: tags.map(String),
           source: "migrated:agentmemory",
-          verification: {
-            level: "observed",
-            verified_by: "migrator:agentmemory"
-          },
         });
       }
     } catch {
