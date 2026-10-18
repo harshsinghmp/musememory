@@ -261,13 +261,41 @@ export function daysSince(iso: string, now: number): number {
   return Math.max(0, (now - t) / 86_400_000);
 }
 
-export function applicability(entry: MemoryEntry, queryTokens: string[]): number {
+/** T-022: Memoized token, symbol, and path sets per memory entry to avoid redundant re-tokenization. */
+const entryTokenSetCache = new WeakMap<MemoryEntry, Set<string>>();
+const entrySymbolsCache = new WeakMap<MemoryEntry, Set<string>>();
+const entryPathsCache = new WeakMap<MemoryEntry, Set<string>>();
+
+/**
+ * Returns or precomputes the set of lowercase lexical tokens for a memory entry.
+ */
+export function getEntryTokenSet(entry: MemoryEntry): Set<string> {
+  let set = entryTokenSetCache.get(entry);
+  if (!set) {
+    const graphSymbols = (entry.graph?.symbol_names ?? []).join(" ");
+    const haystack = tokenize(
+      `${entry.content} ${entry.title} ${entry.project} ${(entry.tags ?? []).join(" ")} ${graphSymbols}`,
+    );
+    set = new Set(haystack);
+    entryTokenSetCache.set(entry, set);
+  }
+  return set;
+}
+
+/** Invalidates cached precomputed token and structural sets for an entry. */
+export function invalidateEntryTokenSet(entry: MemoryEntry): void {
+  entryTokenSetCache.delete(entry);
+  entrySymbolsCache.delete(entry);
+  entryPathsCache.delete(entry);
+}
+
+export function applicability(
+  entry: MemoryEntry,
+  queryTokens: string[],
+  cachedSet?: Set<string>,
+): number {
   if (queryTokens.length === 0) return 0;
-  const graphSymbols = (entry.graph?.symbol_names ?? []).join(" ");
-  const haystack = tokenize(
-    `${entry.content} ${entry.title} ${entry.project} ${(entry.tags ?? []).join(" ")} ${graphSymbols}`,
-  );
-  const hay = new Set(haystack);
+  const hay = cachedSet || getEntryTokenSet(entry);
   const overlap = queryTokens.filter((t) => hay.has(t)).length;
   return overlap / Math.max(1, queryTokens.length);
 }
@@ -363,7 +391,9 @@ export interface ScoreFactors {
 
 /** Symbol-like identifiers an entry declares: AST symbols, single-word tags, backticked code. */
 function entrySymbols(entry: MemoryEntry): Set<string> {
-  const symbols = new Set<string>();
+  let symbols = entrySymbolsCache.get(entry);
+  if (symbols) return symbols;
+  symbols = new Set<string>();
   for (const s of entry.graph?.symbol_names ?? []) symbols.add(s.toLowerCase());
   for (const tag of entry.tags ?? []) {
     if (tag.length > 3 && !tag.includes("-") && !tag.includes(" ")) symbols.add(tag.toLowerCase());
@@ -371,14 +401,18 @@ function entrySymbols(entry: MemoryEntry): Set<string> {
   for (const m of `${entry.title} ${entry.content}`.toLowerCase().match(/`([a-z0-9_$]+)`/g) ?? []) {
     symbols.add(m.replace(/`/g, ""));
   }
+  entrySymbolsCache.set(entry, symbols);
   return symbols;
 }
 
 /** Files an entry touches: AST affected paths plus evidence sources. */
 function entryPaths(entry: MemoryEntry): Set<string> {
-  const paths = new Set<string>();
+  let paths = entryPathsCache.get(entry);
+  if (paths) return paths;
+  paths = new Set<string>();
   for (const p of entry.graph?.affected_paths ?? []) paths.add(p.toLowerCase());
   for (const ev of entry.evidence ?? []) if (ev.source) paths.add(ev.source.toLowerCase());
+  entryPathsCache.set(entry, paths);
   return paths;
 }
 
