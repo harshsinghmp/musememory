@@ -8,6 +8,7 @@ import {
   deriveWhyRetrieved,
   isLowDiscrimination,
   conditionalRerank,
+  clampLimit,
   type ScoreFactors,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
@@ -163,7 +164,7 @@ export async function rankAndRetrieveMemories(
   });
   const ranked = conditionalRerank(scored);
 
-  const limit = options.limit ?? 10;
+  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 200, 1) : 10;
 
   // 6. Token Budget Knapsack Packing: Critical constraints fit first
   if (options.tokenBudget && options.tokenBudget > 0) {
