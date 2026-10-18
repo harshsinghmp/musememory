@@ -368,3 +368,5 @@ export function stalenessDaysRemaining(
 
   return Math.ceil(targetDays - currentDays);
 }
+
+export * from "./retention/expiry_policy.ts";
