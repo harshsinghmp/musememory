@@ -17,6 +17,7 @@ import {
   clampLimit,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
+import { RetrievalEngine } from "../src/retrieval/engine.ts";
 import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
 import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
 
@@ -413,7 +414,54 @@ describe("unified context & retrieval engine", () => {
 
     cleanup(root);
   });
+
+  test("T-064: read-path stale:true provenance tag for degraded/cache reads", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    // 1. Live normal read-path
+    const resLive = queryContext(store, "auth");
+    expect(resLive.source).toBe("live");
+    expect(resLive.stale).toBe(false);
+    expect(resLive.fromCache).toBe(false);
+
+    // 2. Degraded read-path (circuit breaker open)
+    store.circuit?.trip();
+    const resDegraded = queryContext(store, "auth");
+    expect(resDegraded.source).toBe("degraded");
+    expect(resDegraded.stale).toBe(true);
+
+    // Reset circuit
+    store.circuit?.reset();
+    expect(store.circuit?.isDegraded()).toBe(false);
+
+    // 3. FormattedContext cache provenance
+    const ctxLive = formatPromptContext(store, memoryDir, "auth");
+    expect(ctxLive.fromCache).toBe(false);
+    expect(ctxLive.stale).toBe(false);
+
+    // Second call hits cache
+    const ctxCached = formatPromptContext(store, memoryDir, "auth");
+    expect(ctxCached.fromCache).toBe(true);
+    expect(ctxCached.stale).toBe(false);
+
+    // 4. RetrievalEngine fallback degraded reads
+    // Requesting tree search when no tree index exists falls back to exact with stale: true
+    const engineRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "tree" });
+    expect(engineRes.mode).toBe("exact");
+    expect(engineRes.stale).toBe(true);
+    expect(engineRes.explanation).toContain("Degraded read: requested tree search");
+
+    // Requesting hybrid search when no vector index exists falls back to exact with stale: true
+    const hybridRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "hybrid" });
+    expect(hybridRes.mode).toBe("exact");
+    expect(hybridRes.stale).toBe(true);
+    expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
+
+    cleanup(root);
+  });
 });
+
 
 
 

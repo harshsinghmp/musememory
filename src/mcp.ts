@@ -1723,6 +1723,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             total_tokens_used: formatted.totalTokensUsed,
             constraints: formatted.constraints,
             user_profile: formatted.userProfile,
+            stale: formatted.stale ?? false,
+            from_cache: formatted.fromCache ?? false,
           });
         }
         case "memory_checkpoint": {
@@ -1775,7 +1777,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           return toolResult({
             results: res.results.map((r) => ({ ...r.entry, score: r.score })),
             source: res.mode,
-            stale: false,
+            stale: res.stale ?? false,
+            from_cache: res.fromCache ?? false,
             total_tokens_used: res.totalTokensUsed,
             explanation: res.explanation,
           });

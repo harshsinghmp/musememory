@@ -383,6 +383,39 @@ describe("mcp tool handlers logic", () => {
 
     cleanup(root);
   });
+
+  test("T-064: MCP get_context and memory_recall surface stale and from_cache provenance tags", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. get_context call returns stale and from_cache
+    const ctxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+    });
+    expect(ctxRes.isError).toBeFalsy();
+    const ctxPayload = JSON.parse(ctxRes.content[0].text);
+    expect(typeof ctxPayload.stale).toBe("boolean");
+    expect(ctxPayload.stale).toBe(false);
+    expect(typeof ctxPayload.from_cache).toBe("boolean");
+    expect(ctxPayload.from_cache).toBe(false);
+
+    // 2. memory_recall returns stale and from_cache
+    const recallRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_recall", arguments: { query: "deploy", dir: root } },
+    });
+    expect(recallRes.isError).toBeFalsy();
+    const recallPayload = JSON.parse(recallRes.content[0].text);
+    expect(typeof recallPayload.stale).toBe("boolean");
+    expect(recallPayload.stale).toBe(false);
+    expect(typeof recallPayload.from_cache).toBe("boolean");
+    expect(recallPayload.from_cache).toBe(false);
+
+    cleanup(root);
+  });
 });
 
 

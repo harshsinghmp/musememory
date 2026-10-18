@@ -58,6 +58,8 @@ export function queryTieredContext(
       totalTokensUsed,
       constraints,
       userProfile,
+      fromCache: false,
+      stale: queryResult.stale,
     };
   }
 
@@ -103,5 +105,7 @@ export function queryTieredContext(
     totalTokensUsed,
     constraints,
     userProfile,
+    fromCache: false,
+    stale: queryResult.stale,
   };
 }
