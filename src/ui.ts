@@ -2181,9 +2181,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
               <td colspan="2"><strong>\${escapeHtml(item)}</strong></td>
             \`;
           } else {
-            const pillClass = 'priority-' + (item.priority || 'medium').toLowerCase();
+            const rawPriority = String(item.priority || 'medium');
+            const safePriority = escapeHtml(rawPriority);
+            const pillClass = 'priority-' + rawPriority.toLowerCase().replace(/[^a-z0-9_-]/g, '');
             tr.innerHTML = \`
-              <td><span class="priority-badge \${pillClass}">[\${item.priority}]</span></td>
+              <td><span class="priority-badge \${pillClass}">[\${safePriority}]</span></td>
               <td><strong>\${escapeHtml(item.issue)}</strong></td>
               <td>\${escapeHtml(item.action)}</td>
             \`;
