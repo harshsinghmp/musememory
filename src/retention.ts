@@ -213,8 +213,68 @@ export function computeHalfLife(
 }
 
 /**
- * T-074: Compute materialized decay score (1.0 = fully fresh, 0.0 = fully decayed)
- * based on elapsed days and importance-gated half-life.
+ * T-081: Weibull decay curve parameters (shape k, scale multiplier).
+ * Formula: R(t) = exp(-(t / lambda)^k)
+ * where lambda = halfLife / (ln(2))^(1/k) so that R(halfLife) = 0.5 always holds.
+ *
+ * Curve dynamics:
+ * - k < 1 (Infant mortality / durable tail): Early mortality, but surviving entries have high longevity.
+ *   Optimal for architecture, decisions, adrs, constraints.
+ * - k = 1 (Constant hazard): Standard memoryless exponential decay.
+ *   Optimal for operations, generic sessions.
+ * - k > 1 (Wear-out cliff): Freshness plateau with rapid subsequent obsolescence cliff.
+ *   Optimal for bugfixes, temporary discoveries, library workarounds.
+ */
+export interface WeibullParameters {
+  /** Shape parameter k (> 0). */
+  k: number;
+}
+
+export const WEIBULL_TYPE_PROFILES: Record<string, WeibullParameters> = {
+  architecture: { k: 0.7 },
+  adr: { k: 0.7 },
+  decision: { k: 0.8 },
+  negative: { k: 0.8 },
+  operation: { k: 1.0 },
+  fix: { k: 1.6 },
+  discovery: { k: 1.5 },
+};
+
+/**
+ * Returns the Weibull parameters for a given memory type.
+ * Defaults to k = 1.0 (exponential) if type is not recognized.
+ */
+export function weibullParametersForType(type?: string): WeibullParameters {
+  if (type && type in WEIBULL_TYPE_PROFILES) {
+    return WEIBULL_TYPE_PROFILES[type];
+  }
+  return { k: 1.0 };
+}
+
+/**
+ * Re-derived Weibull retention function calibrated to a target half-life.
+ * R(t) = exp(-(t / lambda)^k)
+ *
+ * At t = halfLife, R(halfLife) = exp(-(ln(2))) = 0.5.
+ */
+export function computeWeibullDecay(
+  days: number,
+  halfLife: number,
+  k: number = 1.0,
+): number {
+  if (days <= 0) return 1.0;
+  if (halfLife <= 0) return 0.0;
+  if (k <= 0) return 1.0;
+
+  // lambda = halfLife / (ln(2))^(1/k)
+  const lambda = halfLife / Math.pow(Math.LN2, 1 / k);
+  const score = Math.exp(-Math.pow(days / lambda, k));
+  return Number(Math.max(0, Math.min(1.0, score)).toFixed(4));
+}
+
+/**
+ * T-074 & T-081: Compute materialized decay score (1.0 = fully fresh, 0.0 = fully decayed)
+ * based on elapsed days, importance-gated half-life, and optional Weibull decay curves.
  */
 export function computeDecayScore(
   entry: {
@@ -230,8 +290,13 @@ export function computeDecayScore(
     temporal_mode?: string;
     trust?: string;
     trust_tier?: string;
+    decay_model?: "exponential" | "weibull";
   },
   now: number = Date.now(),
+  options?: {
+    decayModel?: "exponential" | "weibull";
+    k?: number;
+  },
 ): number {
   if (entry.temporal_mode === "timeless" || entry.type === "constraint") {
     return 1.0;
@@ -253,6 +318,13 @@ export function computeDecayScore(
 
   const days = Math.max(0, (now - ms) / 86_400_000);
   if (days <= 0) return 1.0;
+
+  const model = options?.decayModel ?? entry.decay_model ?? "exponential";
+
+  if (model === "weibull") {
+    const k = options?.k ?? weibullParametersForType(entry.type).k;
+    return computeWeibullDecay(days, halfLife, k);
+  }
 
   // Exponential retention: decay_score = exp(-ln(2) * days / halfLife) = 0.5^(days / halfLife)
   const score = Math.exp((-Math.LN2 * days) / halfLife);

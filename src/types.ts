@@ -252,6 +252,8 @@ export interface MemoryEntry {
   expired_at?: string;
   /** T-079: Rule name that caused the memory expiration (e.g. 'ttl_fix_90d', 'governor_sweep'). */
   expired_by?: string;
+  /** T-081: Optional decay model override ('exponential' or 'weibull'). */
+  decay_model?: "exponential" | "weibull";
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";
