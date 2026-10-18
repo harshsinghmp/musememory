@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
-import { recordAuditEvent } from "../audit.ts";
 import { verifyCodeAnchor } from "../anchors/resolver.ts";
 import type { DriftReport, DriftItem, DriftState } from "./types.ts";
 
@@ -24,7 +23,8 @@ function findSourceFiles(dir: string, maxFiles: number = 50): string[] {
       }
 
       const fullPath = join(currentDir, entry);
-      const stat = statSync(fullPath);
+      const stat = statSync(fullPath, { throwIfNoEntry: false });
+      if (!stat) continue;
 
       if (stat.isDirectory()) {
         scan(fullPath);
@@ -129,19 +129,21 @@ export function detectDocumentationCodeDrift(
   // 2. CODE -> DOCS VERIFICATION (Detecting missing documentation for major exports)
   const sourceFiles = findSourceFiles(workspaceRoot, 30);
 
+  // Precompute lowercased corpus of active memories once to avoid O(exports * memories) scan
+  const activeEntriesCorpus = allEntries
+    .filter((e) => e.status !== "archived")
+    .map((e) => `${e.title}\n${e.content}`.toLowerCase())
+    .join("\n\n");
+
   for (const srcFile of sourceFiles) {
     const relPath = relative(workspaceRoot, srcFile);
     const exports = extractExportedSymbols(srcFile);
 
     for (const sym of exports) {
+      const symLower = sym.toLowerCase();
       const isDocumented =
-        documentedSymbols.has(sym.toLowerCase()) ||
-        allEntries.some(
-          (e) =>
-            e.status !== "archived" &&
-            (e.content.toLowerCase().includes(sym.toLowerCase()) ||
-              e.title.toLowerCase().includes(sym.toLowerCase()))
-        );
+        documentedSymbols.has(symLower) ||
+        activeEntriesCorpus.includes(symLower);
 
       if (!isDocumented) {
         missingCount++;
@@ -174,21 +176,6 @@ export function detectDocumentationCodeDrift(
     alignment_score: alignmentScore,
     items,
   };
-
-  if (store.memoryDir && (partialCount > 0 || conflictingCount > 0 || staleCount > 0)) {
-    recordAuditEvent(store.memoryDir, {
-      operation: "drift_detected",
-      entry_id: "store_drift_audit",
-      actor: "drift_engine",
-      reason: `Drift audit flagged ${partialCount} partial, ${conflictingCount} conflicting, and ${staleCount} stale items`,
-      details: {
-        alignment_score: alignmentScore,
-        stale_count: staleCount,
-        conflicting_count: conflictingCount,
-        partial_count: partialCount,
-      },
-    });
-  }
 
   return report;
 }
