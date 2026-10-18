@@ -92,7 +92,11 @@ export function escapeHtml(str: string): string {
 
 export function startUiServer(opts: UiServerOptions): Promise<{ port: number; close: () => void }> {
   return new Promise((resolve, reject) => {
-    let currentPort = opts.port ?? 2222;
+    const rawPort = opts.port !== undefined ? Number(opts.port) : undefined;
+    if (rawPort !== undefined && (!Number.isInteger(rawPort) || rawPort < 0 || rawPort > 65535)) {
+      return reject(new Error(`Invalid port: ${opts.port}. Port must be an integer between 0 and 65535.`));
+    }
+    let currentPort = rawPort ?? 2222;
 
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       let url: URL;
@@ -702,7 +706,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     });
 
     server.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE" && !opts.port) {
+      if (err.code === "EADDRINUSE" && opts.port === undefined) {
         currentPort++;
         server.listen(currentPort, "127.0.0.1");
       } else {
