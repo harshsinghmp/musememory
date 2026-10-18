@@ -7,6 +7,7 @@ import { initUserProfile, userFilePath } from "../user.ts";
 import { connectAgent } from "../connect.ts";
 import { indexGraph } from "../graph.ts";
 import { installGitHook } from "../hook.ts";
+import { scanSecrets } from "../secrets.ts";
 import { type ParsedArgs, usageError } from "./shared.ts";
 
 export interface UpgradeMilestone {
@@ -34,6 +35,7 @@ export interface RepairResult {
   actionsTaken: string[];
   agentsConnected: number;
   memoryDir: string;
+  errors?: string[];
 }
 
 export interface PandaProgressOptions {
@@ -377,12 +379,17 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
   const isDryRun = options.dryRun === true;
   const memoryDir = options.memoryDir || (isGlobal ? getGlobalMemoryDir() : resolveMemoryDir({ root }));
   const actionsTaken: string[] = [];
+  const errors: string[] = [];
 
   // 1. Ensure .memory directory and memories folder exist
   const memoriesDir = join(memoryDir, "memories");
   if (!existsSync(memoriesDir)) {
     if (!isDryRun) {
-      mkdirSync(memoriesDir, { recursive: true });
+      try {
+        mkdirSync(memoriesDir, { recursive: true });
+      } catch (err: unknown) {
+        errors.push(`Failed creating memories directory: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     actionsTaken.push(isDryRun ? `[dry-run] Would create missing memories directory: ${memoriesDir}` : `Created missing memories directory: ${memoriesDir}`);
   }
@@ -391,7 +398,11 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
   const currentPath = join(memoryDir, "CURRENT.md");
   if (!existsSync(currentPath)) {
     if (!isDryRun) {
-      writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
+      try {
+        writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
+      } catch (err: unknown) {
+        errors.push(`Failed creating CURRENT.md: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     actionsTaken.push(isDryRun ? `[dry-run] Would recover missing CURRENT.md at ${currentPath}` : `Recovered missing CURRENT.md at ${currentPath}`);
   }
@@ -400,7 +411,11 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
   const uPath = userFilePath(memoryDir);
   if (!existsSync(uPath)) {
     if (!isDryRun) {
-      initUserProfile(memoryDir, "developer", false, !isGlobal);
+      try {
+        initUserProfile(memoryDir, "developer", false, !isGlobal);
+      } catch (err: unknown) {
+        errors.push(`Failed initializing USER.md: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     actionsTaken.push(isDryRun ? `[dry-run] Would recover missing USER.md profile at ${uPath}` : `Recovered missing USER.md profile at ${uPath}`);
   }
@@ -414,7 +429,9 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
       if (agentsConnected > 0) {
         actionsTaken.push(isDryRun ? `[dry-run] Would auto-wire ${agentsConnected} detected agent platform(s)` : `Auto-wired ${agentsConnected} detected agent platform(s)`);
       }
-    } catch {}
+    } catch (err: unknown) {
+      errors.push(`Failed auto-wiring agents: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // 5. Re-index AST symbols if provider exists
@@ -425,7 +442,9 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
         if (index.symbolCount > 0) {
           actionsTaken.push(`Indexed ${index.symbolCount} AST symbols from ${index.provider}`);
         }
-      } catch {}
+      } catch (err: unknown) {
+        errors.push(`Failed indexing AST symbols: ${err instanceof Error ? err.message : String(err)}`);
+      }
     } else {
       actionsTaken.push(`[dry-run] Would re-index AST symbols from active provider`);
     }
@@ -438,7 +457,9 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
           if (hookRes.installed) {
             actionsTaken.push(`Installed Git pre-commit transcript harvester hook`);
           }
-        } catch {}
+        } catch (err: unknown) {
+          errors.push(`Failed installing Git pre-commit hook: ${err instanceof Error ? err.message : String(err)}`);
+        }
       } else {
         actionsTaken.push(`[dry-run] Would install Git pre-commit transcript harvester hook`);
       }
@@ -446,10 +467,11 @@ export async function repairInstallation(options: RepairOptions = {}): Promise<R
   }
 
   return {
-    repaired: true,
+    repaired: errors.length === 0,
     actionsTaken,
     agentsConnected,
     memoryDir,
+    errors: errors.length > 0 ? errors : undefined,
   };
 }
 
@@ -645,7 +667,21 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       level: 1,
       title: "Vibeguard Security & Credential Audit",
       action: async () => {
-        // Verify no secrets or corrupt files
+        const memDir = isGlobal ? getGlobalMemoryDir() : resolveMemoryDir();
+        const currentPath = join(memDir, "CURRENT.md");
+        const uPath = userFilePath(memDir);
+        const leaked: string[] = [];
+        if (existsSync(currentPath)) {
+          const secrets = scanSecrets(readFileSync(currentPath, "utf-8"));
+          if (secrets.length > 0) leaked.push(`CURRENT.md (${secrets.length} secret[s])`);
+        }
+        if (existsSync(uPath)) {
+          const secrets = scanSecrets(readFileSync(uPath, "utf-8"));
+          if (secrets.length > 0) leaked.push(`USER.md (${secrets.length} secret[s])`);
+        }
+        if (leaked.length > 0) {
+          throw new Error(`Vibeguard audit detected unmasked secrets: ${leaked.join(", ")}`);
+        }
       },
     },
     {
@@ -661,20 +697,48 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       level: 3,
       title: "Synaptic Storage & Schema Alignment",
       action: async () => {
-        repairInfo = await repairInstallation({ global: isGlobal, dryRun });
+        repairInfo = await repairInstallation({ global: isGlobal, dryRun, skipAgentConnect: true });
+        if (repairInfo.errors && repairInfo.errors.length > 0) {
+          throw new Error(`Storage alignment failed: ${repairInfo.errors.join("; ")}`);
+        }
       },
     },
     {
       level: 4,
       title: "80+ Agent Platforms & Skills Auto-Wiring",
       action: async () => {
-        // Agent auto-wiring ran in repairInstallation
+        try {
+          const reports = connectAgent("all", undefined, { dryRun, force: false });
+          const connected = reports.filter((r) => r.updated || r.installed).length;
+          if (repairInfo) {
+            repairInfo.agentsConnected = connected;
+            if (connected > 0) {
+              repairInfo.actionsTaken.push(
+                dryRun
+                  ? `[dry-run] Would auto-wire ${connected} detected agent platform(s)`
+                  : `Auto-wired ${connected} detected agent platform(s)`
+              );
+            }
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (repairInfo) {
+            if (!repairInfo.errors) repairInfo.errors = [];
+            repairInfo.errors.push(`Failed auto-wiring agents: ${msg}`);
+          }
+          throw new Error(`Agent platform wiring failed: ${msg}`);
+        }
       },
     },
     {
       level: 5,
       title: "Cognitive Ascendance Complete",
-      action: async () => {},
+      action: async () => {
+        const memDir = repairInfo?.memoryDir || (isGlobal ? getGlobalMemoryDir() : resolveMemoryDir());
+        if (!existsSync(memDir)) {
+          throw new Error(`Verification failed: Memory directory missing at ${memDir}`);
+        }
+      },
     },
   ];
 
@@ -693,6 +757,12 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
     console.log(`\n🔧 Self-Healing Actions Applied:`);
     for (const act of repairInfo.actionsTaken) {
       console.log(`  ✓ ${act}`);
+    }
+  }
+  if (repairInfo && repairInfo.errors && repairInfo.errors.length > 0) {
+    console.warn(`\n⚠️ Self-Healing Warnings:`);
+    for (const err of repairInfo.errors) {
+      console.warn(`  ! ${err}`);
     }
   }
 
