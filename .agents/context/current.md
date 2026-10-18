@@ -5,8 +5,8 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 10 Focus)
-- **v10 / v11 Feature Waves & Deep Refinements**: Next planned wave execution, production hardening, and CLI ecosystem polish.
+## ⏭️ Next Up (Post-Wave 11 Focus)
+- **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions**: `T-345` (daemon error handling & socket cleanup), `T-346` (upgrade CLI exit codes), `T-350` (drift endpoint symlink & query safety), `T-352` (ADR supersede/reject atomicity), `T-356` (pageindex disclosure depth), `T-358` (daemon command lifecycle & ADR-001 alignment), `T-359` (upgrade audit stub honesty), `T-365` (anchor base normalization).
 
 ---
 
@@ -36,6 +36,15 @@
   - `T-353`: Wiki frontmatter YAML scalar escaping via JSON.stringify (PR #134, Closes #133)
   - `T-354`: CLI argument parsing hardening (POSIX `--` terminator, split on first `=`, negative values) (PR #136, Closes #135)
   - `T-360`: Clean Web Studio keep-alive socket destruction & numeric parameter clamping (PR #138, Closes #137)
+- [x] **Wave 11: Migrator Quarantine, Anti-Poisoning & Validation Hardening**:
+  - `T-366`: Intake schema validation, candidate quarantine, and strip self-certified verification (PR #140, Closes #139)
+  - `T-338`: Strip unearned verification level from external agentmemory records (PR #142, Closes #141)
+  - `T-339`: Prevent Letta core memory (human/persona) prompt injection into CURRENT.md (PR #144, Closes #143)
+  - `T-340`: Generic adapter intake sanitization (reject package.json/configs, bound document size, no loose Object.values) (PR #146, Closes #145)
+  - `T-348`: Path fallback expansion and empty directory defense to enable truthful skipped status (PR #148, Closes #147)
+  - `T-349`: Track deduplication metrics and enforce within-batch dedup in dry runs (PR #150, Closes #149)
+  - `T-357`: Memory status validation and normalizeMemoryStatus (default omitted isLatest to candidate) (PR #152, Closes #151)
+  - `T-362`: Remove dead global config and tighten normalizeMemoryType against loose op substring (PR #154, Closes #153)
 - [x] **Team Onboarding & Documentation**: `docs(team)` Dedicated team getting started guide in `docs/team-getting-started.md` and README team setup section (PR #108, Closes #107).
 - [x] **User Documentation Suite**: `docs(user)` Core Concepts (`docs/concepts.md` via ACCA) and Developer Daily User Guide (`docs/user-guide.md` via QUEST) with README documentation hub (PR #110, Closes #109).
 - **Full Roadmap**: `.agents/context/roadmap.md` and detailed audit report `.agents/artifacts/audit-and-realigned-roadmap-20261015.md`.

@@ -304,7 +304,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [x] T-363 · landed #59 — `src/paths.ts` (`resolveWithin` strict + `resolveExternal` opt-out) applied at wiki/pageindex/pool/mesh boundaries · F
 - [x] T-364 · landed #118 — RB-3 · unique-ID seam: `crypto.randomUUID` slice combined with Date.now() prevents same-ms ID collisions in ADRs and PageIndex · adrs/engine.ts, pageindex/engine.ts · F
 - [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
-- [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
+- [x] T-366 · landed #140 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · F
 - [x] T-367 · **RESOLVED 2026-10-14 — principal decision: zero REQUIRED daemons, opt-in local services allowed.** Charter amends to: no feature may require a running service; `daemon.ts` + studio remain opt-in extras; team-server mode (T-150+) is opt-in per tenant. Residual: add T-379 — amend AGENTS.md + ADR-001 wording from "never depend on background servers" to the amended rule (docs-only) · N
 - [x] T-368 · landed #71 — additive migration stamp + backfill (PRAGMA user_version stamp, MIGRATIONS array, backfill from data JSON) · src/migrate.ts · F
 
@@ -313,9 +313,9 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 **Reject:**
 - [x] T-336 · landed #64 — pageindex path traversal: strict containment tests + listPageIndexes guard · src/pageindex/ · F
 - [x] T-337 · landed #65 — wiki path traversal: strict containment on slug paths · src/wiki/ · F
-- [ ] T-338 · F-04 · migrator self-certification: imported data stamped `verification.level:"independently-verified"` with zero verification (migrator/adapters/agentmemory.ts:59-62) · dep: T-366 · F
-- [ ] T-339 · F-05 · Letta injection: human/persona core memory marked `isConstraint:true` → verbatim into CURRENT.md (letta.ts:26,38; engine.ts:113-115) — cross-agent instruction injection · dep: T-366 · F
-- [ ] T-340 · F-06/F-07 · generic adapter imports junk as confirmed: any JSON object value becomes a memory (generic.ts:21; engine.ts:130); whole .md/.txt/.jsonl files imported wholesale (generic.ts:77-86) · dep: T-366 · F
+- [x] T-338 · landed #142 · F-04 · migrator self-certification: imported data stamped `verification.level:"independently-verified"` with zero verification (migrator/adapters/agentmemory.ts:59-62) · F
+- [x] T-339 · landed #144 · F-05 · Letta injection: human/persona core memory marked `isConstraint:true` → verbatim into CURRENT.md (letta.ts:26,38; engine.ts:113-115) — cross-agent instruction injection · F
+- [x] T-340 · landed #146 · F-06/F-07 · generic adapter imports junk as confirmed: any JSON object value becomes a memory (generic.ts:21; engine.ts:130); whole .md/.txt/.jsonl files imported wholesale (generic.ts:77-86) · F
 - [x] T-341 · landed #120 — F-08 · `memory upgrade --dry-run` respects dryRun: repairInstallation forwards dryRun flag and guards disk mutations · cli/upgrade.ts · F
 - [x] T-342 · landed #68 — studio export XSS: escape studio export payload in UI · src/ui.ts · F
 
@@ -325,8 +325,8 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-345 · F-12/F-13 · daemon hardening: no `server.on("error")` (EADDRINUSE crashes), `/publish` no origin check, client sockets leaked (daemon.ts:36-78,87), shared debounce collapses watcher events, watchers never re-armed · F
 - [ ] T-346 · F-14 · upgrade CLI exit codes: zero non-zero exits in 558 LOC; CI cannot distinguish success from failure (cli/upgrade.ts:498) · F
 - [x] T-347 · landed #132 · F-15 · port-handling contract: integer range validation (1-65535), port 0 ephemeral, auto-increment on collision when port omitted · ui.ts, ecosystem.ts · F
-- [ ] T-348 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
-- [ ] T-349 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
+- [x] T-348 · landed #148 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
+- [x] T-349 · landed #150 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
 - [ ] T-350 · F-18/F-19/F-20 · drift endpoint: unguarded statSync 500s on dangling symlink; O(exports × memories) substring scan; a READ appends audit events (drift.ts:27,139-144,178-191) · F
 - [x] T-351 · landed #66 — mesh anchor path traversal: harden anchor file reads in mesh · src/mesh/ · F
 - [ ] T-352 · F-22/F-23 · ADR integrity: supersede-before-save leaves dangling ref on failure; rejected ADR stored as confirmed (engine.ts:148,162-165,191) · F
@@ -334,12 +334,12 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [x] T-354 · landed #136 · F-25 · CLI arg parsing: POSIX `--` terminator, split on first `=` only, negative numbers parsed as values · cli/shared.ts · F
 - [x] T-355 · landed #67 — sync pool_dir forwarding: harden pool_dir handling · src/sync/ · F
 - [ ] T-356 · F-27 · pageindex disclosure-depth is a no-op: `maxDepth`/`disclosureDepth` accepted, never used (engine.ts:124-125 vs 137-165) · F
-- [ ] T-357 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
+- [x] T-357 · landed #152 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
 - [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
 - [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
 - [x] T-360 · landed #138 · F-31/F-35 · UI shutdown + numeric validation: destroy active sockets on close, bound /api/audit limit & /api/search tokenBudget · ui.ts · F
 - [x] T-361 · landed #126 — F-32 · sanitize priority badge class with alphanumeric filter and HTML-escape item.priority in remediation table · ui.ts:2184-2186 · F
-- [ ] T-362 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
+- [x] T-362 · landed #154 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
 
 ## New tickets from intended mode (claims ↔ evidence)
 
@@ -532,11 +532,12 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 9. **Wave 8: Residual Surfaces Audit** (`T-392`, `T-393`, `T-394`, `T-395`, `T-396`, `T-397`, `T-398`) — [x] Landed on dev
 10. **Wave 9: Runtime Integrity, Seams & Drift Elimination** (`T-010`, `T-011`, `T-012`, `T-364`, `T-341`, `T-343`, `T-344`, `T-361`) — [x] Landed on dev
 11. **Wave 10: CLI Rigor, Governance & Hardened Parsers** (`T-013`, `T-014`, `T-347`, `T-353`, `T-354`, `T-360`) — [x] Landed on dev
+12. **Wave 11: Migrator Quarantine, Anti-Poisoning & Validation Hardening** (`T-366`, `T-338`, `T-339`, `T-340`, `T-348`, `T-349`, `T-357`, `T-362`) — [x] Landed on dev
 
-## v10 Totals
+## v11 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 131 |
-| Active Remaining | 159 |
+| Landed on dev | 139 |
+| Active Remaining | 151 |
 
