@@ -117,7 +117,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       // CORS & CSRF Defense: allow localhost / 127.0.0.1 origins
       const origin = req.headers.origin;
-      const isLocalOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) || origin === "null";
+      const isLocalOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
       if (origin && isLocalOrigin) {
         res.setHeader("Access-Control-Allow-Origin", origin);
