@@ -56,6 +56,7 @@
 - [Key capabilities](#key-capabilities)
 - [Start with one command](#start-with-one-command)
 - [🔄 Upgrading & Self-Healing Maintenance](#-upgrading--self-healing-maintenance)
+- [👥 Team & Multi-Member Setup](#-team--multi-member-setup)
 - [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
 - [👤 5 Role Archetypes (`USER.md`)](#-5-zero-fingerprint-role-archetypes-usermd)
 - [🔌 Full CLI Command Matrix](#-full-cli-command-matrix)
@@ -316,6 +317,42 @@ If you installed the pre-commit transcript harvester hook or injected agent prom
 - **AGENTS.md**: Remove the `<!-- musememory:start --> ... <!-- musememory:end -->` block from your project's `AGENTS.md` file.
 
 </details>
+
+---
+
+## 👥 Team & Multi-Member Setup
+
+Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-06-18)** with Bearer token authentication.
+
+```
+                    Central Team Server (`team.db` + `CURRENT.md`)
+                                       ▲
+                                       │ MCP Streamable HTTP (Bearer Auth)
+         ┌───────────────────┬─────────┴─────────┬───────────────────┐
+      Cursor              Opencode          Antigravity         Claude Code
+```
+
+### 1-Line Team Server Start
+Run on your team's internal VM, build server, or workstation:
+```bash
+# Start server with individual or shared Bearer auth tokens
+musememory serve --port 31338 --host 0.0.0.0 --tokens alice:tok_alice_123,bob:tok_bob_456
+```
+
+### 1-Line Client Recipe Generator
+Generate ready-to-paste configurations tailored to each engineer's specific editor:
+```bash
+# Interactive editor selector
+musememory connect
+
+# Or output directly into console:
+musememory connect --recipe --endpoint http://192.168.1.50:31338/mcp --token tok_alice_123
+```
+
+### Complete Getting Started & Architecture Guide
+For full server setup (systemd service, Docker, reverse proxy), editor-specific client JSON configs, team memory scoping rules (`team.db` vs personal `tenant_<id>.db`), and prompt injection defenses, see:
+- 👉 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** — Step-by-step setup for Team Leads and Engineers.
+- 👉 **[Team Slice Wiring & Architecture Spec](docs/architecture/team-slice-wiring.md)** — Technical deep dive into in-process SQLite vs networked mounts.
 
 ---
 
