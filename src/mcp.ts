@@ -1690,6 +1690,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             } catch {}
           }
 
+          // T-028: Record retrievals to update utility stats and salience
+          if (formatted.entries.length > 0) {
+            const ids = formatted.entries.map((e) => e.entry.id);
+            deferredWrites.push(() => recordRetrievals(activeStore, ids));
+          }
+
           // Auto-harvest recent agent transcripts (deferred: transcript crawl -> import -> propose -> save)
           if (activeMemoryDir) {
             try {
@@ -1757,6 +1763,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             status: a.status ? String(a.status) : undefined,
             verified: a.verified === true,
           });
+          // T-028: Record retrievals to update utility stats and salience
+          if (res.results.length > 0) {
+            const ids = res.results.map((r) => r.entry.id);
+            enqueueWrites([() => recordRetrievals(activeStore, ids)]);
+          }
+
           return toolResult({
             results: res.results.map((r) => ({ ...r.entry, score: r.score })),
             source: res.mode,
