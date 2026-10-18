@@ -1,5 +1,6 @@
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import {
+  get,
   list,
   propose,
   confirm,
@@ -129,11 +130,32 @@ export async function handleRejectCommand({ positional, flags }: ParsedArgs): Pr
 export async function handleDeleteCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const id = positional[0];
+  const id = positional[0]?.trim();
   if (!id) return usageError("delete requires <id>");
+  if (id.includes("*") || id.includes("%") || id.includes("?") || id.includes(",") || id.toLowerCase() === "all") {
+    return fail("delete requires a single point ID; bulk or wildcard patterns are forbidden");
+  }
+  const entry = get(ctx.store, id);
+  if (!entry) {
+    return fail(`no entry found with id ${id}`);
+  }
+
+  const hasConfirmFlag =
+    flags["yes"] === "true" ||
+    flags["y"] === "true" ||
+    flags["apply"] === "true" ||
+    flags["force"] === "true" ||
+    flags["dry-run"] === "false" ||
+    flags["dryRun"] === "false";
+
+  if (!hasConfirmFlag) {
+    console.log(`[dry-run] Would tombstone entry '${id}' (${entry.title || entry.project}). Pass --apply or --yes to execute.`);
+    return 0;
+  }
+
   const ok = deleteEntry(ctx.store, id, flags["reason"], "cli_user");
   if (!ok) {
-    return fail(`no entry found with id ${id}`);
+    return fail(`failed to delete entry ${id}`);
   }
   console.log(`deleted entry ${id}`);
   return 0;

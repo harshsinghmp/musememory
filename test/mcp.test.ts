@@ -325,5 +325,64 @@ describe("mcp tool handlers logic", () => {
 
     cleanup(root);
   });
+
+  test("T-063: memory_delete enforces point-ID-only validation and dry-run by default", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const { get, list, openStore } = await import("../src/store.ts");
+    const store = openStore(memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Wildcard/bulk point-ID rejection
+    const wildcardRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: "*", dir: root } },
+    });
+    expect(wildcardRes.isError).toBe(true);
+    expect(wildcardRes.content[0].text).toContain("bulk or wildcard patterns are forbidden");
+
+    const multiRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: "m_1,m_2", dir: root } },
+    });
+    expect(multiRes.isError).toBe(true);
+    expect(multiRes.content[0].text).toContain("bulk or wildcard patterns are forbidden");
+
+    // 2. Dry run by default: does NOT delete the entry
+    const entryId = list(store)[0].id;
+    const existing = get(store, entryId);
+    expect(existing).toBeDefined();
+
+    const dryRunRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: entryId, dir: root } },
+    });
+    expect(dryRunRes.isError).toBeFalsy();
+    const dryRunPayload = JSON.parse(dryRunRes.content[0].text);
+    expect(dryRunPayload.dry_run).toBe(true);
+    expect(dryRunPayload.deleted).toBe(false);
+
+    // Verify entry still exists
+    expect(get(store, entryId)).toBeDefined();
+
+    // 3. Explicit confirm: true executes deletion
+    const applyRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: entryId, confirm: true, dir: root } },
+    });
+    expect(applyRes.isError).toBeFalsy();
+    const applyPayload = JSON.parse(applyRes.content[0].text);
+    expect(applyPayload.success).toBe(true);
+    expect(applyPayload.tombstoned).toBe(true);
+    expect(applyPayload.dry_run).toBe(false);
+
+    // Verify entry is now tombstoned (get() filters out tombstoned entries)
+    expect(get(store, entryId)).toBeNull();
+
+    cleanup(root);
+  });
 });
+
 
