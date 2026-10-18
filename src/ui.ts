@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
 import type { MemoryEntry } from "./types.ts";
 import { list, get, confirm, markStale, supersede, deleteEntry, propose } from "./store.ts";
@@ -96,9 +97,15 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     if (rawPort !== undefined && (!Number.isInteger(rawPort) || rawPort < 0 || rawPort > 65535)) {
       return reject(new Error(`Invalid port: ${opts.port}. Port must be an integer between 0 and 65535.`));
     }
+    const activeSockets = new Set<Socket>();
     let currentPort = rawPort ?? 2222;
 
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+      if (req.socket && !activeSockets.has(req.socket as Socket)) {
+        const sock = req.socket as Socket;
+        activeSockets.add(sock);
+        sock.once("close", () => activeSockets.delete(sock));
+      }
       let url: URL;
       try {
         url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -279,7 +286,8 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
 
       if (pathname === "/api/audit" && req.method === "GET") {
-        const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+        const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(1000, rawLimit) : 50;
         const trail = getAuditTrail(opts.memoryDir, { limit });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ trail }));
@@ -290,12 +298,16 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         try {
           const body = await parseJsonBody(req);
           const query = String(body.query || "");
-          const tokenBudget = typeof body.tokenBudget === "number" ? body.tokenBudget : undefined;
+          const tokenBudget = typeof body.tokenBudget === "number" && Number.isFinite(body.tokenBudget) && body.tokenBudget > 0
+            ? Math.min(100000, Math.floor(body.tokenBudget))
+            : undefined;
+          const rawLimit = typeof body.limit === "number" ? body.limit : 10;
+          const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(500, rawLimit) : 10;
           const mode = body.mode as any || "auto";
           const resSearch = RetrievalEngine.search(opts.store, opts.memoryDir, query, {
             mode,
             tokenBudget,
-            limit: typeof body.limit === "number" ? body.limit : 10,
+            limit,
             type: body.type ? String(body.type) : undefined,
             status: body.status ? String(body.status) : undefined,
           });
@@ -714,12 +726,23 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
     });
 
+    server.on("connection", (socket: Socket) => {
+      activeSockets.add(socket);
+      socket.on("close", () => activeSockets.delete(socket));
+    });
+
     server.listen(currentPort, "127.0.0.1", () => {
       const addr = server.address();
       const actualPort = typeof addr === "object" && addr ? addr.port : currentPort;
       resolve({
         port: actualPort,
-        close: () => server.close(),
+        close: () => {
+          for (const s of activeSockets) {
+            s.destroy();
+          }
+          activeSockets.clear();
+          server.close();
+        },
       });
     });
   });
