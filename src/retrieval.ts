@@ -246,6 +246,27 @@ export function computeApplicability(entryTokens: Set<string>, queryTokens: stri
   return matched / queryTokens.length;
 }
 
+/**
+ * T-062: Safely parse and clamp model-supplied limit values within [minVal, maxVal].
+ */
+export function clampLimit(
+  val: unknown,
+  defaultVal: number = 10,
+  maxVal: number = 100,
+  minVal: number = 1,
+): number {
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return Math.max(minVal, Math.min(Math.floor(val), maxVal));
+  }
+  if (typeof val === "string" && val.trim()) {
+    const parsed = parseInt(val.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return Math.max(minVal, Math.min(parsed, maxVal));
+    }
+  }
+  return defaultVal;
+}
+
 /** Staleness policy in days per memory type. null = never stale. */
 export { stalePolicyDays } from "./retention.ts";
 
@@ -835,7 +856,7 @@ export function queryContext(
   const scored = sortCandidates(entries, queryTokens, now, options.semanticScores, options.workspaceRoot);
 
   // R23: Record access for top results (updates last_accessed_at and access_count)
-  const limit = options.limit ?? 10;
+  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 500, 1) : 10;
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
 

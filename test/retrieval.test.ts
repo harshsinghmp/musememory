@@ -14,6 +14,7 @@ import {
   applicability,
   getEntryTokenSet,
   invalidateEntryTokenSet,
+  clampLimit,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
@@ -380,6 +381,39 @@ describe("unified context & retrieval engine", () => {
 
     cleanup(root);
   });
+
+  test("T-062: clampLimit sanitizes and bounds model-supplied limit inputs", () => {
+    // 1. Defaults and fallbacks
+    expect(clampLimit(undefined, 10)).toBe(10);
+    expect(clampLimit(null, 10)).toBe(10);
+    expect(clampLimit("invalid", 10)).toBe(10);
+    expect(clampLimit(NaN, 10)).toBe(10);
+
+    // 2. Clamping bounds
+    expect(clampLimit(-10, 10, 100, 1)).toBe(1);
+    expect(clampLimit(0, 10, 100, 1)).toBe(1);
+    expect(clampLimit(50, 10, 100, 1)).toBe(50);
+    expect(clampLimit(999999, 10, 100, 1)).toBe(100);
+
+    // 3. String numeric parsing and float flooring
+    expect(clampLimit("25", 10, 100, 1)).toBe(25);
+    expect(clampLimit(15.9, 10, 100, 1)).toBe(15);
+
+    // 4. queryContext limit clamping integration
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    // Negative limit clamped to 1
+    const resNegative = queryContext(store, "test", { limit: -5 });
+    expect(resNegative.results.length).toBeLessThanOrEqual(1);
+
+    // Zero limit clamped to 1
+    const resZero = queryContext(store, "test", { limit: 0 });
+    expect(resZero.results.length).toBeLessThanOrEqual(1);
+
+    cleanup(root);
+  });
 });
+
 
 

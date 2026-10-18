@@ -1,6 +1,6 @@
 import type { Store } from "../store.ts";
 import { list, countMemories } from "../store.ts";
-import { queryContext, formatPromptContext, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
+import { queryContext, formatPromptContext, clampLimit, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
 import { hybridSearch, rebuildIndex, saveIndex, indexFilePath } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
@@ -127,7 +127,7 @@ export class RetrievalEngine {
     if (mode === "hybrid" || (mode === "auto" && hasVec && memCount > 100)) {
       try {
         const hybridResults = hybridSearch(store, memoryDir, query, {
-          limit: options.limit ?? 10,
+          limit: options.limit !== undefined ? clampLimit(options.limit, 10, 200, 1) : 10,
           // T-303: hybrid is scale-gated, so it must apply the same lifecycle/project
           // row filter as the exact path or stale/cross-project rows leak into context.
           project: options.project,

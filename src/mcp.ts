@@ -25,7 +25,7 @@ import {
   harvestMemories,
   type Store,
 } from "./store.ts";
-import { queryContext, formatPromptContext } from "./retrieval.ts";
+import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
 import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
@@ -1659,9 +1659,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             });
           }
           const tierOpt = typeof a.tier === "number" ? (a.tier as RetrievalTier) : undefined;
+          const contextLimit = clampLimit(a.limit, 5, 50, 1);
           const formatted = tierOpt !== undefined
             ? queryTieredContext(activeStore, activeMemoryDir, queryStr, {
-                limit: typeof a.limit === "number" ? a.limit : 5,
+                limit: contextLimit,
                 tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
                 project: a.project ? String(a.project) : undefined,
                 includeSuperseded: false,
@@ -1671,7 +1672,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 tier: tierOpt,
               })
             : formatPromptContext(activeStore, activeMemoryDir, queryStr, {
-                limit: typeof a.limit === "number" ? a.limit : 5,
+                limit: contextLimit,
                 tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
                 project: a.project ? String(a.project) : undefined,
                 includeSuperseded: false,
@@ -1756,7 +1757,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
             mode,
             project: a.project ? String(a.project) : undefined,
-            limit: typeof a.limit === "number" ? a.limit : 10,
+            limit: clampLimit(a.limit, 10, 100, 1),
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             includeSuperseded: a.include_superseded === true,
             type: a.type ? String(a.type) : undefined,
@@ -1904,7 +1905,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const trail = getAuditTrail(activeMemoryDir, {
           operation: a.operation ? String(a.operation) : undefined,
           entryId: a.entry_id ? String(a.entry_id) : undefined,
-          limit: typeof a.limit === "number" ? a.limit : 50,
+          limit: clampLimit(a.limit, 50, 500, 1),
         });
         return toolResult({ total: trail.length, entries: trail });
       }
@@ -2374,7 +2375,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           tokenBudget: a.token_budget ? Number(a.token_budget) : undefined,
           activeFilePath: a.active_file_path ? String(a.active_file_path) : undefined,
           targetSymbol: a.target_symbol ? String(a.target_symbol) : undefined,
-          limit: a.limit ? Number(a.limit) : 10,
+          limit: clampLimit(a.limit, 10, 100, 1),
         });
         return toolResult({
           query: a.query,
@@ -2619,7 +2620,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const packet = broadcastKnowledge(activeStore, activeRoot, {
           agentId: a.agent_id as string | undefined,
           project: a.project as string | undefined,
-          limit: typeof a.limit === "number" ? a.limit : undefined,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 50, 500, 1) : undefined,
         });
         return toolResult(packet);
       }
@@ -2654,7 +2655,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           query: a.query as string | undefined,
           targetProjects: Array.isArray(a.projects) ? (a.projects as string[]) : undefined,
           types: Array.isArray(a.types) ? (a.types as MemoryType[]) : undefined,
-          limit: typeof a.limit === "number" ? a.limit : undefined,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 50, 500, 1) : undefined,
         });
         return toolResult({ total_found: results.length, results });
       }
