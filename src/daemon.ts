@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
-import { existsSync } from "node:fs";
+import type { Socket } from "node:net";
+import { existsSync, watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import { watch, type FSWatcher } from "node:fs";
 
 export interface HubEvent {
   type: string;
@@ -30,8 +30,9 @@ const DEBOUNCE_MS = 300;
  */
 export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
   const clients = new Set<ServerResponse>();
+  const sockets = new Set<Socket>();
   const watchers: FSWatcher[] = [];
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   const server = createServer((req, res) => {
     if (req.method === "GET" && req.url?.startsWith("/events")) {
@@ -43,10 +44,21 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
       res.write(`data: ${JSON.stringify({ type: "hello", timestamp: new Date().toISOString() })}\n\n`);
       clients.add(res);
       req.on("close", () => clients.delete(res));
+      res.on("close", () => clients.delete(res));
+      res.on("error", () => clients.delete(res));
       return;
     }
 
     if (req.method === "POST" && req.url?.startsWith("/publish")) {
+      // Origin validation: only allow local origins, reject untrusted cross-origin or null origins (T-345)
+      const origin = req.headers.origin;
+      const isLocalOrigin = !origin || (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) && origin !== "null");
+      if (!isLocalOrigin) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "forbidden: cross-origin requests blocked" }));
+        return;
+      }
+
       let body = "";
       req.on("data", (chunk) => {
         body += chunk;
@@ -77,6 +89,11 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
     res.end(JSON.stringify({ error: "not found" }));
   });
 
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
+
   function broadcast(type: string, payload?: unknown, source?: string): number {
     const event: HubEvent = { type, payload, source, timestamp: new Date().toISOString() };
     const frame = `event: ${type}\ndata: ${JSON.stringify(event)}\n\n`;
@@ -90,30 +107,71 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
     return clients.size;
   }
 
-  // Watch .memory/memories/ + CURRENT.md (best-effort; debounced)
+  // Watch .memory/memories/ + CURRENT.md (best-effort; debounced per event type)
   if (memoryDir) {
     const memoriesDir = join(memoryDir, "memories");
+    const currentMd = join(memoryDir, "CURRENT.md");
+
     const armDebounced = (type: string) => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        broadcast(type, undefined, "watcher");
-      }, DEBOUNCE_MS);
+      const prev = debounceTimers.get(type);
+      if (prev) clearTimeout(prev);
+      debounceTimers.set(
+        type,
+        setTimeout(() => {
+          debounceTimers.delete(type);
+          broadcast(type, undefined, "watcher");
+        }, DEBOUNCE_MS),
+      );
     };
-    try {
-      if (existsSync(memoriesDir)) {
-        watchers.push(watch(memoriesDir, () => armDebounced("memory.changed")));
-      }
-      const currentMd = join(memoryDir, "CURRENT.md");
-      if (existsSync(currentMd)) {
-        watchers.push(watch(currentMd, () => armDebounced("constraints.changed")));
-      }
-    } catch {
-      // watcher is best-effort; hub still works without it
-    }
+
+    const setupWatcher = (targetPath: string, eventType: string, isDir: boolean) => {
+      let activeWatcher: FSWatcher | null = null;
+      const arm = () => {
+        if (!existsSync(targetPath)) return;
+        try {
+          if (activeWatcher) {
+            try {
+              activeWatcher.close();
+            } catch {}
+          }
+          activeWatcher = watch(targetPath, (eventTypeObserved) => {
+            armDebounced(eventType);
+            // If an atomic file write emits rename, re-arm watcher
+            if (!isDir && eventTypeObserved === "rename") {
+              setTimeout(arm, 50);
+            }
+          });
+          activeWatcher.on("error", () => {
+            if (activeWatcher) {
+              try {
+                activeWatcher.close();
+              } catch {}
+              activeWatcher = null;
+            }
+            setTimeout(arm, 1000);
+          });
+          watchers.push(activeWatcher);
+        } catch {
+          // best-effort
+        }
+      };
+      arm();
+    };
+
+    setupWatcher(memoriesDir, "memory.changed", true);
+    setupWatcher(currentMd, "constraints.changed", false);
   }
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    let isListening = false;
+    server.on("error", (err) => {
+      if (!isListening) {
+        reject(err);
+      }
+    });
+
     server.listen(port, "127.0.0.1", () => {
+      isListening = true;
       const address = server.address();
       const actualPort = typeof address === "object" && address ? address.port : port;
       resolve({
@@ -126,9 +184,26 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
         broadcast,
         close: () =>
           new Promise<void>((resolveClose) => {
-            for (const w of watchers) w.close();
-            for (const client of clients) client.end();
+            for (const timer of debounceTimers.values()) clearTimeout(timer);
+            debounceTimers.clear();
+            for (const w of watchers) {
+              try {
+                w.close();
+              } catch {}
+            }
+            watchers.length = 0;
+            for (const client of clients) {
+              try {
+                client.end();
+              } catch {}
+            }
             clients.clear();
+            for (const socket of sockets) {
+              try {
+                socket.destroy();
+              } catch {}
+            }
+            sockets.clear();
             server.close(() => resolveClose());
           }),
       });
