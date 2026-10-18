@@ -12,6 +12,7 @@ import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 import { buildSafeFtsQuery } from "./sqlite.ts";
+import { computeDecayScore } from "./retention.ts";
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -489,6 +490,7 @@ export interface ScoreFactors {
   zeroMatchPenalty: number;
   semanticMatch: number;
   totalScore: number;
+  decayScore?: number;
 }
 
 /** Symbol-like identifiers an entry declares: AST symbols, single-word tags, backticked code. */
@@ -684,6 +686,8 @@ export function computeFactors(
     zeroMatchPenalty +
     0.5 * semanticMatch;
 
+  const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
+
   return {
     baseApplicability,
     exactSymbolMatch,
@@ -706,6 +710,7 @@ export function computeFactors(
     zeroMatchPenalty,
     semanticMatch,
     totalScore,
+    decayScore,
   };
 }
 

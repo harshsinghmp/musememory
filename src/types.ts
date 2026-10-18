@@ -241,6 +241,8 @@ export interface MemoryEntry {
   source_ids?: string[];
   /** T-139: True if entry failed or was missed during embedding reindex/build. */
   stale_embedder?: boolean;
+  /** T-074: Materialized decay retention score (1.0 = fully fresh, 0.0 = fully decayed) based on importance-gated half-life. */
+  decay_score?: number;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted";

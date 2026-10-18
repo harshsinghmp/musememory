@@ -43,6 +43,7 @@ import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } fro
 export { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError };
 import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
 export { getStoreCircuitBreaker, CircuitBreaker };
+import { computeDecayScore } from "./retention.ts";
 import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
 export { registerWriteWorker, drainWriteWorkers };
 import { touchActivity } from "./optimize.ts";
@@ -679,6 +680,11 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       }
     }
 
+    // T-074: Ensure decay_score is calculated via importance-gated half-life
+    if (entry.decay_score === undefined) {
+      entry.decay_score = computeDecayScore(entry);
+    }
+
     // 1. Primary write to SQLite database
     if (store.db) {
       try {
@@ -942,6 +948,20 @@ export function propose(
     trust,
     score_retain: retention.score,
     source_ids: opts.source_ids,
+    decay_score:
+      typeof (opts as any).decay_score === "number"
+        ? (opts as any).decay_score
+        : computeDecayScore({
+            type: opts.type ?? "discovery",
+            created_at: now,
+            updated_at: now,
+            valid_from: opts.validFrom ?? opts.valid_from,
+            verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
+            reinforcement: opts.confirmed ? 1 : 0,
+            access_count: 0,
+            salience: typeof opts.salience === "number" ? opts.salience : undefined,
+            temporal_mode,
+          }),
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);

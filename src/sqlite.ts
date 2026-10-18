@@ -152,6 +152,7 @@ function initSchema(db: SqliteDatabase): void {
       mem_path TEXT,
       last_accessed_at TEXT,
       access_count INTEGER,
+      decay_score REAL DEFAULT 1.0,
       data TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -167,6 +168,7 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
+    CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
@@ -219,6 +221,7 @@ export interface DbMemoryRow {
   mem_path: string | null;
   last_accessed_at: string | null;
   access_count: number | null;
+  decay_score?: number | null;
   idempotency_key?: string | null;
   content_hash?: string | null;
   data: string;
@@ -250,6 +253,12 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
     mem_path: row.mem_path !== null ? row.mem_path : parsedData.mem_path,
     last_accessed_at: row.last_accessed_at !== null ? row.last_accessed_at : parsedData.last_accessed_at,
     access_count: row.access_count !== null ? row.access_count : parsedData.access_count,
+    decay_score:
+      typeof row.decay_score === "number"
+        ? row.decay_score
+        : typeof parsedData.decay_score === "number"
+        ? parsedData.decay_score
+        : 1.0,
     idempotency_key: row.idempotency_key !== undefined && row.idempotency_key !== null ? row.idempotency_key : parsedData.idempotency_key,
     content_hash: row.content_hash !== undefined && row.content_hash !== null ? row.content_hash : parsedData.content_hash,
     created_at: row.created_at || parsedData.created_at || new Date().toISOString(),
@@ -263,12 +272,12 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
       INSERT OR REPLACE INTO memories (
         id, title, content, project, type, status, salience, reinforcement,
         session_id, due_at, expires_at, valid_from, valid_to,
-        mem_path, last_accessed_at, access_count, idempotency_key, content_hash, data,
+        mem_path, last_accessed_at, access_count, decay_score, idempotency_key, content_hash, data,
         created_at, updated_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?,
         ?, ?
       )
     `;
@@ -290,6 +299,7 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
       entry.mem_path ?? null,
       entry.last_accessed_at ?? null,
       typeof entry.access_count === "number" ? entry.access_count : null,
+      typeof entry.decay_score === "number" ? entry.decay_score : 1.0,
       entry.idempotency_key ?? null,
       entry.content_hash ?? null,
       JSON.stringify(entry),
