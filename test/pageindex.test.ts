@@ -72,6 +72,46 @@ Argon2id is used for password hashing.
     expect(search.reasoning).toContain("Session Tokens");
   });
 
+  it("T-356: searchPageIndex respects maxDepth pruning and disclosureDepth options", () => {
+    const markdown = `
+# Engineering System
+
+## Architecture
+Overview of architecture.
+
+### Database Layer
+Postgres database details.
+
+#### Sharding Details
+Deep sharding specifics for high throughput.
+`;
+
+    const doc = buildPageIndex(markdown, { project: "testproj", title: "Engineering System", memoryDir });
+
+    // With maxDepth = 2, deep level 4 headers (Sharding Details) should not be traversed
+    const shallowSearch = searchPageIndex(doc, { query: "sharding", maxDepth: 2 });
+    expect(shallowSearch.results.some((r) => r.title.includes("Sharding"))).toBe(false);
+
+    // Without maxDepth constraint (or maxDepth = 4), deep headers are found
+    const deepSearch = searchPageIndex(doc, { query: "sharding", maxDepth: 4 });
+    expect(deepSearch.results.some((r) => r.title.includes("Sharding"))).toBe(true);
+
+    // disclosureDepth L1 omits citations and uses lower token estimates
+    const l1Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L1" });
+    expect(l1Search.results.length).toBeGreaterThan(0);
+    expect(l1Search.results[0].citations).toBeUndefined();
+
+    // disclosureDepth L2 includes citations
+    const l2Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L2" });
+    expect(l2Search.results.length).toBeGreaterThan(0);
+    expect(l2Search.results[0].citations).toBeDefined();
+
+    // disclosureDepth L3 includes content in summary and has higher token accounting
+    const l3Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L3" });
+    expect(l3Search.results.length).toBeGreaterThan(0);
+    expect(l3Search.tokensUsed).toBeGreaterThanOrEqual(l1Search.tokensUsed);
+  });
+
   it("intercepts and rejects secrets via Vibeguard", () => {
     const leakMarkdown = "# Leaked Keys\nsk-1234567890abcdef1234567890abcdef";
     expect(() => {

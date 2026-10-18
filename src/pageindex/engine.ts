@@ -143,6 +143,8 @@ export function searchPageIndex(
 ): PageIndexSearchResult {
   const query = options.query;
   const maxNodes = options.maxNodes ?? 50;
+  const maxDepth = options.maxDepth;
+  const disclosureDepth = options.disclosureDepth ?? "L2";
   const tokenBudget = options.tokenBudget ?? 4000;
   const queryTokens = new Set(tokenize(query));
 
@@ -150,6 +152,9 @@ export function searchPageIndex(
   let totalNodesSearched = 0;
 
   function traverse(node: PageIndexNode) {
+    if (maxDepth !== undefined && node.depth > maxDepth) {
+      return;
+    }
     totalNodesSearched++;
     const haystack = tokenize(`${node.title} ${node.summary} ${node.content} ${node.path}`);
     const haySet = new Set(haystack);
@@ -185,16 +190,36 @@ export function searchPageIndex(
   const results: PageIndexSearchResult["results"] = [];
 
   for (const item of matched) {
-    const approxTokens = Math.max(10, Math.ceil((item.node.title.length + item.node.summary.length + item.node.content.length) / 4));
+    const baseLen = item.node.title.length + (item.node.summary?.length || 0);
+    const contentLen = item.node.content?.length || 0;
+    const citationsLen = item.node.citations ? JSON.stringify(item.node.citations).length : 0;
+
+    let approxTokens: number;
+    switch (disclosureDepth) {
+      case "L1":
+        approxTokens = Math.max(5, Math.ceil(baseLen / 4));
+        break;
+      case "L2":
+        approxTokens = Math.max(10, Math.ceil((baseLen + contentLen) / 4));
+        break;
+      case "L3":
+      default:
+        approxTokens = Math.max(10, Math.ceil((baseLen + contentLen + citationsLen) / 4));
+        break;
+    }
+
     if (tokensUsed + approxTokens > tokenBudget && results.length > 0) break;
 
     results.push({
       nodeId: item.node.id,
       title: item.node.title,
-      summary: item.node.summary || item.node.title,
+      summary:
+        disclosureDepth === "L3" && item.node.content
+          ? `${item.node.summary || item.node.title}\n\n${item.node.content}`
+          : item.node.summary || item.node.title,
       path: item.node.path,
       score: Number(item.score.toFixed(2)),
-      citations: item.node.citations,
+      citations: disclosureDepth === "L1" ? undefined : item.node.citations,
     });
     tokensUsed += approxTokens;
   }
