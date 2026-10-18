@@ -10,13 +10,15 @@ import {
   conditionalRerank,
   clampLimit,
   matchesWordBoundary,
+  evaluateAbstentionGate,
+  type AbstentionDecision,
   type ScoreFactors,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
 
-export type { ScoreFactors };
-export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved, matchesWordBoundary };
+export type { ScoreFactors, AbstentionDecision };
+export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved, matchesWordBoundary, evaluateAbstentionGate };
 
 /**
  * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).
@@ -98,10 +100,10 @@ export async function rankAndRetrieveMemories(
   const now = options.now ?? Date.now();
   const workspaceRoot = store.dir;
 
-  // 1. T-070: Relevance Gate before FTS5 search (T-312: degraded signal handling)
+  // 1. T-070 & T-072: FTS5-tokenizer-matched abstention gate before FTS5 search
   const ftsMatchIds = new Set<string>();
-  const relevance = evaluateQueryRelevance(query);
-  if (store.db && query.trim() && relevance.relevant) {
+  const abstention = evaluateAbstentionGate(query);
+  if (store.db && query.trim() && !abstention.abstain) {
     try {
       const ftsResults = searchMemoriesFts(store.db, query);
       if (ftsResults.degraded) {

@@ -19,6 +19,7 @@ import {
   GENERIC_COMMON_SYMBOLS,
   computeFactors,
   matchesWordBoundary,
+  evaluateAbstentionGate,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { RetrievalEngine } from "../src/retrieval/engine.ts";
@@ -563,6 +564,40 @@ describe("unified context & retrieval engine", () => {
     expect(matchesWordBoundary("race condition", "")).toBe(false);
     expect(matchesWordBoundary(null as any, "race")).toBe(false);
     expect(matchesWordBoundary("race condition", null as any)).toBe(false);
+  });
+
+  test("T-072: evaluateAbstentionGate matches FTS5 tokenization to abstain early", () => {
+    // 1. Empty and whitespace queries
+    expect(evaluateAbstentionGate("").abstain).toBe(true);
+    expect(evaluateAbstentionGate("   ").abstain).toBe(true);
+    expect(evaluateAbstentionGate(null as any).abstain).toBe(true);
+
+    // 2. Trivial greetings
+    expect(evaluateAbstentionGate("hi").abstain).toBe(true);
+    expect(evaluateAbstentionGate("hello").reason).toBe("trivial_greeting");
+    expect(evaluateAbstentionGate("hey there!").abstain).toBe(true);
+    expect(evaluateAbstentionGate("thanks").abstain).toBe(true);
+
+    // 3. Hostile FTS syntax or no searchable terms
+    expect(evaluateAbstentionGate("AND OR NOT").abstain).toBe(true);
+    expect(evaluateAbstentionGate("AND OR NOT").reason).toBe("fts_no_searchable_terms");
+    expect(evaluateAbstentionGate("~ ^ * : { } ( )").abstain).toBe(true);
+
+    // 4. Stopwords only
+    expect(evaluateAbstentionGate("is it or not").abstain).toBe(true);
+    expect(evaluateAbstentionGate("is it or not").reason).toBe("stopwords_only");
+    expect(evaluateAbstentionGate("about above after").reason).toBe("stopwords_only");
+
+    // 5. Legitimate queries pass cleanly
+    const pass1 = evaluateAbstentionGate("auth token validation");
+    expect(pass1.abstain).toBe(false);
+    expect(pass1.searchableTerms).toContain("auth");
+
+    const pass2 = evaluateAbstentionGate("SessionManager connection pool");
+    expect(pass2.abstain).toBe(false);
+
+    const pass3 = evaluateAbstentionGate("`jwt.verify`");
+    expect(pass3.abstain).toBe(false);
   });
 });
 
