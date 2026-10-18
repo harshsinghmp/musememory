@@ -708,6 +708,14 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
     if (store.cache) {
       store.cache.setEntry(entry, undefined, mtimeMs);
     }
+
+    // T-304: Incrementally upsert into vector index.json if present
+    if (store.memoryDir) {
+      try {
+        const { upsertIndexEntry } = require("./vector.ts");
+        upsertIndexEntry(entry, store.memoryDir);
+      } catch {}
+    }
   };
 
   if (options.lock && store.memoryDir) {
@@ -1201,6 +1209,14 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
   // 1. Evict from L0 Cache
   if (store.cache) {
     store.cache.deleteEntry(id);
+  }
+
+  // T-304: Remove from vector index.json if present
+  if (store.memoryDir) {
+    try {
+      const { removeIndexEntry } = require("./vector.ts");
+      removeIndexEntry(id, store.memoryDir);
+    } catch {}
   }
 
   if (store.memoryDir && entry) {
