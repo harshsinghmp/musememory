@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { resolveWithin } from "../paths.ts";
 import { scanSecrets } from "../secrets.ts";
 import { tokenize } from "../retrieval.ts";
@@ -42,7 +43,8 @@ export function buildPageIndex(
   const project = options.project;
   const title = options.title || content.slice(0, 50).trim() || "Untitled Document";
   const maxDepth = options.maxDepth ?? 5;
-  const indexId = `idx_${Date.now()}_${slugify(title) || "doc"}`;
+  const shortUuid = randomUUID().replace(/-/g, "").slice(0, 8);
+  const indexId = `idx_${Date.now()}_${shortUuid}_${slugify(title) || "doc"}`;
   const now = new Date().toISOString();
 
   // 2. Parse Markdown/Text into hierarchical sections

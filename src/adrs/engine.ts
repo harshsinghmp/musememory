@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Store } from "../store.ts";
 import { get, list, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
@@ -101,7 +102,8 @@ export function recordAdr(
   const adrNum = options.adr_number ?? getNextAdrNumber(store);
   const now = new Date().toISOString();
   const status: AdrStatus = options.status || "accepted";
-  const id = `m_${Date.now()}_adr_${adrNum}`;
+  const shortUuid = randomUUID().replace(/-/g, "").slice(0, 8);
+  const id = `m_${Date.now()}_${shortUuid}_adr_${adrNum}`;
 
   // 1. Build native code anchors for affected files and symbols
   const anchors: CodeAnchor[] = [];
