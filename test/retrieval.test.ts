@@ -11,6 +11,9 @@ import {
   sortCandidates,
   tokenize,
   filterByRelevanceThreshold,
+  applicability,
+  getEntryTokenSet,
+  invalidateEntryTokenSet,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
@@ -332,5 +335,51 @@ describe("unified context & retrieval engine", () => {
 
     cleanup(root);
   });
+
+  test("T-022: precomputed token sets per memory avoid per-query retokenization", () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    const entry = propose(store, {
+      title: "Postgres Connection Pool Tuning",
+      content: "Ensure max pool size is 20 and idle timeout is 10000ms.",
+      project: "aria",
+      type: "decision",
+      confirmed: true,
+      tags: ["postgres", "database"],
+      graph: {
+        provider: "codegraph",
+        symbol_names: ["createPool"],
+      },
+    });
+
+    // 1. First call computes and caches token set
+    const set1 = getEntryTokenSet(entry);
+    expect(set1.has("postgres")).toBe(true);
+    expect(set1.has("pool")).toBe(true);
+    expect(set1.has("tuning")).toBe(true);
+    expect(set1.has("createpool")).toBe(true);
+
+    // 2. Subsequent call returns the exact same cached reference
+    const set2 = getEntryTokenSet(entry);
+    expect(set2).toBe(set1);
+
+    // 3. applicability uses cached set
+    const score = applicability(entry, ["postgres", "tuning"]);
+    expect(score).toBe(1.0);
+
+    const partialScore = applicability(entry, ["postgres", "unknown"]);
+    expect(partialScore).toBe(0.5);
+
+    // 4. Invalidation clears cache and forces re-computation
+    invalidateEntryTokenSet(entry);
+    const set3 = getEntryTokenSet(entry);
+    expect(set3).not.toBe(set1);
+    expect(set3.has("postgres")).toBe(true);
+
+    cleanup(root);
+  });
 });
+
 
