@@ -243,6 +243,8 @@ export interface MemoryEntry {
   stale_embedder?: boolean;
   /** T-074: Materialized decay retention score (1.0 = fully fresh, 0.0 = fully decayed) based on importance-gated half-life. */
   decay_score?: number;
+  /** T-076: Bayesian confidence score computed from independent corroboration C(n) = 1 - 0.7^n. */
+  confidence?: number;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted";
