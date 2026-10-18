@@ -1,9 +1,7 @@
 import type {
   CodeIntelligenceProvider,
   SymbolResolution,
-  SymbolReference,
   BlastRadiusResult,
-  GraphContext,
 } from "./types.ts";
 import { CodeGraphProvider } from "./adapters/codegraph.ts";
 import { GraphifyProvider } from "./adapters/graphify.ts";
@@ -25,11 +23,6 @@ export class ProviderRegistry {
         new HeuristicFallbackProvider(),
       ];
     }
-  }
-
-  registerProvider(provider: CodeIntelligenceProvider): void {
-    // Unshift so custom providers take priority before fallback
-    this.providers.unshift(provider);
   }
 
   async getAvailableProviders(workspaceDir: string): Promise<CodeIntelligenceProvider[]> {
@@ -65,57 +58,6 @@ export class ProviderRegistry {
     return [];
   }
 
-  async getCallersWithFallback(
-    symbol: string,
-    workspaceDir: string,
-  ): Promise<SymbolReference[]> {
-    const available = await this.getAvailableProviders(workspaceDir);
-    for (const provider of available) {
-      if (!provider.getCapabilities().callers || !provider.getCallers) continue;
-      try {
-        const results = await provider.getCallers(symbol, workspaceDir);
-        if (results && results.length > 0) {
-          return results;
-        }
-      } catch {}
-    }
-    return [];
-  }
-
-  async getCalleesWithFallback(
-    symbol: string,
-    workspaceDir: string,
-  ): Promise<SymbolReference[]> {
-    const available = await this.getAvailableProviders(workspaceDir);
-    for (const provider of available) {
-      if (!provider.getCapabilities().callees || !provider.getCallees) continue;
-      try {
-        const results = await provider.getCallees(symbol, workspaceDir);
-        if (results && results.length > 0) {
-          return results;
-        }
-      } catch {}
-    }
-    return [];
-  }
-
-  async getRelatedFilesWithFallback(
-    filePath: string,
-    workspaceDir: string,
-  ): Promise<string[]> {
-    const available = await this.getAvailableProviders(workspaceDir);
-    for (const provider of available) {
-      if (!provider.getCapabilities().relatedFiles || !provider.getRelatedFiles) continue;
-      try {
-        const results = await provider.getRelatedFiles(filePath, workspaceDir);
-        if (results && results.length > 0) {
-          return results;
-        }
-      } catch {}
-    }
-    return [];
-  }
-
   async getBlastRadiusWithFallback(
     symbolOrFile: string,
     workspaceDir: string,
@@ -137,23 +79,6 @@ export class ProviderRegistry {
       riskLevel: "low",
       summary: "No dependent references discovered.",
     };
-  }
-
-  async extractGraphContextWithFallback(
-    paths: string[],
-    workspaceDir: string,
-  ): Promise<GraphContext> {
-    const available = await this.getAvailableProviders(workspaceDir);
-    for (const provider of available) {
-      if (!provider.getCapabilities().graphContext || !provider.extractGraphContext) continue;
-      try {
-        const result = await provider.extractGraphContext(paths, workspaceDir);
-        if (result && result.nodes.length > 0) {
-          return result;
-        }
-      } catch {}
-    }
-    return { nodes: [], edges: [] };
   }
 }
 
