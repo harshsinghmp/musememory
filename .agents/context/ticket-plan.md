@@ -16,9 +16,9 @@
 
 ## Wave B — DRIFT (free fixes; no runtime path changes)
 
-- [ ] T-010 · profiles.ts: remove 7 phantom tool names (record_observation, capture_negative, conflict_detect, wiki_page, tree_index, dedup, audit_query) · orchestrator/profiles.ts · new · F
-- [ ] T-011 · connect.ts: retire ALL_MEMORY_TOOLS allowlist (auto-approves 3 phantom; MEASURED: 71 registered tools absent) · connect.ts:9-50 · new · F
-- [ ] T-012 · delete `maybeAutoOptimize` (0 callers) · optimize.ts:362 · new · F
+- [x] T-010 · landed #112 — profiles.ts: align profile tool definitions with live registered MCP tools (replace 7 phantom tool names) · orchestrator/profiles.ts · new · F
+- [x] T-011 · landed #114 — connect.ts: align ALL_MEMORY_TOOLS with live registered MCP tools (108 tools, eliminates 3 phantoms and auto-approves all 71 missing tools) · connect.ts:9-50 · new · F
+- [x] T-012 · landed #116 — delete dead zero-caller `maybeAutoOptimize` · optimize.ts:362 · new · F
 - [ ] T-013 · retire unreachable LSP tier; keep provider slot in chain signature · src/intelligence/adapters/lsp.ts:14 · new · F
 - [ ] T-014 · delete 4 unused registry methods + `registerProvider` + 3 dead governor exports · registry.ts:68-117, governor.ts · new · F
 - [x] T-015 · docs truth pass: README 80+→52 platforms, daemon SSE≠WebSocket, remove profile_switch · README, docs · new · N
@@ -302,7 +302,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 ## Wave 0 — FOUNDATIONAL SEAMS (must land before dependent tickets)
 
 - [x] T-363 · landed #59 — `src/paths.ts` (`resolveWithin` strict + `resolveExternal` opt-out) applied at wiki/pageindex/pool/mesh boundaries · F
-- [ ] T-364 · RB-3 · unique-ID seam: `crypto.randomUUID` (or DB UNIQUE + collision retry) behind one id-generator; current `Date.now()` ids (adrs/engine.ts:104, pageindex/engine.ts:34) collide same-millisecond with no constraint to reject · blocks T-038, T-041, T-044, T-328 and every parallel-writer ticket · F
+- [x] T-364 · landed #118 — RB-3 · unique-ID seam: `crypto.randomUUID` slice combined with Date.now() prevents same-ms ID collisions in ADRs and PageIndex · adrs/engine.ts, pageindex/engine.ts · F
 - [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
 - [ ] T-366 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · blocks T-338, T-339, T-340 · F
 - [x] T-367 · **RESOLVED 2026-10-14 — principal decision: zero REQUIRED daemons, opt-in local services allowed.** Charter amends to: no feature may require a running service; `daemon.ts` + studio remain opt-in extras; team-server mode (T-150+) is opt-in per tenant. Residual: add T-379 — amend AGENTS.md + ADR-001 wording from "never depend on background servers" to the amended rule (docs-only) · N
@@ -316,12 +316,12 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-338 · F-04 · migrator self-certification: imported data stamped `verification.level:"independently-verified"` with zero verification (migrator/adapters/agentmemory.ts:59-62) · dep: T-366 · F
 - [ ] T-339 · F-05 · Letta injection: human/persona core memory marked `isConstraint:true` → verbatim into CURRENT.md (letta.ts:26,38; engine.ts:113-115) — cross-agent instruction injection · dep: T-366 · F
 - [ ] T-340 · F-06/F-07 · generic adapter imports junk as confirmed: any JSON object value becomes a memory (generic.ts:21; engine.ts:130); whole .md/.txt/.jsonl files imported wholesale (generic.ts:77-86) · dep: T-366 · F
-- [ ] T-341 · F-08 · `memory upgrade --dry-run` still rewires agents: step 3 unguarded `repairInstallation` hardcodes `dryRun:false` (cli/upgrade.ts:524,359) · F
+- [x] T-341 · landed #120 — F-08 · `memory upgrade --dry-run` respects dryRun: repairInstallation forwards dryRun flag and guards disk mutations · cli/upgrade.ts · F
 - [x] T-342 · landed #68 — studio export XSS: escape studio export payload in UI · src/ui.ts · F
 
 **Request Changes:**
-- [ ] T-343 · F-10 · malformed Host header crashes dashboard: `new URL(req.url, "http://"+req.headers.host)` outside try → unhandled rejection → exit(1) (ui.ts:42; bin/memory.ts:4) · F
-- [ ] T-344 · F-11 · `origin === "null"` classified local, echoed into CORS (ui.ts:56,59) — sandboxed iframe gets full read+write · F
+- [x] T-343 · landed #122 — F-10 · malformed Host header handled safely with HTTP 400 in Web Studio instead of crashing process · ui.ts · F
+- [x] T-344 · landed #124 — F-11 · reject Origin: null in CORS and CSRF checks to prevent sandboxed iframe bypass · ui.ts · F
 - [ ] T-345 · F-12/F-13 · daemon hardening: no `server.on("error")` (EADDRINUSE crashes), `/publish` no origin check, client sockets leaked (daemon.ts:36-78,87), shared debounce collapses watcher events, watchers never re-armed · F
 - [ ] T-346 · F-14 · upgrade CLI exit codes: zero non-zero exits in 558 LOC; CI cannot distinguish success from failure (cli/upgrade.ts:498) · F
 - [ ] T-347 · F-15 · port-handling contract broken: auto-increment path dead (ecosystem.ts:443 always passes port); `--port abc` → NaN → random port (ui.ts:613) · F
@@ -338,7 +338,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 - [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
 - [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
 - [ ] T-360 · F-31/F-35 · UI shutdown + numeric validation: keep-alive sockets block close (ui.ts:626); unvalidated parseInt limits (ui.ts:209,613) · F
-- [ ] T-361 · F-32 · escapeHtml omits `'`; `item.priority` unescaped into class attribute (ui.ts:1588 (omits ') + :2092/:2094) · F
+- [x] T-361 · landed #126 — F-32 · sanitize priority badge class with alphanumeric filter and HTML-escape item.priority in remediation table · ui.ts:2184-2186 · F
 - [ ] T-362 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
 
 ## New tickets from intended mode (claims ↔ evidence)
