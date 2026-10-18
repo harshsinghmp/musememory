@@ -25,7 +25,8 @@ export function ensureUtility(entry: MemoryEntry): MemoryUtility {
  * Records that one or more memories were retrieved for an agent prompt context.
  */
 export function recordRetrievals(store: Store, memoryIds: string[]): void {
-  for (const id of memoryIds) {
+  const uniqueIds = Array.from(new Set(memoryIds));
+  for (const id of uniqueIds) {
     const entry = get(store, id);
     if (!entry) continue;
 

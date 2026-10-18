@@ -286,4 +286,44 @@ describe("mcp tool handlers logic", () => {
 
     rmSync(testDir, { recursive: true, force: true });
   });
+
+  test("T-028: recordRetrievals increments utility.retrieval_count on recall and get_context", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer, flushPendingWrites } = await import("../src/mcp.ts");
+    const { get, openStore } = await import("../src/store.ts");
+    const store = openStore(memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Call memory_recall
+    const recallRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_recall", arguments: { query: "deploy", dir: root } },
+    });
+    const recallPayload = JSON.parse(recallRes.content[0].text);
+    expect(recallPayload.results.length).toBeGreaterThan(0);
+    const retrievedId = recallPayload.results[0].id;
+
+    // Before flush, utility count is not yet committed
+    // Flush pending writes
+    flushPendingWrites();
+
+    const entryAfterRecall = get(store, retrievedId);
+    expect(entryAfterRecall?.utility?.retrieval_count).toBe(1);
+
+    // 2. Call get_context
+    await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+    });
+
+    flushPendingWrites();
+
+    const entryAfterContext = get(store, retrievedId);
+    expect(entryAfterContext?.utility?.retrieval_count).toBe(2);
+
+    cleanup(root);
+  });
 });
+
