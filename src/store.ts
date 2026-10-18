@@ -779,10 +779,10 @@ export function deriveTrustTier(source?: string, explicitTrust?: TrustTier): Tru
   if (explicitTrust) return explicitTrust;
   if (!source) return "candidate";
   const s = source.toLowerCase().trim();
-  if (["user", "human", "manual", "direct", "owner", "admin", "principal"].includes(s)) {
+  if (["t1", "trusted", "user", "human", "manual", "direct", "owner", "admin", "principal"].includes(s)) {
     return "trusted";
   }
-  if (["web", "external", "third-party", "unknown", "scrape", "url", "crawler"].includes(s)) {
+  if (["t4", "untrusted", "web", "external", "third-party", "unknown", "scrape", "url", "crawler"].includes(s)) {
     return "untrusted";
   }
   return "candidate";

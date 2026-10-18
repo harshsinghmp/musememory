@@ -247,7 +247,7 @@ export interface MemoryEntry {
   confidence?: number;
 }
 
-export type TrustTier = "trusted" | "candidate" | "untrusted";
+export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";
 
 export type OutboxStatus = "pending" | "processing" | "sent" | "held" | "failed";
 
