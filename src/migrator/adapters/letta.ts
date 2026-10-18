@@ -14,6 +14,7 @@ export const LettaAdapter: ProviderAdapter = {
         // Letta Core Memory blocks: human and persona
         if (parsed.memory || parsed.core_memory) {
           const core = parsed.memory || parsed.core_memory;
+          // F-05 / T-339: Do not flag human/persona core memories as constraints to prevent cross-agent CURRENT.md injection
           if (core.human) {
             results.push({
               title: "Letta Core Memory: Human Profile",
@@ -23,7 +24,7 @@ export const LettaAdapter: ProviderAdapter = {
               type: "preference",
               tags: ["letta", "core-memory", "human"],
               source: `migrated:letta:${filename}`,
-              isConstraint: true,
+              isConstraint: false,
             });
           }
           if (core.persona) {
@@ -35,7 +36,7 @@ export const LettaAdapter: ProviderAdapter = {
               type: "architecture",
               tags: ["letta", "core-memory", "persona"],
               source: `migrated:letta:${filename}`,
-              isConstraint: true,
+              isConstraint: false,
             });
           }
         }
