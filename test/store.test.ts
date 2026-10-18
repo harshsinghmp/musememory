@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import {
@@ -19,6 +19,7 @@ import {
   deleteEntry,
   checkFtsParity,
   repairFtsIndex,
+  resetStoreDirtyState,
 } from "../src/store.ts";
 import { searchMemoriesFts } from "../src/sqlite.ts";
 import { getCurrent } from "../src/current.ts";
@@ -315,5 +316,37 @@ describe("store graph", () => {
     expect(checkFtsParity(store).orphanedCount).toBe(0);
 
     cleanup(root);
+  });
+
+  test("T-023: openStore dirty-gate skips redundant syncConstraints and autoCompileWiki", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    resetStoreDirtyState();
+
+    // 1. Initial open runs sync and wiki compilation
+    const store1 = openStore(memoryDir);
+    const currentMdPath = join(memoryDir, "CURRENT.md");
+    expect(existsSync(currentMdPath)).toBe(true);
+    const mtime1 = statSync(currentMdPath).mtimeMs;
+
+    // Small delay to ensure any potential mtime change would be detectable
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 2. Second open with clean store skips re-writing CURRENT.md
+    const store2 = openStore(memoryDir);
+    const mtime2 = statSync(currentMdPath).mtimeMs;
+    expect(mtime2).toBe(mtime1);
+
+    // 3. openStore with skipSyncConstraints and skipAutoWiki options
+    const { root: root2, memoryDir: memDir2 } = setupFixtureRoot();
+    resetStoreDirtyState(memDir2);
+    const storeOpt = openStore(memDir2, {
+      skipSyncConstraints: true,
+      skipAutoWiki: true,
+    });
+    // With skipSyncConstraints on fresh dir, CURRENT.md should not be written
+    expect(existsSync(join(memDir2, "CURRENT.md"))).toBe(false);
+
+    cleanup(root);
+    cleanup(root2);
   });
 });

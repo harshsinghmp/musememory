@@ -114,7 +114,12 @@ export function getStorageLayout(memoryDir: string, options?: StorageLayoutOptio
   };
 }
 
-export interface StoreOptions extends StorageLayoutOptions {}
+export interface StoreOptions extends StorageLayoutOptions {
+  /** T-023: Skip syncing working constraints on open (e.g. read-only operations). */
+  skipSyncConstraints?: boolean;
+  /** T-023: Skip automatic wiki re-compilation on open. */
+  skipAutoWiki?: boolean;
+}
 
 export interface Store {
   dir: string;
@@ -236,6 +241,47 @@ function dbWriteGeneration(db: SqliteDatabase | undefined): number | undefined {
   }
 }
 
+function getStoreMemoriesFingerprint(store: Store): string {
+  if (store.db) {
+    try {
+      const row = store.db.query<{ count: number; max_up: string }>(
+        `SELECT count(*) AS count, coalesce(max(updated_at), '') AS max_up FROM memories`
+      ).get();
+      if (row) return `${row.count}:${row.max_up}`;
+    } catch {}
+  }
+  if (existsSync(store.dir)) {
+    try {
+      return `dir:${statSync(store.dir).mtimeMs}`;
+    } catch {}
+  }
+  return "none";
+}
+
+interface StoreDirtyState {
+  lastWikiFingerprint?: string;
+  lastConstraintsFingerprint?: string;
+  lastConstraintsMtimeMs?: number;
+}
+
+const storeDirtyStateRegistry = new Map<string, StoreDirtyState>();
+
+/**
+ * Resets the in-process dirty gate state for a memory directory (or all directories).
+ * Useful for test isolation or forced recompilation.
+ */
+export function resetStoreDirtyState(memoryDir?: string): void {
+  if (memoryDir) {
+    for (const key of storeDirtyStateRegistry.keys()) {
+      if (key === memoryDir || key.startsWith(memoryDir)) {
+        storeDirtyStateRegistry.delete(key);
+      }
+    }
+  } else {
+    storeDirtyStateRegistry.clear();
+  }
+}
+
 /**
  * Open the memories directory & SQLite primary database for a memory dir, creating it if missing.
  * T-153: Supports multi-DB topologies (e.g. options.tenantId, options.isTeam, options.dbName).
@@ -303,12 +349,46 @@ export function openStore(memoryDir: string, options?: StoreOptions): Store {
     } catch {}
   }
 
-  try {
-    syncConstraints(memoryDir, store);
-  } catch {}
-  try {
-    autoCompileWiki(store, memoryDir);
-  } catch {}
+  // T-023: Dirty-gated constraint synchronization and wiki compilation
+  const dirtyKey = layout.dbPath || memoryDir;
+  let dirtyState = storeDirtyStateRegistry.get(dirtyKey);
+  if (!dirtyState) {
+    dirtyState = {};
+    storeDirtyStateRegistry.set(dirtyKey, dirtyState);
+  }
+
+  const currentFingerprint = getStoreMemoriesFingerprint(store);
+
+  if (!options?.skipSyncConstraints) {
+    const currentMdPath = join(memoryDir, "CURRENT.md");
+    const currentMtime = existsSync(currentMdPath) ? statSync(currentMdPath).mtimeMs : 0;
+    const isConstraintsClean =
+      dirtyState.lastConstraintsFingerprint !== undefined &&
+      dirtyState.lastConstraintsFingerprint === currentFingerprint &&
+      dirtyState.lastConstraintsMtimeMs === currentMtime;
+
+    if (!isConstraintsClean) {
+      try {
+        syncConstraints(memoryDir, store);
+        dirtyState.lastConstraintsFingerprint = getStoreMemoriesFingerprint(store);
+        dirtyState.lastConstraintsMtimeMs = existsSync(currentMdPath) ? statSync(currentMdPath).mtimeMs : 0;
+      } catch {}
+    }
+  }
+
+  if (!options?.skipAutoWiki) {
+    const isWikiClean =
+      dirtyState.lastWikiFingerprint !== undefined &&
+      dirtyState.lastWikiFingerprint === currentFingerprint;
+
+    if (!isWikiClean) {
+      try {
+        autoCompileWiki(store, memoryDir);
+        dirtyState.lastWikiFingerprint = getStoreMemoriesFingerprint(store);
+      } catch {}
+    }
+  }
+
   return store;
 }
 
