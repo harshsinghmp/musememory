@@ -1,16 +1,26 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.4.0`  
-> **Status**: Feature Release (Invalidation, Attribution & Ranking Rigor, Retrieval Performance & Store Hot-Paths, Read-Path Purity)
+> **Version**: `v2.5.0`  
+> **Status**: Feature Release (Expiry, Decay & Confidence Hardening, Abstention & Bayesian Corroboration, Trust-Tier Half-Lives, Expiry Policy YAML)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 14 Focus)
-- **Wave 15: Expiry, Decay & Confidence Hardening**: `T-072` (FTS5-tokenizer-matched abstention gate), `T-073` (`no_confident_match` result mode), `T-074` (materialized `decay_score` column), `T-076` (Bayesian confidence corroboration), `T-077` (trust-tier-keyed half-life), `T-078`–`T-081` (per-type expiry & decay policies).
+## ⏭️ Next Up (Post-Wave 15 Focus)
+- **Wave 16: Temporal Transitions, Contradiction Engine & Verbs**: `T-082` (`valid_to_exact` flag on transitions), `T-083` (`as_of` queries returning `{results, undetermined}`), `T-084` (five-verb lifecycle: change/end/correct/revert/forget), `T-085` (`searchTemporal(atTime)` default-excluding superseded), `T-086` (keep-both conflicts table).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 15: Expiry, Decay & Confidence Hardening**:
+  - `T-072`: Tokenizer-matched abstention gate (`evaluateAbstentionGate`) matching FTS5 Unicode61 boundary rules (PR #200, Closes #199)
+  - `T-073`: `no_confident_match` result mode across `queryContext`, `formatPromptContext`, and MCP `get_context`/`search` (PR #202, Closes #201)
+  - `T-074`: Materialized `decay_score` in SQLite memories table with importance-gated half-life scaling (0.4x to 3.0x) (PR #204, Closes #203)
+  - `T-076`: Bayesian corroboration confidence $C(n) = 1 - 0.7^n$ scaling from initial observation to asymptotic certainty (PR #206, Closes #205)
+  - `T-077`: Trust-tier-keyed half-life (T1 365d → T4 30d) defending against OWASP ASI06 memory poisoning (PR #208, Closes #207)
+  - `T-078`: Per-type admission `expires_at` defaults (fix 90d, op 180d, arch 365d, disc 30d, pref/constraint null) with pin exemptions (PR #210, Closes #209)
+  - `T-079`: Stamped `status: 'expired'`, `expired_at` timestamp, and `expired_by` rule tracking with pin-protected sweeps (PR #212, Closes #211)
+  - `T-080`: Pin-capable first-match-wins declarative expiry policy YAML engine (`.memory/expiry.yaml`) in store admission and sweeps (PR #214, Closes #213)
+  - `T-081`: Optional Weibull per-type decay curves $R(t) = \exp(-(t/\lambda)^k)$ preserving $R(t_{1/2}) = 0.5$ invariant across all shape $k$ values (PR #216, Closes #215)
 - [x] **Wave 14: Invalidation, Attribution & Ranking Rigor**:
   - `T-302`: `memory_capture` full propose options passthrough (evidence, source, verification, dedup, valid_from/to, due_at, expires_at, salience, trust, mem_path, idempotency_key, source_ids) (PR #188, Closes #187)
   - `T-304`: Incremental vector index synchronization on `save()` (`upsertIndexEntry`) and `deleteEntry()` (`removeIndexEntry`) (PR #190, Closes #189)

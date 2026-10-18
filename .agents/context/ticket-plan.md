@@ -76,16 +76,16 @@
 ### Abstention + decay
 - [x] T-070 · landed Wave 3 — IDF-weighted relevance gate before FTS5 (0.3 threshold, identifier-decisive, greeting short-circuit) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [x] T-071 · landed Wave 6 — dual calibrated thresholds (cosine max + BM25 min, engine-pinned constants) · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
-- [ ] T-072 · FTS5-tokenizer-matched abstention gate · retrieval · new · U
-- [ ] T-073 · `no_confident_match` result mode · retrieval, mcp · new · U
-- [ ] T-074 · materialized `decay_score` column, importance-gated half-lives · schema, retrieval · new · U
+- [x] T-072 · landed Wave 15 — FTS5-tokenizer-matched abstention gate · retrieval · PR #200 (Issue #199) · U
+- [x] T-073 · landed Wave 15 — `no_confident_match` result mode · retrieval, mcp · PR #202 (Issue #201) · U
+- [x] T-074 · landed Wave 15 — materialized `decay_score` column, importance-gated half-lives · schema, retrieval · PR #204 (Issue #203) · U
 - [x] T-075 · landed Wave 2 — veracity tiers & ingest trust tiers (trusted/candidate/untrusted) · schema, store, retrieval · branch: feat/wave-2-trust-gates · U
-- [ ] T-076 · Bayesian confidence `1-0.7^n` per corroboration · quality · new · U
-- [ ] T-077 · trust-tier-keyed half-life (T1 365d → T4 30d) · quality · branch: poisoning-trust-tiers · U
-- [ ] T-078 · per-type `expires_at` (fix 90d/operation 180d/architecture 365d/discovery 30d) · types, store · new · U
-- [ ] T-079 · stamped expiry status/expired_at/expired_by rule name · store · new · U
-- [ ] T-080 · pin-capable first-match-wins expiry policy YAML · store · new · U
-- [ ] T-081 · optional Weibull per-type decay curves (re-derived, not ported) · quality · new · U
+- [x] T-076 · landed Wave 15 — Bayesian confidence `1-0.7^n` per corroboration · quality · PR #206 (Issue #205) · U
+- [x] T-077 · landed Wave 15 — trust-tier-keyed half-life (T1 365d → T4 30d) · quality · PR #208 (Issue #207) · U
+- [x] T-078 · landed Wave 15 — per-type `expires_at` (fix 90d/operation 180d/architecture 365d/discovery 30d) · types, store · PR #210 (Issue #209) · U
+- [x] T-079 · landed Wave 15 — stamped expiry status/expired_at/expired_by rule name · store · PR #212 (Issue #211) · U
+- [x] T-080 · landed Wave 15 — pin-capable first-match-wins expiry policy YAML · store · PR #214 (Issue #213) · U
+- [x] T-081 · landed Wave 15 — optional Weibull per-type decay curves (re-derived, not ported) · quality · PR #216 (Issue #215) · U
 
 ### Temporal + contradiction + trust
 - [ ] T-082 · `valid_to_exact` flag on transitions · schema, store · new · U
