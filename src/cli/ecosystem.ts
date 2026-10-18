@@ -517,8 +517,19 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
     }, 100);
   }
 
-  await new Promise<void>(() => {});
-  return 0;
+  return new Promise<number>((resolve) => {
+    const shutdown = () => {
+      process.off("SIGINT", shutdown);
+      process.off("SIGTERM", shutdown);
+      console.log("\nStopping Web Observability Studio...");
+      try {
+        srv.close();
+      } catch {}
+      resolve(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  });
 }
 
 export async function handleGraphCommand({ positional, flags }: ParsedArgs): Promise<number> {
@@ -575,8 +586,18 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
     if (bearerToken || bearerTokens) {
       console.log(`[Auth] Bearer authentication active (${allowedPeers ? `${allowedPeers.length} allowed peers` : "allowlist open"})`);
     }
-    return new Promise<number>(() => {
-      // Run until process terminates
+    return new Promise<number>((resolve) => {
+      const shutdown = async () => {
+        process.off("SIGINT", shutdown);
+        process.off("SIGTERM", shutdown);
+        console.log("\nStopping MCP HTTP server...");
+        try {
+          await handle.close();
+        } catch {}
+        resolve(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
     });
   }
   const { runMcpServer } = await import("../mcp.ts");
@@ -587,12 +608,37 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
 export async function handleDaemonCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const port = flags["port"] ? parseInt(flags["port"], 10) : 7878;
+  let port: number = 7878;
+  if (flags["port"]) {
+    const parsed = parseInt(flags["port"], 10);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+      console.error(`Error: Invalid port "${flags["port"]}". Port must be an integer between 0 and 65535.`);
+      return 1;
+    }
+    port = parsed;
+  }
   const { startHub } = await import("../daemon.ts");
-  const hub = await startHub(port, ctx.memoryDir);
+  let hub;
+  try {
+    hub = await startHub(port, ctx.memoryDir);
+  } catch (err: any) {
+    console.error(`Error starting agency hub on port ${port}: ${err.message || err}`);
+    return 1;
+  }
   console.log(`Agency hub listening on ${hub.url}`);
-  return new Promise<number>(() => {
-    // Run until terminated; SIGINT/SIGTERM default handling tears down the server.
+  console.log(`Press Ctrl+C to stop.`);
+  return new Promise<number>((resolve) => {
+    const shutdown = async () => {
+      process.off("SIGINT", shutdown);
+      process.off("SIGTERM", shutdown);
+      console.log("\nShutting down agency hub...");
+      try {
+        await hub.close();
+      } catch {}
+      resolve(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
   });
 }
 

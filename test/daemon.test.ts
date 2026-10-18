@@ -215,4 +215,52 @@ describe("real-time agency hub (SSE)", () => {
     expect(socketClosed).toBe(true);
     cleanup(root);
   });
+
+  test("T-358: handleDaemonCommand rejects invalid port and catches startup errors", async () => {
+    const { handleDaemonCommand } = await import("../src/cli/ecosystem.ts");
+    const root = makeTempRoot();
+
+    // Invalid port -> returns 1
+    const invalidCode = await handleDaemonCommand({
+      positional: [],
+      flags: { path: root, port: "invalid_port" },
+    });
+    expect(invalidCode).toBe(1);
+
+    const outOfRangeCode = await handleDaemonCommand({
+      positional: [],
+      flags: { path: root, port: "99999" },
+    });
+    expect(outOfRangeCode).toBe(1);
+
+    // Occupy an ephemeral port
+    const hub = await startHub(0);
+    const collisionCode = await handleDaemonCommand({
+      positional: [],
+      flags: { path: root, port: String(hub.port) },
+    });
+    expect(collisionCode).toBe(1);
+
+    await hub.close();
+    cleanup(root);
+  });
+
+  test("T-358: handleDaemonCommand gracefully shuts down on SIGINT", async () => {
+    const { handleDaemonCommand } = await import("../src/cli/ecosystem.ts");
+    const root = makeTempRoot();
+
+    const cmdPromise = handleDaemonCommand({
+      positional: [],
+      flags: { path: root, port: "0" },
+    });
+
+    // Wait a brief tick for the server to start, then trigger SIGINT
+    await new Promise((r) => setTimeout(r, 50));
+    process.emit("SIGINT");
+
+    const exitCode = await cmdPromise;
+    expect(exitCode).toBe(0);
+
+    cleanup(root);
+  });
 });
