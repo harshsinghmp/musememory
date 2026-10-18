@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore, list } from "../src/store.ts";
-import { validateMigratedRecord, normalizeMemoryStatus } from "../src/migrator/types.ts";
+import { validateMigratedRecord, normalizeMemoryStatus, normalizeMemoryType } from "../src/migrator/types.ts";
 import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { GenericAdapter } from "../src/migrator/adapters/generic.ts";
 import { runMigration, detectProviders } from "../src/migrator/index.ts";
@@ -321,5 +321,27 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     expect(superseded?.status).toBe("superseded");
 
     rmSync(root, { recursive: true, force: true });
+  });
+
+  test("T-362: normalizeMemoryType does not misclassify loop, topic, propose, or option as operation", () => {
+    // 1. Terms containing substring 'op' must NOT be misclassified as operation
+    expect(normalizeMemoryType("loop")).toBe("discovery");
+    expect(normalizeMemoryType("open_loop")).toBe("discovery");
+    expect(normalizeMemoryType("topic")).toBe("discovery");
+    expect(normalizeMemoryType("propose")).toBe("discovery");
+    expect(normalizeMemoryType("option")).toBe("discovery");
+    expect(normalizeMemoryType("scope")).toBe("discovery");
+    expect(normalizeMemoryType("opinion")).toBe("discovery");
+
+    // 2. Legitimate operation terms must be classified as operation
+    expect(normalizeMemoryType("operation")).toBe("operation");
+    expect(normalizeMemoryType("operations")).toBe("operation");
+    expect(normalizeMemoryType("ops")).toBe("operation");
+    expect(normalizeMemoryType("op_procedure")).toBe("operation");
+    expect(normalizeMemoryType("task")).toBe("operation");
+    expect(normalizeMemoryType("procedure")).toBe("operation");
+    expect(normalizeMemoryType("skill")).toBe("operation");
+    expect(normalizeMemoryType("runbook")).toBe("operation");
+    expect(normalizeMemoryType("playbook")).toBe("operation");
   });
 });
