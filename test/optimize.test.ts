@@ -192,4 +192,32 @@ describe("Autonomous Memory Optimizer & Auto-Cadence Governor", () => {
 
     cleanup(root);
   });
+
+  test("T-029: save() touches activity metadata", async () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    // Initial state
+    const metaBefore = readOptimizationMetadata(memoryDir);
+    const beforeTime = Date.parse(metaBefore.last_activity_at);
+
+    // Wait a brief moment to ensure timestamp change
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Propose / save a memory
+    propose(store, {
+      title: "Test Activity Touch",
+      content: "Testing that store writes touch optimization activity.",
+      project: "test",
+      type: "decision",
+    });
+
+    const metaAfter = readOptimizationMetadata(memoryDir);
+    const afterTime = Date.parse(metaAfter.last_activity_at);
+    expect(afterTime).toBeGreaterThanOrEqual(beforeTime);
+
+    cleanup(root);
+  });
 });
+
