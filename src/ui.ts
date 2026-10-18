@@ -95,7 +95,15 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     let currentPort = opts.port ?? 2222;
 
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-      const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+      let url: URL;
+      try {
+        url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+      } catch {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "text/plain");
+        res.end("Bad Request: Invalid URL or Host header");
+        return;
+      }
       const pathname = url.pathname;
 
       // Security Headers
