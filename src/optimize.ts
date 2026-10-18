@@ -356,19 +356,3 @@ export function optimizeStore(store: Store, options: OptimizeOptions = {}): Opti
 
   return report;
 }
-
-/**
- * Pre-flight hook: automatically runs optimization if cadence thresholds are met.
- * Can be safely called on CLI commands or session initializations with negligible overhead.
- */
-export function maybeAutoOptimize(store: Store, memoryDir?: string): OptimizeReport | null {
-  const dir = memoryDir || store.memoryDir || ".memory";
-  const check = shouldAutoOptimize(dir);
-  if (!check.shouldRun) return null;
-
-  try {
-    return optimizeStore(store, { memoryDir: dir, force: true });
-  } catch {
-    return null;
-  }
-}
