@@ -77,6 +77,25 @@ export function normalizeMemoryType(raw?: string): MemoryType {
   return "discovery";
 }
 
+const VALID_MEMORY_STATUSES: Set<MemoryStatus> = new Set([
+  "candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted", "cold", "dormant", "archived"
+]);
+
+/**
+ * Normalizes raw status strings into valid MemoryStatus members.
+ */
+export function normalizeMemoryStatus(raw?: string, isArchived?: boolean): MemoryStatus {
+  if (isArchived) return "superseded";
+  if (!raw) return "candidate";
+  const s = raw.toLowerCase().trim();
+  if (s === "archived" || s === "superseded" || s === "closed" || s === "deprecated") return "superseded";
+  if (s === "stale") return "stale";
+  if (s === "confirmed" || s === "active") return "confirmed";
+  if (s === "candidate" || s === "draft" || s === "proposed" || s === "open") return "candidate";
+  if (VALID_MEMORY_STATUSES.has(s as MemoryStatus)) return s as MemoryStatus;
+  return "candidate";
+}
+
 /**
  * Validates and sanitizes an intake record from an external migration source.
  * Enforces schema integrity, valid string types, non-empty content, and
@@ -95,12 +114,7 @@ export function validateMigratedRecord(raw: unknown): MigratedRecord | null {
   }
   if (!title) return null;
 
-  const validStatuses: Set<string> = new Set([
-    "candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted", "cold", "dormant", "archived"
-  ]);
-  const status: MemoryStatus = typeof item.status === "string" && validStatuses.has(item.status)
-    ? (item.status as MemoryStatus)
-    : "candidate";
+  const status: MemoryStatus = normalizeMemoryStatus(item.status);
 
   const type = normalizeMemoryType(typeof item.type === "string" ? item.type : undefined);
 

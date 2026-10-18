@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore, list } from "../src/store.ts";
-import { validateMigratedRecord } from "../src/migrator/types.ts";
+import { validateMigratedRecord, normalizeMemoryStatus } from "../src/migrator/types.ts";
 import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { GenericAdapter } from "../src/migrator/adapters/generic.ts";
 import { runMigration, detectProviders } from "../src/migrator/index.ts";
@@ -260,6 +260,65 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     expect(realReport.totalMigrated).toBe(1);
     expect(realReport.totalDeduplicated).toBe(2);
     expect(realReport.providers[0].deduplicatedCount).toBe(2);
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("T-357: normalizeMemoryStatus normalizes statuses safely and agentmemory defaults to candidate when isLatest omitted", () => {
+    // 1. normalizeMemoryStatus behavior
+    expect(normalizeMemoryStatus("CLOSED")).toBe("superseded");
+    expect(normalizeMemoryStatus("archived")).toBe("superseded");
+    expect(normalizeMemoryStatus("deprecated")).toBe("superseded");
+    expect(normalizeMemoryStatus("stale")).toBe("stale");
+    expect(normalizeMemoryStatus("DRAFT")).toBe("candidate");
+    expect(normalizeMemoryStatus("proposed")).toBe("candidate");
+    expect(normalizeMemoryStatus("open")).toBe("candidate");
+    expect(normalizeMemoryStatus("CONFIRMED")).toBe("confirmed");
+    expect(normalizeMemoryStatus("ACTIVE")).toBe("confirmed");
+    expect(normalizeMemoryStatus("unknown-status-val")).toBe("candidate");
+    expect(normalizeMemoryStatus(undefined)).toBe("candidate");
+    expect(normalizeMemoryStatus("active", true)).toBe("superseded"); // isArchived overrides
+
+    // 2. AgentMemoryAdapter defaults to candidate when isLatest is omitted
+    const root = temp();
+    const jsonPath = join(root, "standalone.json");
+    writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        "mem:memories": {
+          "m_1": {
+            id: "mem_1",
+            title: "Omitted isLatest",
+            content: "Content with isLatest omitted",
+          },
+          "m_2": {
+            id: "mem_2",
+            title: "Explicit isLatest true",
+            content: "Content with isLatest true",
+            isLatest: true,
+          },
+          "m_3": {
+            id: "mem_3",
+            title: "Explicit isLatest false",
+            content: "Content with isLatest false",
+            isLatest: false,
+          },
+        },
+      }),
+      "utf8"
+    );
+
+    const records = AgentMemoryAdapter.extract(jsonPath);
+    expect(records.length).toBe(3);
+
+    const omitted = records.find((r) => r.title === "Omitted isLatest");
+    expect(omitted?.status).toBe("candidate");
+
+    const confirmed = records.find((r) => r.title === "Explicit isLatest true");
+    expect(confirmed?.status).toBe("confirmed");
+
+    const superseded = records.find((r) => r.title === "Explicit isLatest false");
+    expect(superseded?.status).toBe("superseded");
 
     rmSync(root, { recursive: true, force: true });
   });
