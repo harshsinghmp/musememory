@@ -83,6 +83,34 @@ export const VERIFICATION_STABILITY: Record<string, number> = {
 };
 
 /**
+ * T-077: Trust tier base half-lives (T1 365d → T4 30d).
+ * Keyed by trust tier / provenance:
+ * - T1 / trusted: 365 days (human / owner / principal / manual)
+ * - T2 / verified: 180 days (corroborated candidate)
+ * - T3 / candidate: 90 days (default agent / transcript)
+ * - T4 / untrusted: 30 days (external / web / scraper)
+ */
+export const TRUST_TIER_HALF_LIVES: Record<string, number> = {
+  "T1": 365,
+  "trusted": 365,
+  "T2": 180,
+  "verified": 180,
+  "T3": 90,
+  "candidate": 90,
+  "T4": 30,
+  "untrusted": 30,
+};
+
+export function trustTierHalfLife(tier?: string): number | undefined {
+  if (!tier) return undefined;
+  return (
+    TRUST_TIER_HALF_LIVES[tier] ??
+    TRUST_TIER_HALF_LIVES[tier.toLowerCase()] ??
+    TRUST_TIER_HALF_LIVES[tier.toUpperCase()]
+  );
+}
+
+/**
  * Compute the effective half-life in days for a memory entry.
  * Combines base half-life (A15, A18) with access-frequency extension and
  * verification/reinforcement boosts.
@@ -95,6 +123,8 @@ export function computeHalfLife(
     reinforcement?: number;
     salience?: number;
     importance?: number;
+    trust?: string;
+    trustTier?: string;
   },
 ): number | null {
   const base = defaultHalfLifeDays(type);
@@ -107,7 +137,18 @@ export function computeHalfLife(
   // Each access adds sqrt(accessCount) * 5 days, capped at 30 extra days.
   const accessExtension = Math.min(30, Math.sqrt(opts.accessCount) * 5);
 
-  const baseEffective = base * verifyMult + reinfBoost + accessExtension;
+  // T-077: Trust-tier-keyed half-life multiplier (T1 365d -> T4 30d).
+  // Relative to T3 / candidate baseline (90 days):
+  // - T1 / trusted (365d) => 365 / 90 (~4.055x)
+  // - T2 / verified (180d) => 180 / 90 (2.0x)
+  // - T3 / candidate (90d) => 90 / 90 (1.0x)
+  // - T4 / untrusted (30d) => 30 / 90 (0.333x)
+  const tier = opts.trust ?? opts.trustTier;
+  const tierHalfLife = trustTierHalfLife(tier);
+  const trustMultiplier =
+    tierHalfLife !== undefined ? tierHalfLife / DEFAULT_HALF_LIFE_DAYS : 1.0;
+
+  const baseEffective = (base * trustMultiplier) * verifyMult + reinfBoost + accessExtension;
 
   // T-074: Importance-gated half-life multiplier.
   // Salience / importance ranges from 0.0 to 1.0.
@@ -141,6 +182,8 @@ export function computeDecayScore(
     access_count?: number | null;
     salience?: number;
     temporal_mode?: string;
+    trust?: string;
+    trust_tier?: string;
   },
   now: number = Date.now(),
 ): number {
@@ -153,6 +196,7 @@ export function computeDecayScore(
     verificationLevel: entry.verification?.level,
     reinforcement: entry.reinforcement,
     salience: entry.salience,
+    trust: entry.trust ?? entry.trust_tier,
   });
 
   if (halfLife === null) return 1.0; // never decays
@@ -185,6 +229,8 @@ export function computeStaleness(
     reinforcement?: number;
     access_count?: number | null;
     salience?: number;
+    trust?: string;
+    trust_tier?: string;
   },
   now: number = Date.now(),
 ): number {
@@ -193,6 +239,7 @@ export function computeStaleness(
     verificationLevel: entry.verification?.level,
     reinforcement: entry.reinforcement,
     salience: entry.salience,
+    trust: entry.trust ?? entry.trust_tier,
   });
 
   if (halfLife === null) return 0; // never decays
@@ -221,6 +268,8 @@ export function isStale(
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
+    trust?: string;
+    trust_tier?: string;
   },
   now: number = Date.now(),
   threshold: number = DEFAULT_STALENESS_THRESHOLD,
@@ -241,6 +290,9 @@ export function stalenessDaysRemaining(
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
+    salience?: number;
+    trust?: string;
+    trust_tier?: string;
   },
   now: number = Date.now(),
   threshold: number = DEFAULT_STALENESS_THRESHOLD,
@@ -249,6 +301,8 @@ export function stalenessDaysRemaining(
     accessCount: entry.access_count ?? 0,
     verificationLevel: entry.verification?.level,
     reinforcement: entry.reinforcement,
+    salience: entry.salience,
+    trust: entry.trust ?? entry.trust_tier,
   });
 
   if (halfLife === null) return Infinity;
