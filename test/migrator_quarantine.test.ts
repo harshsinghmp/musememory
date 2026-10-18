@@ -6,7 +6,8 @@ import { openStore, list } from "../src/store.ts";
 import { validateMigratedRecord } from "../src/migrator/types.ts";
 import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { GenericAdapter } from "../src/migrator/adapters/generic.ts";
-import { runMigration } from "../src/migrator/index.ts";
+import { runMigration, detectProviders } from "../src/migrator/index.ts";
+import { expandPath } from "../src/migrator/detect.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "migrator-quarantine-test-"));
@@ -189,6 +190,28 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     expect(largeRecords.length).toBe(1);
     expect(largeRecords[0].content.length).toBeLessThanOrEqual(10050);
     expect(largeRecords[0].content).toContain("[TRUNCATED_DOC_MIGRATION]");
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("T-348: detectProviders ignores empty directories and runMigration marks missing as skipped", async () => {
+    const root = temp();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    // 1. Create empty .beads directory
+    const emptyBeads = join(root, ".beads");
+    mkdirSync(emptyBeads, { recursive: true });
+
+    // Empty directory must NOT trigger detection
+    const detected = detectProviders(root);
+    const beads = detected.find((d) => d.id === "beads");
+    expect(beads?.detected).toBe(false);
+
+    // 2. Running migration on provider without existing files must mark it as skipped
+    const report = await runMigration(store, memoryDir, { provider: "beads" });
+    expect(report.providers.length).toBe(1);
+    expect(report.providers[0].status).toBe("skipped");
 
     rmSync(root, { recursive: true, force: true });
   });

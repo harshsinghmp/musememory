@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { DetectedProvider } from "./types.ts";
@@ -373,7 +373,7 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
   }
 ];
 
-function expandPath(p: string, baseDir: string): string {
+export function expandPath(p: string, baseDir: string): string {
   if (p.startsWith("~/") || p === "~") {
     return join(homedir(), p.slice(1));
   }
@@ -392,7 +392,12 @@ export function detectProviders(baseDir: string = process.cwd()): DetectedProvid
       .map((p) => expandPath(p, baseDir))
       .filter((p) => {
         try {
-          return existsSync(p);
+          if (!existsSync(p)) return false;
+          const s = statSync(p);
+          if (s.isDirectory()) {
+            return readdirSync(p).length > 0;
+          }
+          return s.size > 0;
         } catch {
           return false;
         }

@@ -1,6 +1,7 @@
+import { existsSync, statSync, readdirSync } from "node:fs";
 import type { Store } from "../store.ts";
 import { propose, list, markStale, markSuperseded, addConstraint } from "../store.ts";
-import { detectProviders } from "./detect.ts";
+import { detectProviders, expandPath } from "./detect.ts";
 import { AgentMemoryAdapter } from "./adapters/agentmemory.ts";
 import { BeadsAdapter } from "./adapters/beads.ts";
 import { LettaAdapter } from "./adapters/letta.ts";
@@ -54,7 +55,19 @@ export async function runMigration(
   const existingTitles = new Set(existingMemories.map((m) => m.title.trim().toLowerCase()));
 
   for (const provider of targetProviders) {
-    const pathsToProcess = provider.resolvedPaths.length > 0 ? provider.resolvedPaths : provider.paths;
+    const pathsToProcess = provider.resolvedPaths.length > 0
+      ? provider.resolvedPaths
+      : provider.paths
+          .map((p) => expandPath(p, workspaceRoot))
+          .filter((p) => {
+            try {
+              if (!existsSync(p)) return false;
+              const s = statSync(p);
+              return s.isDirectory() ? readdirSync(p).length > 0 : s.size > 0;
+            } catch {
+              return false;
+            }
+          });
     const adapter = getAdapter(provider.id);
 
     const providerReport: MigrationProviderReport = {
