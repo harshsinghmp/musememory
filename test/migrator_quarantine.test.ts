@@ -123,12 +123,72 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
 
     const docDir = join(root, "docs");
     mkdirSync(docDir, { recursive: true });
-    writeFileSync(join(docDir, "readme.txt"), "External plain text imported doc", "utf8");
+    writeFileSync(join(docDir, "readme.txt"), "External plain text imported doc with enough characters", "utf8");
 
     // Run migration using generic fallback on custom path
     const recs = GenericAdapter.extract(join(docDir, "readme.txt"));
     expect(recs.length).toBe(1);
     expect(recs[0].status).toBe("candidate");
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("T-340: GenericAdapter ignores package.json and arbitrary JSON config objects", () => {
+    const root = temp();
+
+    // 1. package.json must be completely ignored
+    const pkgPath = join(root, "package.json");
+    writeFileSync(
+      pkgPath,
+      JSON.stringify({
+        name: "my-package",
+        version: "1.0.0",
+        description: "A library",
+        scripts: { build: "tsc", test: "bun test" },
+      }),
+      "utf8"
+    );
+    const pkgRecords = GenericAdapter.extract(pkgPath);
+    expect(pkgRecords.length).toBe(0);
+
+    // 2. Arbitrary JSON config without memory fields must NOT convert Object.values to memories
+    const configPath = join(root, "random_settings.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        theme: "dark",
+        fontSize: 14,
+        telemetry: false,
+        port: 8080,
+      }),
+      "utf8"
+    );
+    const configRecords = GenericAdapter.extract(configPath);
+    expect(configRecords.length).toBe(0);
+
+    // 3. Single memory object with content is accepted
+    const singleMemPath = join(root, "single_memory.json");
+    writeFileSync(
+      singleMemPath,
+      JSON.stringify({
+        title: "Architecture Design Note",
+        content: "Using SQLite WAL mode with 64KB page size for persistent local storage.",
+      }),
+      "utf8"
+    );
+    const singleRecords = GenericAdapter.extract(singleMemPath);
+    expect(singleRecords.length).toBe(1);
+    expect(singleRecords[0].title).toBe("Architecture Design Note");
+    expect(singleRecords[0].status).toBe("candidate");
+
+    // 4. Oversized text file is capped at 10000 chars
+    const largeDocPath = join(root, "big_doc.txt");
+    const largeContent = "A".repeat(15000);
+    writeFileSync(largeDocPath, largeContent, "utf8");
+    const largeRecords = GenericAdapter.extract(largeDocPath);
+    expect(largeRecords.length).toBe(1);
+    expect(largeRecords[0].content.length).toBeLessThanOrEqual(10050);
+    expect(largeRecords[0].content).toContain("[TRUNCATED_DOC_MIGRATION]");
 
     rmSync(root, { recursive: true, force: true });
   });
