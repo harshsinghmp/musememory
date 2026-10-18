@@ -31,6 +31,7 @@
     "expired_at": { "type": "string", "format": "date-time" },
     "expired_by": { "type": "string" },
     "pinned": { "type": "boolean" },
+    "decay_model": { "type": "string", "enum": ["exponential", "weibull"] },
     "reinforcement": { "type": "integer" },
     "source": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" }, "maxItems": 8 },
