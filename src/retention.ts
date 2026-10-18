@@ -93,6 +93,8 @@ export function computeHalfLife(
     accessCount: number;
     verificationLevel?: string;
     reinforcement?: number;
+    salience?: number;
+    importance?: number;
   },
 ): number | null {
   const base = defaultHalfLifeDays(type);
@@ -105,7 +107,66 @@ export function computeHalfLife(
   // Each access adds sqrt(accessCount) * 5 days, capped at 30 extra days.
   const accessExtension = Math.min(30, Math.sqrt(opts.accessCount) * 5);
 
-  return Math.round(base * verifyMult + reinfBoost + accessExtension);
+  const baseEffective = base * verifyMult + reinfBoost + accessExtension;
+
+  // T-074: Importance-gated half-life multiplier.
+  // Salience / importance ranges from 0.0 to 1.0.
+  // When explicitly provided, low salience (e.g. 0.1) shrinks half-life,
+  // while high salience (e.g. 1.0) extends half-life up to 2.5x.
+  const imp =
+    typeof opts.salience === "number"
+      ? opts.salience
+      : typeof opts.importance === "number"
+      ? opts.importance
+      : undefined;
+  const importanceMultiplier =
+    imp !== undefined ? Math.max(0.4, Math.min(3.0, 0.5 + imp * 2.0)) : 1.0;
+
+  return Math.round(baseEffective * importanceMultiplier);
+}
+
+/**
+ * T-074: Compute materialized decay score (1.0 = fully fresh, 0.0 = fully decayed)
+ * based on elapsed days and importance-gated half-life.
+ */
+export function computeDecayScore(
+  entry: {
+    type?: string;
+    last_accessed_at?: string | null;
+    created_at: string;
+    updated_at: string;
+    valid_from?: string;
+    verification?: { level?: string; [key: string]: any };
+    reinforcement?: number;
+    access_count?: number | null;
+    salience?: number;
+    temporal_mode?: string;
+  },
+  now: number = Date.now(),
+): number {
+  if (entry.temporal_mode === "timeless" || entry.type === "constraint") {
+    return 1.0;
+  }
+
+  const halfLife = computeHalfLife(entry.type, {
+    accessCount: entry.access_count ?? 0,
+    verificationLevel: entry.verification?.level,
+    reinforcement: entry.reinforcement,
+    salience: entry.salience,
+  });
+
+  if (halfLife === null) return 1.0; // never decays
+
+  const referenceTime = entry.valid_from ?? entry.last_accessed_at ?? entry.updated_at ?? entry.created_at;
+  const ms = Date.parse(referenceTime);
+  if (Number.isNaN(ms)) return 1.0;
+
+  const days = Math.max(0, (now - ms) / 86_400_000);
+  if (days <= 0) return 1.0;
+
+  // Exponential retention: decay_score = exp(-ln(2) * days / halfLife) = 0.5^(days / halfLife)
+  const score = Math.exp((-Math.LN2 * days) / halfLife);
+  return Number(Math.max(0, Math.min(1.0, score)).toFixed(4));
 }
 
 /**
@@ -123,6 +184,7 @@ export function computeStaleness(
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
+    salience?: number;
   },
   now: number = Date.now(),
 ): number {
@@ -130,6 +192,7 @@ export function computeStaleness(
     accessCount: entry.access_count ?? 0,
     verificationLevel: entry.verification?.level,
     reinforcement: entry.reinforcement,
+    salience: entry.salience,
   });
 
   if (halfLife === null) return 0; // never decays

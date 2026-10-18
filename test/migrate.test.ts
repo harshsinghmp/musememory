@@ -185,7 +185,7 @@ describe("T-041 & T-038 migration v3 (idempotency, content_hash, and outbox)", (
     expect(() => db.query(`SELECT count(*) FROM outbox`).get()).toThrow();
 
     runMigrations(db);
-    expect(getSchemaVersion(db)).toBe(3);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(3);
 
     const cols = db
       .query<{ name: string }>(`PRAGMA table_info(memories)`)

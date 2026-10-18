@@ -96,6 +96,21 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    up(db) {
+      // T-074: materialized decay_score column for importance-gated half-life decay
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("decay_score")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN decay_score REAL DEFAULT 1.0`);
+        db.exec(`UPDATE memories SET decay_score = COALESCE(json_extract(data, '$.decay_score'), 1.0)`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score)`);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
