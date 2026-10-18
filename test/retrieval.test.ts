@@ -599,6 +599,48 @@ describe("unified context & retrieval engine", () => {
     const pass3 = evaluateAbstentionGate("`jwt.verify`");
     expect(pass3.abstain).toBe(false);
   });
+
+  test("T-073: no_confident_match result mode across queryContext and formatPromptContext", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    propose(store, {
+      title: "PostgreSQL Migration Strategy",
+      content: "Always run migrations using zero-downtime expand-and-contract pattern with foreign key checks disabled.",
+      project: "billing",
+      confirmed: true,
+      salience: 0.9,
+    });
+
+    // 1. Confident query match
+    const confident = queryContext(store, "PostgreSQL migration expand-and-contract");
+    expect(confident.mode).toBe("confident_match");
+    expect(confident.no_confident_match).toBe(false);
+    expect(confident.results.length).toBeGreaterThan(0);
+
+    const formattedConfident = formatPromptContext(store, undefined, "PostgreSQL migration expand-and-contract");
+    expect(formattedConfident.mode).toBe("confident_match");
+    expect(formattedConfident.no_confident_match).toBe(false);
+    expect(formattedConfident.markdown).toContain("PostgreSQL Migration Strategy");
+    expect(formattedConfident.markdown).not.toContain("_No confident prior memories matched this query._");
+
+    // 2. Query with no matches or below confidence threshold
+    const nonConfident = queryContext(store, "quantum computing entanglement superconductors");
+    expect(nonConfident.mode).toBe("no_confident_match");
+    expect(nonConfident.no_confident_match).toBe(true);
+
+    const formattedNonConfident = formatPromptContext(store, undefined, "quantum computing entanglement superconductors");
+    expect(formattedNonConfident.mode).toBe("no_confident_match");
+    expect(formattedNonConfident.no_confident_match).toBe(true);
+    expect(formattedNonConfident.entries.length).toBeGreaterThanOrEqual(1);
+    expect(formattedNonConfident.markdown).toContain("_No confident prior memories matched this query._");
+
+    // 3. Empty query returns default confident match when entries exist
+    const emptyQuery = queryContext(store, "");
+    expect(emptyQuery.mode).toBe("confident_match");
+    expect(emptyQuery.no_confident_match).toBe(false);
+
+    cleanup(root);
+  });
 });
 
 

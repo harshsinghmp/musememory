@@ -30,6 +30,8 @@ export interface ContextQueryOptions extends SearchOptions {
   depth?: DisclosureDepth;
   /** R21: precomputed semantic cosine scores by entry id (ranking dim #12). */
   semanticScores?: Map<string, number>;
+  /** T-073: Optional minimum score threshold to consider a match confident (default: DEFAULT_MIN_RELEVANCE_SCORE = 0.45). */
+  minScoreThreshold?: number;
 }
 
 export interface SearchResult {
@@ -42,6 +44,10 @@ export interface SearchResult {
   withheld?: Array<{ id: string; reason: string }>;
   /** T-117: High-water mark timestamp of the most recent memory in the store. */
   watermark?: string;
+  /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
+  mode?: "confident_match" | "no_confident_match";
+  /** T-073: Explicit flag indicating whether confident memories were returned. */
+  no_confident_match?: boolean;
 }
 
 export interface FormattedContext {
@@ -52,6 +58,10 @@ export interface FormattedContext {
   userProfile?: string | null;
   fromCache?: boolean;
   stale?: boolean;
+  /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
+  mode?: "confident_match" | "no_confident_match";
+  /** T-073: Explicit flag indicating whether confident memories were returned. */
+  no_confident_match?: boolean;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -1042,6 +1052,30 @@ export function queryContext(
   }
 
   const isDegraded = store.circuit?.isDegraded() ?? false;
+  const minThreshold = options.minScoreThreshold ?? DEFAULT_MIN_RELEVANCE_SCORE;
+  const hasConfidentMatch =
+    results.length > 0 &&
+    (!query.trim() ||
+      results.some((r) => {
+        if (r.score < minThreshold) return false;
+        if (queryTokens.length > 0) {
+          const app = applicability(r.entry, queryTokens);
+          const hasQuerySignal =
+            app > 0 ||
+            (r.why_retrieved &&
+              r.why_retrieved.some(
+                (w) =>
+                  w === "lexical_overlap" ||
+                  w === "exact_symbol_match" ||
+                  w === "path_match" ||
+                  w === "bm25_match" ||
+                  w === "semantic_match" ||
+                  w === "graph_overlap",
+              ));
+          return Boolean(hasQuerySignal);
+        }
+        return true;
+      }));
 
   return {
     results,
@@ -1051,6 +1085,8 @@ export function queryContext(
     totalTokensUsed,
     withheld: withheld.length > 0 ? withheld : undefined,
     watermark: getStoreWatermark(store),
+    mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+    no_confident_match: !hasConfidentMatch,
   };
 }
 
@@ -1076,6 +1112,8 @@ export function formatPromptContext(
         ...cached,
         fromCache: true,
         stale: isDegraded || cached.stale || false,
+        mode: cached.mode,
+        no_confident_match: cached.no_confident_match,
       };
     }
   }
@@ -1162,6 +1200,10 @@ export function formatPromptContext(
   if (result.results.length > 0) {
     const depth = options.depth ?? "L2";
     parts.push("### Relevant Memories & Learned Patterns");
+    if (query.trim() && result.no_confident_match) {
+      parts.push("_No confident prior memories matched this query._");
+      parts.push("");
+    }
     if (depth === "L1") {
       // One line per memory: id + title only
       for (const r of result.results) {
@@ -1196,6 +1238,10 @@ export function formatPromptContext(
         parts.push("");
       }
     }
+  } else if (query.trim() && result.no_confident_match) {
+    parts.push("### Relevant Memories & Learned Patterns");
+    parts.push("_No confident prior memories matched this query._");
+    parts.push("");
   }
 
   parts.push("---");
@@ -1209,6 +1255,8 @@ export function formatPromptContext(
     userProfile,
     fromCache: false,
     stale: result.stale,
+    mode: result.mode,
+    no_confident_match: result.no_confident_match,
   };
 
   if (cacheKey && store.cache) {

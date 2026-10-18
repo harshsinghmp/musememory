@@ -60,6 +60,8 @@ export function queryTieredContext(
       userProfile,
       fromCache: false,
       stale: queryResult.stale,
+      mode: queryResult.mode,
+      no_confident_match: queryResult.no_confident_match,
     };
   }
 
@@ -107,5 +109,7 @@ export function queryTieredContext(
     userProfile,
     fromCache: false,
     stale: queryResult.stale,
+    mode: queryResult.mode,
+    no_confident_match: queryResult.no_confident_match,
   };
 }

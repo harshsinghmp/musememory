@@ -3,7 +3,9 @@ import { openStore, propose, confirm, supersede, get } from "../src/store.ts";
 import { queryContext } from "../src/retrieval.ts";
 import { validateStore } from "../src/schema.ts";
 import { getGraphStatus } from "../src/graph.ts";
-import { setupFixtureRoot, cleanup } from "./helpers.ts";
+import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 describe("mcp tool handlers logic", () => {
   test("get_context and search with filters", () => {
@@ -488,6 +490,62 @@ describe("mcp tool handlers logic", () => {
     expect(replayRes.isError).toBeFalsy();
     const replayEntry = JSON.parse(replayRes.content[0].text);
     expect(replayEntry.id).toBe(entry.id);
+
+    cleanup(root);
+  });
+
+  test("T-073: MCP get_context and search return mode and no_confident_match", async () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    mkdirSync(join(memoryDir, "memories"), { recursive: true });
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Initial query with no memories returns no_confident_match
+    const emptyCtxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "authentication tokens", dir: root } },
+    });
+    expect(emptyCtxRes.isError).toBeFalsy();
+    const emptyCtx = JSON.parse(emptyCtxRes.content[0].text);
+    expect(emptyCtx.mode).toBe("no_confident_match");
+    expect(emptyCtx.no_confident_match).toBe(true);
+    expect(emptyCtx.markdown).toContain("_No confident prior memories matched this query._");
+
+    // 2. Capture a memory
+    await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          title: "Authentication Token Lifecycle",
+          content: "Always use ed25519 asymmetric keys for token verification and refresh tokens.",
+          dir: root,
+        },
+      },
+    });
+
+    // 3. get_context query matching memory returns confident_match
+    const matchCtxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "Authentication Token Lifecycle ed25519", dir: root } },
+    });
+    expect(matchCtxRes.isError).toBeFalsy();
+    const matchCtx = JSON.parse(matchCtxRes.content[0].text);
+    expect(matchCtx.mode).toBe("confident_match");
+    expect(matchCtx.no_confident_match).toBe(false);
+    expect(matchCtx.entries.length).toBeGreaterThan(0);
+
+    // 4. search returns mode and no_confident_match
+    const searchRes = await callTool({
+      method: "tools/call",
+      params: { name: "search", arguments: { query: "Authentication Token", dir: root } },
+    });
+    expect(searchRes.isError).toBeFalsy();
+    const searchPayload = JSON.parse(searchRes.content[0].text);
+    expect(searchPayload.mode).toBe("confident_match");
+    expect(searchPayload.no_confident_match).toBe(false);
 
     cleanup(root);
   });

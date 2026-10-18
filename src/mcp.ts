@@ -1750,6 +1750,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             user_profile: formatted.userProfile,
             stale: formatted.stale ?? false,
             from_cache: formatted.fromCache ?? false,
+            mode: formatted.mode,
+            no_confident_match: formatted.no_confident_match,
           });
         }
         case "memory_checkpoint": {
@@ -1806,6 +1808,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             from_cache: res.fromCache ?? false,
             total_tokens_used: res.totalTokensUsed,
             explanation: res.explanation,
+            mode: res.confidence_mode ?? (res.no_confident_match ? "no_confident_match" : "confident_match"),
+            no_confident_match: res.no_confident_match ?? false,
           });
         }
         case "propose":

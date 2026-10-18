@@ -52,6 +52,10 @@ export interface FusedContextResult {
   budget_notice?: string;
   /** T-094: Reserved token allocation for global/USER.md guidelines. */
   user_profile_reserved_tokens?: number;
+  /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
+  mode?: "confident_match" | "no_confident_match";
+  /** T-073: Explicit flag indicating whether confident memories were returned. */
+  no_confident_match?: boolean;
 }
 
 export interface CodeForMemoryResult {

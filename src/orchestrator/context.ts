@@ -342,6 +342,12 @@ export async function resolveMuseContext(
     ...withheldDigestErrors,
   ];
 
+  const hasConfidentMatch =
+    (packedMemories.length > 0 || packedNegative.length > 0) &&
+    (!compositeQuery.trim() ||
+      entriesWithMatchingAnchors.length > 0 ||
+      ranked.some((r) => r.score >= 0.45));
+
   return {
     active_constraints: activeConstraints,
     relevant_memories: packedMemories,
@@ -356,6 +362,8 @@ export async function resolveMuseContext(
     context_manifest,
     budget_notice: budgetNotice,
     user_profile_reserved_tokens: userProfileReservedTokens,
+    mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+    no_confident_match: !hasConfidentMatch,
   };
 }
 
@@ -407,6 +415,9 @@ export function formatCompactContextPack(result: FusedContextResult): string {
       lines.push(m.content);
     }
     lines.push("");
+  } else if (result.no_confident_match) {
+    lines.push("## 💡 Relevant Memories & Decisions");
+    lines.push("_No confident prior memories matched this query._", "");
   }
 
   if (result.suggested_next_steps.length > 0) {
