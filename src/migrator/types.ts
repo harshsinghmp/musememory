@@ -29,7 +29,6 @@ export interface MigrationOptions {
   all?: boolean;
   dryRun?: boolean;
   overwrite?: boolean;
-  global?: boolean;
   project?: string;
 }
 
@@ -65,12 +64,25 @@ export interface ProviderAdapter {
 
 export function normalizeMemoryType(raw?: string): MemoryType {
   if (!raw) return "discovery";
-  const s = raw.toLowerCase();
+  const s = raw.toLowerCase().trim();
   if (s.includes("decision")) return "decision";
   if (s.includes("fix") || s.includes("bug")) return "fix";
   if (s.includes("fail")) return "failure";
   if (s.includes("arch")) return "architecture";
-  if (s.includes("op") || s.includes("task") || s.includes("proc") || s.includes("skill")) return "operation";
+  if (
+    s === "ops" ||
+    s.startsWith("operat") ||
+    s.startsWith("op_") ||
+    s.startsWith("ops_") ||
+    s.endsWith("operation") ||
+    s.includes("task") ||
+    s.includes("proc") ||
+    s.includes("skill") ||
+    s.includes("runbook") ||
+    s.includes("playbook")
+  ) {
+    return "operation";
+  }
   if (s.includes("const") || s.includes("rule")) return "constraint";
   if (s.includes("pref")) return "preference";
   if (s.includes("sess")) return "session";
