@@ -3,14 +3,14 @@ import type { ConceptPage, EntityPage, IndexPage, LogPage, LogEntry } from "./ty
 export function renderConceptPage(page: ConceptPage): string {
   const frontmatter = [
     "---",
-    `title: "${page.title}"`,
+    `title: ${JSON.stringify(page.title)}`,
     `type: ${page.type}`,
     `project: ${page.project}`,
     `updatedAt: ${page.updatedAt}`,
-    `tags: [${page.tags.map((t) => `"${t}"`).join(", ")}]`,
-    `relatedConcepts: [${page.relatedConcepts.map((s) => `"${s}"`).join(", ")}]`,
-    `relatedEntities: [${page.relatedEntities.map((s) => `"${s}"`).join(", ")}]`,
-    `memoryRefs: [${page.memoryRefs.map((s) => `"${s}"`).join(", ")}]`,
+    `tags: ${JSON.stringify(page.tags)}`,
+    `relatedConcepts: ${JSON.stringify(page.relatedConcepts)}`,
+    `relatedEntities: ${JSON.stringify(page.relatedEntities)}`,
+    `memoryRefs: ${JSON.stringify(page.memoryRefs)}`,
     "---",
   ].join("\n");
 
@@ -29,14 +29,14 @@ export function renderConceptPage(page: ConceptPage): string {
 export function renderEntityPage(page: EntityPage): string {
   const frontmatter = [
     "---",
-    `title: "${page.title}"`,
+    `title: ${JSON.stringify(page.title)}`,
     `type: ${page.type}`,
     `entityType: ${page.entityType}`,
     `project: ${page.project}`,
     `updatedAt: ${page.updatedAt}`,
-    `relatedEntities: [${page.relatedEntities.map((s) => `"${s}"`).join(", ")}]`,
-    `relatedConcepts: [${page.relatedConcepts.map((s) => `"${s}"`).join(", ")}]`,
-    `memoryRefs: [${page.memoryRefs.map((s) => `"${s}"`).join(", ")}]`,
+    `relatedEntities: ${JSON.stringify(page.relatedEntities)}`,
+    `relatedConcepts: ${JSON.stringify(page.relatedConcepts)}`,
+    `memoryRefs: ${JSON.stringify(page.memoryRefs)}`,
     "---",
   ].join("\n");
 
@@ -55,7 +55,7 @@ export function renderEntityPage(page: EntityPage): string {
 export function renderIndexPage(page: IndexPage): string {
   const frontmatter = [
     "---",
-    `title: "${page.title}"`,
+    `title: ${JSON.stringify(page.title)}`,
     `type: ${page.type}`,
     `project: ${page.project}`,
     `updatedAt: ${page.updatedAt}`,
@@ -73,7 +73,7 @@ export function renderIndexPage(page: IndexPage): string {
 export function renderLogPage(page: LogPage): string {
   const frontmatter = [
     "---",
-    `title: "${page.title}"`,
+    `title: ${JSON.stringify(page.title)}`,
     `type: ${page.type}`,
     `project: ${page.project}`,
     `updatedAt: ${page.updatedAt}`,
