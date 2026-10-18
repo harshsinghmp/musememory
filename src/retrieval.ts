@@ -33,8 +33,9 @@ export interface ContextQueryOptions extends SearchOptions {
 
 export interface SearchResult {
   results: ScoredEntry[];
-  source: "live";
+  source: "live" | "cache" | "degraded";
   stale: boolean;
+  fromCache?: boolean;
   totalTokensUsed?: number;
   /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
   withheld?: Array<{ id: string; reason: string }>;
@@ -48,6 +49,8 @@ export interface FormattedContext {
   totalTokensUsed: number;
   constraints: string[];
   userProfile?: string | null;
+  fromCache?: boolean;
+  stale?: boolean;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -931,10 +934,13 @@ export function queryContext(
     }
   }
 
+  const isDegraded = store.circuit?.isDegraded() ?? false;
+
   return {
     results,
-    source: "live",
-    stale: false,
+    source: isDegraded ? "degraded" : "live",
+    stale: isDegraded,
+    fromCache: false,
     totalTokensUsed,
     withheld: withheld.length > 0 ? withheld : undefined,
     watermark: getStoreWatermark(store),
@@ -957,7 +963,14 @@ export function formatPromptContext(
 
   if (cacheKey && store.cache) {
     const cached = store.cache.getContext(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      const isDegraded = store.circuit?.isDegraded() ?? false;
+      return {
+        ...cached,
+        fromCache: true,
+        stale: isDegraded || cached.stale || false,
+      };
+    }
   }
 
   const result = queryContext(store, query, options);
@@ -1087,6 +1100,8 @@ export function formatPromptContext(
     totalTokensUsed: result.totalTokensUsed ?? 0,
     constraints,
     userProfile,
+    fromCache: false,
+    stale: result.stale,
   };
 
   if (cacheKey && store.cache) {

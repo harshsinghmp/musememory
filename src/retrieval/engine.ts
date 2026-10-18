@@ -2,7 +2,7 @@ import type { Store } from "../store.ts";
 import { list, countMemories } from "../store.ts";
 import { queryContext, formatPromptContext, clampLimit, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
-import { hybridSearch, rebuildIndex, saveIndex, indexFilePath } from "../vector.ts";
+import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -19,6 +19,8 @@ export interface UnifiedSearchResult {
   results: ScoredEntry[];
   totalTokensUsed: number;
   explanation?: string;
+  stale?: boolean;
+  fromCache?: boolean;
 }
 
 export interface ReindexReport {
@@ -43,6 +45,9 @@ export class RetrievalEngine {
     options: UnifiedSearchOptions = {},
   ): UnifiedSearchResult {
     const mode = options.mode ?? "auto";
+    const isDegraded = store.circuit?.isDegraded() ?? false;
+    let fallbackStale = false;
+    let fallbackExplanation: string | undefined;
 
     // 1. PageIndex Document Search
     if (mode === "pageindex" || (options.docPath && existsSync(options.docPath))) {
@@ -68,10 +73,18 @@ export class RetrievalEngine {
             results: mapped,
             totalTokensUsed: pageResults.tokensUsed,
             explanation: pageResults.reasoning,
+            stale: isDegraded,
+            fromCache: false,
           };
+        } else if (mode === "pageindex") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested pageindex search has no index; fell back to exact search";
         }
-      } catch {
-        // Fallback to exact if pageindex evaluation fails
+      } catch (err: unknown) {
+        if (mode === "pageindex") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: pageindex search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
@@ -112,11 +125,20 @@ export class RetrievalEngine {
               results: mapped,
               totalTokensUsed: treeRes.tokensUsed,
               explanation: `Tree search evaluated ${treeRes.shardsSearched} shards with progressive disclosure ${options.depth ?? "L2"}`,
+              stale: isDegraded,
+              fromCache: false,
             };
           }
         }
-      } catch {
-        // Fallback to exact
+        if (mode === "tree") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested tree search found no index or matches; fell back to exact search";
+        }
+      } catch (err: unknown) {
+        if (mode === "tree") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: tree search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
@@ -142,15 +164,36 @@ export class RetrievalEngine {
             entry: r.entry,
             score: r.score,
           }));
+
+          // T-064 / T-304: check if vector index is stale compared to store memory count
+          let isVectorStale = false;
+          try {
+            const idx = loadIndex(memoryDir);
+            if (idx && Object.keys(idx.entries).length !== memCount) {
+              isVectorStale = true;
+            }
+          } catch {}
+
           return {
             mode: "hybrid",
             results: mapped,
             totalTokensUsed: Math.ceil(mapped.reduce((acc, r) => acc + r.entry.content.length, 0) / 4),
-            explanation: `Hybrid BM25 + Vector search retrieved ${mapped.length} entries`,
+            explanation: isVectorStale
+              ? `Degraded read: Hybrid BM25 + Vector search retrieved ${mapped.length} entries (vector index is stale)`
+              : `Hybrid BM25 + Vector search retrieved ${mapped.length} entries`,
+            stale: isDegraded || isVectorStale,
+            fromCache: false,
           };
         }
-      } catch {
-        // Fallback to exact
+        if (mode === "hybrid") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested hybrid vector index missing or returned no results; fell back to exact search";
+        }
+      } catch (err: unknown) {
+        if (mode === "hybrid") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: hybrid vector search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
@@ -160,6 +203,9 @@ export class RetrievalEngine {
       mode: "exact",
       results: exact.results,
       totalTokensUsed: exact.totalTokensUsed ?? 0,
+      stale: isDegraded || fallbackStale || exact.stale,
+      fromCache: exact.fromCache ?? false,
+      explanation: fallbackExplanation ?? (isDegraded ? "Degraded read: circuit breaker is open" : undefined),
     };
   }
 
