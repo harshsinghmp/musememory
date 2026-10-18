@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import yaml from "js-yaml";
 import type { MigratedRecord, ProviderAdapter } from "../types.ts";
 import { normalizeMemoryType } from "../types.ts";
@@ -26,7 +26,7 @@ export const GenericAdapter: ProviderAdapter = {
                   title: item.slice(0, 60),
                   content: item,
                   project: options.defaultProject || "default",
-                  status: "confirmed",
+                  status: "candidate",
                   type: "discovery",
                   tags: ["imported"],
                   source: `migrated:${filename}`,
@@ -42,7 +42,7 @@ export const GenericAdapter: ProviderAdapter = {
                   title: item.title || content.slice(0, 60),
                   content,
                   project: item.project || options.defaultProject || "default",
-                  status: isArchived ? "superseded" : "confirmed",
+                  status: isArchived ? "superseded" : "candidate",
                   type: normalizeMemoryType(item.type),
                   tags: Array.isArray(item.tags) ? item.tags.map(String) : ["imported"],
                   source: `migrated:${filename}`,
@@ -61,11 +61,12 @@ export const GenericAdapter: ProviderAdapter = {
           const doc = yaml.load(raw) as any;
           if (doc && typeof doc === "object") {
             const content = doc.content || doc.description || raw;
+            const isArchived = doc.status === "archived" || doc.status === "superseded" || doc.status === "stale";
             results.push({
               title: doc.title || filename.replace(/\.(yaml|yml)$/, ""),
               content,
               project: doc.project || options.defaultProject || "default",
-              status: doc.status || "confirmed",
+              status: isArchived ? (doc.status === "stale" ? "stale" : "superseded") : "candidate",
               type: normalizeMemoryType(doc.type),
               tags: Array.isArray(doc.tags) ? doc.tags : ["yaml-imported"],
               source: `migrated:${filename}`,
@@ -79,7 +80,7 @@ export const GenericAdapter: ProviderAdapter = {
             title: filename.replace(/\.(md|markdown|txt)$/, "").replace(/[-_]/g, " "),
             content: raw.trim(),
             project: options.defaultProject || "default",
-            status: "confirmed",
+            status: "candidate",
             type: "discovery",
             tags: ["doc-imported"],
             source: `migrated:${filename}`,
@@ -100,7 +101,7 @@ export const GenericAdapter: ProviderAdapter = {
         // Ignore
       }
     } else {
-      processFile(sourcePath, "source");
+      processFile(sourcePath, basename(sourcePath));
     }
 
     return results;
