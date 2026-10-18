@@ -208,5 +208,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 
 ### Related Documentation
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
+- 🏛️ **[Living Architecture & Drift Auditing](living-architecture-and-drift.md)** — Binding ADRs to structural code anchors and automated drift sentry.
+- ⚡ **[Real-Time Daemon & Observability](daemon-and-observability.md)** — SSE event bus, CI upgrade gates, and PageIndex depth controls.
 - 👥 **[Team Quickstart & Deployment Guide](team-getting-started.md)** — Deploying a shared server for engineering teams.
 - 🏛️ **[Team Architecture Specification](architecture/team-slice-wiring.md)** — In-process SQLite vs networked mounts.

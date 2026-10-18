@@ -5,12 +5,21 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 11 Focus)
-- **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions**: `T-345` (daemon error handling & socket cleanup), `T-346` (upgrade CLI exit codes), `T-350` (drift endpoint symlink & query safety), `T-352` (ADR supersede/reject atomicity), `T-356` (pageindex disclosure depth), `T-358` (daemon command lifecycle & ADR-001 alignment), `T-359` (upgrade audit stub honesty), `T-365` (anchor base normalization).
+## ⏭️ Next Up (Post-Wave 12 Focus)
+- **Wave 13: Retrieval Performance & Store Hot-Paths**: `T-021` (memoized file verification in ranking hot path), `T-022` (precomputed token sets per memory), `T-023` (`openStore` dirty-gate: skip wiki recompile + CURRENT.md sync per MCP call), `T-028` (`recordRetrievals` wiring), `T-029` (`touchActivity` wiring), `T-062` (clamp model-supplied `limit` values), `T-063` (dry-run-by-default for destructive ops), `T-064` (read-path `stale:true` provenance tag).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions**:
+  - `T-345`: Daemon server.on("error") collision handling, /publish origin validation, active socket disposal on close (PR #156, Closes #155)
+  - `T-346`: Upgrade CLI exit codes with --check registry error truthfulness, --fail-on-update, and --strict (PR #158, Closes #157)
+  - `T-350`: Drift endpoint symlink throwIfNoEntry guard, precomputed lowercase corpus, and pure read path (PR #160, Closes #159)
+  - `T-352`: ADR status mapping (rejected -> stale, proposed -> candidate) and save-before-supersede atomicity (PR #162, Closes #161)
+  - `T-356`: PageIndex search maxDepth node pruning and 3-tier disclosureDepth (L1/L2/L3) (PR #164, Closes #163)
+  - `T-358`: Daemon port integer validation (0-65535) and SIGINT/SIGTERM graceful socket shutdown (PR #166, Closes #165)
+  - `T-359`: Upgrade audit honesty (scanSecrets in Vibeguard step, distinct agent wiring, RepairResult.errors) (PR #168, Closes #167)
+  - `T-365`: Anchor base normalization at write time and unified multi-root path resolution in drift and mesh contracts (PR #170, Closes #169)
 - [x] **Wave 0: Pre-Flight Integrity & Baseline Fixes**: `T-402`, `T-403`, `T-404`, `T-401`, `T-370`.
 - [x] **Wave 1: Storage Engine, Outbox & Concurrency**: `T-041`, `T-042`, `T-044`, `T-038`, `T-039`, `T-040`, `T-055`, `T-056`.
 - [x] **Wave 2: Write Admission, Trust & Anti-Poisoning**: `T-104` (scoreRetain 0.3 gate), `T-075` (trust tiers + withholding), `T-058`/`T-059` (read-path re-validation), `T-103` (FTS index-time secret redaction), `T-105`/`T-105b` (corroboration & syntax promotion gates), `T-391` (citation validation against live registry).

@@ -1,29 +1,25 @@
-# HANDOFF — 2026-10-18T12:40:00Z
-branch: dev @ fd5da25 | phase: Wave 11 complete; dev green 880/0
+# HANDOFF — 2026-10-18T14:30:00Z
+branch: dev @ 66876f2 | phase: Wave 12 complete; dev green 892/0
 
 ## Next Step
-Advance to Wave 12 (Daemon Reliability, Upgrade Signals & Living Decisions) or next roadmap wave.
+Advance to Wave 13 (Retrieval Performance & Store Hot-Paths: T-021..T-023, T-028, T-029).
 
 ## In-Flight
-- Wave 11 landed on dev via Ticket=Issue=Branch=PR=Merge:
-  - T-366: Intake schema validation & candidate quarantine (Issue #139, PR #140)
-  - T-338: Strip unearned verification levels from external records (Issue #141, PR #142)
-  - T-339: Prevent Letta core memory injection into CURRENT.md (Issue #143, PR #144)
-  - T-340: Generic adapter intake sanitization (Issue #145, PR #146)
-  - T-348: Path fallback expansion & empty dir defense (Issue #147, PR #148)
-  - T-349: Dedup counter tracking & dry-run within-batch dedup (Issue #149, PR #150)
-  - T-357: Memory status validation & candidate default (Issue #151, PR #152)
-  - T-362: Dead config removal & tighten op type classification (Issue #153, PR #154)
-- Full suite green: 880 pass, 0 fail across 146 files; tsc + build clean.
-
-## Ruled Out
-- Self-certified verification levels or unvetted external memories confirmed directly.
-- Letta human/persona core memories leaking into active CURRENT.md constraints.
-- Non-memory JSON/lockfiles/configs imported by generic adapter.
+- Wave 12 landed on dev via Ticket=Issue=Branch=PR=Merge:
+  - T-345: Daemon error handling, origin check & socket disposal (PR #156)
+  - T-346: Upgrade CLI exit codes & CI strict mode (PR #158)
+  - T-350: Drift endpoint symlink safety & pure read path (PR #160)
+  - T-352: ADR save-before-supersede & status mapping (PR #162)
+  - T-356: PageIndex search maxDepth & disclosureDepth (PR #164)
+  - T-358: Daemon port validation & SIGINT/SIGTERM shutdown (PR #166)
+  - T-359: Upgrade audit honesty & error surfacing (PR #168)
+  - T-365: Anchor base normalization & multi-root resolution (PR #170)
+- Docs pass completed: living-architecture-and-drift.md (ACCA), daemon-and-observability.md (QUEST).
+- Full suite green: 892 pass, 0 fail; tsc + build clean.
 
 ## Decisions
-- Intake quarantine: generic imports default to candidate status.
-- Strict op type parsing: prevent substring collisions on loop, topic, propose, option.
+- Reject ADRs stored as stale; candidate ADRs as candidate; atomic save-before-supersede.
+- Anchors record base_path at write time with multi-root fallback resolution.
 
 ## Verify
-`bun test` 880/0 + `bunx tsc --noEmit` + `bun run build` + `bun run bin/musememory.ts doctor`
+`bun test` 892/0 + `bunx tsc --noEmit` + `bun run build`

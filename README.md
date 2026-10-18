@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-649%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-892%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -40,6 +40,10 @@
 
 ## What changed
 
+- **Real-Time Agency Hub (SSE)**: Fast event fan-out on `http://localhost:31338/events` for parallel agent swarms, featuring CSRF origin filtering and clean socket disposal (`memory daemon`).
+- **Living ADR & Drift Sentry**: Binding Architecture Decision Records to line-independent structural code anchors with write-time `base_path` normalization and pure read-path drift auditing (`memory adr`, `memory check --drift`).
+- **Reasoning Tree PageIndex Depth Controls**: Hierarchical document navigation with configurable `maxDepth` traversal limits and tiered `disclosureDepth` (`L1`/`L2`/`L3`) for token economics.
+- **Hardened Upgrade & CI Verification**: Deterministic exit code contracts (`--check`, `--fail-on-update`, `--strict`), real Vibeguard credential audits, and structured repair error surfacing (`memory upgrade`).
 - **Autonomous Memory Optimizer (`memory optimize`)**: High-precision noise and junk pruning engine with zero-daemon auto-cadence (every 7 days or after 48h idle) and SQLite WAL defragmentation (`VACUUM;` + `PRAGMA optimize;`).
 - **Dashboard "⚡ Optimize" Trigger**: Live visual optimization controls directly inside the Web Observability Studio (`memory ui` / `memory studio`) with real-time feedback on items pruned and bytes reclaimed.
 - **Concurrent Multi-Agent Workstream Tracking**: Live coordination table in `CURRENT.md` enabling multiple agents across parallel chats to monitor active tasks and target scopes without collisions.
@@ -182,6 +186,8 @@ Explore comprehensive documentation tailored for both solo developers and engine
 | :--- | :--- | :--- |
 | 🧠 **[Core Concepts & Architecture](docs/concepts.md)** | **ACCA Framework**: Explains the guarded 7-state lifecycle machine, dual-scope engine, knapsack scoring, and zero-daemon architecture. | Tech Leads, Architects, Evaluators |
 | 🛠️ **[Developer Daily User Guide](docs/user-guide.md)** | **QUEST Framework**: The 3-phase daily pair-programming loop (`/muse-ground` → `CURRENT.md` → `/muse-capture`). | Solo Developers, Daily AI Coders |
+| 🏛️ **[Living Architecture & Drift Auditing](docs/living-architecture-and-drift.md)** | **ACCA Framework**: Binding ADRs to line-independent code anchors, write-time `base_path` normalization, and pure read-path drift sentry. | System Architects, Tech Leads |
+| ⚡ **[Real-Time Daemon & Observability](docs/daemon-and-observability.md)** | **QUEST Framework**: Real-time SSE event hub (`memory daemon`), CI upgrade gates (`--check`, `--strict`), and PageIndex depth parameters. | Swarm Engineers, DevOps, Builders |
 | 👥 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** | Single-host server deployment, systemd/Docker setups, and per-editor client recipes (Cursor, Opencode, Claude Code, Antigravity, Windsurf). | Engineering Managers, Team Leads |
 | 🏛️ **[Team Slice Wiring & Architecture](docs/architecture/team-slice-wiring.md)** | Technical deep-dive into in-process SQLite WAL vs corrupted network mounts. | Infrastructure Engineers, Systems Architects |
 | 📊 **[Agent Memory Comparison Dossier](https://harshsinghmp.github.io/musememory/musememory-comparison.html)** | 68-engine benchmark comparing storage, retrieval, privacy, and token economics. | Decision Makers, Evaluators |
@@ -221,8 +227,14 @@ npx musememory upgrade
 | **NPX** (Zero-Install) | `npx musememory@latest upgrade` | `npx musememory doctor` |
 
 ```bash
-# Check if updates are available without applying
+# Check if updates are available without applying (exits 0 if up to date, 1 if registry fails)
 memory upgrade --check
+
+# Enforce up-to-date installation in CI pipelines (exits 1 if update is available)
+memory upgrade --check --strict
+
+# Preview upgrade actions in dry-run mode
+memory upgrade --dry-run
 
 # Force re-installation and complete platform re-wiring
 memory upgrade --force

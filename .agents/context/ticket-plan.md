@@ -303,7 +303,7 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 
 - [x] T-363 · landed #59 — `src/paths.ts` (`resolveWithin` strict + `resolveExternal` opt-out) applied at wiki/pageindex/pool/mesh boundaries · F
 - [x] T-364 · landed #118 — RB-3 · unique-ID seam: `crypto.randomUUID` slice combined with Date.now() prevents same-ms ID collisions in ADRs and PageIndex · adrs/engine.ts, pageindex/engine.ts · F
-- [ ] T-365 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
+- [x] T-365 · landed #170 · RB-2 · anchor base normalization at write time: `contracts.ts:113-118` resolves against `topology.rootPath` while `drift.ts:93` resolves the same anchor against `workspaceRoot` — two bases, no normalization; anchor records its own base · blocks drift/mesh/code-impact tickets · F
 - [x] T-366 · landed #140 · RB-6 · migrator quarantine: schema-validated intake + quarantine status + strip self-certified `independently-verified` (agentmemory.ts:59-62) + generic adapter never writes `confirmed` · F
 - [x] T-367 · **RESOLVED 2026-10-14 — principal decision: zero REQUIRED daemons, opt-in local services allowed.** Charter amends to: no feature may require a running service; `daemon.ts` + studio remain opt-in extras; team-server mode (T-150+) is opt-in per tenant. Residual: add T-379 — amend AGENTS.md + ADR-001 wording from "never depend on background servers" to the amended rule (docs-only) · N
 - [x] T-368 · landed #71 — additive migration stamp + backfill (PRAGMA user_version stamp, MIGRATIONS array, backfill from data JSON) · src/migrate.ts · F
@@ -322,21 +322,21 @@ Sources: Nexus audit mode over the skipped surfaces (`ui.ts`, `daemon.ts`, `cli/
 **Request Changes:**
 - [x] T-343 · landed #122 — F-10 · malformed Host header handled safely with HTTP 400 in Web Studio instead of crashing process · ui.ts · F
 - [x] T-344 · landed #124 — F-11 · reject Origin: null in CORS and CSRF checks to prevent sandboxed iframe bypass · ui.ts · F
-- [ ] T-345 · F-12/F-13 · daemon hardening: no `server.on("error")` (EADDRINUSE crashes), `/publish` no origin check, client sockets leaked (daemon.ts:36-78,87), shared debounce collapses watcher events, watchers never re-armed · F
-- [ ] T-346 · F-14 · upgrade CLI exit codes: zero non-zero exits in 558 LOC; CI cannot distinguish success from failure (cli/upgrade.ts:498) · F
+- [x] T-345 · landed #156 · F-12/F-13 · daemon hardening: server.on("error") rejects without crash, /publish origin validation, active client socket destruction on close, Map-keyed debounce, atomic rename watcher re-arming · daemon.ts · F
+- [x] T-346 · landed #158 · F-14 · upgrade CLI exit codes: truthful non-zero exits on check failure, --fail-on-update and --strict support, top-level try/catch wrapper · cli/upgrade.ts · F
 - [x] T-347 · landed #132 · F-15 · port-handling contract: integer range validation (1-65535), port 0 ephemeral, auto-increment on collision when port omitted · ui.ts, ecosystem.ts · F
 - [x] T-348 · landed #148 · F-16 · migrator false positives: detection = "directory exists"; unexpanded `~` fallback makes `skipped` branch unreachable (detect.ts:22-276; engine.ts:56,70) · F
 - [x] T-349 · landed #150 · F-17 · migrator dedup silent: no counter; dry-run doesn't dedupe within batch (dry-run ≠ actual) (engine.ts:105-107,145) · F
-- [ ] T-350 · F-18/F-19/F-20 · drift endpoint: unguarded statSync 500s on dangling symlink; O(exports × memories) substring scan; a READ appends audit events (drift.ts:27,139-144,178-191) · F
+- [x] T-350 · landed #160 · F-18/F-19/F-20 · drift endpoint: throwIfNoEntry guards dangling symlinks; precomputed lowercase corpus eliminates scan bottleneck; pure read-path with zero audit mutations · drift.ts · F
 - [x] T-351 · landed #66 — mesh anchor path traversal: harden anchor file reads in mesh · src/mesh/ · F
-- [ ] T-352 · F-22/F-23 · ADR integrity: supersede-before-save leaves dangling ref on failure; rejected ADR stored as confirmed (engine.ts:148,162-165,191) · F
+- [x] T-352 · landed #162 · F-22/F-23 · ADR integrity: atomic save-before-supersede eliminates dangling refs; rejected ADR mapped to stale and proposed to candidate · engine.ts · F
 - [x] T-353 · landed #134 · F-24 · wiki frontmatter forge: YAML scalar escaping with JSON.stringify for title, tags, and relations · wiki/render.ts · F
 - [x] T-354 · landed #136 · F-25 · CLI arg parsing: POSIX `--` terminator, split on first `=` only, negative numbers parsed as values · cli/shared.ts · F
 - [x] T-355 · landed #67 — sync pool_dir forwarding: harden pool_dir handling · src/sync/ · F
-- [ ] T-356 · F-27 · pageindex disclosure-depth is a no-op: `maxDepth`/`disclosureDepth` accepted, never used (engine.ts:124-125 vs 137-165) · F
+- [x] T-356 · landed #164 · F-27 · pageindex disclosure-depth: maxDepth pruned node traversal and 3 disclosure tiers (L1, L2, L3) · engine.ts · F
 - [x] T-357 · landed #152 · F-28 · migrator status cast: raw provider string → `MemoryStatus` unvalidated; `isLatest !== false` defaults to confirmed (generic.ts:68; agentmemory.ts:44) · F
-- [ ] T-358 · F-29 · ADR-001 violation: `handleDaemonCommand` returns never-resolving promise + second blocking server (cli/ecosystem.ts:507) · dep: T-367 · F
-- [ ] T-359 · F-30 · upgrade stubs render ✅ for empty audit steps; 35 empty `catch {}` in cli/ (upgrade.ts:507-509,530-532) · F
+- [x] T-358 · landed #166 · F-29 · persistent server lifecycle: daemon port integer validation (0-65535) and SIGINT/SIGTERM graceful socket shutdown handlers · cli/ecosystem.ts · F
+- [x] T-359 · landed #168 · F-30 · upgrade audit honesty: scanSecrets wired in Vibeguard audit step, storage repair and agent wiring separated, RepairResult.errors populated · cli/upgrade.ts · F
 - [x] T-360 · landed #138 · F-31/F-35 · UI shutdown + numeric validation: destroy active sockets on close, bound /api/audit limit & /api/search tokenBudget · ui.ts · F
 - [x] T-361 · landed #126 — F-32 · sanitize priority badge class with alphanumeric filter and HTML-escape item.priority in remediation table · ui.ts:2184-2186 · F
 - [x] T-362 · landed #154 · F-33/F-34 · migrator dead config + misclassification: `global` never read; `skipped` unreachable; `s.includes("op")` matches loop/topic/propose (types.ts:71; engine.ts:70; drift.ts:12,130) · F
@@ -533,11 +533,12 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 10. **Wave 9: Runtime Integrity, Seams & Drift Elimination** (`T-010`, `T-011`, `T-012`, `T-364`, `T-341`, `T-343`, `T-344`, `T-361`) — [x] Landed on dev
 11. **Wave 10: CLI Rigor, Governance & Hardened Parsers** (`T-013`, `T-014`, `T-347`, `T-353`, `T-354`, `T-360`) — [x] Landed on dev
 12. **Wave 11: Migrator Quarantine, Anti-Poisoning & Validation Hardening** (`T-366`, `T-338`, `T-339`, `T-340`, `T-348`, `T-349`, `T-357`, `T-362`) — [x] Landed on dev
+13. **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions** (`T-345`, `T-346`, `T-350`, `T-352`, `T-356`, `T-358`, `T-359`, `T-365`) — [x] Landed on dev
 
 ## v11 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 139 |
-| Active Remaining | 151 |
+| Landed on dev | 147 |
+| Active Remaining | 143 |
 
