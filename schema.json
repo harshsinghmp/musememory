@@ -28,6 +28,7 @@
     "source_ids": { "type": "array", "items": { "type": "string" } },
     "due_at": { "type": "string", "format": "date-time" },
     "expires_at": { "type": "string", "format": "date-time" },
+    "pinned": { "type": "boolean" },
     "reinforcement": { "type": "integer" },
     "source": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" }, "maxItems": 8 },
