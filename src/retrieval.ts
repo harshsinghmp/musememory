@@ -11,6 +11,7 @@ import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
+import { buildSafeFtsQuery } from "./sqlite.ts";
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -219,6 +220,60 @@ export function evaluateQueryRelevance(query: string): {
     relevant,
     score: Math.min(1.0, score),
     reason: relevant ? undefined : "low_relevance_score",
+  };
+}
+
+export interface AbstentionDecision {
+  abstain: boolean;
+  score: number;
+  reason?: string;
+  searchableTerms?: string;
+}
+
+/**
+ * T-072: FTS5-tokenizer-matched abstention gate.
+ * Evaluates whether a query possesses valid searchable terms under SQLite FTS5 tokenization rules.
+ * Automatically abstains on syntax-only operators, pure punctuation, trivial greetings,
+ * or queries containing only stopwords, short-circuiting expensive candidate scans.
+ */
+export function evaluateAbstentionGate(query: string): AbstentionDecision {
+  if (!query || typeof query !== "string") {
+    return { abstain: true, score: 0, reason: "empty_query" };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return { abstain: true, score: 0, reason: "empty_query" };
+  }
+
+  // 1. Trivial greeting short-circuit
+  const normalized = trimmed.toLowerCase().replace(/[!?.,;:]+$/g, "").trim();
+  if (TRIVIAL_GREETINGS.has(normalized)) {
+    return { abstain: true, score: 0.05, reason: "trivial_greeting" };
+  }
+
+  // 2. FTS5 tokenizer extraction check
+  const safeFts = buildSafeFtsQuery(trimmed);
+  if (!safeFts || safeFts.trim().length === 0) {
+    return { abstain: true, score: 0, reason: "fts_no_searchable_terms" };
+  }
+
+  // 3. Informational density check over non-stopword tokens
+  const tokens = tokenize(trimmed);
+  const informativeTokens = tokens.filter((t) => !STOPWORDS.has(t));
+  if (informativeTokens.length === 0) {
+    return { abstain: true, score: 0.1, reason: "stopwords_only" };
+  }
+
+  const relevance = evaluateQueryRelevance(trimmed);
+  if (!relevance.relevant) {
+    return { abstain: true, score: relevance.score, reason: relevance.reason };
+  }
+
+  return {
+    abstain: false,
+    score: relevance.score,
+    searchableTerms: safeFts,
   };
 }
 
