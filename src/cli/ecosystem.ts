@@ -478,15 +478,29 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
 export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const port = flags["port"] ? parseInt(flags["port"], 10) : 2222;
+  let port: number | undefined = undefined;
+  if (flags["port"]) {
+    const parsed = parseInt(flags["port"], 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      console.error(`Error: Invalid port "${flags["port"]}". Port must be an integer between 1 and 65535.`);
+      return 1;
+    }
+    port = parsed;
+  }
   const sync = flags["sync"] === "true";
 
   const { startUiServer } = await import("../ui.ts");
-  const srv = await startUiServer({
-    port,
-    memoryDir: ctx.memoryDir,
-    store: ctx.store,
-  });
+  let srv: { port: number; close: () => void };
+  try {
+    srv = await startUiServer({
+      port,
+      memoryDir: ctx.memoryDir,
+      store: ctx.store,
+    });
+  } catch (err: any) {
+    console.error(`Error starting Web Observability Studio: ${err.message || err}`);
+    return 1;
+  }
   console.log(`\x1b[36m[Studio] Muse Memory Web Observability Studio running at: http://localhost:${srv.port}\x1b[0m`);
   console.log(`Press Ctrl+C to stop.`);
 
