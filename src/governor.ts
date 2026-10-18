@@ -320,7 +320,7 @@ export function updateSessionHandoff(memoryDir: string, update: Partial<SessionH
   return updated;
 }
 
-export function registerAgentWorkstream(
+function registerAgentWorkstream(
   memoryDir: string,
   workstream: {
     agent: string;
@@ -414,7 +414,7 @@ export function setCurrent(memoryDir: string, text: string, project = "default")
   return current.constraints;
 }
 
-export function isValidConstraintLine(text: string): boolean {
+function isValidConstraintLine(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length < 5 || trimmed.length > 300) return false;
   if (trimmed.includes("\n")) return false;
@@ -537,23 +537,6 @@ export function getSessionMemories(store: Store, sessionId: string): MemoryEntry
   return list(store).filter((e) => e.session_id === sessionId && e.type !== "session");
 }
 
-export function linkMemoriesToSession(
-  store: Store,
-  sessionId: string,
-  memoryIds: string[],
-): MemoryEntry[] {
-  const updated: MemoryEntry[] = [];
-  const entries = list(store);
-  for (const id of memoryIds) {
-    const entry = entries.find((e) => e.id === id);
-    if (entry) {
-      entry.session_id = sessionId;
-      save(store, entry);
-      updated.push(entry);
-    }
-  }
-  return updated;
-}
 
 // -----------------------------------------------------------------------------
 // OPEN LOOPS & AMBIENT OBLIGATIONS
