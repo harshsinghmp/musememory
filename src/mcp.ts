@@ -1278,6 +1278,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             symbol_name: { type: "string", description: "Optional symbol name (function, class, interface, method)" },
             qualified_name: { type: "string", description: "Optional qualified symbol name (e.g. Service.method)" },
             provider_metadata: { type: "object", description: "Optional provider external IDs (e.g. CodeGraph node ID)" },
+            base_path: { type: "string", description: "Optional base directory for anchor resolution (defaults to workspace root)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
           required: ["memory_id", "file_path"],
@@ -2473,6 +2474,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const anchor = createCodeAnchor(activeRoot, {
           kind,
           filePath: String(a.file_path),
+          basePath: a.base_path ? String(a.base_path) : undefined,
           symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
           qualifiedName: a.qualified_name ? String(a.qualified_name) : undefined,
           providerMetadata: (a.provider_metadata && typeof a.provider_metadata === "object") ? a.provider_metadata as Record<string, any> : undefined,

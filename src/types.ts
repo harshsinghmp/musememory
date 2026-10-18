@@ -101,6 +101,7 @@ export interface CodeAnchor {
   id: string;
   kind: CodeAnchorKind;
   file_path: string;
+  base_path?: string;
   symbol_name?: string;
   qualified_name?: string;
   structural_hash?: string;

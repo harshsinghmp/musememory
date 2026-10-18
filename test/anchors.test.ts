@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { openStore, save, get } from "../src/store.ts";
 import {
   computeStructuralHash,
@@ -9,6 +9,7 @@ import {
   extractSymbolBody,
   createCodeAnchor,
   verifyCodeAnchor,
+  resolveAnchorPath,
   attachAnchorToMemory,
   auditMemoryAnchors,
 } from "../src/anchors/index.ts";
@@ -237,6 +238,34 @@ describe("R8: Native Code Anchors & Stable Structural Code Identity", () => {
       expect(verification.status).toBe("orphaned");
       expect(verification.file_exists).toBe(false);
       expect(verification.drift_details).toContain("File 'src/temp.ts' does not exist");
+    });
+
+    it("T-365: records base_path at write time and resolves accurately across distinct roots", () => {
+      const subpackageDir = join(tmpDir, "packages", "auth");
+      mkdirSync(join(subpackageDir, "src"), { recursive: true });
+      const authFile = join(subpackageDir, "src", "token.ts");
+      writeFileSync(authFile, `export function validateToken(t: string): boolean { return true; }\n`);
+
+      // Create anchor with explicit subpackage basePath
+      const anchor = createCodeAnchor(tmpDir, {
+        kind: "symbol",
+        filePath: "src/token.ts",
+        basePath: subpackageDir,
+        symbolName: "validateToken",
+      });
+
+      expect(anchor.status).toBe("valid");
+      expect(anchor.base_path).toBe(subpackageDir);
+
+      // Verify anchor from monorepo root tmpDir: should find file via recorded base_path
+      const verificationFromRoot = verifyCodeAnchor(tmpDir, anchor);
+      expect(verificationFromRoot.status).toBe("valid");
+      expect(verificationFromRoot.file_exists).toBe(true);
+      expect(verificationFromRoot.symbol_exists).toBe(true);
+
+      // Also verify resolveAnchorPath exports
+      const resolved = resolveAnchorPath(tmpDir, anchor);
+      expect(resolved).toBe(resolve(subpackageDir, "src/token.ts"));
     });
   });
 

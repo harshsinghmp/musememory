@@ -133,9 +133,17 @@ export function auditMeshContracts(topology: MeshTopology, store: Store): MeshCo
 
           const stripped = relativePath.replace(/^repo:[^/]+\//, "");
           // External by design (T-363): normalize + reject NUL, never confine.
-          const resolvedPath = resolveExternal(
-            path.isAbsolute(stripped) ? stripped : path.join(topology.rootPath, stripped),
+          let resolvedPath = resolveExternal(
+            path.isAbsolute(stripped)
+              ? stripped
+              : path.join(anchor.base_path || topology.rootPath, stripped),
           );
+          if (!fs.existsSync(resolvedPath) && anchor.base_path && topology.rootPath) {
+            const fallbackPath = resolveExternal(path.join(topology.rootPath, stripped));
+            if (fs.existsSync(fallbackPath)) {
+              resolvedPath = fallbackPath;
+            }
+          }
 
           if (!fs.existsSync(resolvedPath)) {
             items.push({
