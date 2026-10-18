@@ -26,16 +26,16 @@
 ## Wave C — P0 RELIABILITY (v2.4.0)
 
 - [x] T-020 · landed #73 — query-cache self-destruction fix (writes no longer poison read cache) · store.ts:281 vs cache.ts:124/212 · F
-- [ ] T-021 · memoized file verification in ranking hot path · retrieval.ts:199-204 · new · F
-- [ ] T-022 · precomputed token sets per memory (drop per-query retokenization) · retrieval.ts · new · F
-- [ ] T-023 · `openStore` dirty-gate: skip wiki recompile + CURRENT.md sync per MCP call · store.ts openStore · new · F
+- [x] T-021 · landed Wave 13 (#172) — memoized file verification in ranking hot path · retrieval.ts:199-204 · new · F
+- [x] T-022 · landed Wave 13 (#174) — precomputed token sets per memory (drop per-query retokenization) · retrieval.ts · new · F
+- [x] T-023 · landed Wave 13 (#176) — `openStore` dirty-gate: skip wiki recompile + CURRENT.md sync per MCP call · store.ts openStore · new · F
 - [x] T-024 · landed #73 — bounded FTS preflight (cap term count; reject oversized queries) · store.ts · F
 - [x] T-025 · landed #73 — single-transaction writes (replace 3-commit paths; ~180ms→~60ms) · store.ts · F
 - [x] T-026 · landed #73 — FTS↔row parity check + repair command · store.ts · F
 - [ ] T-016 · dispatch-coverage matrix: 64/107 MCP tools referenced by NO test (T-016 was referenced but never defined — plan's largest coverage hole had no ticket). Ships with Wave 5; T-371 lands first · F
 - [x] RESOLVED (intended lane): `dedup` IS wired at store.ts:418 — only memory_capture omits it; scope folded into T-027 note + T-040 covers the missing normalization · mcp.ts:55, quality · new · F
-- [ ] T-028 · `recordRetrievals`: wire into recall or delete · mcp.ts:1692, quality · new · F
-- [ ] T-029 · `touchActivity`: wire into store or delete · optimize.ts:77 · new · F
+- [x] T-028 · landed Wave 13 (#178) — `recordRetrievals`: wire into recall or delete · mcp.ts:1692, quality · new · F
+- [x] T-029 · landed Wave 13 (#180) — `touchActivity`: wire into store or delete · optimize.ts:77 · new · F
 - [x] T-030 · landed #75 — tombstone schema + ops (soft-delete, never hard-delete) · schema, store · branch: memory-tombstones · F
 - [x] T-031 · landed #75 — `memory_restore` CLI+MCP command · cli, mcp · branch: memory-tombstones · F
 - [x] T-032 · landed #75 — audit-replay restore (rebuild from audit.jsonl) · store · branch: memory-tombstones · F
@@ -67,9 +67,9 @@
 - [x] MERGED→T-058 T-059 · log-once dedup for revalidation skips · retrieval · branch: poisoning-trust-tiers · F
 - [x] T-060 · landed Wave 3 — safe FTS5 query construction (quote every token, prefix wildcards, T-312 error log) · sqlite.ts · branch: feat/wave-3-retrieval-ranking · F
 - [x] T-061 · landed Wave 3 — compound-token expansion (camelCase/PascalCase/snake_case split) · retrieval.ts · branch: feat/wave-3-retrieval-ranking · F
-- [ ] T-062 · clamp model-supplied `limit` values · mcp tools · new · F
-- [ ] T-063 · dry-run-by-default, point-id-only destructive ops · mcp, cli · new · F
-- [ ] T-064 · read-path `stale:true` provenance tag for degraded/cache reads · retrieval · new · F
+- [x] T-062 · landed Wave 13 (#182) — clamp model-supplied `limit` values · mcp tools · new · F
+- [x] T-063 · landed Wave 13 (#184) — dry-run-by-default, point-id-only destructive ops · mcp, cli · new · F
+- [x] T-064 · landed Wave 13 (#186) — read-path `stale:true` provenance tag for degraded/cache reads · retrieval · new · F
 
 ## Wave D — P1 MEMORY QUALITY (v2.5.0)
 
@@ -534,11 +534,12 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 11. **Wave 10: CLI Rigor, Governance & Hardened Parsers** (`T-013`, `T-014`, `T-347`, `T-353`, `T-354`, `T-360`) — [x] Landed on dev
 12. **Wave 11: Migrator Quarantine, Anti-Poisoning & Validation Hardening** (`T-366`, `T-338`, `T-339`, `T-340`, `T-348`, `T-349`, `T-357`, `T-362`) — [x] Landed on dev
 13. **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions** (`T-345`, `T-346`, `T-350`, `T-352`, `T-356`, `T-358`, `T-359`, `T-365`) — [x] Landed on dev
+14. **Wave 13: Retrieval Performance & Store Hot-Paths** (`T-021`, `T-022`, `T-023`, `T-028`, `T-029`, `T-062`, `T-063`, `T-064`) — [x] Landed on dev
 
 ## v11 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 147 |
-| Active Remaining | 143 |
+| Landed on dev | 155 |
+| Active Remaining | 135 |
 

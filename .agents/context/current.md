@@ -5,12 +5,21 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 12 Focus)
-- **Wave 13: Retrieval Performance & Store Hot-Paths**: `T-021` (memoized file verification in ranking hot path), `T-022` (precomputed token sets per memory), `T-023` (`openStore` dirty-gate: skip wiki recompile + CURRENT.md sync per MCP call), `T-028` (`recordRetrievals` wiring), `T-029` (`touchActivity` wiring), `T-062` (clamp model-supplied `limit` values), `T-063` (dry-run-by-default for destructive ops), `T-064` (read-path `stale:true` provenance tag).
+## ⏭️ Next Up (Post-Wave 13 Focus)
+- **Wave 14: Invalidation, Attribution & Ranking Rigor**: `T-302` (`memory_capture` full passthrough options), `T-304` (vector index invalidation on `save()`), `T-307` (Hebbian graph bounded incremental updates), `T-309` (IDF-weighted symbol matching), `T-310` (word-boundary token matching), `T-312` (FTS failure degraded signal).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 13: Retrieval Performance & Store Hot-Paths**:
+  - `T-021`: Memoized runtime file verification in ranking hot path (PR #172, Closes #171)
+  - `T-022`: Precomputed token sets per memory to drop per-query retokenization (PR #174, Closes #173)
+  - `T-023`: `openStore` dirty-gate with SQLite fingerprinting to skip redundant wiki recompiles & CURRENT.md sync (PR #176, Closes #175)
+  - `T-028`: `recordRetrievals` wiring into `get_context` deferred writes & `memory_recall` (PR #178, Closes #177)
+  - `T-029`: `touchActivity` wiring into `save()` with 1-second throttling (PR #180, Closes #179)
+  - `T-062`: Clamp model-supplied `limit` values across all retrieval engines and MCP handlers (PR #182, Closes #181)
+  - `T-063`: Dry-run-by-default and point-ID-only validation for destructive ops (PR #184, Closes #183)
+  - `T-064`: Read-path `stale: true` and `from_cache: boolean` provenance tags for degraded reads (PR #186, Closes #185)
 - [x] **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions**:
   - `T-345`: Daemon server.on("error") collision handling, /publish origin validation, active socket disposal on close (PR #156, Closes #155)
   - `T-346`: Upgrade CLI exit codes with --check registry error truthfulness, --fail-on-update, and --strict (PR #158, Closes #157)

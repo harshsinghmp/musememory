@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-892%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-902%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -40,6 +40,8 @@
 
 ## What changed
 
+- **Retrieval Performance & Hot-Path Hardening (Wave 13)**: Precomputed WeakMap token sets ($O(1)$ lookup), memoized runtime code-anchor verification, dirty-gated store loads (`count(*)` + `max(updated_at)` fingerprinting), input limit clamping, and `stale: boolean` provenance tags for degraded reads ([docs/retrieval-performance-and-limits.md](docs/retrieval-performance-and-limits.md)).
+- **Point-ID-Only Dry-Run Deletions**: Hardened destructive deletion commands (`memory delete`, `memory_delete`) defaulting to dry-run previews and blocking wildcard expressions to prevent accidental data loss.
 - **Real-Time Agency Hub (SSE)**: Fast event fan-out on `http://localhost:31338/events` for parallel agent swarms, featuring CSRF origin filtering and clean socket disposal (`memory daemon`).
 - **Living ADR & Drift Sentry**: Binding Architecture Decision Records to line-independent structural code anchors with write-time `base_path` normalization and pure read-path drift auditing (`memory adr`, `memory check --drift`).
 - **Reasoning Tree PageIndex Depth Controls**: Hierarchical document navigation with configurable `maxDepth` traversal limits and tiered `disclosureDepth` (`L1`/`L2`/`L3`) for token economics.
@@ -186,6 +188,7 @@ Explore comprehensive documentation tailored for both solo developers and engine
 | :--- | :--- | :--- |
 | 🧠 **[Core Concepts & Architecture](docs/concepts.md)** | **ACCA Framework**: Explains the guarded 7-state lifecycle machine, dual-scope engine, knapsack scoring, and zero-daemon architecture. | Tech Leads, Architects, Evaluators |
 | 🛠️ **[Developer Daily User Guide](docs/user-guide.md)** | **QUEST Framework**: The 3-phase daily pair-programming loop (`/muse-ground` → `CURRENT.md` → `/muse-capture`). | Solo Developers, Daily AI Coders |
+| ⚡ **[Retrieval Performance & Guardrails](docs/retrieval-performance-and-limits.md)** | **QUEST Framework**: WeakMap token sets, memoized runtime anchors, dirty-gating, limit clamping, and dry-run safety. | Platform Engineers, AI Architects |
 | 🏛️ **[Living Architecture & Drift Auditing](docs/living-architecture-and-drift.md)** | **ACCA Framework**: Binding ADRs to line-independent code anchors, write-time `base_path` normalization, and pure read-path drift sentry. | System Architects, Tech Leads |
 | ⚡ **[Real-Time Daemon & Observability](docs/daemon-and-observability.md)** | **QUEST Framework**: Real-time SSE event hub (`memory daemon`), CI upgrade gates (`--check`, `--strict`), and PageIndex depth parameters. | Swarm Engineers, DevOps, Builders |
 | 👥 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** | Single-host server deployment, systemd/Docker setups, and per-editor client recipes (Cursor, Opencode, Claude Code, Antigravity, Windsurf). | Engineering Managers, Team Leads |
