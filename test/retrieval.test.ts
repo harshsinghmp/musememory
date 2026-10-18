@@ -15,6 +15,9 @@ import {
   getEntryTokenSet,
   invalidateEntryTokenSet,
   clampLimit,
+  calculateSymbolSpecificity,
+  GENERIC_COMMON_SYMBOLS,
+  computeFactors,
 } from "../src/retrieval.ts";
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { RetrievalEngine } from "../src/retrieval/engine.ts";
@@ -459,6 +462,77 @@ describe("unified context & retrieval engine", () => {
     expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
 
     cleanup(root);
+  });
+
+  test("T-309: calculateSymbolSpecificity downweights generic symbols and rewards specific identifiers", () => {
+    // 1. Falsy and stopwords
+    expect(calculateSymbolSpecificity("")).toBe(0);
+    expect(calculateSymbolSpecificity("the")).toBe(0);
+    expect(calculateSymbolSpecificity("for")).toBe(0);
+
+    // 2. Generic verbs and ultra-short
+    expect(GENERIC_COMMON_SYMBOLS.has("get")).toBe(true);
+    expect(calculateSymbolSpecificity("get")).toBe(0.05);
+    expect(calculateSymbolSpecificity("set")).toBe(0.05);
+    expect(calculateSymbolSpecificity("run")).toBe(0.05);
+    expect(calculateSymbolSpecificity("db")).toBe(0.05);
+    expect(calculateSymbolSpecificity("foo")).toBe(0.15);
+
+    // 3. Compound identifiers (snake_case, camelCase, dotted)
+    expect(calculateSymbolSpecificity("SessionManager")).toBe(1.0);
+    expect(calculateSymbolSpecificity("auth_token")).toBe(1.0);
+    expect(calculateSymbolSpecificity("jwt.verify")).toBe(1.0);
+    expect(calculateSymbolSpecificity("handleClick")).toBe(1.0);
+
+    // 4. Length-based specificity
+    expect(calculateSymbolSpecificity("database")).toBe(0.85); // length 8
+    expect(calculateSymbolSpecificity("token")).toBe(0.60);    // length 5
+    expect(calculateSymbolSpecificity("rate")).toBe(0.35);     // length 4
+  });
+
+  test("T-309: computeFactors applies IDF-weighted symbol matching rather than flat 1.0", () => {
+    const entryGeneric = {
+      id: "mem-generic",
+      title: "How to get records",
+      content: "Call `get` to read value.",
+      project: "aria",
+      type: "decision",
+      confirmed: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any;
+
+    const entrySpecific = {
+      id: "mem-specific",
+      title: "Session token rotation",
+      content: "Use `SessionManager` for rotation.",
+      project: "aria",
+      type: "decision",
+      confirmed: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any;
+
+    const now = Date.now();
+    // Query containing generic verb "get"
+    const factorsGeneric = computeFactors(entryGeneric, ["get", "records"], { now });
+    // exactSymbolMatch should be downweighted (0.05) instead of binary 1.0
+    expect(factorsGeneric.exactSymbolMatch).toBe(0.05);
+
+    // Query containing specific compound identifier "SessionManager"
+    const factorsSpecific = computeFactors(entrySpecific, ["SessionManager", "rotation"], { now });
+    expect(factorsSpecific.exactSymbolMatch).toBe(1.0);
+
+    // Query containing lowercased "sessionmanager" (length >= 8) awards 0.85
+    const factorsLower = computeFactors(entrySpecific, ["sessionmanager", "rotation"], { now });
+    expect(factorsLower.exactSymbolMatch).toBe(0.85);
+
+    // Explicit ctx.targetSymbol preserves 1.0 even for generic symbol
+    const factorsExplicit = computeFactors(entryGeneric, ["records"], {
+      now,
+      targetSymbol: "get",
+    });
+    expect(factorsExplicit.exactSymbolMatch).toBe(1.0);
   });
 });
 
