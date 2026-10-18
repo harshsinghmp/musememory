@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { MigratedRecord, ProviderAdapter } from "../types.ts";
-import { normalizeMemoryType } from "../types.ts";
+import { normalizeMemoryType, normalizeMemoryStatus } from "../types.ts";
 import type { MemoryStatus } from "../../types.ts";
 
 export const AgentMemoryAdapter: ProviderAdapter = {
@@ -41,8 +41,17 @@ export const AgentMemoryAdapter: ProviderAdapter = {
         if (!content || typeof content !== "string") continue;
 
         const title = item.title || content.slice(0, 60).replace(/[\r\n]+/g, " ");
-        const isLatest = item.isLatest !== false && item.archived !== true;
-        const status: MemoryStatus = isLatest ? "confirmed" : "superseded";
+        const isArchived = item.archived === true || item.isLatest === false;
+        let status: MemoryStatus;
+        if (isArchived) {
+          status = "superseded";
+        } else if (item.status) {
+          status = normalizeMemoryStatus(String(item.status));
+        } else if (item.isLatest === true) {
+          status = "confirmed";
+        } else {
+          status = "candidate";
+        }
         const type = normalizeMemoryType(item.type);
 
         const tags = Array.isArray(item.concepts) ? item.concepts : (Array.isArray(item.tags) ? item.tags : []);

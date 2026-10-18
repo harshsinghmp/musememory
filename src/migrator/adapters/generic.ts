@@ -2,7 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import yaml from "js-yaml";
 import type { MigratedRecord, ProviderAdapter } from "../types.ts";
-import { normalizeMemoryType } from "../types.ts";
+import { normalizeMemoryType, normalizeMemoryStatus } from "../types.ts";
+import type { MemoryStatus } from "../../types.ts";
 
 export const GenericAdapter: ProviderAdapter = {
   id: "generic",
@@ -94,13 +95,14 @@ export const GenericAdapter: ProviderAdapter = {
           const doc = yaml.load(raw) as any;
           if (doc && typeof doc === "object") {
             const content = (doc.content || doc.description || (typeof doc === "string" ? doc : "")).trim();
-            if (!content || content.length < 5) return;
-            const isArchived = doc.status === "archived" || doc.status === "superseded" || doc.status === "stale";
+            const isArchived = doc.status === "archived" || doc.status === "superseded" || doc.status === "stale" || doc.is_active === false;
+            const parsedStatus = normalizeMemoryStatus(doc.status, isArchived);
+            const status: MemoryStatus = parsedStatus === "confirmed" ? "candidate" : parsedStatus;
             results.push({
               title: doc.title || filename.replace(/\.(yaml|yml)$/, ""),
               content,
               project: doc.project || options.defaultProject || "default",
-              status: isArchived ? (doc.status === "stale" ? "stale" : "superseded") : "candidate",
+              status,
               type: normalizeMemoryType(doc.type),
               tags: Array.isArray(doc.tags) ? doc.tags : ["yaml-imported"],
               source: `migrated:${filename}`,
