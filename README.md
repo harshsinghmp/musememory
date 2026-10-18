@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-908%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-948%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -40,6 +40,7 @@
 
 ## What changed
 
+- **Expiry, Decay & Confidence Hardening (Wave 15)**: Tokenizer-matched abstention gates (`evaluateAbstentionGate`), explicit `no_confident_match` mode eliminating model hallucination, materialized `decay_score` in SQLite with importance gating (0.4x to 3.0x), Bayesian corroboration confidence ($C(n) = 1 - 0.7^n$), trust-tier-keyed half-lives (T1 365d → T4 30d) defending against OWASP ASI06 poisoning, per-type admission `expires_at` defaults (fix 90d, op 180d, arch 365d, disc 30d), stamped `status: 'expired'`, `expired_at`, and `expired_by` rule tracking, pin-capable first-match-wins declarative expiry policy YAML (`.memory/expiry.yaml`), and optional Weibull hazard curve modeling ($R(t) = \exp(-(t/\lambda)^k)$) ([docs/expiry-decay-and-confidence.md](docs/expiry-decay-and-confidence.md)).
 - **Invalidation, Attribution & Ranking Rigor (Wave 14)**: Incremental `index.json` vector synchronization on `save()` and `deleteEntry()`, bounded Hebbian co-activation plasticity (8 seeds, 30 edges, 500 nodes), IDF-weighted symbol matching (generic verbs downweighted to 0.05, compound identifiers scored 1.0), Unicode word-boundary matching blocking false positives (`race⊂trace`, `port⊂report`), and explicit SQLite FTS failure degradation signals with `[FTS5_DEGRADED]` logging ([docs/retrieval-ranking-and-invalidation.md](docs/retrieval-ranking-and-invalidation.md)).
 - **Retrieval Performance & Hot-Path Hardening (Wave 13)**: Precomputed WeakMap token sets ($O(1)$ lookup), memoized runtime code-anchor verification, dirty-gated store loads (`count(*)` + `max(updated_at)` fingerprinting), input limit clamping, and `stale: boolean` provenance tags for degraded reads ([docs/retrieval-performance-and-limits.md](docs/retrieval-performance-and-limits.md)).
 - **Point-ID-Only Dry-Run Deletions**: Hardened destructive deletion commands (`memory delete`, `memory_delete`) defaulting to dry-run previews and blocking wildcard expressions to prevent accidental data loss.

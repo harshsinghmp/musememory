@@ -1,23 +1,25 @@
-# HANDOFF — 2026-10-18T19:08:00Z
-branch: dev @ 454b29c | phase: Wave 14 complete; dev green 908/0
+# HANDOFF — 2026-10-19T02:12:00Z
+branch: dev @ 22002ba | phase: Wave 15 complete; dev green 948/0
 
 ## Next Step
-Advance to Wave 15 (Expiry, Decay & Confidence Hardening: T-072, T-073, T-074, T-076, T-077, T-078-T-081).
+Advance to Wave 16 (Temporal Transitions, Contradiction Engine & Verbs: T-082–T-086).
 
 ## In-Flight
-- Wave 14 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #188-#198):
-  - T-302: memory_capture full propose options passthrough (PR #188)
-  - T-304: Incremental index.json vector sync on save() & deleteEntry() (PR #190)
-  - T-307: Bounded Hebbian plasticity (8 seeds, 30 edges, 500 nodes) (PR #192)
-  - T-309: IDF-weighted symbol matching (generic 0.05 vs compound 1.0) (PR #194)
-  - T-310: Word-boundary token matching blocks race⊂trace, port⊂report (PR #196)
-  - T-312: FTS failure degraded signal distinguishes 0-match from error (PR #198)
-- Docs pass completed: docs/retrieval-ranking-and-invalidation.md (ACCA), user-guide.md updated.
-- Full suite green: 908 pass, 0 fail; tsc + build clean.
+- Wave 15 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #200–#216):
+  - T-072: FTS5-tokenizer-matched abstention gate (PR #200)
+  - T-073: no_confident_match result mode across retrieval & MCP (PR #202)
+  - T-074: Materialized decay_score & importance-gated half-lives (PR #204)
+  - T-076: Bayesian corroboration confidence C(n) = 1 - 0.7^n (PR #206)
+  - T-077: Trust-tier-keyed half-life T1 365d → T4 30d (PR #208)
+  - T-078: Per-type default expires_at (fix 90d, op 180d, arch 365d, disc 30d) (PR #210)
+  - T-079: Stamped expiry status, expired_at, and expired_by rule name (PR #212)
+  - T-080: Pin-capable first-match-wins expiry policy YAML engine (PR #214)
+  - T-081: Optional Weibull per-type hazard curves R(t) = exp(-(t/λ)^k) (PR #216)
+- Docs pass: docs/expiry-decay-and-confidence.md, user-guide.md, README.md (948 passed).
 
 ## Decisions
-- Downweight generic symbols (get/set) to 0.05, compound identifiers (SessionManager) to 1.0.
-- FTS5 returns degraded: true with loud [FTS5_DEGRADED] logs on SQL/engine execution failure.
+- Calibration invariant: λ = t_half / (ln 2)^(1/k) guarantees R(t_half) = 0.5 for all k.
+- OWASP ASI06 defense: untrusted sources decay at 30d half-life; pin exemptions never expire.
 
 ## Verify
-`bun test` 908/0 + `bunx tsc --noEmit` + `bun run build`
+`bun test` 948/0 + `bunx tsc --noEmit` + `bun run build`
