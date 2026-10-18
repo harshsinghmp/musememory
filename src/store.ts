@@ -1161,6 +1161,107 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
   return entry;
 }
 
+/**
+ * T-079: Transition a memory entry to expired status, stamping expired_at and expired_by rule name.
+ * Respects pin exemptions (pinned: true entries cannot be expired unless forced).
+ */
+export function expireEntry(
+  store: Store,
+  id: string,
+  options?: {
+    rule?: string;
+    expired_at?: string;
+    reason?: string;
+    force?: boolean;
+  },
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  // Pin-capable exemption: pinned entries never expire unless explicitly forced
+  if (entry.pinned && !options?.force) {
+    return entry;
+  }
+
+  const now = options?.expired_at ?? nowIso();
+  const ruleName = options?.rule ?? "rule:default_expiry";
+
+  entry.status = "expired";
+  entry.expired_at = now;
+  entry.expired_by = ruleName;
+  entry.quality = determineQuality(entry);
+  closeOutValidity(entry);
+
+  if (options?.reason) {
+    entry.content = `${entry.content}\n\nExpired: [${ruleName}] ${options.reason}`;
+  }
+  entry.updated_at = now;
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "expire",
+      entry_id: entry.id,
+      project: entry.project,
+      reason: options?.reason,
+      details: {
+        expired_at: now,
+        expired_by: ruleName,
+      },
+    });
+  }
+
+  return entry;
+}
+
+/** T-079: Alias for expireEntry */
+export const markExpired = expireEntry;
+
+/**
+ * T-079: Sweep and expire all entries in the store whose expires_at is past now.
+ */
+export function sweepExpiredEntries(
+  store: Store,
+  options?: {
+    now?: number;
+    rule?: string;
+    project?: string;
+  },
+): { expired: MemoryEntry[]; skippedPinned: number } {
+  const nowMs = options?.now ?? Date.now();
+  const entries = list(store, { project: options?.project });
+  const expired: MemoryEntry[] = [];
+  let skippedPinned = 0;
+
+  for (const entry of entries) {
+    if (entry.status === "expired" || entry.status === "archived" || entry.status === "superseded") {
+      continue;
+    }
+    if (entry.pinned) {
+      skippedPinned++;
+      continue;
+    }
+    if (entry.expires_at) {
+      const expiresMs = Date.parse(entry.expires_at);
+      if (!Number.isNaN(expiresMs) && expiresMs <= nowMs) {
+        const res = expireEntry(store, entry.id, {
+          rule: options?.rule ?? `ttl_${entry.type ?? "discovery"}`,
+          expired_at: new Date(nowMs).toISOString(),
+        });
+        if (res) expired.push(res);
+      }
+    }
+  }
+
+  return { expired, skippedPinned };
+}
+
 /** Two-way link: union related_memory_ids on both sides, no dupes. */
 export function link(store: Store, id: string, relatedIds: string[]): MemoryEntry | null {
   const primary = get(store, id);

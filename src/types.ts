@@ -67,7 +67,8 @@ export type MemoryStatus =
   | "conflicted"
   | "cold"
   | "dormant"
-  | "archived";
+  | "archived"
+  | "expired";
 
 export type MemoryScope = "local" | "project" | "global";
 
@@ -247,6 +248,10 @@ export interface MemoryEntry {
   confidence?: number;
   /** T-078 & T-080: Pin status exempting memory from expiration policies. */
   pinned?: boolean;
+  /** T-079: Timestamp when the memory was expired. */
+  expired_at?: string;
+  /** T-079: Rule name that caused the memory expiration (e.g. 'ttl_fix_90d', 'governor_sweep'). */
+  expired_by?: string;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";
@@ -281,6 +286,7 @@ export const STATUS_PENALTY: Record<MemoryStatus, number> = {
   cold: -0.2,
   dormant: -0.5,
   archived: -0.9,
+  expired: -1.0,
 };
 
 export const VERIFICATION_BONUS: Record<VerificationLevel, number> = {
@@ -333,7 +339,8 @@ export type AuditOperation =
   | "optimize"
   | "memory_branch"
   | "memory_checkout"
-  | "memory_blame";
+  | "memory_blame"
+  | "expire";
 
 export interface AuditEntry {
   timestamp: string;

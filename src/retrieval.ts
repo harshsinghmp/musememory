@@ -417,8 +417,9 @@ export function dueDateBonus(entry: MemoryEntry, now: number): number {
   return 0;
 }
 
-/** True when entry.expires_at is set and in the past (unparseable dates never expire). */
+/** True when entry.expires_at is set and in the past, or status is "expired" (unparseable dates never expire). */
 export function isExpired(entry: MemoryEntry, now: number): boolean {
+  if (entry.status === "expired") return true;
   if (!entry.expires_at) return false;
   const t = Date.parse(entry.expires_at);
   return !Number.isNaN(t) && t <= now;
