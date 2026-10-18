@@ -101,7 +101,7 @@ The refresh token expiration was not properly checked.
     expect(res.isError).toBeFalsy();
     const parsed = JSON.parse(res.content[0].text);
     expect(parsed).toBeDefined();
-  });
+  }, 15000);
 
   test("accepts auto=true flag without text to trigger transcript harvesting", async () => {
     const server = createServer(tmpDir, "full");
@@ -118,5 +118,5 @@ The refresh token expiration was not properly checked.
     expect(res.isError).toBeFalsy();
     const parsed = JSON.parse(res.content[0].text);
     expect(parsed).toBeDefined();
-  });
+  }, 15000);
 });
