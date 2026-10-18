@@ -78,7 +78,7 @@ export function termFrequencies(text: string): { tf: Record<string, number>; len
 
 /** Build a full index over the store. ponytail: O(n) full rebuild every time — fine to ~10k entries; switch to incremental per-entry upserts if stores grow past that. */
 export function rebuildIndex(store: Store): VectorIndex {
-  const index: VectorIndex = { version: 1, entries: {} };
+  const index: VectorIndex = { version: 1, updated_at: new Date().toISOString(), entries: {} };
   for (const e of list(store)) {
     const text = `${e.title} ${e.content} ${(e.tags ?? []).join(" ")}`;
     const { tf, len } = termFrequencies(text);
@@ -90,6 +90,45 @@ export function rebuildIndex(store: Store): VectorIndex {
 export function saveIndex(index: VectorIndex, memoryDir: string): void {
   if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
   writeFileSync(indexFilePath(memoryDir), JSON.stringify(index), "utf8");
+}
+
+/**
+ * T-304: Incrementally upsert an entry into index.json if the index file exists.
+ * Does not force index creation if none exists yet (rebuildIndex handles cold stores).
+ */
+export function upsertIndexEntry(entry: MemoryEntry, memoryDir: string): boolean {
+  const p = indexFilePath(memoryDir);
+  if (!existsSync(p)) return false;
+  try {
+    const index = loadIndex(memoryDir);
+    if (!index) return false;
+    const text = `${entry.title} ${entry.content} ${(entry.tags ?? []).join(" ")}`;
+    const { tf, len } = termFrequencies(text);
+    index.entries[entry.id] = { vector: embed(text), tf, len };
+    index.updated_at = new Date().toISOString();
+    saveIndex(index, memoryDir);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * T-304: Remove an entry from index.json upon deletion or tombstoning.
+ */
+export function removeIndexEntry(id: string, memoryDir: string): boolean {
+  const p = indexFilePath(memoryDir);
+  if (!existsSync(p)) return false;
+  try {
+    const index = loadIndex(memoryDir);
+    if (!index || !index.entries[id]) return false;
+    delete index.entries[id];
+    index.updated_at = new Date().toISOString();
+    saveIndex(index, memoryDir);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadIndex(memoryDir: string): VectorIndex | null {
