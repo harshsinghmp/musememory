@@ -1,6 +1,8 @@
 import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { openStore, propose, markSuperseded } from "../src/store.ts";
+import { verifyRuntimeFiles } from "../src/graph.ts";
 import { setCurrent } from "../src/current.ts";
 import {
   queryContext,
@@ -274,4 +276,61 @@ describe("unified context & retrieval engine", () => {
 
     cleanup(root);
   });
+
+  test("T-021: memoized file verification caches path checks and verdicts across candidates", () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+    const now = Date.now();
+
+    // Create an actual file in workspace
+    const realFile = join(root, "src", "index.ts");
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(realFile, "export const x = 1;");
+
+    const e1 = propose(store, {
+      title: "Architecture 1",
+      content: "Module A handles data",
+      project: "test",
+      type: "decision",
+      confirmed: true,
+      graph: {
+        provider: "codegraph",
+        affected_paths: ["src/index.ts", "src/missing.ts"],
+      },
+    });
+
+    const e2 = propose(store, {
+      title: "Architecture 2",
+      content: "Module B handles data",
+      project: "test",
+      type: "decision",
+      confirmed: true,
+      graph: {
+        provider: "codegraph",
+        affected_paths: ["src/index.ts", "src/missing.ts"],
+      },
+    });
+
+    // Test verifyRuntimeFiles path cache
+    const pathCache = new Map<string, boolean>();
+    const verdict1 = verifyRuntimeFiles(e1, root, pathCache);
+    expect(verdict1.verdict).toBe("WEAK");
+    expect(verdict1.existingPaths).toEqual(["src/index.ts"]);
+    expect(verdict1.missingPaths).toEqual(["src/missing.ts"]);
+    expect(pathCache.size).toBe(2);
+    expect(pathCache.get(realFile)).toBe(true);
+
+    // Call verifyRuntimeFiles on e2 with the same pathCache
+    const verdict2 = verifyRuntimeFiles(e2, root, pathCache);
+    expect(verdict2.verdict).toBe("WEAK");
+    expect(verdict2.existingPaths).toEqual(["src/index.ts"]);
+
+    // Test sortCandidates with workspaceRoot runs through memoized fileVerificationCache
+    const scored = sortCandidates([e1, e2], ["data"], now, undefined, root);
+    expect(scored.length).toBe(2);
+
+    cleanup(root);
+  });
 });
+
