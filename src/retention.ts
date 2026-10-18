@@ -63,6 +63,52 @@ export function stalePolicyDays(type?: string): number | null {
   return policy ? policy.stale_after_days : DEFAULT_STALE_DAYS;
 }
 
+/**
+ * T-078: Per-type default expiration horizons in days.
+ * - fix: 90 days
+ * - operation: 180 days
+ * - architecture: 365 days
+ * - discovery: 30 days
+ * - preference: null (never expires)
+ * - constraint: null (never expires)
+ * - adr: 365 days
+ * - negative: 180 days
+ */
+export const DEFAULT_EXPIRY_DAYS_BY_TYPE: Record<string, number | null> = {
+  fix: 90,
+  operation: 180,
+  architecture: 365,
+  discovery: 30,
+  preference: null,
+  constraint: null,
+  adr: 365,
+  negative: 180,
+};
+
+export function defaultExpiryDays(type?: string): number | null {
+  if (!type) return null;
+  if (type in DEFAULT_EXPIRY_DAYS_BY_TYPE) {
+    return DEFAULT_EXPIRY_DAYS_BY_TYPE[type];
+  }
+  return stalePolicyDays(type);
+}
+
+export function computeDefaultExpiresAt(
+  type?: string,
+  baseTime: string | number | Date = Date.now(),
+): string | undefined {
+  const days = defaultExpiryDays(type);
+  if (days === null || days === undefined) return undefined;
+  const ms =
+    baseTime instanceof Date
+      ? baseTime.getTime()
+      : typeof baseTime === "number"
+      ? baseTime
+      : Date.parse(baseTime);
+  if (Number.isNaN(ms)) return undefined;
+  return new Date(ms + days * 86_400_000).toISOString();
+}
+
 export interface StalenessPolicy {
   /** Base half-life in days (null = never stale). */
   halfLifeDays: number | null;

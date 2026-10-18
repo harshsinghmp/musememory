@@ -43,7 +43,7 @@ import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } fro
 export { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError };
 import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
 export { getStoreCircuitBreaker, CircuitBreaker };
-import { computeDecayScore } from "./retention.ts";
+import { computeDecayScore, computeDefaultExpiresAt } from "./retention.ts";
 import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
 export { registerWriteWorker, drainWriteWorkers };
 import { touchActivity } from "./optimize.ts";
@@ -806,11 +806,15 @@ export function propose(
     validFrom?: string;
     validTo?: string;
     dueAt?: string;
-    expiresAt?: string;
+    expiresAt?: string | null;
     valid_from?: string;
     valid_to?: string;
     due_at?: string;
-    expires_at?: string;
+    expires_at?: string | null;
+    /** T-078 & T-080: Pin status exempting memory from expiration policies. */
+    pinned?: boolean;
+    /** T-078: Enable automatic per-type default expiration calculation even when type is default. */
+    autoExpire?: boolean;
     test_command?: string;
     graph?: GraphMetadata;
     fingerprint?: string;
@@ -919,6 +923,20 @@ export function propose(
   const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
   const trust = deriveTrustTier(opts.source, opts.trust);
 
+  // T-078: Per-type default expires_at (fix 90d, operation 180d, architecture 365d, discovery 30d).
+  // Explicit overrides (string) win; explicit null opts out; pinned/timeless exempt.
+  let expires_at: string | undefined;
+  if (opts.expiresAt !== undefined || opts.expires_at !== undefined) {
+    const rawExpiry = opts.expiresAt ?? opts.expires_at;
+    expires_at = rawExpiry === null ? undefined : rawExpiry;
+  } else if (
+    !opts.pinned &&
+    temporal_mode !== "timeless" &&
+    (opts.type !== undefined || opts.autoExpire === true)
+  ) {
+    expires_at = computeDefaultExpiresAt(opts.type ?? "discovery", now);
+  }
+
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
     title,
@@ -934,7 +952,8 @@ export function propose(
     valid_from: opts.validFrom ?? opts.valid_from,
     valid_to: opts.validTo ?? opts.valid_to,
     due_at: opts.dueAt ?? opts.due_at,
-    expires_at: opts.expiresAt ?? opts.expires_at,
+    expires_at,
+    pinned: opts.pinned,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
     graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),

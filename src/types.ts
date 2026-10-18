@@ -245,6 +245,8 @@ export interface MemoryEntry {
   decay_score?: number;
   /** T-076: Bayesian confidence score computed from independent corroboration C(n) = 1 - 0.7^n. */
   confidence?: number;
+  /** T-078 & T-080: Pin status exempting memory from expiration policies. */
+  pinned?: boolean;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";
