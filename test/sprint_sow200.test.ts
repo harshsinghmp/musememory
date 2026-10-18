@@ -233,6 +233,28 @@ describe("SOW-204: Gradient-Free Hebbian Co-Activation Plasticity", () => {
     expect(associations[1].targetId).toBe("m_cookies");
     expect(associations[1].weight).toBeCloseTo(0.05, 2);
   });
+
+  it("T-307: bounds co-activation seeds and edge counts per node", async () => {
+    const { recordCoActivation, getAssociatedMemories, MAX_COACTIVE_SEEDS, MAX_EDGES_PER_NODE } = await import("../src/plasticity.ts");
+    const memoryDir = join(testDir, ".memory_plasticity_bounds");
+    mkdirSync(memoryDir, { recursive: true });
+
+    // 1. Pass 20 IDs: only the first MAX_COACTIVE_SEEDS (8) should be linked
+    const ids = Array.from({ length: 20 }, (_, i) => `m_${i}`);
+    recordCoActivation(ids, memoryDir);
+
+    const m0Associations = getAssociatedMemories("m_0", memoryDir);
+    // m_0 should only have associations with m_1..m_7 (7 targets)
+    expect(m0Associations.length).toBe(MAX_COACTIVE_SEEDS - 1);
+    expect(m0Associations.every((a) => parseInt(a.targetId.split("_")[1]) < MAX_COACTIVE_SEEDS)).toBe(true);
+
+    // 2. Add 40 edges to m_0: should be capped at MAX_EDGES_PER_NODE (30)
+    for (let i = 1; i <= 40; i++) {
+      recordCoActivation(["m_target", `m_edge_${i}`], memoryDir);
+    }
+    const targetAssociations = getAssociatedMemories("m_target", memoryDir);
+    expect(targetAssociations.length).toBeLessThanOrEqual(MAX_EDGES_PER_NODE);
+  });
 });
 
 describe("SOW-205: Semantic Memory Prompt Compression", () => {

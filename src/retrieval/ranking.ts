@@ -109,6 +109,21 @@ export async function rankAndRetrieveMemories(
     } catch {}
   }
 
+  // 1.5. T-307: Hebbian associative candidate expansion from top matches
+  if (store.memoryDir && ftsMatchIds.size > 0) {
+    try {
+      const { getAssociatedMemories } = await import("../plasticity.ts");
+      for (const id of Array.from(ftsMatchIds).slice(0, 3)) {
+        const associated = getAssociatedMemories(id, store.memoryDir);
+        for (const assoc of associated.slice(0, 5)) {
+          if (assoc.weight >= 0.2) {
+            ftsMatchIds.add(assoc.targetId);
+          }
+        }
+      }
+    } catch {}
+  }
+
   // 2. Optional Blast Radius pre-flight via Code Intelligence Provider
   const blastRadiusFiles = new Set<string>();
   if (options.targetSymbol || options.activeFilePath) {
