@@ -6,6 +6,7 @@ import { openStore } from "../store.ts";
 import type { MemoryEntry, MemoryScope, PromotionRecord } from "../types.ts";
 import type { PromotionEvaluation, PromotionResult } from "./types.ts";
 import { generalizeContent, isContentGeneralizable } from "./generalization.ts";
+import { evaluateCorroboration } from "../quality/corroboration.ts";
 
 /** Minimum successful reuse applications required for automatic global promotion */
 export const MIN_PROMOTION_SUCCESSFUL_USES = 5;
@@ -88,6 +89,9 @@ export interface CorroborationResult {
   distinctDays: number;
   nonSyntheticSources: string[];
   reason?: string;
+  /** T-076: Bayesian confidence score 1 - 0.7^n based on corroboration count. */
+  confidence?: number;
+  corroborationCount?: number;
 }
 
 export function checkCorroboration(entry: MemoryEntry): CorroborationResult {
@@ -142,11 +146,15 @@ export function checkCorroboration(entry: MemoryEntry): CorroborationResult {
     }
   }
 
+  const evalRes = evaluateCorroboration(entry);
+
   return {
     corroborated,
     distinctDays,
     nonSyntheticSources: nonSynthList,
     reason,
+    confidence: evalRes.confidence,
+    corroborationCount: evalRes.n,
   };
 }
 
