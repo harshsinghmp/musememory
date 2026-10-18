@@ -43,7 +43,20 @@ import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } fro
 export { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError };
 import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
 export { getStoreCircuitBreaker, CircuitBreaker };
-import { computeDecayScore, computeDefaultExpiresAt } from "./retention.ts";
+import {
+  computeDecayScore,
+  computeDefaultExpiresAt,
+  loadExpiryPolicyYaml,
+  evaluateExpiryPolicy,
+  applyExpiryPolicy,
+  parseExpiryPolicyYaml,
+} from "./retention.ts";
+export {
+  loadExpiryPolicyYaml,
+  parseExpiryPolicyYaml,
+  evaluateExpiryPolicy,
+  applyExpiryPolicy,
+};
 import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
 export { registerWriteWorker, drainWriteWorkers };
 import { touchActivity } from "./optimize.ts";
@@ -811,6 +824,10 @@ export function propose(
     valid_to?: string;
     due_at?: string;
     expires_at?: string | null;
+    createdAt?: string;
+    created_at?: string;
+    updatedAt?: string;
+    updated_at?: string;
     /** T-078 & T-080: Pin status exempting memory from expiration policies. */
     pinned?: boolean;
     /** T-078: Enable automatic per-type default expiration calculation even when type is default. */
@@ -919,22 +936,47 @@ export function propose(
   }
 
   const now = nowIso();
+  const createdAt = opts.createdAt ?? opts.created_at ?? now;
+  const updatedAt = opts.updatedAt ?? opts.updated_at ?? now;
   const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
   const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
   const trust = deriveTrustTier(opts.source, opts.trust);
 
-  // T-078: Per-type default expires_at (fix 90d, operation 180d, architecture 365d, discovery 30d).
+  // T-078 & T-080: Expiry & Pinning Policy evaluation (first-match-wins)
   // Explicit overrides (string) win; explicit null opts out; pinned/timeless exempt.
+  let pinned = opts.pinned;
   let expires_at: string | undefined;
+
   if (opts.expiresAt !== undefined || opts.expires_at !== undefined) {
     const rawExpiry = opts.expiresAt ?? opts.expires_at;
     expires_at = rawExpiry === null ? undefined : rawExpiry;
-  } else if (
-    !opts.pinned &&
-    temporal_mode !== "timeless" &&
-    (opts.type !== undefined || opts.autoExpire === true)
-  ) {
-    expires_at = computeDefaultExpiresAt(opts.type ?? "discovery", now);
+  } else {
+    // T-080: Check for declarative expiry.yaml in store.memoryDir
+    if (!pinned && store.memoryDir) {
+      const customPolicy = loadExpiryPolicyYaml(store.memoryDir);
+      if (customPolicy) {
+        const candidateEntry: any = {
+          title,
+          content: opts.content,
+          project: opts.project,
+          type: opts.type ?? "discovery",
+          tags: opts.tags ?? [],
+          trust,
+          temporal_mode,
+          created_at: createdAt,
+          pinned,
+        };
+        const match = evaluateExpiryPolicy(candidateEntry, customPolicy, Date.now());
+        if (match) {
+          if (match.pinned) pinned = true;
+          if (match.expires_at) expires_at = match.expires_at;
+        }
+      }
+    }
+
+    if (!pinned && temporal_mode !== "timeless" && expires_at === undefined && (opts.type !== undefined || opts.autoExpire === true)) {
+      expires_at = computeDefaultExpiresAt(opts.type ?? "discovery", createdAt);
+    }
   }
 
   const entry: MemoryEntry = {
@@ -944,8 +986,8 @@ export function propose(
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
     type: opts.type ?? "discovery",
-    created_at: now,
-    updated_at: now,
+    created_at: createdAt,
+    updated_at: updatedAt,
     source: opts.source ?? "manual",
     tags: opts.tags?.slice(0, 8) ?? [],
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
@@ -953,7 +995,7 @@ export function propose(
     valid_to: opts.validTo ?? opts.valid_to,
     due_at: opts.dueAt ?? opts.due_at,
     expires_at,
-    pinned: opts.pinned,
+    pinned,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
     graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),
