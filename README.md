@@ -55,6 +55,7 @@
 - [What Muse Memory does](#what-muse-memory-does)
 - [Key capabilities](#key-capabilities)
 - [Start with one command](#start-with-one-command)
+- [📖 Documentation & User Guides](#-documentation--user-guides)
 - [🔄 Upgrading & Self-Healing Maintenance](#-upgrading--self-healing-maintenance)
 - [👥 Team & Multi-Member Setup](#-team--multi-member-setup)
 - [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
@@ -171,8 +172,20 @@ git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
 
-> [!NOTE]
-> ### 📊 How does Muse Memory compare to other solutions?
+---
+
+## 📖 Documentation & User Guides
+
+Explore comprehensive documentation tailored for both solo developers and engineering leadership:
+
+| Guide | Intent & Framework | Target Audience |
+| :--- | :--- | :--- |
+| 🧠 **[Core Concepts & Architecture](docs/concepts.md)** | **ACCA Framework**: Explains the guarded 7-state lifecycle machine, dual-scope engine, knapsack scoring, and zero-daemon architecture. | Tech Leads, Architects, Evaluators |
+| 🛠️ **[Developer Daily User Guide](docs/user-guide.md)** | **QUEST Framework**: The 3-phase daily pair-programming loop (`/muse-ground` → `CURRENT.md` → `/muse-capture`). | Solo Developers, Daily AI Coders |
+| 👥 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** | Single-host server deployment, systemd/Docker setups, and per-editor client recipes (Cursor, Opencode, Claude Code, Antigravity, Windsurf). | Engineering Managers, Team Leads |
+| 🏛️ **[Team Slice Wiring & Architecture](docs/architecture/team-slice-wiring.md)** | Technical deep-dive into in-process SQLite WAL vs corrupted network mounts. | Infrastructure Engineers, Systems Architects |
+| 📊 **[Agent Memory Comparison Dossier](https://harshsinghmp.github.io/musememory/musememory-comparison.html)** | 68-engine benchmark comparing storage, retrieval, privacy, and token economics. | Decision Makers, Evaluators |
+
 ---
 
 ## 🔄 Upgrading & Self-Healing Maintenance
