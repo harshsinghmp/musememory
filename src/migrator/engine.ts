@@ -10,6 +10,7 @@ import { getCurrent, setCurrent } from "../current.ts";
 import { workspaceRootFor } from "../root.ts";
 import { recordAuditEvent } from "../audit.ts";
 import type { MigrationOptions, MigrationReport, MigrationProviderReport, ProviderAdapter, MigratedRecord } from "./types.ts";
+import { validateMigratedRecord } from "./types.ts";
 
 const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   agentmemory: AgentMemoryAdapter,
@@ -88,8 +89,9 @@ export async function runMigration(
         }
       }
 
-      for (const record of records) {
-        if (!record.content || !record.content.trim()) continue;
+      for (const rawRecord of records) {
+        const record = validateMigratedRecord(rawRecord);
+        if (!record || !record.content || !record.content.trim()) continue;
 
         // Vibeguard zero-leakage check
         let finalContent = record.content;

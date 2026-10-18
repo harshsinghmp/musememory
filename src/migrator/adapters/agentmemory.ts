@@ -57,7 +57,7 @@ export const AgentMemoryAdapter: ProviderAdapter = {
           tags: tags.map(String),
           source: "migrated:agentmemory",
           verification: {
-            level: "independently-verified",
+            level: "observed",
             verified_by: "migrator:agentmemory"
           },
         });
