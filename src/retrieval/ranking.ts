@@ -98,16 +98,22 @@ export async function rankAndRetrieveMemories(
   const now = options.now ?? Date.now();
   const workspaceRoot = store.dir;
 
-  // 1. T-070: Relevance Gate before FTS5 search
+  // 1. T-070: Relevance Gate before FTS5 search (T-312: degraded signal handling)
   const ftsMatchIds = new Set<string>();
   const relevance = evaluateQueryRelevance(query);
   if (store.db && query.trim() && relevance.relevant) {
     try {
       const ftsResults = searchMemoriesFts(store.db, query);
-      for (const res of ftsResults.slice(0, 15)) {
-        ftsMatchIds.add(res.entry.id);
+      if (ftsResults.degraded) {
+        console.warn(`[FTS5_DEGRADED] Lexical FTS signal unavailable for ranking query "${query}": ${ftsResults.error}`);
+      } else {
+        for (const res of ftsResults.slice(0, 15)) {
+          ftsMatchIds.add(res.entry.id);
+        }
       }
-    } catch {}
+    } catch (err) {
+      console.warn(`[FTS5_DEGRADED] FTS exception during ranking: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // 1.5. T-307: Hebbian associative candidate expansion from top matches

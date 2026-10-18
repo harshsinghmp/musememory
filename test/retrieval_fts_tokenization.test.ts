@@ -91,20 +91,42 @@ describe("Wave 3 - Task 2: FTS5 Query Injection Safety & Compound Token Splittin
       };
       insertOrReplaceMemory(db, sample);
 
-      // Normal query works
+      // Normal query works and is not degraded
       const res1 = searchMemoriesFts(db, "UserProfile auth_token");
       expect(res1.length).toBeGreaterThan(0);
       expect(res1[0].entry.id).toBe("mem-test-fts-1");
+      expect(res1.degraded).toBe(false);
 
-      // Hostile FTS injection queries do not throw or crash
+      // Normal zero-match query returns 0 items with degraded: false (T-312)
+      const resZero = searchMemoriesFts(db, "nonexistent_term_xyz_12345");
+      expect(resZero.length).toBe(0);
+      expect(resZero.degraded).toBe(false);
+
+      // Hostile FTS injection queries do not throw or crash and are not degraded
       const resHostile1 = searchMemoriesFts(db, `NOT AND OR * " ' ( ) ^ : { }`);
       expect(Array.isArray(resHostile1)).toBe(true);
+      expect(resHostile1.degraded).toBe(false);
 
       const resHostile2 = searchMemoriesFts(db, `NEAR(getUserProfile auth_token, 10)`);
       expect(Array.isArray(resHostile2)).toBe(true);
+      expect(resHostile2.degraded).toBe(false);
 
       const resHostile3 = searchMemoriesFts(db, `"unclosed quote with * wildcard`);
       expect(Array.isArray(resHostile3)).toBe(true);
+      expect(resHostile3.degraded).toBe(false);
+    });
+
+    test("T-312: searchMemoriesFts signals degraded: true when FTS execution throws", () => {
+      const db = openDatabase(":memory:");
+
+      // Close database to force query execution error
+      db.close();
+
+      const resDegraded = searchMemoriesFts(db, "auth token");
+      expect(resDegraded.length).toBe(0);
+      expect(resDegraded.degraded).toBe(true);
+      expect(typeof resDegraded.error).toBe("string");
+      expect(resDegraded.error!.length).toBeGreaterThan(0);
     });
   });
 });

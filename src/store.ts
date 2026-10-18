@@ -20,6 +20,7 @@ import {
   listMemories,
   searchMemoriesFts,
   type SqliteDatabase,
+  type FtsSearchHits,
 } from "./sqlite.ts";
 import { runMigrations } from "./migrate.ts";
 import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
@@ -1442,15 +1443,23 @@ export function searchMemories(
   store: Store,
   query: string,
   filters?: { project?: string; type?: string; status?: string; limit?: number },
-): { entry: MemoryEntry; rank: number }[] {
+): FtsSearchHits {
   const preflight = preflightFtsQuery(query);
   if (!preflight.ok) throw new Error(`FTS query rejected: ${preflight.reason}`);
-  if (!store.db) return [];
+  if (!store.db) {
+    const empty: FtsSearchHits = [];
+    empty.degraded = false;
+    return empty;
+  }
   const hits = searchMemoriesFts(store.db, query, filters);
   // T-030: the delete path already evicts the FTS row; this holds the read path closed even if
   // a row carries a marker without that eviction having run.
   const tombstones = tombstonedIds(store);
-  return tombstones.size === 0 ? hits : hits.filter((h) => !tombstones.has(h.entry.id));
+  if (tombstones.size === 0) return hits;
+  const filtered = hits.filter((h) => !tombstones.has(h.entry.id)) as FtsSearchHits;
+  filtered.degraded = hits.degraded;
+  filtered.error = hits.error;
+  return filtered;
 }
 
 // --- T-026: FTS <-> row parity ----------------------------------------------------

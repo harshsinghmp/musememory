@@ -461,17 +461,31 @@ export function buildSafeFtsQuery(rawQuery: string): string {
   return terms.join(" OR ");
 }
 
+export interface FtsSearchHit {
+  entry: MemoryEntry;
+  rank: number;
+}
+
+export type FtsSearchHits = FtsSearchHit[] & {
+  degraded?: boolean;
+  error?: string;
+};
+
 /**
  * High-speed BM25 full-text search directly inside SQLite using FTS5.
- * Sanitizes and safely escapes all query tokens (T-060) and logs errors (T-312).
+ * Sanitizes and safely escapes all query tokens (T-060) and surfaces degraded status (T-312).
  */
 export function searchMemoriesFts(
   db: SqliteDatabase,
   query: string,
   filters?: { project?: string; type?: string; status?: string; limit?: number },
-): { entry: MemoryEntry; rank: number }[] {
+): FtsSearchHits {
   const terms = buildSafeFtsQuery(query);
-  if (!terms) return [];
+  if (!terms) {
+    const empty: FtsSearchHits = [];
+    empty.degraded = false;
+    return empty;
+  }
 
   let sql = `
     SELECT m.*, bm25(memories_fts) as rank
@@ -507,14 +521,20 @@ export function searchMemoriesFts(
 
   try {
     const rows = db.query<DbMemoryRow & { rank: number }>(sql).all(params);
-    return rows.map((r) => ({
+    const results: FtsSearchHits = rows.map((r) => ({
       entry: rowToMemoryEntry(r),
       rank: r.rank,
     }));
+    results.degraded = false;
+    return results;
   } catch (err) {
-    // T-312: Surface FTS failure instead of silent swallow
-    console.warn(`[FTS5] Search error for query "${query}": ${err instanceof Error ? err.message : String(err)}`);
-    return [];
+    // T-312: Surface FTS failure with loud log and degraded: true signal instead of silent swallow
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[FTS5_DEGRADED] FTS query execution failed for "${query}": ${errorMsg}`);
+    const empty: FtsSearchHits = [];
+    empty.degraded = true;
+    empty.error = errorMsg;
+    return empty;
   }
 }
 
