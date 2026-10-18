@@ -441,6 +441,33 @@ function entryPaths(entry: MemoryEntry): Set<string> {
 }
 
 /**
+ * Common generic programming verbs and high-frequency terms with near-zero identifier specificity.
+ * When matching query tokens against entry symbols, these must not award full symbol match points.
+ */
+export const GENERIC_COMMON_SYMBOLS = new Set([
+  "get", "set", "run", "do", "use", "make", "add", "call", "new", "all",
+  "init", "data", "test", "item", "val", "key", "list", "check", "put", "let",
+  "has", "is", "log", "req", "res", "out", "err", "msg", "type", "name",
+]);
+
+/**
+ * T-309: Calculate IDF-weighted specificity score for a symbol match.
+ * Prevents generic verbs (`get`, `set`) in tags/backticks from hijacking ranking over lexically-relevant memories.
+ */
+export function calculateSymbolSpecificity(symbol: string): number {
+  if (!symbol || typeof symbol !== "string") return 0;
+  const s = symbol.toLowerCase().trim();
+  if (STOPWORDS.has(s)) return 0;
+  if (GENERIC_COMMON_SYMBOLS.has(s) || s.length <= 2) return 0.05;
+  if (s.length <= 3) return 0.15;
+  // Compound identifiers (e.g. SessionManager, getUserProfile, auth_token, jwt.verify) have highest specificity
+  if (/[_.]|[a-z][A-Z]/.test(symbol)) return 1.0;
+  if (s.length >= 8) return 0.85;
+  if (s.length >= 5) return 0.60;
+  return 0.35;
+}
+
+/**
  * The single multi-factor scorer behind every retrieval path (T-308).
  * get_context scores through it via scoreEntry, muse_context through
  * calculateMultiFactorScore — same store, same factors, same order.
@@ -464,11 +491,23 @@ export function computeFactors(
   const symbols = entrySymbols(entry);
   const pathList = [...entryPaths(entry)];
 
-  const exactSymbolMatch =
-    (ctx.targetSymbol ? symbols.has(ctx.targetSymbol.toLowerCase()) : false) ||
-    lowerTokens.some((t) => symbols.has(t))
-      ? 1.0
-      : 0;
+  // T-309: IDF-weighted symbol matching instead of flat binary 1.0
+  let exactSymbolMatch = 0;
+  if (ctx.targetSymbol && symbols.has(ctx.targetSymbol.toLowerCase())) {
+    exactSymbolMatch = 1.0;
+  } else {
+    for (let i = 0; i < lowerTokens.length; i++) {
+      const lt = lowerTokens[i];
+      if (symbols.has(lt)) {
+        const rawToken = queryTokens[i] || lt;
+        const spec = Math.max(
+          calculateSymbolSpecificity(rawToken),
+          calculateSymbolSpecificity(lt)
+        );
+        if (spec > exactSymbolMatch) exactSymbolMatch = spec;
+      }
+    }
+  }
 
   let pathMatch = 0;
   if (ctx.activeFilePath) {
