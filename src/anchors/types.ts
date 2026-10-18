@@ -29,6 +29,7 @@ export interface AnchorAuditReport {
 export interface CreateAnchorOptions {
   kind: CodeAnchorKind;
   filePath: string;
+  basePath?: string;
   symbolName?: string;
   qualifiedName?: string;
   providerMetadata?: Record<string, any>;

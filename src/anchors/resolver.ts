@@ -20,23 +20,46 @@ function slugify(text: string): string {
 }
 
 /**
+ * Resolves the actual filesystem path for an anchor, respecting its recorded base_path
+ * with fallback to workspaceRoot.
+ */
+export function resolveAnchorPath(workspaceRoot: string, anchor: CodeAnchor): string {
+  if (anchor.base_path) {
+    // 1. Direct path from recorded base_path
+    const candidateWithBase = resolve(anchor.base_path, anchor.file_path);
+    if (existsSync(candidateWithBase)) {
+      return candidateWithBase;
+    }
+    // 2. Relative to workspaceRoot if base_path is relative or a subpath
+    const candidateRelative = resolve(workspaceRoot, anchor.base_path, anchor.file_path);
+    if (existsSync(candidateRelative)) {
+      return candidateRelative;
+    }
+  }
+  return resolve(workspaceRoot, anchor.file_path);
+}
+
+/**
  * Creates a line-independent structural code anchor pointing to a file or symbol.
  */
 export function createCodeAnchor(
   workspaceRoot: string,
   options: CreateAnchorOptions
 ): CodeAnchor {
-  const fullPath = resolve(workspaceRoot, options.filePath);
+  const effectiveBase = options.basePath ? resolve(options.basePath) : resolve(workspaceRoot);
+  const fullPath = resolve(effectiveBase, options.filePath);
   const now = new Date().toISOString();
   const fileExists = existsSync(fullPath);
 
   const anchorId = `anc_${Date.now()}_${slugify(options.symbolName || options.filePath)}`;
+  const recordedBase = options.basePath ? options.basePath : workspaceRoot;
 
   if (!fileExists) {
     return {
       id: anchorId,
       kind: options.kind,
       file_path: options.filePath,
+      base_path: recordedBase,
       symbol_name: options.symbolName,
       qualified_name: options.qualifiedName,
       status: "orphaned",
@@ -55,6 +78,7 @@ export function createCodeAnchor(
         id: anchorId,
         kind: options.kind,
         file_path: options.filePath,
+        base_path: recordedBase,
         symbol_name: options.symbolName,
         qualified_name: options.qualifiedName,
         status: "orphaned",
@@ -69,6 +93,7 @@ export function createCodeAnchor(
       id: anchorId,
       kind: options.kind,
       file_path: options.filePath,
+      base_path: recordedBase,
       symbol_name: options.symbolName,
       qualified_name: options.qualifiedName,
       signature: extracted.signature,
@@ -86,6 +111,7 @@ export function createCodeAnchor(
     id: anchorId,
     kind: options.kind,
     file_path: options.filePath,
+    base_path: recordedBase,
     structural_hash: fileHash,
     status: "valid",
     provider_metadata: options.providerMetadata,
@@ -101,7 +127,7 @@ export function verifyCodeAnchor(
   workspaceRoot: string,
   anchor: CodeAnchor
 ): AnchorVerificationResult {
-  const fullPath = resolve(workspaceRoot, anchor.file_path);
+  const fullPath = resolveAnchorPath(workspaceRoot, anchor);
   const fileExists = existsSync(fullPath);
 
   if (!fileExists) {
