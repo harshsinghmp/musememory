@@ -142,12 +142,21 @@ export function recordAdr(
     supersedes: options.supersedes,
   };
 
+  const mappedStatus =
+    status === "accepted"
+      ? "confirmed"
+      : status === "rejected"
+      ? "stale"
+      : status === "superseded"
+      ? "superseded"
+      : "candidate";
+
   const entry: MemoryEntry = {
     id,
     title: `ADR-${adrNum}: ${options.title}`,
     content,
     project: options.project,
-    status: status === "proposed" ? "candidate" : "confirmed",
+    status: mappedStatus,
     type: "adr",
     temporal_mode: "timeless",
     created_at: now,
@@ -159,12 +168,13 @@ export function recordAdr(
     verification: { level: "authoritative" },
   };
 
-  // 3. Handle supersedes link
+  // 1. Save new entry first so new ADR exists before any linkage
+  save(store, entry);
+
+  // 2. Handle supersedes link after save succeeds
   if (options.supersedes) {
     supersedeAdr(store, options.supersedes, id, options.actor);
   }
-
-  save(store, entry);
 
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {

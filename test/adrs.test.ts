@@ -154,6 +154,32 @@ describe("R11: Architecture Decision Records (ADRs) & Documentation Drift Engine
       expect(proposedOnly.length).toBe(1);
       expect(proposedOnly[0].adr?.status).toBe("proposed");
     });
+
+    it("T-352: rejected ADR is persisted with stale status and proposed with candidate", () => {
+      const rejectedAdr = recordAdr(store, tmpDir, {
+        project: "app",
+        title: "Rejected Architecture",
+        context_and_drivers: ["High complexity"],
+        decision: "Reject single global lock",
+        consequences: {},
+        status: "rejected",
+      });
+
+      expect(rejectedAdr.status).toBe("stale");
+      expect(rejectedAdr.adr?.status).toBe("rejected");
+
+      const proposedAdr = recordAdr(store, tmpDir, {
+        project: "app",
+        title: "Proposed Protocol",
+        context_and_drivers: ["Researching alternative"],
+        decision: "Propose event-driven gossip",
+        consequences: {},
+        status: "proposed",
+      });
+
+      expect(proposedAdr.status).toBe("candidate");
+      expect(proposedAdr.adr?.status).toBe("proposed");
+    });
   });
 
   describe("Documentation <-> Code Drift Engine", () => {
