@@ -46,6 +46,7 @@ export async function runMigration(
     totalSuperseded: 0,
     totalConstraints: 0,
     totalSecretsRedacted: 0,
+    totalDeduplicated: 0,
     dryRun: Boolean(options.dryRun),
     providers: [],
     errors: [],
@@ -78,6 +79,7 @@ export async function runMigration(
       supersededCount: 0,
       constraintsCount: 0,
       secretsRedacted: 0,
+      deduplicatedCount: 0,
       status: "success",
     };
 
@@ -118,8 +120,12 @@ export async function runMigration(
         // Deduplication check
         const normalizedTitle = record.title.trim().toLowerCase();
         if (!options.overwrite && existingTitles.has(normalizedTitle)) {
+          providerReport.deduplicatedCount++;
+          report.totalDeduplicated++;
           continue;
         }
+
+        existingTitles.add(normalizedTitle);
 
         if (record.isConstraint) {
           // Append active working constraint / persona to CURRENT.md (audited via addConstraint)
@@ -156,8 +162,6 @@ export async function runMigration(
               providerReport.supersededCount++;
               report.totalSuperseded++;
             }
-
-            existingTitles.add(normalizedTitle);
           } else {
             if (record.status === "superseded" || record.status === "stale") {
               providerReport.supersededCount++;

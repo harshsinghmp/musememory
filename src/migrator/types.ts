@@ -41,6 +41,7 @@ export interface MigrationProviderReport {
   supersededCount: number;
   constraintsCount: number;
   secretsRedacted: number;
+  deduplicatedCount: number;
   status: "success" | "skipped" | "failed";
   error?: string;
 }
@@ -51,6 +52,7 @@ export interface MigrationReport {
   totalSuperseded: number;
   totalConstraints: number;
   totalSecretsRedacted: number;
+  totalDeduplicated: number;
   dryRun: boolean;
   providers: MigrationProviderReport[];
   errors: string[];

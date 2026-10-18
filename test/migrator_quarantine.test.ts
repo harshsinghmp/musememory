@@ -215,4 +215,52 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
 
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("T-349: dry-run deduplicates batch-internal duplicates identically to actual run and reports counts", async () => {
+    const root = temp();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    // Create a provider file containing 3 items with identical title
+    const beadsDir = join(root, ".beads");
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, "beads.json"),
+      JSON.stringify([
+        {
+          id: "b1",
+          title: "Duplicate Architecture Rule",
+          description: "Rule content 1",
+          status: "open",
+        },
+        {
+          id: "b2",
+          title: "Duplicate Architecture Rule",
+          description: "Rule content 2",
+          status: "open",
+        },
+        {
+          id: "b3",
+          title: "Duplicate Architecture Rule",
+          description: "Rule content 3",
+          status: "open",
+        },
+      ]),
+      "utf8"
+    );
+
+    // 1. Dry run
+    const dryReport = await runMigration(store, memoryDir, { provider: "beads", dryRun: true });
+    expect(dryReport.totalMigrated).toBe(1);
+    expect(dryReport.totalDeduplicated).toBe(2);
+    expect(dryReport.providers[0].deduplicatedCount).toBe(2);
+
+    // 2. Real run
+    const realReport = await runMigration(store, memoryDir, { provider: "beads", dryRun: false });
+    expect(realReport.totalMigrated).toBe(1);
+    expect(realReport.totalDeduplicated).toBe(2);
+    expect(realReport.providers[0].deduplicatedCount).toBe(2);
+
+    rmSync(root, { recursive: true, force: true });
+  });
 });
