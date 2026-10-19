@@ -20,7 +20,11 @@ import {
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
-import { defaultReinjectionTracker, filterSelfEchoes } from "./suppression.ts";
+import {
+  defaultReinjectionTracker,
+  filterSelfEchoes,
+  defaultSeenChunkTracker,
+} from "./suppression.ts";
 
 export type { ScoreFactors, AbstentionDecision, VeracityClass };
 export {
@@ -122,6 +126,12 @@ export async function rankAndRetrieveMemories(
     echoHorizonMs?: number;
     /** T-109: Caller agent name/identifier for provenance checking. */
     agent?: string;
+    /** T-111: Suppress chunks/memories already seen within TTL window. */
+    suppressSeenChunks?: boolean;
+    /** T-111: Seen-chunk TTL in milliseconds (default: 5 minutes / 300,000ms). */
+    seenChunkTtlMs?: number;
+    /** T-111: Whether to record returned entries into seen-chunk tracker. */
+    recordSeenChunks?: boolean;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -199,6 +209,14 @@ export async function rankAndRetrieveMemories(
     });
     entries = echoFiltered.allowed;
   }
+  // T-111: Seen-chunk TTL suppression
+  if (options.sessionId && (options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+    const seenFiltered = defaultSeenChunkTracker.filterSeen(options.sessionId, entries, {
+      now,
+      ttlMs: options.seenChunkTtlMs,
+    });
+    entries = seenFiltered.allowed;
+  }
 
   // T-137: Vector-upgrade degradation path — resolve semantic scores if embedder configured
   let semanticScores = options.semanticScores;
@@ -274,8 +292,24 @@ export async function rankAndRetrieveMemories(
       }
     }
 
-    return packed;
+    const results = packed;
+    if (options.sessionId && (options.recordSeenChunks || options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+      defaultSeenChunkTracker.recordSeen(
+        options.sessionId,
+        results.map((r) => r.entry),
+        { now, ttlMs: options.seenChunkTtlMs }
+      );
+    }
+    return results;
   }
 
-  return ranked.slice(0, limit);
+  const results = ranked.slice(0, limit);
+  if (options.sessionId && (options.recordSeenChunks || options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+    defaultSeenChunkTracker.recordSeen(
+      options.sessionId,
+      results.map((r) => r.entry),
+      { now, ttlMs: options.seenChunkTtlMs }
+    );
+  }
+  return results;
 }

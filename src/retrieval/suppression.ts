@@ -248,3 +248,170 @@ export function filterSelfEchoes(
 
   return { allowed, suppressed };
 }
+
+/**
+ * T-111: Seen-chunk TTL in retrieval (default: 5 minutes / 300,000ms).
+ * Tracks chunks and memory entries already served to a session, suppressing
+ * redundant re-serving within their active TTL window.
+ */
+export const DEFAULT_SEEN_CHUNK_TTL_MS = 5 * 60 * 1000;
+
+export interface SeenChunkRecord {
+  chunkKey: string;
+  seenAt: number;
+  ttlMs: number;
+}
+
+export function computeChunkKey(entry: {
+  id: string;
+  content?: string;
+  content_hash?: string;
+}): string {
+  if (entry.content_hash && entry.content_hash.trim()) {
+    return entry.content_hash;
+  }
+  if (entry.content && entry.content.length > 0) {
+    return `${entry.id}:${entry.content.slice(0, 60)}`;
+  }
+  return entry.id;
+}
+
+export class SeenChunkTracker {
+  private readonly defaultTtlMs: number;
+  // Map<sessionId, Map<chunkKey, SeenChunkRecord>>
+  private sessions: Map<string, Map<string, SeenChunkRecord>> = new Map();
+
+  constructor(defaultTtlMs = DEFAULT_SEEN_CHUNK_TTL_MS) {
+    this.defaultTtlMs = defaultTtlMs;
+  }
+
+  recordSeen(
+    sessionId: string,
+    items: Array<{ id: string; content?: string; content_hash?: string }>,
+    options: { now?: number; ttlMs?: number } = {}
+  ): void {
+    if (!sessionId || !items.length) return;
+    const now = options.now ?? Date.now();
+    const ttlMs = options.ttlMs ?? this.defaultTtlMs;
+
+    let sessionMap = this.sessions.get(sessionId);
+    if (!sessionMap) {
+      sessionMap = new Map();
+      this.sessions.set(sessionId, sessionMap);
+    }
+
+    for (const item of items) {
+      const key = computeChunkKey(item);
+      sessionMap.set(key, { chunkKey: key, seenAt: now, ttlMs });
+    }
+
+    // Prune expired records (older than 2x effective TTL)
+    for (const [key, rec] of sessionMap.entries()) {
+      if (now - rec.seenAt >= rec.ttlMs * 2) {
+        sessionMap.delete(key);
+      }
+    }
+  }
+
+  isSeen(
+    sessionId: string,
+    item: { id: string; content?: string; content_hash?: string },
+    options: { now?: number; ttlMs?: number } = {}
+  ): { seen: boolean; remainingTtlMs?: number; seenAt?: number } {
+    const sessionMap = this.sessions.get(sessionId);
+    if (!sessionMap) return { seen: false };
+
+    const key = computeChunkKey(item);
+    const rec = sessionMap.get(key);
+    if (!rec) return { seen: false };
+
+    const now = options.now ?? Date.now();
+    const effectiveTtl = options.ttlMs ?? rec.ttlMs ?? this.defaultTtlMs;
+    const elapsed = now - rec.seenAt;
+
+    if (elapsed >= 0 && elapsed < effectiveTtl) {
+      return {
+        seen: true,
+        remainingTtlMs: effectiveTtl - elapsed,
+        seenAt: rec.seenAt,
+      };
+    }
+
+    return { seen: false, remainingTtlMs: 0, seenAt: rec.seenAt };
+  }
+
+  filterSeen<
+    T extends {
+      id: string;
+      content?: string;
+      content_hash?: string;
+      type?: string;
+      temporal_mode?: string;
+    }
+  >(
+    sessionId: string,
+    entries: T[],
+    options: {
+      now?: number;
+      ttlMs?: number;
+      exemptTypes?: string[];
+      allowExempt?: boolean;
+    } = {}
+  ): {
+    allowed: T[];
+    suppressed: Array<{
+      item: T;
+      chunkKey: string;
+      remainingTtlMs: number;
+      seenAt: number;
+      reason: string;
+    }>;
+  } {
+    const now = options.now ?? Date.now();
+    const ttlMs = options.ttlMs ?? this.defaultTtlMs;
+    const exempt = new Set(options.exemptTypes ?? ["constraint"]);
+    const allowExempt = options.allowExempt !== false;
+
+    const allowed: T[] = [];
+    const suppressed: Array<{
+      item: T;
+      chunkKey: string;
+      remainingTtlMs: number;
+      seenAt: number;
+      reason: string;
+    }> = [];
+
+    for (const entry of entries) {
+      if (allowExempt && (exempt.has(entry.type ?? "") || entry.temporal_mode === "timeless")) {
+        allowed.push(entry);
+        continue;
+      }
+
+      const check = this.isSeen(sessionId, entry, { now, ttlMs });
+      if (check.seen && check.remainingTtlMs !== undefined) {
+        const sec = Math.ceil(check.remainingTtlMs / 1000);
+        suppressed.push({
+          item: entry,
+          chunkKey: computeChunkKey(entry),
+          remainingTtlMs: check.remainingTtlMs,
+          seenAt: check.seenAt ?? now,
+          reason: `seen_chunk_suppressed: served ${Math.round((now - (check.seenAt ?? now)) / 1000)}s ago (${sec}s TTL remaining)`,
+        });
+      } else {
+        allowed.push(entry);
+      }
+    }
+
+    return { allowed, suppressed };
+  }
+
+  resetSession(sessionId: string): void {
+    this.sessions.delete(sessionId);
+  }
+
+  clearAll(): void {
+    this.sessions.clear();
+  }
+}
+
+export const defaultSeenChunkTracker = new SeenChunkTracker();
