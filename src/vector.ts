@@ -4,6 +4,13 @@ import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 import { tokenize, isExpired, safeMax } from "./retrieval.ts";
 import { softOrFusion } from "./retrieval/ranking.ts";
+import {
+  type RrfConfig,
+  type RrfVariant,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+} from "./retrieval/rrf.ts";
 import type { MemoryEntry } from "./types.ts";
 
 const DIMS = 256;
@@ -206,8 +213,12 @@ export interface HybridSearchOptions {
   includeExpired?: boolean;
   /** Clock for expiry evaluation; defaults to Date.now(). */
   now?: number;
-  /** Fusion strategy: 'linear' (default for legacy compatibility) or 'soft_or' (T-114). */
-  fusion?: "linear" | "soft_or";
+  /** Fusion strategy: 'linear' (default for legacy compatibility), 'soft_or' (T-114), or 'rrf' (T-120). */
+  fusion?: "linear" | "soft_or" | "rrf";
+  /** T-120: RRF configuration when fusion === 'rrf'. */
+  rrfConfig?: RrfConfig;
+  /** T-120: A/B variant for RRF presets ('A'/'control' vs 'B'/'treatment'). */
+  rrfVariant?: RrfVariant;
 }
 
 /**
@@ -260,17 +271,52 @@ export function hybridSearch(
   }
   const maxBm25 = safeMax(scored.map((s) => s.bm25), Number.EPSILON);
 
-  const useSoftOr = options.fusion === "soft_or";
-  for (const s of scored) {
-    const pv = Math.max(0, s.cosine);
-    const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
-    const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
-    results.push({
-      entry: s.entry,
-      cosine: s.cosine,
-      bm25: s.bm25,
-      score,
-    });
+  if (options.fusion === "rrf") {
+    const { k, weights } = resolveRrfConfig(
+      options.rrfConfig ?? (options.rrfVariant ? { variant: options.rrfVariant } : {}),
+    );
+    const cosineRanked = [...scored].sort((a, b) => b.cosine - a.cosine);
+    const bm25Ranked = [...scored].sort((a, b) => b.bm25 - a.bm25);
+
+    const cosineRanks = new Map<string, number>();
+    cosineRanked.forEach((s, idx) => cosineRanks.set(s.entry.id, idx + 1));
+
+    const bm25Ranks = new Map<string, number>();
+    bm25Ranked.forEach((s, idx) => bm25Ranks.set(s.entry.id, idx + 1));
+
+    const semWeight = weights.semantic ?? 1.0;
+    const lexWeight = weights.lexical ?? 1.0;
+
+    for (const s of scored) {
+      const cRank = cosineRanks.get(s.entry.id) ?? 999;
+      const bRank = bm25Ranks.get(s.entry.id) ?? 999;
+      const score = calculateRrfItemScore(
+        [
+          { rank: cRank, weight: semWeight, signal: "semantic" },
+          { rank: bRank, weight: lexWeight, signal: "lexical" },
+        ],
+        k,
+      );
+      results.push({
+        entry: s.entry,
+        cosine: s.cosine,
+        bm25: s.bm25,
+        score,
+      });
+    }
+  } else {
+    const useSoftOr = options.fusion === "soft_or";
+    for (const s of scored) {
+      const pv = Math.max(0, s.cosine);
+      const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
+      const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
+      results.push({
+        entry: s.entry,
+        cosine: s.cosine,
+        bm25: s.bm25,
+        score,
+      });
+    }
   }
 
   results.sort((a, b) => b.score - a.score);

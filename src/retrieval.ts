@@ -24,14 +24,27 @@ import {
   computeReinforcementMultiplier,
   computeEffectiveScore,
 } from "./retrieval/effective_score.ts";
+import {
+  type RrfConfig,
+  type RrfVariant,
+  type RrfWeights,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
+} from "./retrieval/rrf.ts";
 
-export type { VeracityClass, TaskIntent };
+export type { VeracityClass, TaskIntent, RrfConfig, RrfVariant, RrfWeights };
 export {
   INTENT_BIAS_TABLE,
   detectQueryIntent,
   computeIntentMultiplier,
   computeReinforcementMultiplier,
   computeEffectiveScore,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
 };
 
 /**

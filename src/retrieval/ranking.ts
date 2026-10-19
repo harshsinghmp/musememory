@@ -23,6 +23,13 @@ import {
   computeIntentMultiplier,
   computeReinforcementMultiplier,
   computeEffectiveScore,
+  type RrfConfig,
+  type RrfVariant,
+  type RrfWeights,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
@@ -32,7 +39,7 @@ import {
   defaultSeenChunkTracker,
 } from "./suppression.ts";
 
-export type { ScoreFactors, AbstentionDecision, VeracityClass, TaskIntent };
+export type { ScoreFactors, AbstentionDecision, VeracityClass, TaskIntent, RrfConfig, RrfVariant, RrfWeights };
 export {
   isLowDiscrimination,
   conditionalRerank,
@@ -47,6 +54,10 @@ export {
   computeIntentMultiplier,
   computeReinforcementMultiplier,
   computeEffectiveScore,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
 };
 
 /**
@@ -65,6 +76,8 @@ export interface MultiFactorScoreResult {
   score: number;
   /** T-119: Multiplicative composite score: base × reinforcement × decay. */
   effectiveScore?: number;
+  /** T-120: Reciprocal Rank Fusion score across multi-signal rankings. */
+  rrfScore?: number;
   factors: ScoreFactors;
   why_retrieved?: string[];
 }
@@ -160,6 +173,12 @@ export async function rankAndRetrieveMemories(
     inferIntent?: boolean;
     /** T-119: Rank candidates by multiplicative effective_score (base × reinforcement × decay) instead of additive totalScore. */
     useEffectiveScore?: boolean;
+    /** T-120: Rank candidates using Reciprocal Rank Fusion (RRF). */
+    useRrf?: boolean;
+    /** T-120: RRF configuration when useRrf is enabled. */
+    rrfConfig?: RrfConfig;
+    /** T-120: A/B testing variant for RRF presets ('A'/'control' vs 'B'/'treatment'). */
+    rrfVariant?: RrfVariant;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -275,6 +294,48 @@ export async function rankAndRetrieveMemories(
       useEffectiveScore: options.useEffectiveScore,
     }),
   );
+
+  // 4.5. T-120: Optional Reciprocal Rank Fusion (RRF) across multi-signals
+  if (options.useRrf || options.rrfVariant !== undefined || options.rrfConfig !== undefined) {
+    const { k, weights, variant } = resolveRrfConfig(
+      options.rrfConfig ?? (options.rrfVariant ? { variant: options.rrfVariant } : {}),
+    );
+
+    // Compute ranks across 4 key signals: lexical, semantic, graph, recency
+    const lexicalRanked = [...scored].sort((a, b) => (b.factors.baseApplicability + b.factors.bm25Match) - (a.factors.baseApplicability + a.factors.bm25Match));
+    const semanticRanked = [...scored].sort((a, b) => (b.factors.semanticMatch ?? 0) - (a.factors.semanticMatch ?? 0));
+    const graphRanked = [...scored].sort((a, b) => (b.factors.exactSymbolMatch + b.factors.graphOverlap + b.factors.blastRadius) - (a.factors.exactSymbolMatch + a.factors.graphOverlap + a.factors.blastRadius));
+    const recencyRanked = [...scored].sort((a, b) => {
+      const bU = Date.parse(b.entry.updated_at);
+      const aU = Date.parse(a.entry.updated_at);
+      return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
+    });
+
+    const lexRanks = new Map<string, number>();
+    lexicalRanked.forEach((s, idx) => lexRanks.set(s.entry.id, idx + 1));
+    const semRanks = new Map<string, number>();
+    semanticRanked.forEach((s, idx) => semRanks.set(s.entry.id, idx + 1));
+    const graphRanks = new Map<string, number>();
+    graphRanked.forEach((s, idx) => graphRanks.set(s.entry.id, idx + 1));
+    const recencyRanks = new Map<string, number>();
+    recencyRanked.forEach((s, idx) => recencyRanks.set(s.entry.id, idx + 1));
+
+    for (const item of scored) {
+      const rrf = calculateRrfItemScore([
+        { rank: lexRanks.get(item.entry.id) ?? 999, weight: weights.lexical ?? 1.0, signal: "lexical" },
+        { rank: semRanks.get(item.entry.id) ?? 999, weight: weights.semantic ?? 1.0, signal: "semantic" },
+        { rank: graphRanks.get(item.entry.id) ?? 999, weight: weights.graph ?? 0.8, signal: "graph" },
+        { rank: recencyRanks.get(item.entry.id) ?? 999, weight: weights.recency ?? 0.5, signal: "recency" },
+      ], k);
+      item.rrfScore = rrf;
+      item.score = rrf;
+      item.why_retrieved = item.why_retrieved ?? [];
+      item.why_retrieved.push("rrf_fused");
+      if (variant) {
+        item.why_retrieved.push(`rrf_variant:${variant}`);
+      }
+    }
+  }
 
   // 5. Sort descending by score (or effectiveScore if useEffectiveScore is true) and apply conditional rerank (T-115)
   scored.sort((a, b) => {
