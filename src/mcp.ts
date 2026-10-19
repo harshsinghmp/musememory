@@ -297,6 +297,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             idempotency_key: { type: "string", description: "Unique idempotency key to prevent duplicate writes during retries" },
             source_ids: { type: "array", items: { type: "string" }, description: "Referenced citation IDs in sources.json" },
             linked_memory_ids: { type: "array", items: { type: "string" }, description: "Explicit memory IDs to link to this memory entry" },
+            session_id: { type: "string", description: "Origin session ID for provenance tracking and self-echo suppression" },
+            agent: { type: "string", description: "Origin agent name or identifier" },
           },
           required: ["content"],
         },
@@ -1437,6 +1439,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             session_id: { type: "string", description: "Optional session ID for 6-turn re-injection suppression and LRU tracking" },
             turn: { type: "number", description: "Optional 1-indexed turn number within the session" },
             suppress_reinjected: { type: "boolean", description: "Whether to suppress re-injecting recently seen memories (default: true if session_id provided)" },
+            suppress_self_echo: { type: "boolean", description: "Whether to suppress self-echoes created by active session/agent within echo horizon (default: true)" },
+            echo_horizon_ms: { type: "number", description: "Self-echo horizon in ms (default: 600000 / 10 minutes)" },
+            agent: { type: "string", description: "Caller agent name for provenance self-echo matching" },
           },
         },
       },
@@ -1960,6 +1965,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               idempotency_key: a.idempotency_key ? String(a.idempotency_key) : undefined,
               source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
               linked_memory_ids: Array.isArray(a.linked_memory_ids) ? a.linked_memory_ids.map(String) : (Array.isArray(a.linkedMemoryIds) ? a.linkedMemoryIds.map(String) : undefined),
+              session_id: a.session_id ? String(a.session_id) : undefined,
             });
             if (a.type === "constraint") {
               try {
@@ -2821,6 +2827,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           session_id: a.session_id ? String(a.session_id) : undefined,
           turn: typeof a.turn === "number" ? a.turn : undefined,
           suppress_reinjected: a.suppress_reinjected !== undefined ? Boolean(a.suppress_reinjected) : undefined,
+          agent: a.agent ? String(a.agent) : undefined,
+          suppress_self_echo: a.suppress_self_echo !== undefined ? Boolean(a.suppress_self_echo) : undefined,
+          echo_horizon_ms: typeof a.echo_horizon_ms === "number" ? a.echo_horizon_ms : undefined,
         });
         return toolResult(result);
       }

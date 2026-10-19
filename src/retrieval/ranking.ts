@@ -20,7 +20,7 @@ import {
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
-import { defaultReinjectionTracker } from "./suppression.ts";
+import { defaultReinjectionTracker, filterSelfEchoes } from "./suppression.ts";
 
 export type { ScoreFactors, AbstentionDecision, VeracityClass };
 export {
@@ -116,6 +116,12 @@ export async function rankAndRetrieveMemories(
     suppressReinjection?: boolean;
     /** T-108: Turn window for suppression (default 6). */
     reinjectionWindow?: number;
+    /** T-109: Suppress memories created by caller session/agent within echo horizon (default true). */
+    suppressSelfEcho?: boolean;
+    /** T-109: Self-echo horizon in milliseconds (default 10 minutes). */
+    echoHorizonMs?: number;
+    /** T-109: Caller agent name/identifier for provenance checking. */
+    agent?: string;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -182,6 +188,16 @@ export async function rankAndRetrieveMemories(
       window: options.reinjectionWindow,
     });
     entries = filtered.allowed;
+  }
+  // T-109: Self-echo suppression via capture-side provenance
+  if (options.suppressSelfEcho !== false && (options.sessionId || options.agent)) {
+    const echoFiltered = filterSelfEchoes(entries, {
+      sessionId: options.sessionId,
+      agent: options.agent,
+      now,
+      echoHorizonMs: options.echoHorizonMs,
+    });
+    entries = echoFiltered.allowed;
   }
 
   // T-137: Vector-upgrade degradation path — resolve semantic scores if embedder configured
