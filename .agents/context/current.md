@@ -1,16 +1,25 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.7.0`  
-> **Status**: Feature Release (Packing, Graph, Lineage & Provenance: linked_memory_ids, supersede-not-delete, prefer_observations, progressive wikilinks, fact_provenance table, lineage FKs, lineage BFS walker, hash-chained audit & session Merkle checkpoints)
+> **Version**: `v2.8.0`  
+> **Status**: Feature Release (Ingestion, Suppression & Curation Gates: curator empirical evidence protocol, two-tier promotion staging, 6-turn re-injection suppression, age-bounded self-echo suppression, injected-block stripping, seen-chunk TTL, topic-overlap prefetch skip, and trivial-prompt gate)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 17 Focus)
-- **Wave 18: Ingestion, Suppression & Curation Gates**: `T-106` (curator concept), `T-107` (two-tier promotion), `T-108` (re-injection suppression 6-turn LRU), `T-109` (self-echo suppression), `T-110` (strip injected memory-context blocks), `T-111` (seen-chunk TTL), `T-112` (topic-overlap prefetch skip), `T-113` (trivial-prompt gate).
+## ⏭️ Next Up (Post-Wave 18 Focus)
+- **Wave 19: Scoring Refinements & Abstract Sidecars**: `T-118` (query-intent bias multipliers), `T-119` (effective_score = base × reinforcement × decay), `T-120` (RRF weight tuning + A/B), `T-121` (typed drop/keep reasons per candidate), `T-122` (L0/L1 abstract sidecars), `T-123` (ratio-batched sidecar refresh), `T-124` (resident INDEX route-map), `T-125` (tier budgets as named constants with provenance).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 18: Ingestion, Suppression & Curation Gates**:
+  - `T-106`: Curator concept: agent appends empirical evidence/application outcomes, deterministic promotion decides records (PR #256, Closes #255)
+  - `T-107`: Two-tier promotion staging (`pending_promotions.json`) and session-end atomic flush (`memory_flush_pending`) (PR #258, Closes #257)
+  - `T-108`: Re-injection suppression per session with 6-turn LRU window and constraint/timeless exemptions (PR #260, Closes #259)
+  - `T-109`: Self-echo suppression via capture-side provenance within 10-minute horizon (PR #262, Closes #261)
+  - `T-110`: `<memory-context>` and injected block sanitization before propose and harvest (PR #264, Closes #263)
+  - `T-111`: Seen-chunk TTL suppression in retrieval with 5-minute window and chunk key tracking (PR #266, Closes #265)
+  - `T-112`: Topic-overlap >0.6 prefetch skip in retrieval caching context packs on consecutive queries (PR #268, Closes #267)
+  - `T-113`: Trivial-prompt gate bypassing recall on conversational greetings while preserving constraints (PR #270, Closes #269)
 - [x] **Wave 17: Packing, Graph, Lineage & Provenance**:
   - `T-095`: `linked_memory_ids` write-time graph edges auto-seeded during capture and indexed in SQLite (PR #239, Closes #238)
   - `T-096`: HyAtlas supersede-not-delete lifecycle marking `valid_to`/`valid_to_exact` with hidden-count-aware over-fetching (PR #241, Closes #240)
