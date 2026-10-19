@@ -6,7 +6,7 @@ import { list, get, save, supersede } from "../store.ts";
 import { getAuditTrail } from "../audit.ts";
 import { parseCurrentFile, writeCurrentFile } from "../governor.ts";
 import { scanSecrets } from "../secrets.ts";
-import { detectConflict } from "../quality/contradiction.ts";
+import { detectConflict, flagConflict } from "../quality/contradiction.ts";
 import { findDuplicates } from "../quality/dedup.ts";
 import type { MemoryEntry } from "../types.ts";
 import type {
@@ -218,14 +218,13 @@ export function ingestKnowledge(
     // Semantic Contradiction Check
     const conflict = detectConflict(store, incoming);
     if (conflict.conflicted && conflict.conflictingEntry && conflict.confidence > 0.75) {
-      const conflicting = conflict.conflictingEntry;
-      conflicting.status = "conflicted";
-      conflicting.conflict_ids = Array.from(new Set([...(conflicting.conflict_ids || []), incoming.id]));
-      save(store, conflicting);
-
-      incoming.status = "conflicted";
-      incoming.conflict_ids = [conflicting.id];
       save(store, incoming);
+      flagConflict(
+        store,
+        conflict.conflictingEntry.id,
+        incoming.id,
+        conflict.reason || "Gossiped contradiction detected during sync",
+      );
 
       result.conflict_count++;
       result.details.conflicted_ids.push(incoming.id);

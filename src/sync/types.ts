@@ -105,3 +105,64 @@ export interface PoolSyncReport {
   broadcast_packet_id: string;
   timestamp: string;
 }
+
+/**
+ * T-088: Federation handshake packet exchanged between mesh nodes for conflict deduplication.
+ */
+export interface FederationHandshakePacket {
+  protocol_version: "2.0.0";
+  handshake_id: string;
+  sender_id: string;
+  target_id?: string;
+  mesh_id?: string;
+  created_at: string;
+  vector_clock: VectorClock;
+  conflicts: Array<{
+    id: string;
+    memory_a_id: string;
+    memory_b_id: string;
+    status: "open" | "resolved" | "acknowledged";
+    conflict_type: string;
+    confidence: number;
+    reason?: string;
+    detected_at: string;
+    resolved_at?: string;
+    resolution_strategy?: string;
+    resolved_by?: string;
+    data?: Record<string, any>;
+    created_at: string;
+    updated_at: string;
+  }>;
+  checksum: string;
+}
+
+/**
+ * T-088: Result of processing a federation handshake with conflict reconciliation.
+ */
+export interface FederationHandshakeResult {
+  success: boolean;
+  handshake_id: string;
+  sender_id: string;
+  total_remote_conflicts: number;
+  deduplicated_conflicts: number;
+  imported_conflicts: number;
+  reconciled_resolutions: number;
+  conflicts: Array<{
+    id: string;
+    memory_a_id: string;
+    memory_b_id: string;
+    status: "open" | "resolved" | "acknowledged";
+    conflict_type: string;
+    confidence: number;
+    reason?: string;
+    detected_at: string;
+    resolved_at?: string;
+    resolution_strategy?: string;
+    resolved_by?: string;
+    data?: Record<string, any>;
+    created_at: string;
+    updated_at: string;
+  }>;
+  errors: string[];
+}
+
