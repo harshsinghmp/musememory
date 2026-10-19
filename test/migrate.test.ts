@@ -235,3 +235,46 @@ describe("T-082 migration v5 (valid_to_exact)", () => {
   });
 });
 
+describe("T-086 migration v6 (conflicts table)", () => {
+  test("adds conflicts table and indexes to legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v6-"));
+    const { db } = legacyStore(root);
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(6);
+
+    const tables = db
+      .query<{ name: string }>(`SELECT name FROM sqlite_master WHERE type='table'`)
+      .all()
+      .map((t) => t.name);
+    expect(tables).toContain("conflicts");
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(conflicts)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("id");
+    expect(cols).toContain("memory_a_id");
+    expect(cols).toContain("memory_b_id");
+    expect(cols).toContain("status");
+    expect(cols).toContain("conflict_type");
+    expect(cols).toContain("confidence");
+    expect(cols).toContain("reason");
+    expect(cols).toContain("detected_at");
+    expect(cols).toContain("resolved_at");
+    expect(cols).toContain("resolution_strategy");
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(conflicts)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_conflicts_status");
+    expect(indexes).toContain("idx_conflicts_mem_a");
+    expect(indexes).toContain("idx_conflicts_mem_b");
+    expect(indexes).toContain("idx_conflicts_pair");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+

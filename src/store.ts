@@ -36,7 +36,12 @@ import {
   detectConflict,
   flagConflict,
   calculateRetentionScore,
+  listConflicts,
+  getConflict,
+  recordConflict,
+  type ConflictRecord,
 } from "./quality/index.ts";
+export { listConflicts, getConflict, recordConflict, type ConflictRecord };
 import { recoverStaleLocks } from "./outbox.ts";
 export * from "./outbox.ts";
 import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } from "./lock.ts";
