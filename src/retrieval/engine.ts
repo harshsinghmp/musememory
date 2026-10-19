@@ -39,6 +39,8 @@ export interface UnifiedSearchResult {
   withheld?: Array<{ id: string; reason: string }>;
   /** T-096: Count of superseded or inactive memories filtered out during retrieval */
   hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations */
+  deduped_count?: number;
 }
 
 export interface ReindexReport {
@@ -246,6 +248,7 @@ export class RetrievalEngine {
       undetermined: exact.undetermined,
       withheld: exact.withheld,
       hidden_count: exact.hidden_count,
+      deduped_count: exact.deduped_count,
     };
   }
 

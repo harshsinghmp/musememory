@@ -13,6 +13,7 @@ import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 import { buildSafeFtsQuery } from "./sqlite.ts";
 import { computeDecayScore } from "./retention.ts";
+import { computeJaccardSimilarity } from "./quality/dedup.ts";
 
 export type { VeracityClass };
 
@@ -138,6 +139,9 @@ export interface ContextQueryOptions extends SearchOptions {
   minScoreThreshold?: number;
   /** T-083: Bi-temporal point-in-time query timestamp (ISO string or epoch ms). */
   as_of?: string | number;
+  /** T-097: Hindsight recall-time deduplication favoring concrete observations over abstract inferences (scoped to top-2x limit). */
+  prefer_observations?: boolean;
+  preferObservations?: boolean;
 }
 
 export interface SearchResult {
@@ -160,6 +164,8 @@ export interface SearchResult {
   undetermined?: ScoredEntry[];
   /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
   hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
+  deduped_count?: number;
 }
 
 export interface FormattedContext {
@@ -180,6 +186,8 @@ export interface FormattedContext {
   undetermined?: ScoredEntry[];
   /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
   hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
+  deduped_count?: number;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -1230,6 +1238,71 @@ export function queryContext(
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
 
+  // T-097: Hindsight recall-time dedup scoped to top-2x limit/budget window
+  const preferObs = Boolean(options.prefer_observations ?? options.preferObservations);
+  let dedupedCandidates = scored;
+  let deduped_count = 0;
+
+  if (preferObs && scored.length > 1) {
+    const windowSize = Math.min(scored.length, limit * 2);
+    const topSlice = scored.slice(0, windowSize);
+    const remainingSlice = scored.slice(windowSize);
+
+    const isObservation = (e: MemoryEntry): boolean => {
+      if (e.evidence && e.evidence.length > 0) return true;
+      if (e.type === "fix" || e.type === "failure" || (e.type as string) === "observation") return true;
+      if (e.source === "test" || e.source === "tool" || e.source === "build" || e.source === "terminal" || e.source === "file_edit") return true;
+      return false;
+    };
+
+    // Apply observation bonus (+0.10) to observation-backed entries within the top window
+    const boostedTop = topSlice.map((s) => ({
+      ...s,
+      score: isObservation(s.entry) ? s.score + 0.1 : s.score,
+    }));
+    boostedTop.sort((a, b) => b.score - a.score);
+
+    const kept: typeof scored = [];
+    const suppressedIds = new Set<string>();
+
+    for (let i = 0; i < boostedTop.length; i++) {
+      const itemA = boostedTop[i];
+      if (suppressedIds.has(itemA.entry.id)) continue;
+
+      for (let j = i + 1; j < boostedTop.length; j++) {
+        const itemB = boostedTop[j];
+        if (suppressedIds.has(itemB.entry.id)) continue;
+
+        const sim = computeJaccardSimilarity(itemA.entry.content, itemB.entry.content);
+        if (sim >= 0.65) {
+          const aObs = isObservation(itemA.entry);
+          const bObs = isObservation(itemB.entry);
+
+          if (aObs && !bObs) {
+            suppressedIds.add(itemB.entry.id);
+            withheld.push({ id: itemB.entry.id, reason: "observation_preferred" });
+            deduped_count++;
+          } else if (bObs && !aObs) {
+            suppressedIds.add(itemA.entry.id);
+            withheld.push({ id: itemA.entry.id, reason: "observation_preferred" });
+            deduped_count++;
+            break;
+          } else {
+            suppressedIds.add(itemB.entry.id);
+            withheld.push({ id: itemB.entry.id, reason: "observation_preferred_dedup" });
+            deduped_count++;
+          }
+        }
+      }
+
+      if (!suppressedIds.has(itemA.entry.id)) {
+        kept.push(itemA);
+      }
+    }
+
+    dedupedCandidates = [...kept, ...remainingSlice];
+  }
+
   const recordAccessFor = (store: Store | undefined, entry: MemoryEntry) => {
     if (!store) return;
     const now = nowIso();
@@ -1257,7 +1330,7 @@ export function queryContext(
         e.negative;
 
       // First pass: pack priority guardrails (constraints, timeless rules, negative anti-patterns)
-      for (const item of scored) {
+      for (const item of dedupedCandidates) {
         if (results.length >= limit) break;
         if (!isPriorityGuardrail(item.entry)) continue;
         const tokens = estimateEntryTokens(item.entry);
@@ -1270,7 +1343,7 @@ export function queryContext(
       }
 
       // Second pass: pack remaining highest-scoring entries
-      for (const item of scored) {
+      for (const item of dedupedCandidates) {
         if (results.length >= limit) break;
         if (packedIds.has(item.entry.id)) continue;
         const tokens = estimateEntryTokens(item.entry);
@@ -1282,7 +1355,7 @@ export function queryContext(
       }
     }
   } else {
-    for (const item of scored.slice(0, limit)) {
+    for (const item of dedupedCandidates.slice(0, limit)) {
       results.push(item);
       totalTokensUsed += estimateEntryTokens(item.entry);
       recordAccessFor(store, item.entry);
@@ -1347,6 +1420,7 @@ export function queryContext(
     as_of: asOfIso,
     undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
     hidden_count,
+    deduped_count: preferObs ? deduped_count : undefined,
   };
 }
 
@@ -1619,6 +1693,7 @@ export function formatPromptContext(
     as_of: result.as_of,
     undetermined: result.undetermined,
     hidden_count: result.hidden_count,
+    deduped_count: result.deduped_count,
   };
 
   if (cacheKey && store.cache) {
