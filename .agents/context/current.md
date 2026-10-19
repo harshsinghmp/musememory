@@ -1,16 +1,26 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.5.0`  
-> **Status**: Feature Release (Expiry, Decay & Confidence Hardening, Abstention & Bayesian Corroboration, Trust-Tier Half-Lives, Expiry Policy YAML)
+> **Version**: `v2.6.0`  
+> **Status**: Feature Release (Temporal Transitions, Contradiction Engine & Verbs, Keep-Both Conflicts, Bi-Temporal Boundaries, Scoped Invalidation, Federation Handshake, Veracity Ranking & Evidence-Age Stamping)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 15 Focus)
-- **Wave 16: Temporal Transitions, Contradiction Engine & Verbs**: `T-082` (`valid_to_exact` flag on transitions), `T-083` (`as_of` queries returning `{results, undetermined}`), `T-084` (five-verb lifecycle: change/end/correct/revert/forget), `T-085` (`searchTemporal(atTime)` default-excluding superseded), `T-086` (keep-both conflicts table).
+## ⏭️ Next Up (Post-Wave 16 Focus)
+- **Wave 17: Packing + Graph + Provenance**: `T-095` (`linked_memory_ids` write-time edges), `T-096` (supersede-not-delete + hidden-count-aware over-fetch), `T-097` (`prefer_observations` recall-time dedup), `T-098` (progressive wikilink expansion), `T-099` (`fact_provenance` append-only table), `T-100` (`supersedes_id`/`conflicts_with_id` lineage FKs), `T-101` (lineage BFS walker), `T-102` (hash-chained audit).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 16: Temporal Transitions, Contradiction Engine & Verbs**:
+  - `T-082`: `valid_to_exact` flag on transitions stamping exact historical cessation boundaries vs runtime transitions (PR #219, Closes #218)
+  - `T-083`: `as_of` queries returning `{results, undetermined}` without date invention (PR #221, Closes #220)
+  - `T-084`: Five-verb lifecycle (`change`, `end`, `correct`, `revert`, `forget` with GDPR hard/soft tombstones) and typed audit logging (PR #223, Closes #222)
+  - `T-085`: `searchTemporal(atTime)` default-excluding superseded knowledge while returning undetermined boundary candidates (PR #225, Closes #224)
+  - `T-086`: Keep-both `conflicts` SQLite table (Migration v6) preserving contradictions without deletion (PR #227, Closes #226)
+  - `T-087`: Scoped invalidation requiring semantic `(entity, relation, target, scope)` alignment to eliminate Graphiti #1728 false-positive conflicts across environments (PR #229, Closes #228)
+  - `T-088`: Federation handshake protocol for mesh-mode conflict deduplication and resolution propagation (`supersede`, `keep_both`, `historical`, `reject`) (PR #231, Closes #230)
+  - `T-089`: Provenance veracity rank weighting (`user` 1.0, `agent` 0.7, `external` 0.5, `system` 0.3) with tie-breaker bonuses and `minVeracity` filtering (PR #233, Closes #232)
+  - `T-090`: `src_ts` evidence-age stamping (Migration v7) ensuring memory freshness cannot exceed underlying source document age (PR #235, Closes #234)
 - [x] **Wave 15: Expiry, Decay & Confidence Hardening**:
   - `T-072`: Tokenizer-matched abstention gate (`evaluateAbstentionGate`) matching FTS5 Unicode61 boundary rules (PR #200, Closes #199)
   - `T-073`: `no_confident_match` result mode across `queryContext`, `formatPromptContext`, and MCP `get_context`/`search` (PR #202, Closes #201)
