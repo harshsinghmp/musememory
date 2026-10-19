@@ -751,9 +751,14 @@ export function computeFactors(
     isNegative && (baseApplicability > 0 || exactSymbolMatch > 0 || pathMatch > 0) ? 0.3 : 0;
   const timelessBoost = entry.temporal_mode === "timeless" || entry.type === "constraint" ? 0.2 : 0;
 
+  // T-090: src_ts evidence-age stamping (memory freshness cannot exceed evidence freshness)
+  const effectiveRecencyDays = entry.src_ts
+    ? Math.max(daysSince(entry.valid_from ?? entry.updated_at, now), daysSince(entry.src_ts, now))
+    : daysSince(entry.valid_from ?? entry.updated_at, now);
+
   const recencyDecay =
     entry.temporal_mode !== "timeless" && entry.type !== "constraint"
-      ? -0.05 * Math.min(Math.floor(daysSince(entry.valid_from ?? entry.updated_at, now) / 30), 6)
+      ? -0.05 * Math.min(Math.floor(effectiveRecencyDays / 30), 6)
       : 0;
 
   // Runtime trust verdict bonus/penalty (SOW-201, T-021 memoized)

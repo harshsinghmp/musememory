@@ -276,5 +276,28 @@ describe("T-086 migration v6 (conflicts table)", () => {
     db.close();
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("T-090 migration v7 (src_ts) > adds src_ts column and index to legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v7-"));
+    const { db } = legacyStore(root);
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(7);
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(memories)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("src_ts");
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(memories)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_memories_src_ts");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 

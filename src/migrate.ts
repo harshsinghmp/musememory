@@ -154,6 +154,23 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    up(db) {
+      // T-090: src_ts evidence-age stamping (memory only as fresh as evidence)
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("src_ts")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN src_ts TEXT`);
+        db.exec(
+          `UPDATE memories SET src_ts = json_extract(data, '$.src_ts') WHERE json_extract(data, '$.src_ts') IS NOT NULL`,
+        );
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_src_ts ON memories(src_ts)`);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -283,6 +283,7 @@ export function computeDecayScore(
     created_at: string;
     updated_at: string;
     valid_from?: string;
+    src_ts?: string;
     verification?: { level?: string; [key: string]: any };
     reinforcement?: number;
     access_count?: number | null;
@@ -313,8 +314,16 @@ export function computeDecayScore(
   if (halfLife === null) return 1.0; // never decays
 
   const referenceTime = entry.valid_from ?? entry.last_accessed_at ?? entry.updated_at ?? entry.created_at;
-  const ms = Date.parse(referenceTime);
+  let ms = Date.parse(referenceTime);
   if (Number.isNaN(ms)) return 1.0;
+
+  // T-090: src_ts evidence-age stamping (memory cannot be fresher than its evidence)
+  if (entry.src_ts) {
+    const srcMs = Date.parse(entry.src_ts);
+    if (!Number.isNaN(srcMs) && srcMs < ms) {
+      ms = srcMs;
+    }
+  }
 
   const days = Math.max(0, (now - ms) / 86_400_000);
   if (days <= 0) return 1.0;
@@ -343,6 +352,7 @@ export function computeStaleness(
     last_accessed_at?: string | null;
     created_at: string;
     updated_at: string;
+    src_ts?: string;
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
@@ -364,8 +374,16 @@ export function computeStaleness(
 
   // Use last_accessed_at if available, fall back to created_at
   const referenceTime = entry.last_accessed_at ?? entry.created_at;
-  const ms = Date.parse(referenceTime);
+  let ms = Date.parse(referenceTime);
   if (Number.isNaN(ms)) return 0.5; // neutral if unparseable
+
+  // T-090: src_ts evidence-age stamping
+  if (entry.src_ts) {
+    const srcMs = Date.parse(entry.src_ts);
+    if (!Number.isNaN(srcMs) && srcMs < ms) {
+      ms = srcMs;
+    }
+  }
 
   const days = Math.max(0, (now - ms) / 86_400_000);
   if (days === 0) return 0;
@@ -383,6 +401,7 @@ export function isStale(
     last_accessed_at?: string | null;
     created_at: string;
     updated_at: string;
+    src_ts?: string;
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
@@ -405,6 +424,7 @@ export function stalenessDaysRemaining(
     last_accessed_at?: string | null;
     created_at: string;
     updated_at: string;
+    src_ts?: string;
     verification?: { level?: string };
     reinforcement?: number;
     access_count?: number | null;
@@ -426,8 +446,16 @@ export function stalenessDaysRemaining(
   if (halfLife === null) return Infinity;
 
   const referenceTime = entry.last_accessed_at ?? entry.created_at;
-  const ms = Date.parse(referenceTime);
+  let ms = Date.parse(referenceTime);
   if (Number.isNaN(ms)) return 0;
+
+  // T-090: src_ts evidence-age stamping
+  if (entry.src_ts) {
+    const srcMs = Date.parse(entry.src_ts);
+    if (!Number.isNaN(srcMs) && srcMs < ms) {
+      ms = srcMs;
+    }
+  }
 
   const currentStaleness = computeStaleness(entry, now);
   if (currentStaleness >= threshold) return -1;

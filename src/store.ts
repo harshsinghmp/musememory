@@ -867,6 +867,9 @@ export function propose(
     valid_from?: string;
     valid_to?: string;
     valid_to_exact?: boolean;
+    /** T-090: Original timestamp of underlying evidence or source document. */
+    src_ts?: string;
+    srcTs?: string;
     dueAt?: string;
     expiresAt?: string | null;
     due_at?: string;
@@ -989,6 +992,18 @@ export function propose(
   const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
   const trust = deriveTrustTier(opts.source, opts.trust);
 
+  // T-090: src_ts evidence-age stamping (derive from explicit option or evidence items)
+  let src_ts = opts.src_ts ?? opts.srcTs;
+  if (!src_ts && opts.evidence && opts.evidence.length > 0) {
+    for (const ev of opts.evidence) {
+      const evTs = (ev as any).timestamp || (ev as any).ts || (ev as any).created_at || (ev as any).date;
+      if (evTs) {
+        src_ts = evTs;
+        break;
+      }
+    }
+  }
+
   // T-078 & T-080: Expiry & Pinning Policy evaluation (first-match-wins)
   // Explicit overrides (string) win; explicit null opts out; pinned/timeless exempt.
   let pinned = opts.pinned;
@@ -1048,6 +1063,7 @@ export function propose(
         : opts.validTo || opts.valid_to
         ? true
         : undefined,
+    src_ts,
     due_at: opts.dueAt ?? opts.due_at,
     expires_at,
     pinned,
@@ -1072,6 +1088,7 @@ export function propose(
             created_at: now,
             updated_at: now,
             valid_from: opts.validFrom ?? opts.valid_from,
+            src_ts,
             verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
             reinforcement: opts.confirmed ? 1 : 0,
             access_count: 0,
