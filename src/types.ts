@@ -124,6 +124,23 @@ export interface SemanticFactTriple {
   scope?: string;
 }
 
+/**
+ * T-099: Append-only fact provenance record tracking triple origin and evidence.
+ */
+export interface FactProvenanceRecord {
+  id: string;
+  memory_id: string;
+  entity: string;
+  relation: string;
+  target: string;
+  scope?: string;
+  source?: string;
+  session_id?: string;
+  confidence?: number;
+  data?: string;
+  created_at: string;
+}
+
 export interface EvidenceItem {
   id: string;
   type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";

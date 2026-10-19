@@ -205,6 +205,25 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_conflicts_mem_a ON conflicts(memory_a_id);
     CREATE INDEX IF NOT EXISTS idx_conflicts_mem_b ON conflicts(memory_b_id);
     CREATE INDEX IF NOT EXISTS idx_conflicts_pair ON conflicts(memory_a_id, memory_b_id);
+
+    -- T-099: fact_provenance append-only table with triple-unique index
+    CREATE TABLE IF NOT EXISTS fact_provenance (
+      id TEXT PRIMARY KEY,
+      memory_id TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      relation TEXT NOT NULL,
+      target TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT 'global',
+      source TEXT,
+      session_id TEXT,
+      confidence REAL DEFAULT 1.0,
+      data TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_fact_provenance_triple ON fact_provenance(entity, relation, target);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_mem_id ON fact_provenance(memory_id);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_entity ON fact_provenance(entity);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_created ON fact_provenance(created_at);
   `);
 
   // T-402: Only create indexes on post-v0 columns if those columns actually exist (or have been migrated)
@@ -806,5 +825,130 @@ export function listConflictsFromDb(
 
   const rows = db.query<DbConflictRow>(sql).all(params);
   return rows.map(rowToConflictRecord);
+}
+
+/**
+ * T-099: Raw database row representing an append-only fact provenance assertion.
+ */
+export interface FactProvenanceRow {
+  id: string;
+  memory_id: string;
+  entity: string;
+  relation: string;
+  target: string;
+  scope: string;
+  source: string | null;
+  session_id: string | null;
+  confidence: number | null;
+  data: string | null;
+  created_at: string;
+}
+
+/**
+ * T-099: Appends a fact provenance record to SQLite using INSERT OR IGNORE
+ * to enforce the triple-unique index idx_fact_provenance_triple(entity, relation, target).
+ */
+export function insertFactProvenance(
+  db: SqliteDatabase,
+  record: {
+    id: string;
+    memory_id: string;
+    entity: string;
+    relation: string;
+    target: string;
+    scope?: string;
+    source?: string;
+    session_id?: string;
+    confidence?: number;
+    data?: string;
+    created_at?: string;
+  },
+): boolean {
+  try {
+    const scope = record.scope ?? "global";
+    const confidence = record.confidence ?? 1.0;
+    const createdAt = record.created_at ?? new Date().toISOString();
+    db.run(
+      `INSERT OR IGNORE INTO fact_provenance (id, memory_id, entity, relation, target, scope, source, session_id, confidence, data, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        record.id,
+        record.memory_id,
+        record.entity,
+        record.relation,
+        record.target,
+        scope,
+        record.source ?? null,
+        record.session_id ?? null,
+        confidence,
+        record.data ?? null,
+        createdAt,
+      ],
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * T-099: Look up a fact provenance assertion by its exact canonical triple (entity, relation, target).
+ */
+export function getFactProvenanceRow(
+  db: SqliteDatabase,
+  entity: string,
+  relation: string,
+  target: string,
+): FactProvenanceRow | null {
+  try {
+    const row = db
+      .query<FactProvenanceRow>(
+        `SELECT * FROM fact_provenance WHERE entity = ? AND relation = ? AND target = ? LIMIT 1`,
+      )
+      .get([entity, relation, target]);
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * T-099: List append-only fact provenance assertions matching optional filters.
+ */
+export function listFactProvenanceRows(
+  db: SqliteDatabase,
+  filters: { memory_id?: string; entity?: string; relation?: string; target?: string; scope?: string } = {},
+): FactProvenanceRow[] {
+  try {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filters.memory_id) {
+      conditions.push("memory_id = ?");
+      params.push(filters.memory_id);
+    }
+    if (filters.entity) {
+      conditions.push("entity = ?");
+      params.push(filters.entity);
+    }
+    if (filters.relation) {
+      conditions.push("relation = ?");
+      params.push(filters.relation);
+    }
+    if (filters.target) {
+      conditions.push("target = ?");
+      params.push(filters.target);
+    }
+    if (filters.scope) {
+      conditions.push("scope = ?");
+      params.push(filters.scope);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const sql = `SELECT * FROM fact_provenance ${where} ORDER BY created_at ASC`;
+    return db.query<FactProvenanceRow>(sql).all(params);
+  } catch {
+    return [];
+  }
 }
 

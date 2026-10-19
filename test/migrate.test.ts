@@ -322,5 +322,31 @@ describe("T-086 migration v6 (conflicts table)", () => {
     db.close();
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("T-099 migration v9 (fact_provenance) > creates fact_provenance table and triple-unique index in legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v9-"));
+    const { db } = legacyStore(root);
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(9);
+
+    const tables = db
+      .query<{ name: string }>(`SELECT name FROM sqlite_master WHERE type='table'`)
+      .all()
+      .map((t) => t.name);
+    expect(tables).toContain("fact_provenance");
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(fact_provenance)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_fact_provenance_triple");
+    expect(indexes).toContain("idx_fact_provenance_mem_id");
+    expect(indexes).toContain("idx_fact_provenance_entity");
+    expect(indexes).toContain("idx_fact_provenance_created");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 

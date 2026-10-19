@@ -188,6 +188,31 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_linked_ids ON memories(linked_memory_ids)`);
     },
   },
+  {
+    version: 9,
+    up(db) {
+      // T-099: fact_provenance append-only table, triple-unique index
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS fact_provenance (
+          id TEXT PRIMARY KEY,
+          memory_id TEXT NOT NULL,
+          entity TEXT NOT NULL,
+          relation TEXT NOT NULL,
+          target TEXT NOT NULL,
+          scope TEXT NOT NULL DEFAULT 'global',
+          source TEXT,
+          session_id TEXT,
+          confidence REAL DEFAULT 1.0,
+          data TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_fact_provenance_triple ON fact_provenance(entity, relation, target);
+        CREATE INDEX IF NOT EXISTS idx_fact_provenance_mem_id ON fact_provenance(memory_id);
+        CREATE INDEX IF NOT EXISTS idx_fact_provenance_entity ON fact_provenance(entity);
+        CREATE INDEX IF NOT EXISTS idx_fact_provenance_created ON fact_provenance(created_at);
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
