@@ -904,6 +904,12 @@ export function propose(
     skipRetentionGate?: boolean;
     /** T-391: Citation source IDs referencing sources in sources.json. */
     source_ids?: string[];
+    /** T-095: Explicit write-time linked memory IDs. */
+    linked_memory_ids?: string[];
+    linkedMemoryIds?: string[];
+    /** T-095: Whether to auto-seed write-time linked memory IDs if omitted (default: true). */
+    autoLink?: boolean;
+    session_id?: string;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -1041,6 +1047,53 @@ export function propose(
     }
   }
 
+  // T-095: linked_memory_ids write-time edges seeded during capture (mem0 pattern)
+  let linked_memory_ids: string[] = [];
+  if (Array.isArray(opts.linked_memory_ids) || Array.isArray(opts.linkedMemoryIds)) {
+    const rawIds = (opts.linked_memory_ids ?? opts.linkedMemoryIds ?? []).map(String).filter(Boolean);
+    linked_memory_ids = Array.from(new Set(rawIds)).slice(0, 10);
+  } else if (opts.autoLink !== false) {
+    if (store.db) {
+      try {
+        const recentRows = store.db.query<{ id: string; title: string; tags: string; session_id: string | null }>(`
+          SELECT id, title, COALESCE(json_extract(data, '$.tags'), '') as tags, session_id
+          FROM memories
+          WHERE project = ? AND status NOT IN ('superseded', 'expired', 'rejected') AND (deleted_at IS NULL)
+          ORDER BY updated_at DESC
+          LIMIT 10
+        `).all([opts.project]);
+
+        const scoredCandidates: { id: string; score: number }[] = [];
+        const incomingTags = new Set((opts.tags ?? []).map((t) => t.toLowerCase()));
+        const incomingTitleWords = new Set(
+          (title + " " + opts.content).toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3)
+        );
+
+        for (const row of recentRows) {
+          if (opts.id && row.id === opts.id) continue;
+          let score = 0.5; // base temporal recency score
+          if (opts.session_id && row.session_id === opts.session_id) {
+            score += 1.0; // strong boost for same session
+          }
+          try {
+            const rowTags: string[] = JSON.parse(row.tags || "[]");
+            for (const rt of rowTags) {
+              if (incomingTags.has(rt.toLowerCase())) score += 0.8;
+            }
+          } catch {}
+          const rowTitleWords = row.title.toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3);
+          for (const rw of rowTitleWords) {
+            if (incomingTitleWords.has(rw)) score += 0.3;
+          }
+          scoredCandidates.push({ id: row.id, score });
+        }
+
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        linked_memory_ids = scoredCandidates.slice(0, 5).map((c) => c.id);
+      } catch {}
+    }
+  }
+
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
     title,
@@ -1064,6 +1117,7 @@ export function propose(
         ? true
         : undefined,
     src_ts,
+    linked_memory_ids: linked_memory_ids.length > 0 ? linked_memory_ids : undefined,
     due_at: opts.dueAt ?? opts.due_at,
     expires_at,
     pinned,

@@ -299,5 +299,28 @@ describe("T-086 migration v6 (conflicts table)", () => {
     db.close();
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("T-095 migration v8 (linked_memory_ids) > adds linked_memory_ids column and index to legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v8-"));
+    const { db } = legacyStore(root);
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(8);
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(memories)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("linked_memory_ids");
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(memories)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_memories_linked_ids");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 

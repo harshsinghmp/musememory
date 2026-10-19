@@ -171,6 +171,23 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_src_ts ON memories(src_ts)`);
     },
   },
+  {
+    version: 8,
+    up(db) {
+      // T-095: linked_memory_ids write-time edges seeded during capture
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("linked_memory_ids")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN linked_memory_ids TEXT`);
+        db.exec(
+          `UPDATE memories SET linked_memory_ids = json_extract(data, '$.linked_memory_ids') WHERE json_extract(data, '$.linked_memory_ids') IS NOT NULL`,
+        );
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_linked_ids ON memories(linked_memory_ids)`);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
