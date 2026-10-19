@@ -137,15 +137,15 @@
 - [x] T-124 · landed Wave 19 — resident INDEX route-map · orchestrator · PR #286 · U
 - [x] T-125 · landed Wave 19 — tier budgets as named constants with provenance · retrieval, orchestrator · PR #288 · U
 - [x] T-126 · landed Wave 3 — `why_retrieved` deterministic reason tokens · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
-- [ ] T-127 · recall→usage telemetry join (`usage_rate` feeds ROI) · quality · branch: io-budget-telemetry · U
-- [ ] T-128 · `[DRAFT]` marking with separate confident-answer key · store · new · U
-- [ ] T-129 · config-honesty AST audit (WIRED/DORMANT/UNREAD, build-failing) · new module · new · U
-- [ ] T-130 · storage-version compat tests in CI matrix · test · new · U
-- [ ] T-131 · honest benchmark labels (measured-vs-claimed) on all published numbers · docs, benchmark · new · U
-- [ ] T-132 · constitution contract: rules injected first, trim-exempt, no write tool · orchestrator · new · U
-- [ ] T-133 · `degraded − notes` fault signal · retrieval · new · U
-- [ ] T-134 · ground-moved reporting for anchors (silent when undeterminable) · anchors · new · U
-- [ ] T-135 · tiered retrieval ladder labeling loosened matches · retrieval · new · U
+- [x] T-127 · landed Wave 20 — recall→usage telemetry join (`usage_rate` feeds ROI) · quality · PR #291 · U
+- [x] T-128 · landed Wave 20 — `[DRAFT]` marking with separate confident-answer key · store · PR #293 · U
+- [x] T-129 · landed Wave 20 — config-honesty AST audit (WIRED/DORMANT/UNREAD, build-failing) · new module · PR #295 · U
+- [x] T-130 · landed Wave 20 — storage-version compat tests in CI matrix · test · PR #297 · U
+- [x] T-131 · landed Wave 20 — honest benchmark labels (measured-vs-claimed) on all published numbers · docs, benchmark · PR #299 · U
+- [x] T-132 · landed Wave 20 — constitution contract: rules injected first, trim-exempt, no write tool · orchestrator · PR #301 · U
+- [x] T-133 · landed Wave 20 — `degraded − notes` fault signal · retrieval · PR #303 · U
+- [x] T-134 · landed Wave 20 — ground-moved reporting for anchors (silent when undeterminable) · anchors · PR #305 · U
+- [x] T-135 · landed Wave 20 — tiered retrieval ladder labeling loosened matches · retrieval · PR #307 · U
 - [x] T-136 · landed Wave 6 — embeddings engine fingerprint pinning · intelligence/embed · branch: feat/wave-6-embeddings-eval-harness · U
 - [x] T-137 · landed Wave 6 — FTS5-floor/vector-upgrade degradation path · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
 - [x] T-138 · landed Wave 6 — brute-force cosine in SQLite BLOB (no ANN daemon, ever) · retrieval · branch: feat/wave-6-embeddings-eval-harness · U
@@ -535,11 +535,19 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 12. **Wave 11: Migrator Quarantine, Anti-Poisoning & Validation Hardening** (`T-366`, `T-338`, `T-339`, `T-340`, `T-348`, `T-349`, `T-357`, `T-362`) — [x] Landed on dev
 13. **Wave 12: Daemon Reliability, Upgrade Signals & Living Decisions** (`T-345`, `T-346`, `T-350`, `T-352`, `T-356`, `T-358`, `T-359`, `T-365`) — [x] Landed on dev
 14. **Wave 13: Retrieval Performance & Store Hot-Paths** (`T-021`, `T-022`, `T-023`, `T-028`, `T-029`, `T-062`, `T-063`, `T-064`) — [x] Landed on dev
+15. **Wave 14: Invalidation, Attribution & Ranking Rigor** (`T-302`, `T-304`, `T-307`, `T-309`, `T-310`, `T-312`) — [x] Landed on dev
+16. **Wave 15: Expiry, Decay & Confidence Hardening** (`T-072`, `T-073`, `T-074`, `T-076`–`T-081`) — [x] Landed on dev
+17. **Wave 16: Temporal Transitions, Contradiction Engine & Verbs** (`T-082`–`T-090`) — [x] Landed on dev
+18. **Wave 17: Packing, Graph, Lineage & Provenance** (`T-095`–`T-102`) — [x] Landed on dev
+19. **Wave 18: Ingestion, Suppression & Curation Gates** (`T-106`–`T-113`) — [x] Landed on dev
+20. **Wave 19: Scoring Refinements & Abstract Sidecars** (`T-118`–`T-125`) — [x] Landed on dev
+21. **Wave 20: Quality Telemetry, Honesty Gates & Retrieval Fault Signals** (`T-127`–`T-135`) — [x] Landed on dev
 
-## v11 Totals
+## v12 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 290 |
-| Landed on dev | 155 |
-| Active Remaining | 135 |
+| Landed on dev | 212 |
+| Active Remaining | 78 |
+
 

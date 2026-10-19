@@ -1,16 +1,26 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.9.0`  
-> **Status**: Feature Release (Scoring Refinements & Abstract Sidecars: query-intent bias multipliers, effective score calculation, RRF A/B tuning, typed candidate drop/keep reasons, clean-room L0/L1 abstract sidecars, ratio-batched refresh, resident INDEX route-mapping, and tier budgets with provenance)
+> **Version**: `v2.10.0`  
+> **Status**: Feature Release (Quality Telemetry, Honesty Gates & Retrieval Fault Signals: recall-usage telemetry join, draft marking, config-honesty AST audit, storage-version CI compat matrix, honest benchmark labels, constitution contract, degraded fault signals, ground-moved anchor reports, and tiered ladder labeling)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 19 Focus)
-- **Wave 20**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. `T-127` recall-usage telemetry join, `T-128` draft marking, `T-129` config-honesty AST audit).
+## ⏭️ Next Up (Post-Wave 20 Focus)
+- **Wave 21**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. failure attribution, eval harness, dashboard panels, and Hermes provider adapter).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 20: Quality Telemetry, Honesty Gates & Retrieval Fault Signals**:
+  - `T-127`: Recall→usage telemetry join (`usage_rate` feeds ROI) (PR #291, Closes #290)
+  - `T-128`: `[DRAFT]` marking with separate confident-answer key (PR #293, Closes #292)
+  - `T-129`: Config-honesty AST audit (`auditConfigHonesty`, WIRED/DORMANT/UNREAD, build-failing) (PR #295, Closes #294)
+  - `T-130`: Storage-version compat tests in CI matrix (`test/storage_version_compat.test.ts`, `schema_versions.json`) (PR #297, Closes #296)
+  - `T-131`: Honest benchmark labels (measured-vs-claimed) on all published numbers (PR #299, Closes #298)
+  - `T-132`: Constitution contract: rules injected first, trim-exempt, no write tool (PR #301, Closes #300)
+  - `T-133`: `degraded − notes` fault signal (`degraded_notes`, `formatDegradedFaultNotice`) (PR #303, Closes #302)
+  - `T-134`: Ground-moved reporting for anchors (silent when undeterminable) (PR #305, Closes #304)
+  - `T-135`: Tiered retrieval ladder labeling loosened matches (`executeRetrievalLadder`, `formatLoosenedBadge`) (PR #307, Closes #306)
 - [x] **Wave 19: Scoring Refinements & Abstract Sidecars**:
   - `T-118`: Query-intent bias multipliers (`detectQueryIntent`, `computeIntentMultiplier`, `taskIntent`) (PR #274, Closes #273)
   - `T-119`: `effective_score = base × reinforcement × decay` with utility reinforcement boosts and floor limits (PR #276, Closes #275)
