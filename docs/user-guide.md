@@ -163,6 +163,8 @@ musememory capture \
 | :--- | :--- | :--- |
 | `musememory why "<symbol/path>"` | `/muse-why` | Explains **why** a function or file was designed this way before you refactor it. Synthesizes past ADRs, bug fixes, and constraints. |
 | `musememory health` | `/muse-health` | Runs the 5-pillar health check (store integrity, code anchors, doc/code alignment, anti-pattern sentry, technical debt) before opening a PR. |
+| `search(as_of="<iso>")` | — | Executes bi-temporal point-in-time recall, returning active memories and undetermined boundary items without date invention. |
+| `memory_lifecycle(verb)` | — | Executes one of the five canonical lifecycle verbs (`change`, `end`, `correct`, `revert`, `forget`) with full audit logging. |
 | `musememory doctor` | — | Validates database WAL files, checks MCP server readiness, and audits token allocations. |
 | `musememory ui` | — | Launches the Web Observability Studio (`http://localhost:31337`) with live visual health scorecards, memory graphs, and optimization triggers. |
 | `musememory optimize` | — | Prunes dead candidate memories, removes expired observations, and defragments SQLite WAL files. |
@@ -208,6 +210,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 
 ### Related Documentation
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
+- ⏳ **[Temporal Transitions, Contradiction Engine & Verbs](temporal-contradiction-and-trust.md)** — Bi-temporal validity tracking, five-verb lifecycle, keep-both conflicts table, scoped invalidation, federation handshake, and veracity ranking.
 - ⏳ **[Expiry, Decay & Confidence Hardening](expiry-decay-and-confidence.md)** — Tokenizer-matched abstention gates, Bayesian corroboration confidence, trust-tier half-lives, pin-capable expiry policy YAML, and Weibull hazard curves.
 - 🎯 **[Invalidation, Attribution & Ranking Rigor](retrieval-ranking-and-invalidation.md)** — Incremental vector index sync, bounded Hebbian plasticity, IDF-weighted symbol matching, word boundaries, and FTS failure signals.
 - ⚡ **[Retrieval Performance & Guardrails](retrieval-performance-and-limits.md)** — Hot-path WeakMaps, memoized anchors, dirty-gating, limit clamping, and dry-run safety.

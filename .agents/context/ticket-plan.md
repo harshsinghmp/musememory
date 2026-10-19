@@ -88,15 +88,15 @@
 - [x] T-081 · landed Wave 15 — optional Weibull per-type decay curves (re-derived, not ported) · quality · PR #216 (Issue #215) · U
 
 ### Temporal + contradiction + trust
-- [ ] T-082 · `valid_to_exact` flag on transitions · schema, store · new · U
-- [ ] T-083 · `as_of` queries returning `{results, undetermined}` (invent no dates) · retrieval · new · U
-- [ ] T-084 · five-verb lifecycle: change/end/correct/revert/forget · store · new · U
-- [ ] T-085 · `searchTemporal(atTime)` default-excluding superseded · retrieval · new · U
-- [ ] T-086 · keep-both conflicts table (never delete) · quality · new · U
-- [ ] T-087 · scoped invalidation requiring (entity, relation, target) alignment · quality · new · U
-- [ ] T-088 · federation handshake for mesh-mode conflict dedup · sync · new · U
-- [ ] T-089 · veracity rank weights user 1.0/agent 0.7/external 0.5/system 0.3 · retrieval · branch: poisoning-trust-tiers · U
-- [ ] T-090 · `src_ts` evidence-age stamping (memory only as fresh as evidence) · schema, store · new · U
+- [x] T-082 · landed Wave 16 — `valid_to_exact` flag on transitions · schema, store · PR #219 (Issue #218) · U
+- [x] T-083 · landed Wave 16 — `as_of` queries returning `{results, undetermined}` (invent no dates) · retrieval · PR #221 (Issue #220) · U
+- [x] T-084 · landed Wave 16 — five-verb lifecycle: change/end/correct/revert/forget · store · PR #223 (Issue #222) · U
+- [x] T-085 · landed Wave 16 — `searchTemporal(atTime)` default-excluding superseded · retrieval · PR #225 (Issue #224) · U
+- [x] T-086 · landed Wave 16 — keep-both conflicts table (never delete) · quality · PR #227 (Issue #226) · U
+- [x] T-087 · landed Wave 16 — scoped invalidation requiring (entity, relation, target) alignment · quality · PR #229 (Issue #228) · U
+- [x] T-088 · landed Wave 16 — federation handshake for mesh-mode conflict dedup · sync · PR #231 (Issue #230) · U
+- [x] T-089 · landed Wave 16 — veracity rank weights user 1.0/agent 0.7/external 0.5/system 0.3 · retrieval · PR #233 (Issue #232) · U
+- [x] T-090 · landed Wave 16 — `src_ts` evidence-age stamping (memory only as fresh as evidence) · schema, store · PR #235 (Issue #234) · U
 
 ### Packing + graph + provenance
 - [x] T-091 · landed Wave 4 — TOON-style row-wise context-pack compaction (verify 77.6% claim ourselves) · orchestrator · branch: feat/wave-4-compaction-distillation · U
