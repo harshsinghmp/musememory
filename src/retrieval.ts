@@ -14,6 +14,7 @@ import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts"
 import { buildSafeFtsQuery } from "./sqlite.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
+import { isDraftMemory } from "./drafts.ts";
 import {
   type TaskIntent,
   INTENT_BIAS_TABLE,
@@ -252,6 +253,10 @@ export interface SearchResult {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
   /** T-083: Target timestamp when as_of evaluation was requested. */
   as_of?: string;
   /** T-083: Memories whose validity at as_of is undetermined without date invention. */
@@ -280,6 +285,10 @@ export interface FormattedContext {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
   /** T-083: Target timestamp when as_of evaluation was requested. */
   as_of?: string;
   /** T-083: Memories whose validity at as_of is undetermined. */
@@ -1769,11 +1778,14 @@ export function queryContext(
 
   const isDegraded = store.circuit?.isDegraded() ?? false;
   const minThreshold = options.minScoreThreshold ?? DEFAULT_MIN_RELEVANCE_SCORE;
-  const hasConfidentMatch =
-    results.length > 0 &&
-    (!query.trim() ||
-      results.some((r) => {
-        if (r.score < minThreshold) return false;
+  const confident_answers: ScoredEntry[] = [];
+  const draft_answers: ScoredEntry[] = [];
+
+  for (const r of results) {
+    if (isDraftMemory(r.entry)) {
+      draft_answers.push(r);
+    } else {
+      if (r.score >= minThreshold) {
         if (queryTokens.length > 0) {
           const app = applicability(r.entry, queryTokens);
           const hasQuerySignal =
@@ -1788,10 +1800,17 @@ export function queryContext(
                   w === "semantic_match" ||
                   w === "graph_overlap",
               ));
-          return Boolean(hasQuerySignal);
+          if (hasQuerySignal) {
+            confident_answers.push(r);
+          }
+        } else {
+          confident_answers.push(r);
         }
-        return true;
-      }));
+      }
+    }
+  }
+
+  const hasConfidentMatch = confident_answers.length > 0;
 
   const asOfIso =
     options.as_of !== undefined
@@ -1810,6 +1829,8 @@ export function queryContext(
     watermark: getStoreWatermark(store),
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
     no_confident_match: !hasConfidentMatch,
+    confident_answers,
+    draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
     as_of: asOfIso,
     undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
     hidden_count,
@@ -1933,6 +1954,8 @@ export function formatPromptContext(
         stale: isDegraded || cached.stale || false,
         mode: cached.mode,
         no_confident_match: cached.no_confident_match,
+        confident_answers: cached.confident_answers,
+        draft_answers: cached.draft_answers,
       };
     }
   }
@@ -2105,6 +2128,8 @@ export function formatPromptContext(
     stale: result.stale,
     mode: result.mode,
     no_confident_match: result.no_confident_match,
+    confident_answers: result.confident_answers,
+    draft_answers: result.draft_answers,
     as_of: result.as_of,
     undetermined: result.undetermined,
     hidden_count: result.hidden_count,
