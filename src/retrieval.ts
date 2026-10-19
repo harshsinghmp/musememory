@@ -33,8 +33,25 @@ import {
   resolveRrfConfig,
   reciprocalRankFusion,
 } from "./retrieval/rrf.ts";
+import {
+  type CandidateKeepReason,
+  type CandidateDropReason,
+  type CandidateEvaluation,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
+} from "./retrieval/candidate_reasons.ts";
 
-export type { VeracityClass, TaskIntent, RrfConfig, RrfVariant, RrfWeights };
+export type {
+  VeracityClass,
+  TaskIntent,
+  RrfConfig,
+  RrfVariant,
+  RrfWeights,
+  CandidateKeepReason,
+  CandidateDropReason,
+  CandidateEvaluation,
+};
 export {
   INTENT_BIAS_TABLE,
   detectQueryIntent,
@@ -45,6 +62,9 @@ export {
   calculateRrfItemScore,
   resolveRrfConfig,
   reciprocalRankFusion,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
 };
 
 /**
@@ -153,6 +173,10 @@ export interface ScoredEntry {
   score: number;
   /** T-126: Deterministic reason tokens explaining why this memory was retrieved. */
   why_retrieved?: string[];
+  /** T-121: Typed keep reasons explaining why this memory was preserved. */
+  keep_reasons?: CandidateKeepReason[];
+  /** T-121: Typed drop reasons if candidate was evaluated and rejected. */
+  drop_reasons?: CandidateDropReason[];
 }
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
@@ -222,6 +246,8 @@ export interface SearchResult {
   expanded_wikilinks?: ExpandedWikilink[];
   /** T-098: Count of wikilinks expanded after fusion. */
   expanded_count?: number;
+  /** T-121: Typed evaluation outcomes (keep/drop with structured reasons) for all evaluated candidates. */
+  candidate_evaluations?: CandidateEvaluation[];
 }
 
 export interface FormattedContext {

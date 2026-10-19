@@ -30,6 +30,12 @@ import {
   calculateRrfItemScore,
   resolveRrfConfig,
   reciprocalRankFusion,
+  type CandidateKeepReason,
+  type CandidateDropReason,
+  type CandidateEvaluation,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
@@ -39,7 +45,18 @@ import {
   defaultSeenChunkTracker,
 } from "./suppression.ts";
 
-export type { ScoreFactors, AbstentionDecision, VeracityClass, TaskIntent, RrfConfig, RrfVariant, RrfWeights };
+export type {
+  ScoreFactors,
+  AbstentionDecision,
+  VeracityClass,
+  TaskIntent,
+  RrfConfig,
+  RrfVariant,
+  RrfWeights,
+  CandidateKeepReason,
+  CandidateDropReason,
+  CandidateEvaluation,
+};
 export {
   isLowDiscrimination,
   conditionalRerank,
@@ -58,6 +75,9 @@ export {
   calculateRrfItemScore,
   resolveRrfConfig,
   reciprocalRankFusion,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
 };
 
 /**
@@ -80,6 +100,10 @@ export interface MultiFactorScoreResult {
   rrfScore?: number;
   factors: ScoreFactors;
   why_retrieved?: string[];
+  /** T-121: Typed keep reasons explaining why this memory was preserved. */
+  keep_reasons?: CandidateKeepReason[];
+  /** T-121: Typed drop reasons if candidate was rejected. */
+  drop_reasons?: CandidateDropReason[];
 }
 
 export interface MultiFactorRankingOptions {
@@ -128,6 +152,7 @@ export function calculateMultiFactorScore(
     effectiveScore: factors.effectiveScore,
     factors,
     why_retrieved: deriveWhyRetrieved(factors, entry),
+    keep_reasons: deriveCandidateKeepReasons(entry, factors),
   };
 }
 
