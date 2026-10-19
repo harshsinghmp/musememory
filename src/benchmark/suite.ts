@@ -198,26 +198,27 @@ export function formatBenchmarkScoreboard(report: BenchmarkReport): string {
   out += `\nBenchmark Runs:     ${report.iterations} iterations\n`;
   out += `Timestamp:          ${report.timestamp}\n`;
 
-  out += `\n🏎️ SPEED & LATENCY PROFILE:\n`;
-  out += `  ┌─────────────────────────┬──────────┬──────────┬──────────┬──────────┐\n`;
-  out += `  │ Operation               │ Min      │ P50      │ P95      │ P99      │\n`;
-  out += `  ├─────────────────────────┼──────────┼──────────┼──────────┼──────────┤\n`;
-  out += `  │ Hot Cache Lookup        │ ${(report.speed.hot_cache_lookup.min + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p50 + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p95 + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p99 + " µs").padEnd(8)} │\n`;
-  out += `  │ FTS5 BM25 Retrieval     │ ${(report.speed.fts5_search.min + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p50 + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p95 + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p99 + " ms").padEnd(8)} │\n`;
-  out += `  │ Knapsack Ranking        │ ${(report.speed.knapsack_ranking.min + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p50 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p95 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p99 + " ms").padEnd(8)} │\n`;
-  out += `  │ Context Assembly        │ ${(report.speed.context_assembly.min + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p50 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p95 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p99 + " ms").padEnd(8)} │\n`;
-  out += `  └─────────────────────────┴──────────┴──────────┴──────────┴──────────┘\n`;
+  out += `\n🏎️ SPEED & LATENCY PROFILE (Honest Provenance: [MEASURED] on current hardware):\n`;
+  out += `  ┌─────────────────────────────────┬──────────┬──────────┬──────────┬──────────┐\n`;
+  out += `  │ Operation                       │ Min      │ P50      │ P95      │ P99      │\n`;
+  out += `  ├─────────────────────────────────┼──────────┼──────────┼──────────┼──────────┤\n`;
+  out += `  │ [MEASURED] Hot Cache Lookup     │ ${(report.speed.hot_cache_lookup.min + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p50 + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p95 + " µs").padEnd(8)} │ ${(report.speed.hot_cache_lookup.p99 + " µs").padEnd(8)} │\n`;
+  out += `  │ [MEASURED] FTS5 BM25 Retrieval  │ ${(report.speed.fts5_search.min + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p50 + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p95 + " ms").padEnd(8)} │ ${(report.speed.fts5_search.p99 + " ms").padEnd(8)} │\n`;
+  out += `  │ [MEASURED] Knapsack Ranking     │ ${(report.speed.knapsack_ranking.min + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p50 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p95 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p99 + " ms").padEnd(8)} │\n`;
+  out += `  │ [MEASURED] Context Assembly     │ ${(report.speed.context_assembly.min + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p50 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p95 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p99 + " ms").padEnd(8)} │\n`;
+  out += `  └─────────────────────────────────┴──────────┴──────────┴──────────┴──────────┘\n`;
+  out += `  * [CLAIMED] SLA Target Bounds: Hot Cache < 50 µs, FTS5 < 15 ms, Context Fusion < 50 ms\n`;
 
   out += `\n🎯 KNOWLEDGE QUALITY & ROI:\n`;
   out += `  * Total Active Memories:  ${report.quality.total_memories}\n`;
   out += `  * Contradiction Rate:     ${report.quality.conflict_rate_pct}%\n`;
   out += `  * Stale Knowledge Rate:   ${report.quality.stale_rate_pct}%\n`;
-  out += `  * Memory ROI Success:     \x1b[32m${report.quality.roi_success_rate_pct}%\x1b[0m\n`;
+  out += `  * [MEASURED] Memory ROI:  \x1b[32m${report.quality.roi_success_rate_pct}%\x1b[0m\n`;
 
   out += `\n🪙 TOKEN ECONOMY & EFFICIENCY:\n`;
   out += `  * Total Raw Store Tokens: ${report.tokens.raw_tokens_total} tokens\n`;
   out += `  * Average Injected Tokens:${report.tokens.packed_tokens_avg} tokens\n`;
-  out += `  * Knapsack Compression:   \x1b[36m${report.tokens.compression_ratio_pct}% tokens saved\x1b[0m\n`;
+  out += `  * [MEASURED] Compression: \x1b[36m${report.tokens.compression_ratio_pct}% tokens saved\x1b[0m\n`;
 
   out += `\n`;
   return out;
