@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, Verification, GraphMetadata, TrustTier, FactProvenanceRecord } from "./types.ts";
+import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
@@ -1342,6 +1342,190 @@ export function supersede(
 /** T-096: Returns true if memory is in superseded status */
 export function isSuperseded(entry: MemoryEntry): boolean {
   return entry.status === "superseded";
+}
+
+export interface LineageWalkOptions {
+  /** Traversal direction: ancestors (supersedes), descendants (superseded_by), or both. Default: 'both' */
+  direction?: "ancestors" | "descendants" | "both";
+  /** Maximum traversal depth from root. Default: 5 */
+  maxDepth?: number;
+  /** Maximum number of unique entries to collect. Default: 50 */
+  limit?: number;
+  /** Whether to traverse lateral conflicts (conflicts_with_id / conflict_ids). Default: false */
+  includeConflicts?: boolean;
+  /** Whether to traverse associative write-time links (linked_memory_ids / related_memory_ids). Default: false */
+  includeLinked?: boolean;
+  /** Filter collected entries by memory status (root is always included). */
+  filterStatus?: MemoryStatus[];
+}
+
+export interface LineageEdge {
+  from: string;
+  to: string;
+  relation: "supersedes" | "superseded_by" | "conflicts_with" | "linked";
+}
+
+export interface LineageWalkResult {
+  rootId: string;
+  entries: MemoryEntry[];
+  depths: Record<string, number>;
+  edges: LineageEdge[];
+}
+
+/**
+ * T-101: Lineage BFS walker traversing provenance DAG edges with cycle prevention and depth bounds.
+ */
+export function walkLineageBfs(
+  store: Store,
+  startId: string,
+  options: LineageWalkOptions = {},
+): LineageWalkResult {
+  const rootEntry = get(store, startId);
+  if (!rootEntry) {
+    return { rootId: startId, entries: [], depths: {}, edges: [] };
+  }
+
+  const direction = options.direction ?? "both";
+  const maxDepth = typeof options.maxDepth === "number" && options.maxDepth >= 0 ? options.maxDepth : 5;
+  const limit = typeof options.limit === "number" && options.limit > 0 ? options.limit : 50;
+  const includeConflicts = Boolean(options.includeConflicts);
+  const includeLinked = Boolean(options.includeLinked);
+  const allowedStatuses = options.filterStatus ? new Set(options.filterStatus) : null;
+
+  const entries: MemoryEntry[] = [rootEntry];
+  const depths: Record<string, number> = { [startId]: 0 };
+  const edges: LineageEdge[] = [];
+  const edgeSet = new Set<string>();
+
+  const visited = new Set<string>([startId]);
+  const queue: { id: string; depth: number }[] = [{ id: startId, depth: 0 }];
+
+  const addEdge = (from: string, to: string, relation: LineageEdge["relation"]) => {
+    const key = `${from}->${to}:${relation}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      edges.push({ from, to, relation });
+    }
+  };
+
+  while (queue.length > 0 && entries.length < limit) {
+    const current = queue.shift()!;
+    if (current.depth >= maxDepth) continue;
+
+    const currentEntry = get(store, current.id);
+    if (!currentEntry) continue;
+
+    const neighborCandidates: { id: string; relation: LineageEdge["relation"] }[] = [];
+
+    // 1. Ancestors (what currentEntry supersedes / replaced)
+    if (direction === "ancestors" || direction === "both") {
+      const ancIds = new Set<string>();
+      if (currentEntry.supersedes_id) ancIds.add(currentEntry.supersedes_id);
+      for (const sid of normalizeIdArray(currentEntry.supersedes)) {
+        ancIds.add(sid);
+      }
+      for (const ancId of ancIds) {
+        if (ancId && ancId !== current.id) {
+          neighborCandidates.push({ id: ancId, relation: "supersedes" });
+        }
+      }
+    }
+
+    // 2. Descendants (what superseded currentEntry / replaced it)
+    if (direction === "descendants" || direction === "both") {
+      const descIds = new Set<string>();
+      for (const sby of normalizeIdArray(currentEntry.superseded_by)) {
+        descIds.add(sby);
+      }
+      // Fast SQLite query via idx_memories_supersedes_id
+      if (store.db) {
+        try {
+          const rows = store.db.query<{ id: string }>(
+            "SELECT id FROM memories WHERE supersedes_id = ?"
+          ).all([current.id]);
+          for (const r of rows) {
+            descIds.add(r.id);
+          }
+        } catch {}
+      }
+      for (const descId of descIds) {
+        if (descId && descId !== current.id) {
+          neighborCandidates.push({ id: descId, relation: "superseded_by" });
+        }
+      }
+    }
+
+    // 3. Lateral Conflicts (conflicting memories)
+    if (includeConflicts) {
+      const cflIds = new Set<string>();
+      if (currentEntry.conflicts_with_id) cflIds.add(currentEntry.conflicts_with_id);
+      for (const cid of currentEntry.conflict_ids || []) {
+        cflIds.add(cid);
+      }
+      // Fast SQLite query via idx_memories_conflicts_with_id
+      if (store.db) {
+        try {
+          const rows = store.db.query<{ id: string }>(
+            "SELECT id FROM memories WHERE conflicts_with_id = ?"
+          ).all([current.id]);
+          for (const r of rows) {
+            cflIds.add(r.id);
+          }
+        } catch {}
+      }
+      for (const cflId of cflIds) {
+        if (cflId && cflId !== current.id) {
+          neighborCandidates.push({ id: cflId, relation: "conflicts_with" });
+        }
+      }
+    }
+
+    // 4. Linked & Related edges
+    if (includeLinked) {
+      const linkIds = new Set<string>();
+      for (const lid of currentEntry.linked_memory_ids || []) {
+        linkIds.add(lid);
+      }
+      for (const rid of currentEntry.related_memory_ids || []) {
+        linkIds.add(rid);
+      }
+      for (const linkId of linkIds) {
+        if (linkId && linkId !== current.id) {
+          neighborCandidates.push({ id: linkId, relation: "linked" });
+        }
+      }
+    }
+
+    for (const candidate of neighborCandidates) {
+      addEdge(current.id, candidate.id, candidate.relation);
+
+      if (!visited.has(candidate.id)) {
+        visited.add(candidate.id);
+        const neighborEntry = get(store, candidate.id);
+        if (neighborEntry) {
+          const nextDepth = current.depth + 1;
+          depths[candidate.id] = nextDepth;
+
+          if (!allowedStatuses || allowedStatuses.has(neighborEntry.status)) {
+            entries.push(neighborEntry);
+          }
+
+          if (entries.length >= limit) {
+            break;
+          }
+
+          queue.push({ id: candidate.id, depth: nextDepth });
+        }
+      }
+    }
+  }
+
+  return {
+    rootId: startId,
+    entries,
+    depths,
+    edges,
+  };
 }
 
 /** Mark an entry stale; reason appended to content. (T-082) */
