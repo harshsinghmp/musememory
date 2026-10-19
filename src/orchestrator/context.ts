@@ -200,6 +200,7 @@ export async function resolveMuseContext(
         recordSeenChunks: false,
         echoHorizonMs: input.echo_horizon_ms,
         agent: input.agent,
+        taskIntent: input.task_intent,
       });
 
   // Merge anchored memories to front of candidate pool
