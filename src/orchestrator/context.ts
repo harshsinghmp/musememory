@@ -22,6 +22,7 @@ import {
   USER_PROFILE_DEFAULT_BUDGET,
 } from "../retrieval/tier_budgets.ts";
 import { isDraftMemory } from "../drafts.ts";
+import { resolveConstitutionalRules, type ConstitutionalRule } from "./constitution.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -75,6 +76,17 @@ export async function resolveMuseContext(
           topic_overlap_prior_query: skipDecision.priorQuery,
         };
       }
+    }
+  }
+
+  // 1.5. T-132: Constitutional Directives (Injected First, Trim-Exempt)
+  let constitutionalRules: ConstitutionalRule[] | undefined;
+  if (input.constitutional_rules !== undefined || input.include_constitution === true) {
+    constitutionalRules = resolveConstitutionalRules(input.constitutional_rules);
+    for (const rule of constitutionalRules) {
+      const cost = estimateTokens(`${rule.id} ${rule.title} ${rule.rule}`);
+      usedBudget += cost;
+      remainingBudget = Math.max(0, remainingBudget - cost);
     }
   }
 
@@ -418,14 +430,28 @@ export async function resolveMuseContext(
   const omittedCount = Math.max(0, totalCandidateCount - packedCount);
   const budgetNotice = omittedCount > 0 ? `[${omittedCount} omitted — budget ${budget} tokens]` : undefined;
 
+  // T-132: Constitution manifest items (trim-exempt)
+  const constitutionManifest: ContextManifestItem[] = constitutionalRules
+    ? constitutionalRules.map((r) => ({
+        id: r.id,
+        title: r.title,
+        type: "constitution",
+        truncated: false,
+        score: 1.0,
+      }))
+    : [];
+
   // T-092: Never-drop manifest TOC listing all candidate memories
-  const context_manifest: ContextManifestItem[] = sortedGatedPool.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    type: entry.type,
-    truncated: !packedIds.has(entry.id),
-    score: entry.salience,
-  }));
+  const context_manifest: ContextManifestItem[] = [
+    ...constitutionManifest,
+    ...sortedGatedPool.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      type: entry.type,
+      truncated: !packedIds.has(entry.id),
+      score: entry.salience,
+    })),
+  ];
 
   // 7. Generate actionable suggested next steps
   const suggestedNextSteps: string[] = [];
@@ -515,6 +541,7 @@ export async function resolveMuseContext(
   }
 
   const finalResult: FusedContextResult = {
+    constitutional_rules: constitutionalRules && constitutionalRules.length > 0 ? constitutionalRules : undefined,
     active_constraints: activeConstraints,
     relevant_memories: packedMemories,
     negative_lessons: packedNegative,
@@ -565,6 +592,15 @@ export function formatCompactContextPack(result: FusedContextResult): string {
 
   if (result.trivial_prompt_gated) {
     lines.push("> ℹ️ _Conversational greeting or acknowledgement detected: memory recall bypassed to conserve tokens._", "");
+  }
+
+  // T-132: Constitutional Directives (injected first, trim-exempt, immutable)
+  if (result.constitutional_rules && result.constitutional_rules.length > 0) {
+    lines.push("## 📜 Constitutional Directives (Trim-Exempt · Immutable)");
+    for (const rule of result.constitutional_rules) {
+      lines.push(`- **[${rule.id}] ${rule.title}**: ${rule.rule}`);
+    }
+    lines.push("");
   }
 
   if (result.context_manifest && result.context_manifest.length > 0) {

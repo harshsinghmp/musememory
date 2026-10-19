@@ -1,5 +1,6 @@
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import type { RouteMatch } from "./route_map.ts";
+import type { ConstitutionalRule } from "./constitution.ts";
 
 export type McpProfile =
   | "core"
@@ -47,6 +48,10 @@ export interface MuseContextInput {
   topic_overlap_threshold?: number;
   /** T-113: Whether to bypass memory recall for trivial greetings and pleasantries (default: true). */
   enable_trivial_gate?: boolean;
+  /** T-132: Custom constitutional rules to inject under constitution contract. */
+  constitutional_rules?: ConstitutionalRule[];
+  /** T-132: Whether to include trim-exempt constitutional rules injected first (default: true). */
+  include_constitution?: boolean;
 }
 
 export interface ContextManifestItem {
@@ -58,6 +63,8 @@ export interface ContextManifestItem {
 }
 
 export interface FusedContextResult {
+  /** T-132: Trim-exempt constitutional rules injected at index 0. */
+  constitutional_rules?: ConstitutionalRule[];
   active_constraints: Array<{ id: string; title: string; content: string }>;
   relevant_memories: MemoryEntry[];
   negative_lessons: MemoryEntry[];
