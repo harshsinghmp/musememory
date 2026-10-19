@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
-import { list } from "./store.ts";
+import { list, get, slugifyId as slugify } from "./store.ts";
 import { getCurrent, syncConstraints, getSessionHandoff, parseCurrentFile } from "./governor.ts";
-import { listWikiPages } from "./wiki/compiler.ts";
+import { listWikiPages, getWikiPage } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
 import type { MemoryEntry, SearchOptions, VeracityClass } from "./types.ts";
@@ -127,6 +127,23 @@ export interface ScoredEntry {
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
 
+/**
+ * T-098: Progressively expanded wikilink target resolved from primary fused candidates.
+ */
+export interface ExpandedWikilink {
+  target: string;
+  sourceId: string;
+  hop: number;
+  entry?: MemoryEntry;
+  wikiPage?: {
+    slug: string;
+    title: string;
+    type: string;
+    summary?: string;
+  };
+  score: number;
+}
+
 export interface ContextQueryOptions extends SearchOptions {
   query?: string;
   includeExpired?: boolean;
@@ -142,6 +159,11 @@ export interface ContextQueryOptions extends SearchOptions {
   /** T-097: Hindsight recall-time deduplication favoring concrete observations over abstract inferences (scoped to top-2x limit). */
   prefer_observations?: boolean;
   preferObservations?: boolean;
+  /** T-098: Progressive wikilink expansion after fusion (resolves [[target]] and linked_memory_ids). */
+  expand_wikilinks?: boolean;
+  expandWikilinks?: boolean;
+  /** Maximum hops for progressive wikilink expansion (default: 1, max: 3). */
+  max_wikilink_hops?: number;
 }
 
 export interface SearchResult {
@@ -166,6 +188,10 @@ export interface SearchResult {
   hidden_count?: number;
   /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
   deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates. */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion. */
+  expanded_count?: number;
 }
 
 export interface FormattedContext {
@@ -188,6 +214,10 @@ export interface FormattedContext {
   hidden_count?: number;
   /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
   deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates. */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion. */
+  expanded_count?: number;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -1036,6 +1066,179 @@ export function sortCandidates(
 }
 
 /**
+ * T-098: Extracts [[target]] and [[target|alias]] wikilink references from text.
+ */
+export function extractWikilinks(text: string): string[] {
+  if (!text) return [];
+  const regex = /\[\[([a-zA-Z0-9_\-\.\/ ]+?)(?:[|#][^\]]+)?\]\]/g;
+  const links: string[] = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const raw = match[1].trim();
+    if (raw && !links.includes(raw)) {
+      links.push(raw);
+    }
+  }
+  return links;
+}
+
+/**
+ * T-098: Progressively expands wikilinks and linked_memory_ids after fusion retrieval.
+ * Resolves targets to related memories or compiled wiki pages within token budget and hop limits.
+ */
+export function expandFusedWikilinks(
+  store: Store,
+  primaryResults: ScoredEntry[],
+  options: {
+    tokenBudgetRemaining?: number;
+    maxHops?: number;
+    depth?: DisclosureDepth;
+    includeSuperseded?: boolean;
+    memoryDir?: string;
+  } = {},
+): {
+  expanded: ExpandedWikilink[];
+  tokensUsed: number;
+} {
+  const maxHops = Math.min(3, Math.max(1, options.maxHops ?? 1));
+  const expanded: ExpandedWikilink[] = [];
+  let tokensUsed = 0;
+  let remainingBudget = options.tokenBudgetRemaining;
+
+  // Track all visited targets (primary results + expanded) to prevent duplicates & cycles
+  const visited = new Set<string>();
+  for (const r of primaryResults) {
+    visited.add(r.entry.id);
+    if (r.entry.title) visited.add(r.entry.title);
+  }
+
+  const memoryDir = options.memoryDir || store.memoryDir || store.dir;
+
+  // Level-by-level BFS frontier for multi-hop expansion
+  let currentFrontier: Array<{ id: string; content: string; title: string; linked_memory_ids?: string[]; score: number }> =
+    primaryResults.map((r) => ({
+      id: r.entry.id,
+      content: r.entry.content,
+      title: r.entry.title,
+      linked_memory_ids: r.entry.linked_memory_ids,
+      score: r.score,
+    }));
+
+  for (let hop = 1; hop <= maxHops; hop++) {
+    const nextFrontier: Array<{ id: string; content: string; title: string; linked_memory_ids?: string[]; score: number }> = [];
+
+    for (const source of currentFrontier) {
+      // Collect candidate targets from [[wikilinks]] and linked_memory_ids
+      const extractedLinks = extractWikilinks(source.content + " " + source.title);
+      const linkedIds = source.linked_memory_ids ?? [];
+      const targets = Array.from(new Set([...extractedLinks, ...linkedIds]));
+
+      for (const target of targets) {
+        if (!target || visited.has(target)) continue;
+        visited.add(target);
+
+        // Try resolving target as a MemoryEntry in store
+        let resolvedEntry: MemoryEntry | null = null;
+        try {
+          resolvedEntry = get(store, target);
+        } catch {}
+
+        if (!resolvedEntry && store.db) {
+          try {
+            const row = store.db.query("SELECT data FROM memories WHERE id = ? OR title = ? LIMIT 1").get([target, target]) as { data: string } | null;
+            if (row?.data) {
+              resolvedEntry = JSON.parse(row.data);
+            }
+          } catch {}
+        }
+
+        if (resolvedEntry) {
+          visited.add(resolvedEntry.id);
+          if (resolvedEntry.title) visited.add(resolvedEntry.title);
+
+          if (!options.includeSuperseded && (resolvedEntry.status === "superseded" || resolvedEntry.valid_to)) {
+            if (resolvedEntry.status === "superseded") continue;
+          }
+
+          const entryTokens = estimateEntryTokens(resolvedEntry);
+          const compactTokens = Math.max(8, Math.ceil((resolvedEntry.title.length + resolvedEntry.id.length) / 4));
+
+          if (remainingBudget !== undefined) {
+            if (remainingBudget < compactTokens) {
+              continue; // Budget exhausted
+            }
+          }
+
+          const hopDecay = Math.pow(0.85, hop);
+          const score = Number((source.score * hopDecay).toFixed(4));
+          const actualTokens = remainingBudget !== undefined && remainingBudget < entryTokens ? compactTokens : entryTokens;
+
+          if (remainingBudget !== undefined) {
+            remainingBudget -= actualTokens;
+          }
+          tokensUsed += actualTokens;
+
+          expanded.push({
+            target,
+            sourceId: source.id,
+            hop,
+            entry: resolvedEntry,
+            score,
+          });
+
+          nextFrontier.push({
+            id: resolvedEntry.id,
+            content: resolvedEntry.content,
+            title: resolvedEntry.title,
+            linked_memory_ids: resolvedEntry.linked_memory_ids,
+            score,
+          });
+          continue;
+        }
+
+        // Try resolving target as a compiled wiki page
+        if (memoryDir && existsSync(join(memoryDir, "wiki"))) {
+          try {
+            const page = getWikiPage(memoryDir, target) || getWikiPage(memoryDir, slugify(target));
+            if (page) {
+              const summary = (page as any).summary || "";
+              const pageTokens = Math.max(12, Math.ceil((page.title.length + summary.length) / 4));
+
+              if (remainingBudget !== undefined) {
+                if (remainingBudget < pageTokens) continue;
+                remainingBudget -= pageTokens;
+              }
+              tokensUsed += pageTokens;
+
+              const hopDecay = Math.pow(0.80, hop);
+              const score = Number((source.score * hopDecay).toFixed(4));
+
+              expanded.push({
+                target,
+                sourceId: source.id,
+                hop,
+                wikiPage: {
+                  slug: page.slug,
+                  title: page.title,
+                  type: page.type,
+                  summary: summary || undefined,
+                },
+                score,
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+
+    currentFrontier = nextFrontier;
+    if (currentFrontier.length === 0) break;
+  }
+
+  return { expanded, tokensUsed };
+}
+
+/**
  * Deep Context Query Engine:
  * Filters, ranks, and knapsack-packs relevant memories within token budgets.
  */
@@ -1374,6 +1577,26 @@ export function queryContext(
     }
   }
 
+  // T-098: Progressive wikilink expansion after fusion
+  let expanded_wikilinks: ExpandedWikilink[] | undefined;
+  let expanded_count = 0;
+
+  if (options.expand_wikilinks || options.expandWikilinks) {
+    const budgetRemaining = options.tokenBudget ? Math.max(0, options.tokenBudget - totalTokensUsed) : undefined;
+    const expansion = expandFusedWikilinks(store, results, {
+      tokenBudgetRemaining: budgetRemaining,
+      maxHops: options.max_wikilink_hops,
+      depth: options.depth,
+      includeSuperseded: options.includeSuperseded,
+      memoryDir: store.memoryDir || store.dir,
+    });
+    if (expansion.expanded.length > 0) {
+      expanded_wikilinks = expansion.expanded;
+      expanded_count = expansion.expanded.length;
+      totalTokensUsed += expansion.tokensUsed;
+    }
+  }
+
   const isDegraded = store.circuit?.isDegraded() ?? false;
   const minThreshold = options.minScoreThreshold ?? DEFAULT_MIN_RELEVANCE_SCORE;
   const hasConfidentMatch =
@@ -1421,6 +1644,8 @@ export function queryContext(
     undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
     hidden_count,
     deduped_count: preferObs ? deduped_count : undefined,
+    expanded_wikilinks,
+    expanded_count: expanded_count > 0 ? expanded_count : undefined,
   };
 }
 
@@ -1677,6 +1902,26 @@ export function formatPromptContext(
     parts.push("");
   }
 
+  if (result.expanded_wikilinks && result.expanded_wikilinks.length > 0) {
+    parts.push("### Progressively Expanded Wiki Links & Related Memories");
+    for (const exp of result.expanded_wikilinks) {
+      if (exp.entry) {
+        const typeBadge = exp.entry.type ? ` [${exp.entry.type.toUpperCase()}]` : "";
+        if (options.depth === "L1") {
+          parts.push(`- **[[${exp.target}]]**: ${exp.entry.id} ${exp.entry.title}${typeBadge} (via ${exp.sourceId}, hop ${exp.hop})`);
+        } else {
+          parts.push(`#### [[${exp.target}]] — ${exp.entry.title}${typeBadge} (via ${exp.sourceId}, hop ${exp.hop})`);
+          parts.push(exp.entry.content);
+          parts.push("");
+        }
+      } else if (exp.wikiPage) {
+        const sum = exp.wikiPage.summary ? ` — ${exp.wikiPage.summary}` : "";
+        parts.push(`- **[[${exp.wikiPage.slug}]]** (${exp.wikiPage.type}): ${exp.wikiPage.title}${sum} (via ${exp.sourceId}, hop ${exp.hop})`);
+      }
+    }
+    parts.push("");
+  }
+
   parts.push("---");
   parts.push("*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call `memory_capture` immediately.*");
 
@@ -1694,6 +1939,8 @@ export function formatPromptContext(
     undetermined: result.undetermined,
     hidden_count: result.hidden_count,
     deduped_count: result.deduped_count,
+    expanded_wikilinks: result.expanded_wikilinks,
+    expanded_count: result.expanded_count,
   };
 
   if (cacheKey && store.cache) {
