@@ -10,7 +10,17 @@ import { syncConstraints } from "../governor.ts";
 import { getUserProfile } from "../user.ts";
 import { formatCoreBlock } from "../core.ts";
 
-export type RetrievalTier = 0 | 1 | 2;
+import {
+  type RetrievalTier,
+  resolveTierBudget,
+  TIER_0_DEFAULT_BUDGET,
+  TIER_1_DEFAULT_BUDGET,
+  TIER_2_DEFAULT_BUDGET,
+  getTierBudgetProvenance,
+} from "./tier_budgets.ts";
+
+export type { RetrievalTier };
+export { resolveTierBudget, getTierBudgetProvenance };
 
 export interface TieredContextOptions extends ContextQueryOptions {
   tier?: RetrievalTier;
@@ -18,9 +28,9 @@ export interface TieredContextOptions extends ContextQueryOptions {
 
 /**
  * Deterministic Tiered Retrieval Engine:
- * - Tier 0 (Manifest): Ultra-compact index of memory IDs, types, and titles (~50 tokens).
- * - Tier 1 (Routing Set): Active USER.md, CURRENT.md, and routed invariant headers (~300 tokens).
- * - Tier 2 (Bounded Bodies): Full memory bodies fitted greedily into token knapsack budget.
+ * - Tier 0 (Manifest): Ultra-compact index of memory IDs, types, and titles (default: ~80 tokens).
+ * - Tier 1 (Routing Set): Active USER.md, CURRENT.md, and routed invariant headers (default: ~400 tokens).
+ * - Tier 2 (Bounded Bodies): Full memory bodies fitted greedily into token knapsack budget (default: ~4000 tokens).
  */
 export function queryTieredContext(
   store: Store,
