@@ -33,6 +33,8 @@ export interface ContextQueryOptions extends SearchOptions {
   semanticScores?: Map<string, number>;
   /** T-073: Optional minimum score threshold to consider a match confident (default: DEFAULT_MIN_RELEVANCE_SCORE = 0.45). */
   minScoreThreshold?: number;
+  /** T-083: Bi-temporal point-in-time query timestamp (ISO string or epoch ms). */
+  as_of?: string | number;
 }
 
 export interface SearchResult {
@@ -49,6 +51,10 @@ export interface SearchResult {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-083: Target timestamp when as_of evaluation was requested. */
+  as_of?: string;
+  /** T-083: Memories whose validity at as_of is undetermined without date invention. */
+  undetermined?: ScoredEntry[];
 }
 
 export interface FormattedContext {
@@ -63,6 +69,10 @@ export interface FormattedContext {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-083: Target timestamp when as_of evaluation was requested. */
+  as_of?: string;
+  /** T-083: Memories whose validity at as_of is undetermined. */
+  undetermined?: ScoredEntry[];
 }
 
 /** Stopwords filtered out during tokenization */
@@ -911,6 +921,50 @@ export function validateRecalledEntry(entry: MemoryEntry): { valid: boolean; rea
   return { valid: true };
 }
 
+export interface AsOfEvaluation {
+  status: "valid" | "undetermined" | "invalid";
+  reason?: string;
+}
+
+/**
+ * T-083: Evaluates bi-temporal validity of a memory entry as of targetTime without inventing dates.
+ * - valid: entry was definitely valid at targetTime (either active with no cessation or exact cessation >= targetTime)
+ * - undetermined: entry was created before targetTime, but closed out at/after targetTime with valid_to_exact: false
+ * - invalid: entry was not yet created at targetTime, or ceased prior to targetTime
+ */
+export function evaluateAsOf(entry: MemoryEntry, asOfTime: string | number): AsOfEvaluation {
+  const targetMs = typeof asOfTime === "number" ? asOfTime : Date.parse(asOfTime);
+  if (isNaN(targetMs)) {
+    throw new Error(`Invalid as_of timestamp: ${asOfTime}`);
+  }
+
+  const startIso = entry.valid_from ?? entry.created_at;
+  const startMs = Date.parse(startIso);
+  if (!isNaN(startMs) && targetMs < startMs) {
+    return { status: "invalid", reason: "not_yet_valid" };
+  }
+
+  if (!entry.valid_to) {
+    return { status: "valid", reason: "active_no_cessation" };
+  }
+
+  const endMs = Date.parse(entry.valid_to);
+  if (isNaN(endMs)) {
+    return { status: "valid", reason: "unparseable_valid_to" };
+  }
+
+  if (targetMs > endMs) {
+    return { status: "invalid", reason: "ceased_before_target" };
+  }
+
+  // targetMs <= endMs
+  if (entry.valid_to_exact === true) {
+    return { status: "valid", reason: "exact_boundary_valid" };
+  }
+
+  return { status: "undetermined", reason: "inexact_boundary_observation_lag" };
+}
+
 export function queryContext(
   store: Store,
   query: string = "",
@@ -949,11 +1003,17 @@ export function queryContext(
   if (options.project) {
     entries = entries.filter((e) => e.project === options.project);
   }
-  if (!options.includeSuperseded) {
-    entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
-  }
-  if (!options.includeArchived && options.status !== "archived") {
-    entries = entries.filter((e) => e.status !== "archived");
+  // When as_of is NOT provided, apply current active lifecycle filters
+  if (options.as_of === undefined) {
+    if (!options.includeSuperseded) {
+      entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
+    }
+    if (!options.includeArchived && options.status !== "archived") {
+      entries = entries.filter((e) => e.status !== "archived");
+    }
+    if (!options.includeExpired) {
+      entries = entries.filter((e) => !isExpired(e, now));
+    }
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
@@ -975,11 +1035,28 @@ export function queryContext(
         e.status !== "candidate",
     );
   }
-  if (!options.includeExpired) {
-    entries = entries.filter((e) => !isExpired(e, now));
+
+  // T-083: Bi-temporal point-in-time partitioning
+  let undeterminedEntries: MemoryEntry[] = [];
+  if (options.as_of !== undefined) {
+    const validEntries: MemoryEntry[] = [];
+    for (const e of entries) {
+      const evaluation = evaluateAsOf(e, options.as_of);
+      if (evaluation.status === "valid") {
+        validEntries.push(e);
+      } else if (evaluation.status === "undetermined") {
+        undeterminedEntries.push(e);
+      }
+      // "invalid" entries are dropped
+    }
+    entries = validEntries;
   }
 
   const scored = sortCandidates(entries, queryTokens, now, options.semanticScores, options.workspaceRoot);
+  const scoredUndetermined =
+    options.as_of !== undefined && undeterminedEntries.length > 0
+      ? sortCandidates(undeterminedEntries, queryTokens, now, options.semanticScores, options.workspaceRoot)
+      : [];
 
   // R23: Record access for top results (updates last_accessed_at and access_count)
   const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 500, 1) : 10;
@@ -1083,6 +1160,13 @@ export function queryContext(
         return true;
       }));
 
+  const asOfIso =
+    options.as_of !== undefined
+      ? typeof options.as_of === "number"
+        ? new Date(options.as_of).toISOString()
+        : String(options.as_of)
+      : undefined;
+
   return {
     results,
     source: isDegraded ? "degraded" : "live",
@@ -1093,6 +1177,42 @@ export function queryContext(
     watermark: getStoreWatermark(store),
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
     no_confident_match: !hasConfidentMatch,
+    as_of: asOfIso,
+    undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
+  };
+}
+
+export interface AsOfQueryResult {
+  as_of: string;
+  results: ScoredEntry[];
+  undetermined: ScoredEntry[];
+  totalTokensUsed: number;
+  mode?: "confident_match" | "no_confident_match";
+  no_confident_match?: boolean;
+}
+
+/**
+ * T-083: Point-in-time bi-temporal query returning confirmed valid results and undetermined facts.
+ * Avoids date invention by cleanly segregating facts whose historical status is ambiguous.
+ */
+export function queryAsOf(
+  store: Store,
+  query: string,
+  asOfTime: string | number,
+  options: ContextQueryOptions = {},
+): AsOfQueryResult {
+  const result = queryContext(store, query, {
+    ...options,
+    as_of: asOfTime,
+  });
+  const asOfIso = typeof asOfTime === "number" ? new Date(asOfTime).toISOString() : String(asOfTime);
+  return {
+    as_of: asOfIso,
+    results: result.results,
+    undetermined: result.undetermined ?? [],
+    totalTokensUsed: result.totalTokensUsed ?? 0,
+    mode: result.mode,
+    no_confident_match: result.no_confident_match,
   };
 }
 
@@ -1250,6 +1370,15 @@ export function formatPromptContext(
     parts.push("");
   }
 
+  if (result.undetermined && result.undetermined.length > 0) {
+    parts.push(`### Undetermined Historical Memories (as_of: ${result.as_of})`);
+    parts.push("_The following facts had inexact historical boundaries; validity at target time is undetermined:_");
+    for (const r of result.undetermined) {
+      parts.push(`- ${r.entry.id} ${r.entry.title} (valid_to: ${r.entry.valid_to}, exact: false)`);
+    }
+    parts.push("");
+  }
+
   parts.push("---");
   parts.push("*Memory Directive: When learning durable facts, bug resolutions, or user preferences, call `memory_capture` immediately.*");
 
@@ -1263,6 +1392,8 @@ export function formatPromptContext(
     stale: result.stale,
     mode: result.mode,
     no_confident_match: result.no_confident_match,
+    as_of: result.as_of,
+    undetermined: result.undetermined,
   };
 
   if (cacheKey && store.cache) {

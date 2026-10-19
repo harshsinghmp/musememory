@@ -23,6 +23,10 @@ export interface UnifiedSearchResult {
   fromCache?: boolean;
   confidence_mode?: "confident_match" | "no_confident_match";
   no_confident_match?: boolean;
+  /** T-083: Point-in-time timestamp if as_of evaluation was requested */
+  as_of?: string;
+  /** T-083: Memories whose validity is undetermined at as_of */
+  undetermined?: ScoredEntry[];
 }
 
 export interface ReindexReport {
@@ -226,7 +230,26 @@ export class RetrievalEngine {
       explanation: fallbackExplanation ?? (isDegraded ? "Degraded read: circuit breaker is open" : undefined),
       confidence_mode: exact.mode,
       no_confident_match: exact.no_confident_match,
+      as_of: exact.as_of,
+      undetermined: exact.undetermined,
     };
+  }
+
+  /**
+   * T-083: Bi-temporal point-in-time search returning results and undetermined candidates.
+   */
+  static searchAsOf(
+    store: Store,
+    memoryDir: string,
+    query: string,
+    asOfTime: string | number,
+    options: UnifiedSearchOptions = {},
+  ): UnifiedSearchResult {
+    return RetrievalEngine.search(store, memoryDir, query, {
+      ...options,
+      as_of: asOfTime,
+      mode: "exact",
+    });
   }
 
   /**
