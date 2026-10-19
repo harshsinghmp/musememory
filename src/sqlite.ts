@@ -532,21 +532,31 @@ export interface FtsSearchHit {
 export type FtsSearchHits = FtsSearchHit[] & {
   degraded?: boolean;
   error?: string;
+  hidden_count?: number;
 };
 
 /**
  * High-speed BM25 full-text search directly inside SQLite using FTS5.
  * Sanitizes and safely escapes all query tokens (T-060) and surfaces degraded status (T-312).
+ * Implements hidden-count-aware over-fetch (T-096) so superseded/inactive memories do not starve limit.
  */
 export function searchMemoriesFts(
   db: SqliteDatabase,
   query: string,
-  filters?: { project?: string; type?: string; status?: string; limit?: number },
+  filters?: {
+    project?: string;
+    type?: string;
+    status?: string;
+    limit?: number;
+    includeSuperseded?: boolean;
+    overfetch?: boolean;
+  },
 ): FtsSearchHits {
   const terms = buildSafeFtsQuery(query);
   if (!terms) {
     const empty: FtsSearchHits = [];
     empty.degraded = false;
+    empty.hidden_count = 0;
     return empty;
   }
 
@@ -558,6 +568,14 @@ export function searchMemoriesFts(
   `;
   const conditions: string[] = [];
   const params: unknown[] = [terms];
+
+  // Exclude tombstoned rows if column exists
+  try {
+    const cols = db.query<{ name: string }>(`PRAGMA table_info(memories)`).all().map((c) => c.name);
+    if (cols.includes("deleted_at")) {
+      conditions.push(`(m.deleted_at IS NULL OR m.deleted_at = '')`);
+    }
+  } catch {}
 
   if (filters?.project) {
     conditions.push(`m.project = ?`);
@@ -577,18 +595,34 @@ export function searchMemoriesFts(
   }
   sql += ` ORDER BY rank ASC`;
 
-  if (filters?.limit) {
+  // Hidden-count-aware over-fetch: if limit is requested and superseded rows should be filtered out,
+  // query an over-fetch buffer so active results fill the requested limit.
+  const targetLimit = filters?.limit;
+  if (targetLimit) {
+    const shouldOverfetch = filters?.overfetch !== false && !filters?.includeSuperseded && !filters?.status;
+    const fetchLimit = shouldOverfetch ? Math.min(500, Math.max(targetLimit * 2, targetLimit + 10)) : targetLimit;
     sql += ` LIMIT ?`;
-    params.push(filters.limit);
+    params.push(fetchLimit);
   }
 
   try {
     const rows = db.query<DbMemoryRow & { rank: number }>(sql).all(params);
-    const results: FtsSearchHits = rows.map((r) => ({
-      entry: rowToMemoryEntry(r),
-      rank: r.rank,
-    }));
+    let hidden_count = 0;
+    const activeHits: FtsSearchHit[] = [];
+
+    for (const r of rows) {
+      const entry = rowToMemoryEntry(r);
+      if (!filters?.includeSuperseded && !filters?.status && (entry.status === "superseded" || entry.status === "rejected")) {
+        hidden_count++;
+        continue;
+      }
+      activeHits.push({ entry, rank: r.rank });
+    }
+
+    const finalHits = targetLimit ? activeHits.slice(0, targetLimit) : activeHits;
+    const results: FtsSearchHits = finalHits as FtsSearchHits;
     results.degraded = false;
+    results.hidden_count = hidden_count;
     return results;
   } catch (err) {
     // T-312: Surface FTS failure with loud log and degraded: true signal instead of silent swallow
@@ -597,6 +631,7 @@ export function searchMemoriesFts(
     const empty: FtsSearchHits = [];
     empty.degraded = true;
     empty.error = errorMsg;
+    empty.hidden_count = 0;
     return empty;
   }
 }

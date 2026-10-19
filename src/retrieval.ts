@@ -158,6 +158,8 @@ export interface SearchResult {
   as_of?: string;
   /** T-083: Memories whose validity at as_of is undetermined without date invention. */
   undetermined?: ScoredEntry[];
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
+  hidden_count?: number;
 }
 
 export interface FormattedContext {
@@ -176,6 +178,8 @@ export interface FormattedContext {
   as_of?: string;
   /** T-083: Memories whose validity at as_of is undetermined. */
   undetermined?: ScoredEntry[];
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
+  hidden_count?: number;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -1159,17 +1163,24 @@ export function queryContext(
   if (options.project) {
     entries = entries.filter((e) => e.project === options.project);
   }
+  let hidden_count = 0;
   // When as_of is NOT provided, apply current active lifecycle filters
   if (options.as_of === undefined) {
-    if (!options.includeSuperseded) {
-      entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
-    }
-    if (!options.includeArchived && options.status !== "archived") {
-      entries = entries.filter((e) => e.status !== "archived");
-    }
-    if (!options.includeExpired) {
-      entries = entries.filter((e) => !isExpired(e, now));
-    }
+    entries = entries.filter((e) => {
+      if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
+        hidden_count++;
+        return false;
+      }
+      if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
+        hidden_count++;
+        return false;
+      }
+      if (!options.includeExpired && isExpired(e, now)) {
+        hidden_count++;
+        return false;
+      }
+      return true;
+    });
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
@@ -1335,6 +1346,7 @@ export function queryContext(
     no_confident_match: !hasConfidentMatch,
     as_of: asOfIso,
     undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
+    hidden_count,
   };
 }
 
@@ -1606,6 +1618,7 @@ export function formatPromptContext(
     no_confident_match: result.no_confident_match,
     as_of: result.as_of,
     undetermined: result.undetermined,
+    hidden_count: result.hidden_count,
   };
 
   if (cacheKey && store.cache) {

@@ -910,6 +910,8 @@ export function propose(
     /** T-095: Whether to auto-seed write-time linked memory IDs if omitted (default: true). */
     autoLink?: boolean;
     session_id?: string;
+    /** T-096: Prior memory ID(s) superseded by this proposal (supersede-not-delete). */
+    supersedes?: string | string[];
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -1163,6 +1165,41 @@ export function propose(
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
 
+  // T-096: supersede-not-delete handling during proposal
+  if (opts.supersedes) {
+    const rawSuperseded = Array.isArray(opts.supersedes) ? opts.supersedes : [opts.supersedes];
+    const validSupersededIds: string[] = [];
+    for (const oldId of rawSuperseded) {
+      if (!oldId || oldId === entry.id) continue;
+      const oldEntry = get(store, oldId);
+      if (oldEntry) {
+        validSupersededIds.push(oldId);
+        // Mark status, update cessation bounds, and save (NEVER delete)
+        oldEntry.status = "superseded";
+        oldEntry.valid_to = nowIso();
+        oldEntry.valid_to_exact = true;
+        const prevSup = normalizeIdArray(oldEntry.superseded_by);
+        if (!prevSup.includes(entry.id)) {
+          oldEntry.superseded_by = [...prevSup, entry.id];
+        }
+        oldEntry.updated_at = nowIso();
+        save(store, oldEntry);
+        if (store.memoryDir) {
+          recordAuditEvent(store.memoryDir, {
+            operation: "supersede",
+            entry_id: oldEntry.id,
+            project: oldEntry.project,
+            details: { superseded_by: entry.id },
+          });
+        }
+      }
+    }
+    if (validSupersededIds.length > 0) {
+      entry.supersedes = Array.isArray(opts.supersedes) ? validSupersededIds : validSupersededIds[0];
+      save(store, entry);
+    }
+  }
+
   // Optional automated contradiction detection
   if (opts.checkConflict) {
     const conflict = detectConflict(store, {
@@ -1275,6 +1312,11 @@ export function supersede(
     });
   }
   return old;
+}
+
+/** T-096: Returns true if memory is in superseded status */
+export function isSuperseded(entry: MemoryEntry): boolean {
+  return entry.status === "superseded";
 }
 
 /** Mark an entry stale; reason appended to content. (T-082) */
