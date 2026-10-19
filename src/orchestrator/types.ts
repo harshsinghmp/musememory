@@ -81,6 +81,10 @@ export interface FusedContextResult {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: MemoryEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: MemoryEntry[];
   /** T-108: Number of candidate memories withheld due to 6-turn re-injection suppression. */
   reinjection_suppressed_count?: number;
   /** T-109: Number of candidate memories withheld due to age-bounded self-echo suppression. */

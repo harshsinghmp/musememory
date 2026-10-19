@@ -200,6 +200,8 @@ export interface MemoryEntry {
   status: MemoryStatus;
   created_at: string;
   updated_at: string;
+  /** T-128: Draft flag marking preliminary memory, kept isolated from confident answers. */
+  draft?: boolean;
   /** Valid-time (event time) start; decay uses this when set (bi-temporal). */
   valid_from?: string;
   /** Valid-time end, set when an entry leaves active knowledge (stale/rejected/superseded). */

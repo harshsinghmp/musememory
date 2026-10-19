@@ -21,6 +21,7 @@ import {
   USER_PROFILE_BUDGET_RATIO,
   USER_PROFILE_DEFAULT_BUDGET,
 } from "../retrieval/tier_budgets.ts";
+import { isDraftMemory } from "../drafts.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -482,12 +483,15 @@ export async function resolveMuseContext(
     ...withheldDigestErrors,
   ];
 
+  const confident_answers = packedMemories.filter((m) => !isDraftMemory(m));
+  const draft_answers = packedMemories.filter((m) => isDraftMemory(m));
+
   const hasConfidentMatch =
     !trivialGate.isTrivial &&
-    (packedMemories.length > 0 || packedNegative.length > 0) &&
+    (confident_answers.length > 0 || packedNegative.length > 0) &&
     (!compositeQuery.trim() ||
       entriesWithMatchingAnchors.length > 0 ||
-      ranked.some((r) => r.score >= 0.45));
+      ranked.some((r) => r.score >= 0.45 && !isDraftMemory(r.entry)));
 
   if (trivialGate.isTrivial) {
     suggestedNextSteps.unshift(
@@ -526,6 +530,8 @@ export async function resolveMuseContext(
     user_profile_reserved_tokens: userProfileReservedTokens,
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
     no_confident_match: !hasConfidentMatch,
+    confident_answers,
+    draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
     reinjection_suppressed_count: reinjectionSuppressedCount > 0 ? reinjectionSuppressedCount : undefined,
     self_echo_suppressed_count: selfEchoSuppressedCount > 0 ? selfEchoSuppressedCount : undefined,
     seen_chunk_suppressed_count: seenChunkSuppressedCount > 0 ? seenChunkSuppressedCount : undefined,

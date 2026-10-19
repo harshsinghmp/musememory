@@ -14,6 +14,7 @@ import {
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
 import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
+import { isDraftMemory } from "../drafts.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -33,6 +34,10 @@ export interface UnifiedSearchResult {
   fromCache?: boolean;
   confidence_mode?: "confident_match" | "no_confident_match";
   no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
   /** T-083: Point-in-time timestamp if as_of evaluation was requested */
   as_of?: string;
   /** T-083: Memories whose validity is undetermined at as_of */
@@ -95,8 +100,9 @@ export class RetrievalEngine {
             score: r.score,
           }));
           const minScore = options.minScoreThreshold ?? 0.45;
-          const hasConfidentMatch =
-            mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
+          const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+          const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+          const hasConfidentMatch = confident_answers.length > 0;
           return {
             mode: "pageindex",
             results: mapped,
@@ -106,6 +112,8 @@ export class RetrievalEngine {
             fromCache: false,
             confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
             no_confident_match: !hasConfidentMatch,
+            confident_answers,
+            draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
           };
         } else if (mode === "pageindex") {
           fallbackStale = true;
@@ -152,8 +160,9 @@ export class RetrievalEngine {
             }));
 
             const minScore = options.minScoreThreshold ?? 0.45;
-            const hasConfidentMatch =
-              mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
+            const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+            const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+            const hasConfidentMatch = confident_answers.length > 0;
             return {
               mode: "tree",
               results: mapped,
@@ -163,6 +172,8 @@ export class RetrievalEngine {
               fromCache: false,
               confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
               no_confident_match: !hasConfidentMatch,
+              confident_answers,
+              draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
             };
           }
         }
@@ -211,8 +222,9 @@ export class RetrievalEngine {
           } catch {}
 
           const minScore = options.minScoreThreshold ?? 0.45;
-          const hasConfidentMatch =
-            mapped.length > 0 && (!query.trim() || mapped.some((r) => r.score >= minScore));
+          const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+          const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+          const hasConfidentMatch = confident_answers.length > 0;
 
           return {
             mode: "hybrid",
@@ -225,6 +237,8 @@ export class RetrievalEngine {
             fromCache: false,
             confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
             no_confident_match: !hasConfidentMatch,
+            confident_answers,
+            draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
           };
         }
         if (mode === "hybrid") {
@@ -250,6 +264,8 @@ export class RetrievalEngine {
       explanation: fallbackExplanation ?? (isDegraded ? "Degraded read: circuit breaker is open" : undefined),
       confidence_mode: exact.mode,
       no_confident_match: exact.no_confident_match,
+      confident_answers: exact.confident_answers,
+      draft_answers: exact.draft_answers,
       as_of: exact.as_of,
       undetermined: exact.undetermined,
       withheld: exact.withheld,

@@ -72,6 +72,8 @@ export function queryTieredContext(
       stale: queryResult.stale,
       mode: queryResult.mode,
       no_confident_match: queryResult.no_confident_match,
+      confident_answers: queryResult.confident_answers,
+      draft_answers: queryResult.draft_answers,
     };
   }
 
@@ -121,5 +123,7 @@ export function queryTieredContext(
     stale: queryResult.stale,
     mode: queryResult.mode,
     no_confident_match: queryResult.no_confident_match,
+    confident_answers: queryResult.confident_answers,
+    draft_answers: queryResult.draft_answers,
   };
 }

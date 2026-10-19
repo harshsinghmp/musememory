@@ -54,6 +54,18 @@ import {
   type SemanticFactTriple,
   type ScopedInvalidationResult,
 } from "./quality/index.ts";
+import {
+  isDraftMemory,
+  ensureDraftTitle,
+  stripDraftTitle,
+  promoteDraft,
+} from "./drafts.ts";
+export {
+  isDraftMemory,
+  ensureDraftTitle,
+  stripDraftTitle,
+  promoteDraft,
+};
 export {
   detectConflict,
   flagConflict,
@@ -929,6 +941,8 @@ export function propose(
     conflicts_with_id?: string | null;
     /** T-087 & T-099: Semantic fact triples for scoped invalidation and fact_provenance. */
     triples?: SemanticFactTriple[];
+    /** T-128: Draft flag marking preliminary memory, kept isolated from confident answers. */
+    draft?: boolean;
     /** First-class code anchors linking memory to files and symbols. */
     anchors?: CodeAnchor[];
   },
@@ -960,7 +974,9 @@ export function propose(
     }
   }
 
-  const title = (opts.title ?? cleanContent.slice(0, 120)).slice(0, 120);
+  const isDraft = Boolean(opts.draft || (opts.title && opts.title.startsWith("[DRAFT]")));
+  const rawTitle = opts.title ?? cleanContent.slice(0, 120);
+  const title = isDraft ? ensureDraftTitle(rawTitle).slice(0, 140) : rawTitle.slice(0, 120);
   const content_hash = opts.content_hash ?? computeContentHash(cleanContent);
 
   // T-104: Retention admission gate
@@ -1128,6 +1144,7 @@ export function propose(
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
     type: opts.type ?? "discovery",
+    ...(isDraft ? { draft: true } : {}),
     created_at: createdAt,
     updated_at: updatedAt,
     source: opts.source ?? "manual",
@@ -1282,6 +1299,10 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   const now = nowIso();
   entry.status = "confirmed";
   entry.disputed_by = undefined;
+  if (entry.draft || (entry.title && entry.title.startsWith("[DRAFT]"))) {
+    entry.draft = false;
+    entry.title = stripDraftTitle(entry.title);
+  }
   entry.last_confirmed_at = now;
   entry.reinforcement = (entry.reinforcement ?? 0) + 1;
   entry.verification = { level: "user-confirmed", verified_at: now };
