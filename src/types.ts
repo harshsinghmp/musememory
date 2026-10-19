@@ -388,7 +388,8 @@ export type AuditOperation =
   | "lifecycle_end"
   | "lifecycle_correct"
   | "lifecycle_revert"
-  | "lifecycle_forget";
+  | "lifecycle_forget"
+  | "merkle_checkpoint";
 
 export interface AuditEntry {
   timestamp: string;
@@ -398,6 +399,31 @@ export interface AuditEntry {
   actor?: string;
   reason?: string;
   details?: Record<string, any>;
+  /** T-102: SHA-256 hash of the immediately preceding audit entry in the chain. */
+  prev_hash?: string;
+  /** T-102: Cryptographic SHA-256 hash of this entry with per-day salt. */
+  hash?: string;
+  /** T-102: Date partition for the per-day salt (YYYY-MM-DD). */
+  salt_date?: string;
+}
+
+/** T-102: Session-scoped Merkle tree checkpoint. */
+export interface MerkleCheckpoint {
+  checkpoint_id: string;
+  session_id: string;
+  timestamp: string;
+  merkle_root: string;
+  leaf_count: number;
+  leaves: string[];
+  daily_salt: string;
+}
+
+/** T-102: Merkle inclusion proof for verifiable audit logs. */
+export interface MerkleProof {
+  leaf: string;
+  index: number;
+  siblings: string[];
+  root: string;
 }
 
 export interface SearchOptions {
