@@ -6,13 +6,116 @@ import { getCurrent, syncConstraints, getSessionHandoff, parseCurrentFile } from
 import { listWikiPages } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
-import type { MemoryEntry, SearchOptions } from "./types.ts";
+import type { MemoryEntry, SearchOptions, VeracityClass } from "./types.ts";
 import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 import { buildSafeFtsQuery } from "./sqlite.ts";
 import { computeDecayScore } from "./retention.ts";
+
+export type { VeracityClass };
+
+/**
+ * T-089: Canonical provenance veracity weights:
+ * user 1.0, agent 0.7, external 0.5, system 0.3.
+ */
+export const VERACITY_RANK_WEIGHTS: Record<VeracityClass, number> = {
+  user: 1.0,
+  agent: 0.7,
+  external: 0.5,
+  system: 0.3,
+};
+
+/**
+ * Resolves the veracity class from memory provenance attributes.
+ * Precedence: specific source origin > verification level > broad trust tier.
+ */
+export function resolveVeracityClass(entry: {
+  source?: string;
+  trust?: string;
+  verification?: { verified_by?: string; level?: string };
+}): VeracityClass {
+  const src = (entry.source || "").toLowerCase().trim();
+
+  // 1. Direct source origin check
+  if (
+    src === "user" ||
+    src === "user_input" ||
+    src === "human" ||
+    src === "principal" ||
+    src === "manual"
+  ) {
+    return "user";
+  }
+  if (
+    src === "system" ||
+    src === "system_generated" ||
+    src === "rule" ||
+    src === "daemon" ||
+    src === "background" ||
+    src === "sweep"
+  ) {
+    return "system";
+  }
+  if (
+    src === "external" ||
+    src === "external_data" ||
+    src === "web" ||
+    src === "crawler" ||
+    src === "import" ||
+    src === "doc" ||
+    src === "article"
+  ) {
+    return "external";
+  }
+  if (
+    src === "agent" ||
+    src === "agent_inferred" ||
+    src === "ai" ||
+    src === "assistant" ||
+    src === "subagent"
+  ) {
+    return "agent";
+  }
+
+  // 2. Verification level check
+  if (
+    entry.verification?.level === "user-confirmed" ||
+    entry.verification?.level === "authoritative"
+  ) {
+    return "user";
+  }
+
+  // 3. Trust tier fallback
+  const trust = (entry.trust || "").toLowerCase().trim();
+  if (trust === "trusted" || trust === "t1") {
+    return "user";
+  }
+  if (trust === "untrusted" || trust === "t3") {
+    return "external";
+  }
+  if (trust === "t4") {
+    return "system";
+  }
+  if (trust === "candidate" || trust === "t2") {
+    return "agent";
+  }
+
+  return "agent";
+}
+
+/**
+ * Returns the numerical veracity rank weight for an entry.
+ */
+export function getVeracityWeight(entry: {
+  source?: string;
+  trust?: string;
+  verification?: { verified_by?: string; level?: string };
+}): number {
+  const cls = resolveVeracityClass(entry);
+  return VERACITY_RANK_WEIGHTS[cls];
+}
 
 export interface ScoredEntry {
   entry: MemoryEntry;
@@ -496,6 +599,12 @@ export interface ScoreFactors {
   timelessBoost: number;
   recencyDecay: number;
   trustAdjustment: number;
+  /** T-089: Numerical provenance veracity rank weight (user 1.0, agent 0.7, external 0.5, system 0.3). */
+  veracityWeight: number;
+  /** T-089: Resolved provenance veracity category. */
+  veracityClass: VeracityClass;
+  /** T-089: Additive rank bonus/discount computed from veracity weight. */
+  veracityBonus: number;
   accessBoost: number;
   recentAccessBoost: number;
   zeroMatchPenalty: number;
@@ -667,6 +776,11 @@ export function computeFactors(
   const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
   const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
 
+  // T-089: Veracity rank weighting (user 1.0, agent 0.7, external 0.5, system 0.3)
+  const veracityClass = resolveVeracityClass(entry);
+  const veracityWeight = VERACITY_RANK_WEIGHTS[veracityClass];
+  const veracityBonus = Number(((veracityWeight - 0.7) * 0.5).toFixed(4));
+
   // A query whose tokens match nothing — including a degenerate query that tokenizes
   // to nothing at all — is not evidence of relevance (SOW-202, T-311).
   const zeroMatchPenalty = baseApplicability === 0 && graphOverlap === 0 ? -0.35 : 0;
@@ -692,6 +806,7 @@ export function computeFactors(
     timelessBoost +
     recencyDecay +
     trustAdjustment +
+    veracityBonus +
     accessBoost +
     recentAccessBoost +
     zeroMatchPenalty +
@@ -716,6 +831,9 @@ export function computeFactors(
     timelessBoost,
     recencyDecay,
     trustAdjustment,
+    veracityWeight,
+    veracityClass,
+    veracityBonus,
     accessBoost,
     recentAccessBoost,
     zeroMatchPenalty,
@@ -770,6 +888,13 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
   if (factors.recentAccessBoost > 0) reasons.push("recent_access");
   if (factors.baseApplicability > 0) reasons.push("lexical_overlap");
 
+  // T-089: Veracity reasons
+  if (factors.veracityClass === "user" || (factors.veracityWeight !== undefined && factors.veracityWeight >= 1.0)) {
+    reasons.push("user_veracity_boost");
+  } else if (factors.veracityWeight !== undefined && factors.veracityWeight < 0.7) {
+    reasons.push("discounted_veracity");
+  }
+
   return reasons.sort();
 }
 
@@ -785,7 +910,7 @@ export function isLowDiscrimination(scores: number[], threshold: number = 0.04):
 
 /**
  * T-115: Conditional secondary reranking for candidates when primary scores are tightly clustered.
- * Uses verification level, trust tier, recency, and historical access to break ties deterministically.
+ * Uses verification level, trust tier, recency, historical access, and provenance veracity to break ties deterministically.
  */
 export function conditionalRerank<T extends { entry: MemoryEntry; score: number }>(candidates: T[]): T[] {
   if (!candidates || candidates.length < 2) return candidates;
@@ -806,10 +931,20 @@ export function conditionalRerank<T extends { entry: MemoryEntry; score: number 
     return Number.isNaN(ts) ? 0 : Math.min(0.01, (ts / 2e12) * 0.01);
   };
   const accessBonus = (e: MemoryEntry) => Math.min(0.005, (e.access_count ?? 0) * 0.001);
+  // T-089: Veracity tie-breaker bonus (user +0.015, agent 0, external -0.01, system -0.02)
+  const veracityBonus = (e: MemoryEntry) => {
+    const w = getVeracityWeight(e);
+    return (w - 0.7) * 0.05;
+  };
 
   return candidates
     .map((c) => {
-      const adj = vBonus(c.entry) + tBonus(c.entry) + recencyBonus(c.entry) + accessBonus(c.entry);
+      const adj =
+        vBonus(c.entry) +
+        tBonus(c.entry) +
+        recencyBonus(c.entry) +
+        accessBonus(c.entry) +
+        veracityBonus(c.entry);
       return {
         ...c,
         score: Number((c.score + adj).toFixed(5)),
@@ -999,6 +1134,22 @@ export function queryContext(
     }
     return true;
   });
+
+  // T-089: Minimum provenance veracity filter
+  if (options.minVeracity !== undefined) {
+    const minThreshold =
+      typeof options.minVeracity === "number"
+        ? options.minVeracity
+        : (VERACITY_RANK_WEIGHTS[options.minVeracity] ?? 0);
+    entries = entries.filter((e) => {
+      const weight = getVeracityWeight(e);
+      if (weight < minThreshold) {
+        withheld.push({ id: e.id, reason: "low_veracity_source" });
+        return false;
+      }
+      return true;
+    });
+  }
 
   if (options.project) {
     entries = entries.filter((e) => e.project === options.project);
@@ -1283,7 +1434,7 @@ export function formatPromptContext(
   options: ContextQueryOptions = {},
 ): FormattedContext {
   const cacheKey = store.cache
-    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}`
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}`
     : undefined;
 
   if (cacheKey && store.cache) {

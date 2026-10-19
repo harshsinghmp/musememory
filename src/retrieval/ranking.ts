@@ -13,12 +13,25 @@ import {
   evaluateAbstentionGate,
   type AbstentionDecision,
   type ScoreFactors,
+  type VeracityClass,
+  VERACITY_RANK_WEIGHTS,
+  resolveVeracityClass,
+  getVeracityWeight,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
 
-export type { ScoreFactors, AbstentionDecision };
-export { isLowDiscrimination, conditionalRerank, deriveWhyRetrieved, matchesWordBoundary, evaluateAbstentionGate };
+export type { ScoreFactors, AbstentionDecision, VeracityClass };
+export {
+  isLowDiscrimination,
+  conditionalRerank,
+  deriveWhyRetrieved,
+  matchesWordBoundary,
+  evaluateAbstentionGate,
+  VERACITY_RANK_WEIGHTS,
+  resolveVeracityClass,
+  getVeracityWeight,
+};
 
 /**
  * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).

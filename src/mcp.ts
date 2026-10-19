@@ -225,6 +225,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Progressive disclosure tier: L1 = id+title lines, L2 = title+content+tags (default), L3 = full raw entry" },
             tier: { type: "number", description: "Deterministic retrieval tier: 0 (manifest index), 1 (routing set), 2 (bounded bodies, default)" },
             as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
+            min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
           },
         },
       },
@@ -246,6 +247,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             verified: { type: "boolean" },
             as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
             at_time: { type: "string", description: "Temporal point-in-time timestamp (default-excludes superseded entries)" },
+            min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
           },
           required: ["query"],
         },
@@ -1735,6 +1737,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 status: a.status ? String(a.status) : undefined,
                 verified: a.verified === true,
                 tier: tierOpt,
+                minVeracity: a.min_veracity as any,
               })
             : formatPromptContext(activeStore, activeMemoryDir, queryStr, {
                 limit: contextLimit,
@@ -1746,6 +1749,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 verified: a.verified === true,
                 depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
                 as_of: a.as_of ? String(a.as_of) : undefined,
+                minVeracity: a.min_veracity as any,
               });
 
           // Record Hebbian co-activation on retrieved memory units (SOW-204)
@@ -1834,6 +1838,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               type: a.type ? String(a.type) : undefined,
               status: a.status ? String(a.status) : undefined,
               verified: a.verified === true,
+              minVeracity: a.min_veracity as any,
             });
             if (res.results.length > 0) {
               const ids = res.results.map((r) => r.entry.id);
@@ -1863,6 +1868,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             status: a.status ? String(a.status) : undefined,
             verified: a.verified === true,
             as_of: a.as_of ? String(a.as_of) : undefined,
+            minVeracity: a.min_veracity as any,
           });
           // T-028: Record retrievals to update utility stats and salience
           if (res.results.length > 0) {
@@ -1881,6 +1887,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             no_confident_match: res.no_confident_match ?? false,
             as_of: res.as_of,
             undetermined: res.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
+            withheld: res.withheld,
           });
         }
         case "propose":

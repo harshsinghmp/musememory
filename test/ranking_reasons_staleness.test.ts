@@ -124,6 +124,9 @@ describe("Wave 3 - Task 4: Conditional Reranking, Watermark Staleness & Reason T
         recentAccessBoost: 0,
         zeroMatchPenalty: 0,
         semanticMatch: 0,
+        veracityWeight: 0.7,
+        veracityClass: "agent" as const,
+        veracityBonus: 0,
         totalScore: 2.8,
       };
 
