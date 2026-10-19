@@ -9,6 +9,8 @@ import {
 import { syncConstraints } from "../governor.ts";
 import { getUserProfile } from "../user.ts";
 import { formatCoreBlock } from "../core.ts";
+import { formatDegradedFaultNotice } from "./faults.ts";
+
 
 import {
   type RetrievalTier,
@@ -51,6 +53,9 @@ export function queryTieredContext(
 
   if (tier === 0) {
     const parts: string[] = [];
+    if (queryResult.degraded && queryResult.degraded_notes && queryResult.degraded_notes.length > 0) {
+      parts.push(formatDegradedFaultNotice(queryResult.degraded_notes));
+    }
     parts.push("### Memory Manifest (Tier 0)");
     if (queryResult.results.length === 0) {
       parts.push("*(No matching memories)*");
@@ -70,6 +75,9 @@ export function queryTieredContext(
       userProfile,
       fromCache: false,
       stale: queryResult.stale,
+      degraded: queryResult.degraded,
+      degraded_notes: queryResult.degraded_notes,
+      fault_notes: queryResult.fault_notes,
       mode: queryResult.mode,
       no_confident_match: queryResult.no_confident_match,
       confident_answers: queryResult.confident_answers,
@@ -79,6 +87,9 @@ export function queryTieredContext(
 
   // Tier 1: Routing Set
   const parts: string[] = [];
+  if (queryResult.degraded && queryResult.degraded_notes && queryResult.degraded_notes.length > 0) {
+    parts.push(formatDegradedFaultNotice(queryResult.degraded_notes));
+  }
   if (userProfile) {
     parts.push("### User Profile & Preferences (USER.md)");
     parts.push(userProfile);
@@ -121,6 +132,9 @@ export function queryTieredContext(
     userProfile,
     fromCache: false,
     stale: queryResult.stale,
+    degraded: queryResult.degraded,
+    degraded_notes: queryResult.degraded_notes,
+    fault_notes: queryResult.fault_notes,
     mode: queryResult.mode,
     no_confident_match: queryResult.no_confident_match,
     confident_answers: queryResult.confident_answers,

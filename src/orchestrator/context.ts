@@ -23,6 +23,7 @@ import {
 } from "../retrieval/tier_budgets.ts";
 import { isDraftMemory } from "../drafts.ts";
 import { resolveConstitutionalRules, type ConstitutionalRule } from "./constitution.ts";
+import { mergeDegradedFaults, formatDegradedFaultNotice } from "../retrieval/faults.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -540,8 +541,29 @@ export async function resolveMuseContext(
     }
   }
 
+  // T-133: Collect degraded fault signals
+  const collectedFaultNotes: string[] = [];
+  if (input.degraded_notes) collectedFaultNotes.push(...input.degraded_notes);
+  if (input.fault_notes) collectedFaultNotes.push(...input.fault_notes);
+  if (store.circuit?.isDegraded()) {
+    collectedFaultNotes.push("circuit_breaker_open: circuit breaker open after failure threshold, operating in fallback cache mode");
+  }
+  if (digestRefusalReason) {
+    collectedFaultNotes.push(`digest_corrupted: active constraints in CURRENT.md corrupted (${digestRefusalReason})`);
+  }
+  if (gate.withheldNotice) {
+    collectedFaultNotes.push(`freshness_gate_withheld: ${gate.withheld.length} memory code citations drifted from live workspace`);
+  }
+  const faultSignal = mergeDegradedFaults({
+    degraded: input.degraded === true || store.circuit?.isDegraded() === true,
+    degraded_notes: collectedFaultNotes,
+  });
+
   const finalResult: FusedContextResult = {
     constitutional_rules: constitutionalRules && constitutionalRules.length > 0 ? constitutionalRules : undefined,
+    degraded: faultSignal.degraded ? true : undefined,
+    degraded_notes: faultSignal.degraded_notes,
+    fault_notes: faultSignal.fault_notes,
     active_constraints: activeConstraints,
     relevant_memories: packedMemories,
     negative_lessons: packedNegative,
@@ -588,6 +610,11 @@ export function formatCompactContextPack(result: FusedContextResult): string {
 
   if (result.budget_notice) {
     lines.push(`> ⚠️ **Budget Constraint**: ${result.budget_notice}`, "");
+  }
+
+  // T-133: Degraded retrieval fault notice
+  if (result.degraded && result.degraded_notes && result.degraded_notes.length > 0) {
+    lines.push(formatDegradedFaultNotice(result.degraded_notes).trim(), "");
   }
 
   if (result.trivial_prompt_gated) {
