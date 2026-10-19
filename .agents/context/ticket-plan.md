@@ -128,14 +128,14 @@
 - [x] T-115 · landed Wave 3 — `low_discrimination()` conditional rerank (tier/verification/recency tie-breaker) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [x] MERGED→T-071 T-116 · semantic threshold gate BEFORE BM25/entity fusion · retrieval · branch: local-embeddings-llama-cpp · U
 - [x] T-117 · landed Wave 3 — watermark staleness from `last_memory_seen_at` (max store timestamp) · retrieval.ts · branch: feat/wave-3-retrieval-ranking · U
-- [ ] T-118 · query-intent bias multipliers · retrieval · new · U
-- [ ] T-119 · `effective_score = base × reinforcement × decay` · retrieval · new · U
-- [ ] T-120 · RRF weight tuning + A/B · retrieval · branch: recall-eval-harness · U
-- [ ] T-121 · typed drop/keep reasons per candidate · retrieval · new · U
-- [ ] T-122 · L0/L1 abstract sidecars (reimplement; source is AGPL) · store · new · U
-- [ ] T-123 · ratio-batched sidecar refresh · store · new · U
-- [ ] T-124 · resident INDEX route-map · orchestrator · branch: io-budget-telemetry · U
-- [ ] T-125 · tier budgets as named constants with provenance · retrieval, orchestrator · branch: io-budget-telemetry · U
+- [x] T-118 · landed Wave 19 — query-intent bias multipliers · retrieval · PR #274 · U
+- [x] T-119 · landed Wave 19 — `effective_score = base × reinforcement × decay` · retrieval · PR #276 · U
+- [x] T-120 · landed Wave 19 — RRF weight tuning + A/B · retrieval · PR #278 · U
+- [x] T-121 · landed Wave 19 — typed drop/keep reasons per candidate · retrieval · PR #280 · U
+- [x] T-122 · landed Wave 19 — L0/L1 abstract sidecars (clean-room MIT implementation) · store · PR #282 · U
+- [x] T-123 · landed Wave 19 — ratio-batched sidecar refresh · store · PR #284 · U
+- [x] T-124 · landed Wave 19 — resident INDEX route-map · orchestrator · PR #286 · U
+- [x] T-125 · landed Wave 19 — tier budgets as named constants with provenance · retrieval, orchestrator · PR #288 · U
 - [x] T-126 · landed Wave 3 — `why_retrieved` deterministic reason tokens · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [ ] T-127 · recall→usage telemetry join (`usage_rate` feeds ROI) · quality · branch: io-budget-telemetry · U
 - [ ] T-128 · `[DRAFT]` marking with separate confident-answer key · store · new · U

@@ -1,16 +1,25 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.8.0`  
-> **Status**: Feature Release (Ingestion, Suppression & Curation Gates: curator empirical evidence protocol, two-tier promotion staging, 6-turn re-injection suppression, age-bounded self-echo suppression, injected-block stripping, seen-chunk TTL, topic-overlap prefetch skip, and trivial-prompt gate)
+> **Version**: `v2.9.0`  
+> **Status**: Feature Release (Scoring Refinements & Abstract Sidecars: query-intent bias multipliers, effective score calculation, RRF A/B tuning, typed candidate drop/keep reasons, clean-room L0/L1 abstract sidecars, ratio-batched refresh, resident INDEX route-mapping, and tier budgets with provenance)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 18 Focus)
-- **Wave 19: Scoring Refinements & Abstract Sidecars**: `T-118` (query-intent bias multipliers), `T-119` (effective_score = base × reinforcement × decay), `T-120` (RRF weight tuning + A/B), `T-121` (typed drop/keep reasons per candidate), `T-122` (L0/L1 abstract sidecars), `T-123` (ratio-batched sidecar refresh), `T-124` (resident INDEX route-map), `T-125` (tier budgets as named constants with provenance).
+## ⏭️ Next Up (Post-Wave 19 Focus)
+- **Wave 20**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. `T-127` recall-usage telemetry join, `T-128` draft marking, `T-129` config-honesty AST audit).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 19: Scoring Refinements & Abstract Sidecars**:
+  - `T-118`: Query-intent bias multipliers (`detectQueryIntent`, `computeIntentMultiplier`, `taskIntent`) (PR #274, Closes #273)
+  - `T-119`: `effective_score = base × reinforcement × decay` with utility reinforcement boosts and floor limits (PR #276, Closes #275)
+  - `T-120`: Reciprocal Rank Fusion (RRF) weight tuning + A/B variant presets (control/A vs treatment/B) (PR #278, Closes #277)
+  - `T-121`: Typed drop/keep reasons per candidate with granular audit tokens (PR #280, Closes #279)
+  - `T-122`: Clean-room MIT L0 (<=120 chars) and structured L1 abstract sidecars with disk and SQLite caching (PR #282, Closes #281)
+  - `T-123`: Ratio-batched sidecar refresh (`getSidecarStaleness`, `refreshSidecarsRatioBatched`) (PR #284, Closes #283)
+  - `T-124`: Resident INDEX route-map in orchestrator (`buildResidentRouteMap`, `matchResidentRoutes`, `INDEX.json`) (PR #286, Closes #285)
+  - `T-125`: Tier budgets as named constants with provenance (`TIER_BUDGET_PROVENANCE`, `resolveTierBudget`) (PR #288, Closes #287)
 - [x] **Wave 18: Ingestion, Suppression & Curation Gates**:
   - `T-106`: Curator concept: agent appends empirical evidence/application outcomes, deterministic promotion decides records (PR #256, Closes #255)
   - `T-107`: Two-tier promotion staging (`pending_promotions.json`) and session-end atomic flush (`memory_flush_pending`) (PR #258, Closes #257)
