@@ -921,6 +921,10 @@ export function propose(
     session_id?: string;
     /** T-096: Prior memory ID(s) superseded by this proposal (supersede-not-delete). */
     supersedes?: string | string[];
+    /** T-100: Lineage foreign key for superseded memory ID. */
+    supersedes_id?: string | null;
+    /** T-100: Lineage foreign key for conflicting memory ID. */
+    conflicts_with_id?: string | null;
     /** T-087 & T-099: Semantic fact triples for scoped invalidation and fact_provenance. */
     triples?: SemanticFactTriple[];
   },
@@ -1141,6 +1145,12 @@ export function propose(
     temporal_mode,
     evidence: opts.evidence,
     conflict_ids: opts.conflict_ids,
+    supersedes_id:
+      opts.supersedes_id ??
+      (typeof opts.supersedes === "string" ? opts.supersedes : Array.isArray(opts.supersedes) ? (opts.supersedes[0] ?? null) : null),
+    conflicts_with_id:
+      opts.conflicts_with_id ??
+      (Array.isArray(opts.conflict_ids) ? (opts.conflict_ids[0] ?? null) : null),
     triples: opts.triples,
     session_id: opts.session_id,
     mem_path: opts.mem_path,
@@ -1209,6 +1219,7 @@ export function propose(
     }
     if (validSupersededIds.length > 0) {
       entry.supersedes = Array.isArray(opts.supersedes) ? validSupersededIds : validSupersededIds[0];
+      entry.supersedes_id = validSupersededIds[0];
       save(store, entry);
     }
   }
@@ -1306,6 +1317,7 @@ export function supersede(
   if (!prevNext.includes(oldId)) {
     next.supersedes = [...prevNext, oldId];
   }
+  next.supersedes_id = oldId;
   next.quality = determineQuality(next);
   next.updated_at = nowIso();
 

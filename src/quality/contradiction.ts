@@ -168,6 +168,9 @@ export function flagConflict(
   const existingConflicts = new Set(existing.conflict_ids || []);
   existingConflicts.add(newId);
   existing.conflict_ids = [...existingConflicts];
+  if (!existing.conflicts_with_id) {
+    existing.conflicts_with_id = newId;
+  }
   existing.status = "conflicted";
   existing.quality = "CONFLICTED";
   existing.updated_at = new Date().toISOString();
@@ -177,6 +180,7 @@ export function flagConflict(
   const incomingConflicts = new Set(incoming.conflict_ids || []);
   incomingConflicts.add(existingId);
   incoming.conflict_ids = [...incomingConflicts];
+  incoming.conflicts_with_id = existingId;
   incoming.status = "conflicted";
   incoming.quality = "CONFLICTED";
   incoming.updated_at = new Date().toISOString();
