@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord } from "./types.ts";
+import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
@@ -929,6 +929,8 @@ export function propose(
     conflicts_with_id?: string | null;
     /** T-087 & T-099: Semantic fact triples for scoped invalidation and fact_provenance. */
     triples?: SemanticFactTriple[];
+    /** First-class code anchors linking memory to files and symbols. */
+    anchors?: CodeAnchor[];
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -1167,6 +1169,7 @@ export function propose(
     trust,
     score_retain: retention.score,
     source_ids: opts.source_ids,
+    anchors: opts.anchors,
     reinforcement: typeof opts.reinforcement === "number" ? opts.reinforcement : undefined,
     utility: opts.utility,
     decay_score:

@@ -15,6 +15,7 @@ import {
 } from "../retrieval/suppression.ts";
 import { defaultPrefetchCache } from "../retrieval/prefetch.ts";
 import { evaluateTrivialPromptGate } from "./trivial_gate.ts";
+import { getOrBuildResidentRouteMap, matchResidentRoutes } from "./route_map.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -203,8 +204,27 @@ export async function resolveMuseContext(
         taskIntent: input.task_intent,
       });
 
+  // T-124: Match resident routes using in-memory INDEX route-map
+  const residentRouteMap = getOrBuildResidentRouteMap(store);
+  const routeLookup = matchResidentRoutes(residentRouteMap, compositeQuery, {
+    project: input.project,
+    active_file: input.active_file,
+    symbol: input.symbol,
+  });
+
   // Merge anchored memories to front of candidate pool
   const candidatePool: MemoryEntry[] = [...entriesWithMatchingAnchors];
+
+  // Include route-prioritized entries
+  for (const pid of routeLookup.prioritized_entry_ids) {
+    if (!candidatePool.some((c) => c.id === pid)) {
+      const matchEntry = allEntries.find((e) => e.id === pid);
+      if (matchEntry) {
+        candidatePool.push(matchEntry);
+      }
+    }
+  }
+
   for (const r of ranked) {
     if (!candidatePool.some((c) => c.id === r.entry.id)) {
       candidatePool.push(r.entry);
@@ -502,6 +522,8 @@ export async function resolveMuseContext(
     seen_chunk_suppressed_count: seenChunkSuppressedCount > 0 ? seenChunkSuppressedCount : undefined,
     trivial_prompt_gated: trivialGate.isTrivial ? true : undefined,
     trivial_gate_reason: trivialGate.isTrivial ? trivialGate.reason : undefined,
+    matched_routes: routeLookup.matched_routes.length > 0 ? routeLookup.matched_routes : undefined,
+    route_prioritized_ids: routeLookup.prioritized_entry_ids.length > 0 ? routeLookup.prioritized_entry_ids : undefined,
   };
 
   // T-112: Record prefetch payload in session cache
