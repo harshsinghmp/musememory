@@ -292,6 +292,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             mem_path: { type: "string", description: "Semantic dotted-path addressing (e.g. 'auth.session.jwt')" },
             idempotency_key: { type: "string", description: "Unique idempotency key to prevent duplicate writes during retries" },
             source_ids: { type: "array", items: { type: "string" }, description: "Referenced citation IDs in sources.json" },
+            linked_memory_ids: { type: "array", items: { type: "string" }, description: "Explicit memory IDs to link to this memory entry" },
           },
           required: ["content"],
         },
@@ -1918,6 +1919,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               mem_path: a.mem_path ? String(a.mem_path) : undefined,
               idempotency_key: a.idempotency_key ? String(a.idempotency_key) : undefined,
               source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
+              linked_memory_ids: Array.isArray(a.linked_memory_ids) ? a.linked_memory_ids.map(String) : (Array.isArray(a.linkedMemoryIds) ? a.linkedMemoryIds.map(String) : undefined),
             });
             if (a.type === "constraint") {
               try {

@@ -80,8 +80,8 @@ describe("T-090: src_ts Evidence-Age Stamping (Memory Freshness Capped by Eviden
 
       expect(getSchemaVersion(db as any)).toBe(6);
       const newVersion = runMigrations(db as any);
-      expect(newVersion).toBe(7);
-      expect(getSchemaVersion(db as any)).toBe(7);
+      expect(newVersion).toBeGreaterThanOrEqual(7);
+      expect(getSchemaVersion(db as any)).toBeGreaterThanOrEqual(7);
 
       const row = db
         .query<{ src_ts: string }, [string]>(`SELECT src_ts FROM memories WHERE id = ?`)

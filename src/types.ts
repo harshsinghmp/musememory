@@ -204,6 +204,8 @@ export interface MemoryEntry {
   verification?: Verification;
   last_confirmed_at?: string | null;
   related_memory_ids?: string[];
+  /** T-095: Write-time graph edges seeded during capture linking to recent or related memories. */
+  linked_memory_ids?: string[];
   session_id?: string;
   /** Executable verification command for the Verification Oracle (memory verify). */
   test_command?: string;
