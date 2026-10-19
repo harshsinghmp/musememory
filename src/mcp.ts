@@ -23,6 +23,11 @@ import {
   restoreEntry,
   replayFromAudit,
   harvestMemories,
+  change,
+  end,
+  correct,
+  revert,
+  forget,
   type Store,
 } from "./store.ts";
 import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
@@ -350,6 +355,35 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             new_id: { type: "string", description: "Alias for with" },
           },
           required: ["id"],
+        },
+      },
+      {
+        name: "memory_lifecycle",
+        description: "T-084: Five-verb canonical memory lifecycle mutation (change, end, correct, revert, forget)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            verb: {
+              type: "string",
+              enum: ["change", "end", "correct", "revert", "forget"],
+              description: "Lifecycle action to perform",
+            },
+            id: { type: "string", description: "Target memory ID" },
+            replacement: {
+              type: "object",
+              description: "New memory draft or parameters when verb='change'",
+            },
+            new_id: { type: "string", description: "Existing memory ID to supersede with when verb='change'" },
+            correction: {
+              type: "string",
+              description: "Corrected content or correction payload when verb='correct'",
+            },
+            reason: { type: "string", description: "Audit rationale for this lifecycle transition" },
+            valid_to: { type: "string", description: "Explicit historical cessation timestamp when verb='end' or 'change'" },
+            valid_to_exact: { type: "boolean", description: "Whether the cessation timestamp is an exact historical boundary" },
+            hard: { type: "boolean", description: "Whether to execute a hard erasure when verb='forget' (default: false)" },
+          },
+          required: ["verb", "id"],
         },
       },
       {
@@ -1909,6 +1943,58 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const entry = supersede(activeStore, oldId, newId);
         if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
         return toolResult(entry);
+      }
+      case "memory_lifecycle": {
+        const verb = String(a.verb).toLowerCase();
+        const id = String(a.id);
+        switch (verb) {
+          case "change": {
+            const replacement = a.replacement ?? a.new_id ?? a.with;
+            if (!replacement) return toolError("memory_lifecycle verb='change' requires 'replacement' or 'new_id'");
+            const changed = change(activeStore, id, replacement as any, {
+              reason: a.reason ? String(a.reason) : undefined,
+              valid_from: a.valid_to ? String(a.valid_to) : undefined,
+              valid_to_exact: typeof a.valid_to_exact === "boolean" ? a.valid_to_exact : undefined,
+            });
+            if (!changed) return toolError(`Failed to change memory ${id}: not found or invalid replacement`);
+            return toolResult({ success: true, verb: "change", old: changed.old, next: changed.next });
+          }
+          case "end": {
+            const ended = end(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+              valid_to: a.valid_to ? String(a.valid_to) : undefined,
+              valid_to_exact: typeof a.valid_to_exact === "boolean" ? a.valid_to_exact : undefined,
+            });
+            if (!ended) return toolError(`Failed to end memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "end", entry: ended });
+          }
+          case "correct": {
+            const correction = a.correction ?? a.content;
+            if (!correction) return toolError("memory_lifecycle verb='correct' requires 'correction' content or payload");
+            const corrected = correct(activeStore, id, correction as any, {
+              reason: a.reason ? String(a.reason) : undefined,
+            });
+            if (!corrected) return toolError(`Failed to correct memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "correct", entry: corrected });
+          }
+          case "revert": {
+            const reverted = revert(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+            });
+            if (!reverted) return toolError(`Failed to revert memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "revert", entry: reverted });
+          }
+          case "forget": {
+            const ok = forget(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+              hard: a.hard === true,
+            });
+            if (!ok) return toolError(`Failed to forget memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "forget", id, hard: a.hard === true });
+          }
+          default:
+            return toolError(`Unknown lifecycle verb '${verb}'. Supported verbs: change, end, correct, revert, forget`);
+        }
       }
       case "memory_link": {
         const related = Array.isArray(a.related) ? a.related.map(String) : [];

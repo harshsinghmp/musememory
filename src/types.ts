@@ -178,6 +178,11 @@ export interface MemoryEntry {
   valid_to?: string;
   /** T-082: Explicit flag indicating whether valid_to is a known exact historical cessation boundary. */
   valid_to_exact?: boolean;
+  /** T-084: Five-verb lifecycle audit stamps */
+  corrected_at?: string;
+  correction_reason?: string;
+  ended_at?: string;
+  reverted_at?: string;
   /** Reinforcement counter: +1 on confirm, -1 on stale/reject/supersede. */
   reinforcement?: number;
   source?: string;
@@ -344,7 +349,12 @@ export type AuditOperation =
   | "memory_branch"
   | "memory_checkout"
   | "memory_blame"
-  | "expire";
+  | "expire"
+  | "lifecycle_change"
+  | "lifecycle_end"
+  | "lifecycle_correct"
+  | "lifecycle_revert"
+  | "lifecycle_forget";
 
 export interface AuditEntry {
   timestamp: string;
