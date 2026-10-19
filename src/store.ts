@@ -35,6 +35,7 @@ import {
   consolidateIntoCanonical,
   detectConflict,
   flagConflict,
+  resolveConflict,
   calculateRetentionScore,
   listConflicts,
   getConflict,
@@ -49,6 +50,7 @@ import {
 export {
   detectConflict,
   flagConflict,
+  resolveConflict,
   listConflicts,
   getConflict,
   recordConflict,
@@ -58,6 +60,22 @@ export {
   evaluateScopedAlignment,
   type SemanticFactTriple,
   type ScopedInvalidationResult,
+};
+import {
+  initiateFederationHandshake,
+  processFederationHandshake,
+  getConflictDedupKey,
+  computeConflictsChecksum,
+  type FederationHandshakePacket,
+  type FederationHandshakeResult,
+} from "./sync/index.ts";
+export {
+  initiateFederationHandshake,
+  processFederationHandshake,
+  getConflictDedupKey,
+  computeConflictsChecksum,
+  type FederationHandshakePacket,
+  type FederationHandshakeResult,
 };
 import { recoverStaleLocks } from "./outbox.ts";
 export * from "./outbox.ts";
