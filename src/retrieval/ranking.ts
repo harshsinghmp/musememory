@@ -17,6 +17,10 @@ import {
   VERACITY_RANK_WEIGHTS,
   resolveVeracityClass,
   getVeracityWeight,
+  type TaskIntent,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
@@ -26,7 +30,7 @@ import {
   defaultSeenChunkTracker,
 } from "./suppression.ts";
 
-export type { ScoreFactors, AbstentionDecision, VeracityClass };
+export type { ScoreFactors, AbstentionDecision, VeracityClass, TaskIntent };
 export {
   isLowDiscrimination,
   conditionalRerank,
@@ -36,6 +40,9 @@ export {
   VERACITY_RANK_WEIGHTS,
   resolveVeracityClass,
   getVeracityWeight,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
 };
 
 /**
@@ -65,6 +72,9 @@ export interface MultiFactorRankingOptions {
   blastRadiusFiles?: Set<string>;
   /** R21: precomputed semantic cosine scores by entry id. */
   semanticScores?: Map<string, number>;
+  /** T-118: Caller or detected task intent for query-intent bias. */
+  taskIntent?: TaskIntent;
+  inferIntent?: boolean;
 }
 
 /**
@@ -85,6 +95,8 @@ export function calculateMultiFactorScore(
     targetSymbol: options.targetSymbol,
     ftsMatchIds: options.ftsMatchIds,
     blastRadiusFiles: options.blastRadiusFiles,
+    taskIntent: options.taskIntent,
+    inferIntent: options.inferIntent,
   });
 
   return {
@@ -132,11 +144,17 @@ export async function rankAndRetrieveMemories(
     seenChunkTtlMs?: number;
     /** T-111: Whether to record returned entries into seen-chunk tracker. */
     recordSeenChunks?: boolean;
+    /** T-118: Caller or detected task intent for query-intent bias. */
+    taskIntent?: TaskIntent;
+    inferIntent?: boolean;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
   const workspaceRoot = store.dir;
+  const effectiveTaskIntent =
+    options.taskIntent ??
+    (options.inferIntent !== false && query.trim().length > 0 ? detectQueryIntent(query) : undefined);
 
   // 1. T-070 & T-072: FTS5-tokenizer-matched abstention gate before FTS5 search
   const ftsMatchIds = new Set<string>();
@@ -240,6 +258,7 @@ export async function rankAndRetrieveMemories(
       ftsMatchIds,
       blastRadiusFiles,
       semanticScores,
+      taskIntent: effectiveTaskIntent,
     }),
   );
 

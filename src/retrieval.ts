@@ -14,8 +14,15 @@ import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts"
 import { buildSafeFtsQuery } from "./sqlite.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
+import {
+  type TaskIntent,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+} from "./retrieval/intent_bias.ts";
 
-export type { VeracityClass };
+export type { VeracityClass, TaskIntent };
+export { INTENT_BIAS_TABLE, detectQueryIntent, computeIntentMultiplier };
 
 /**
  * T-089: Canonical provenance veracity weights:
@@ -620,6 +627,10 @@ export interface ScoreContext {
   fileVerificationCache?: Map<string, RuntimeVerificationVerdict>;
   /** T-021: Memoized cache of individual file existence checks. */
   filePathCache?: Map<string, boolean>;
+  /** T-118: Caller or detected task intent for query-intent bias. */
+  taskIntent?: TaskIntent;
+  /** T-118: Infer intent heuristically from query if not provided (default false). */
+  inferIntent?: boolean;
 }
 
 /** Every factor the unified scorer computes. One scorer, one factor set, one ordering (T-308). */
@@ -651,6 +662,10 @@ export interface ScoreFactors {
   recentAccessBoost: number;
   zeroMatchPenalty: number;
   semanticMatch: number;
+  /** T-118: Query-intent bias multiplier applied to candidate matching signals. */
+  intentMultiplier?: number;
+  /** T-118: Additive score bonus from query-intent bias multiplier. */
+  intentBias?: number;
   totalScore: number;
   decayScore?: number;
 }
@@ -836,6 +851,14 @@ export function computeFactors(
   const rawSemantic = ctx.semanticScore ?? 0;
   const semanticMatch = rawSemantic >= 0.30 ? rawSemantic : 0;
 
+  // T-118: Query-intent bias multiplier
+  const effectiveIntent =
+    ctx.taskIntent ??
+    (ctx.inferIntent && queryTokens.length > 0 ? detectQueryIntent(queryTokens.join(" ")) : undefined);
+  const intentMultiplier = effectiveIntent ? computeIntentMultiplier(effectiveIntent, entry) : 1.0;
+  const matchingSignal = Math.max(0, baseApplicability + exactSymbolMatch + bm25Match + 0.5 * semanticMatch);
+  const intentBias = intentMultiplier > 1.0 ? Number(((intentMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
+
   const totalScore =
     baseApplicability +
     exactSymbolMatch +
@@ -857,7 +880,8 @@ export function computeFactors(
     accessBoost +
     recentAccessBoost +
     zeroMatchPenalty +
-    0.5 * semanticMatch;
+    0.5 * semanticMatch +
+    intentBias;
 
   const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
 
@@ -885,6 +909,8 @@ export function computeFactors(
     recentAccessBoost,
     zeroMatchPenalty,
     semanticMatch,
+    intentMultiplier,
+    intentBias,
     totalScore,
     decayScore,
   };
@@ -934,6 +960,11 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
   if (entry.temporal_mode === "timeless") reasons.push("timeless_rule");
   if (factors.recentAccessBoost > 0) reasons.push("recent_access");
   if (factors.baseApplicability > 0) reasons.push("lexical_overlap");
+
+  // T-118: Intent bias boost
+  if ((factors.intentBias && factors.intentBias > 0) || (factors.intentMultiplier && factors.intentMultiplier > 1.0)) {
+    reasons.push("intent_bias_boost");
+  }
 
   // T-089: Veracity reasons
   if (factors.veracityClass === "user" || (factors.veracityWeight !== undefined && factors.veracityWeight >= 1.0)) {
