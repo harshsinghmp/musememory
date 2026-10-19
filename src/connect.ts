@@ -90,6 +90,7 @@ export const ALL_MEMORY_TOOLS = [
   "memory_archive",
   "memory_rehydrate",
   "memory_lifecycle_status",
+  "memory_lifecycle",
   "memory_anchor_create",
   "memory_anchor_verify",
   "memory_anchor_audit",

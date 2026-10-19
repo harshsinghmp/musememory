@@ -179,6 +179,28 @@ function initSchema(db: SqliteDatabase): void {
       tags,
       tokenize = 'unicode61'
     );
+
+    -- T-086: keep-both conflicts table (never delete)
+    CREATE TABLE IF NOT EXISTS conflicts (
+      id TEXT PRIMARY KEY,
+      memory_a_id TEXT NOT NULL,
+      memory_b_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      conflict_type TEXT NOT NULL,
+      confidence REAL DEFAULT 1.0,
+      reason TEXT,
+      detected_at TEXT NOT NULL,
+      resolved_at TEXT,
+      resolution_strategy TEXT,
+      resolved_by TEXT,
+      data TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_mem_a ON conflicts(memory_a_id);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_mem_b ON conflicts(memory_b_id);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_pair ON conflicts(memory_a_id, memory_b_id);
   `);
 
   // T-402: Only create indexes on post-v0 columns if those columns actually exist (or have been migrated)
@@ -556,5 +578,177 @@ export function searchMemoriesFts(
     empty.error = errorMsg;
     return empty;
   }
+}
+
+// ---------------------------------------------------------------------------
+// T-086: keep-both conflicts table (never delete)
+// ---------------------------------------------------------------------------
+
+export interface DbConflictRow {
+  id: string;
+  memory_a_id: string;
+  memory_b_id: string;
+  status: string;
+  conflict_type: string;
+  confidence: number;
+  reason: string | null;
+  detected_at: string;
+  resolved_at: string | null;
+  resolution_strategy: string | null;
+  resolved_by: string | null;
+  data: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConflictRecord {
+  id: string;
+  memory_a_id: string;
+  memory_b_id: string;
+  status: "open" | "resolved" | "acknowledged";
+  conflict_type: string;
+  confidence: number;
+  reason?: string;
+  detected_at: string;
+  resolved_at?: string;
+  resolution_strategy?: string;
+  resolved_by?: string;
+  data?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToConflictRecord(row: DbConflictRow): ConflictRecord {
+  let parsedData: Record<string, any> | undefined;
+  if (row.data) {
+    try {
+      parsedData = JSON.parse(row.data);
+    } catch {}
+  }
+  return {
+    id: row.id,
+    memory_a_id: row.memory_a_id,
+    memory_b_id: row.memory_b_id,
+    status: row.status as "open" | "resolved" | "acknowledged",
+    conflict_type: row.conflict_type,
+    confidence: row.confidence,
+    reason: row.reason ?? undefined,
+    detected_at: row.detected_at,
+    resolved_at: row.resolved_at ?? undefined,
+    resolution_strategy: row.resolution_strategy ?? undefined,
+    resolved_by: row.resolved_by ?? undefined,
+    data: parsedData,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function insertOrUpdateConflict(db: SqliteDatabase, conflict: ConflictRecord): void {
+  const existing = getConflictById(db, conflict.id);
+  const now = new Date().toISOString();
+  if (existing) {
+    db.run(
+      `UPDATE conflicts SET
+        status = ?,
+        conflict_type = ?,
+        confidence = ?,
+        reason = ?,
+        resolved_at = ?,
+        resolution_strategy = ?,
+        resolved_by = ?,
+        data = ?,
+        updated_at = ?
+       WHERE id = ?`,
+      [
+        conflict.status,
+        conflict.conflict_type,
+        conflict.confidence,
+        conflict.reason ?? null,
+        conflict.resolved_at ?? null,
+        conflict.resolution_strategy ?? null,
+        conflict.resolved_by ?? null,
+        conflict.data ? JSON.stringify(conflict.data) : null,
+        conflict.updated_at || now,
+        conflict.id,
+      ]
+    );
+  } else {
+    db.run(
+      `INSERT INTO conflicts (
+        id, memory_a_id, memory_b_id, status, conflict_type, confidence,
+        reason, detected_at, resolved_at, resolution_strategy, resolved_by,
+        data, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        conflict.id,
+        conflict.memory_a_id,
+        conflict.memory_b_id,
+        conflict.status,
+        conflict.conflict_type,
+        conflict.confidence,
+        conflict.reason ?? null,
+        conflict.detected_at,
+        conflict.resolved_at ?? null,
+        conflict.resolution_strategy ?? null,
+        conflict.resolved_by ?? null,
+        conflict.data ? JSON.stringify(conflict.data) : null,
+        conflict.created_at || now,
+        conflict.updated_at || now,
+      ]
+    );
+  }
+}
+
+export function getConflictById(db: SqliteDatabase, id: string): ConflictRecord | null {
+  const row = db.query<DbConflictRow>(`SELECT * FROM conflicts WHERE id = ?`).get([id]);
+  if (!row) return null;
+  return rowToConflictRecord(row);
+}
+
+export function findConflictBetween(
+  db: SqliteDatabase,
+  memoryA: string,
+  memoryB: string,
+): ConflictRecord | null {
+  const row = db
+    .query<DbConflictRow>(
+      `SELECT * FROM conflicts
+       WHERE (memory_a_id = ? AND memory_b_id = ?)
+          OR (memory_a_id = ? AND memory_b_id = ?)
+       ORDER BY detected_at DESC
+       LIMIT 1`,
+    )
+    .get([memoryA, memoryB, memoryB, memoryA]);
+  if (!row) return null;
+  return rowToConflictRecord(row);
+}
+
+export function listConflictsFromDb(
+  db: SqliteDatabase,
+  options?: { status?: string; memoryId?: string; limit?: number },
+): ConflictRecord[] {
+  let sql = `SELECT * FROM conflicts`;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (options?.status) {
+    conditions.push(`status = ?`);
+    params.push(options.status);
+  }
+  if (options?.memoryId) {
+    conditions.push(`(memory_a_id = ? OR memory_b_id = ?)`);
+    params.push(options.memoryId, options.memoryId);
+  }
+  if (conditions.length > 0) {
+    sql += ` WHERE ` + conditions.join(" AND ");
+  }
+  sql += ` ORDER BY detected_at DESC`;
+  if (options?.limit && options.limit > 0) {
+    sql += ` LIMIT ?`;
+    params.push(options.limit);
+  }
+
+  const rows = db.query<DbConflictRow>(sql).all(params);
+  return rows.map(rowToConflictRecord);
 }
 

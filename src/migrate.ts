@@ -126,6 +126,34 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact)`);
     },
   },
+  {
+    version: 6,
+    up(db) {
+      // T-086: keep-both conflicts table (never delete)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS conflicts (
+          id TEXT PRIMARY KEY,
+          memory_a_id TEXT NOT NULL,
+          memory_b_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'open',
+          conflict_type TEXT NOT NULL,
+          confidence REAL DEFAULT 1.0,
+          reason TEXT,
+          detected_at TEXT NOT NULL,
+          resolved_at TEXT,
+          resolution_strategy TEXT,
+          resolved_by TEXT,
+          data TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
+        CREATE INDEX IF NOT EXISTS idx_conflicts_mem_a ON conflicts(memory_a_id);
+        CREATE INDEX IF NOT EXISTS idx_conflicts_mem_b ON conflicts(memory_b_id);
+        CREATE INDEX IF NOT EXISTS idx_conflicts_pair ON conflicts(memory_a_id, memory_b_id);
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
