@@ -8,7 +8,7 @@ import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { gateCandidates } from "./freshness.ts";
 import type { MuseContextInput, FusedContextResult, ContextManifestItem } from "./types.ts";
 import { validateDigestIntegrity, dualMeasureTokens } from "../compaction/tokens.ts";
-import { defaultReinjectionTracker } from "../retrieval/suppression.ts";
+import { defaultReinjectionTracker, filterSelfEchoes } from "../retrieval/suppression.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -155,6 +155,12 @@ export async function resolveMuseContext(
     activeFilePath: input.active_file,
     targetSymbol: input.symbol,
     limit: 15,
+    sessionId: input.session_id,
+    sessionTurn: input.turn,
+    suppressReinjection: false,
+    suppressSelfEcho: false,
+    echoHorizonMs: input.echo_horizon_ms,
+    agent: input.agent,
   });
 
   // Merge anchored memories to front of candidate pool
@@ -207,6 +213,25 @@ export async function resolveMuseContext(
       withheldSuppressed.push({
         id: sup.item.id,
         reason: `reinjection_suppressed (${sup.turnsAgo} turns ago, injected at turn ${sup.injectedAtTurn}; 6-turn LRU)`,
+        file_path: "",
+      });
+    }
+  }
+
+  // T-109: Self-echo suppression via capture-side provenance (age-bounded)
+  let selfEchoSuppressedCount = 0;
+  if (input.suppress_self_echo !== false && (input.session_id || input.agent)) {
+    const echoFiltered = filterSelfEchoes(candidatePoolAfterSuppression, {
+      sessionId: input.session_id,
+      agent: input.agent,
+      echoHorizonMs: input.echo_horizon_ms,
+    });
+    candidatePoolAfterSuppression = echoFiltered.allowed;
+    selfEchoSuppressedCount = echoFiltered.suppressed.length;
+    for (const echo of echoFiltered.suppressed) {
+      withheldSuppressed.push({
+        id: echo.entry.id,
+        reason: echo.reason,
         file_path: "",
       });
     }
@@ -394,6 +419,7 @@ export async function resolveMuseContext(
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
     no_confident_match: !hasConfidentMatch,
     reinjection_suppressed_count: reinjectionSuppressedCount > 0 ? reinjectionSuppressedCount : undefined,
+    self_echo_suppressed_count: selfEchoSuppressedCount > 0 ? selfEchoSuppressedCount : undefined,
   };
 }
 

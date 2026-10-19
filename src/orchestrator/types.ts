@@ -28,6 +28,12 @@ export interface MuseContextInput {
   turn?: number;
   /** T-108: Whether to suppress re-injection of memories injected in the last 6 turns (default: true if session_id provided). */
   suppress_reinjected?: boolean;
+  /** T-109: Whether to suppress memories created by active session/agent within echo horizon (default: true). */
+  suppress_self_echo?: boolean;
+  /** T-109: Horizon in ms for self-echo suppression (default: 10 minutes). */
+  echo_horizon_ms?: number;
+  /** T-109: Active caller agent name for provenance matching. */
+  agent?: string;
 }
 
 export interface ContextManifestItem {
@@ -64,6 +70,8 @@ export interface FusedContextResult {
   no_confident_match?: boolean;
   /** T-108: Number of candidate memories withheld due to 6-turn re-injection suppression. */
   reinjection_suppressed_count?: number;
+  /** T-109: Number of candidate memories withheld due to age-bounded self-echo suppression. */
+  self_echo_suppressed_count?: number;
 }
 
 export interface CodeForMemoryResult {
