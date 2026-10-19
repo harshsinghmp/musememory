@@ -1444,6 +1444,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             agent: { type: "string", description: "Caller agent name for provenance self-echo matching" },
             suppress_seen_chunks: { type: "boolean", description: "Whether to suppress memories already served within their TTL window" },
             seen_chunk_ttl_ms: { type: "number", description: "Seen-chunk TTL in ms (default: 300000 / 5 minutes)" },
+            check_topic_overlap: { type: "boolean", description: "Whether to skip prefetch and reuse cached context when topic overlap > 0.6" },
+            topic_overlap_threshold: { type: "number", description: "Custom topic overlap threshold (default: 0.6)" },
           },
         },
       },
@@ -2834,6 +2836,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           echo_horizon_ms: typeof a.echo_horizon_ms === "number" ? a.echo_horizon_ms : undefined,
           suppress_seen_chunks: a.suppress_seen_chunks !== undefined ? Boolean(a.suppress_seen_chunks) : undefined,
           seen_chunk_ttl_ms: typeof a.seen_chunk_ttl_ms === "number" ? a.seen_chunk_ttl_ms : undefined,
+          check_topic_overlap: a.check_topic_overlap !== undefined ? Boolean(a.check_topic_overlap) : undefined,
+          topic_overlap_threshold: typeof a.topic_overlap_threshold === "number" ? a.topic_overlap_threshold : undefined,
         });
         return toolResult(result);
       }

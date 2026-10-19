@@ -13,6 +13,7 @@ import {
   filterSelfEchoes,
   defaultSeenChunkTracker,
 } from "../retrieval/suppression.ts";
+import { defaultPrefetchCache } from "../retrieval/prefetch.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -45,6 +46,29 @@ export async function resolveMuseContext(
   if (input.task_intent) queryParts.push(input.task_intent);
 
   const compositeQuery = queryParts.join(" ") || "active constraints and architecture";
+
+  // T-112: Topic-overlap >0.6 prefetch skip check
+  if (
+    input.session_id &&
+    (input.check_topic_overlap || input.topic_overlap_threshold !== undefined)
+  ) {
+    const skipDecision = defaultPrefetchCache.checkPrefetchSkip(
+      input.session_id,
+      compositeQuery,
+      { threshold: input.topic_overlap_threshold }
+    );
+    if (skipDecision.skip) {
+      const cached = defaultPrefetchCache.getCached(input.session_id);
+      if (cached) {
+        return {
+          ...cached,
+          prefetch_skipped: true,
+          topic_overlap: skipDecision.overlap,
+          topic_overlap_prior_query: skipDecision.priorQuery,
+        };
+      }
+    }
+  }
 
   // 2. Active Constraints & CURRENT.md
   const activeConstraints: Array<{ id: string; title: string; content: string }> = [];
@@ -440,7 +464,7 @@ export async function resolveMuseContext(
     }
   }
 
-  return {
+  const finalResult: FusedContextResult = {
     active_constraints: activeConstraints,
     relevant_memories: packedMemories,
     negative_lessons: packedNegative,
@@ -460,6 +484,13 @@ export async function resolveMuseContext(
     self_echo_suppressed_count: selfEchoSuppressedCount > 0 ? selfEchoSuppressedCount : undefined,
     seen_chunk_suppressed_count: seenChunkSuppressedCount > 0 ? seenChunkSuppressedCount : undefined,
   };
+
+  // T-112: Record prefetch payload in session cache
+  if (input.session_id) {
+    defaultPrefetchCache.recordPrefetch(input.session_id, compositeQuery, finalResult);
+  }
+
+  return finalResult;
 }
 
 /**
