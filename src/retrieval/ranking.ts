@@ -21,6 +21,8 @@ import {
   INTENT_BIAS_TABLE,
   detectQueryIntent,
   computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
@@ -43,6 +45,8 @@ export {
   INTENT_BIAS_TABLE,
   detectQueryIntent,
   computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
 };
 
 /**
@@ -59,6 +63,8 @@ export function softOrFusion(pv: number, pl: number): number {
 export interface MultiFactorScoreResult {
   entry: MemoryEntry;
   score: number;
+  /** T-119: Multiplicative composite score: base × reinforcement × decay. */
+  effectiveScore?: number;
   factors: ScoreFactors;
   why_retrieved?: string[];
 }
@@ -75,6 +81,8 @@ export interface MultiFactorRankingOptions {
   /** T-118: Caller or detected task intent for query-intent bias. */
   taskIntent?: TaskIntent;
   inferIntent?: boolean;
+  /** T-119: Use multiplicative effective_score (base × reinforcement × decay) for score. */
+  useEffectiveScore?: boolean;
 }
 
 /**
@@ -99,9 +107,12 @@ export function calculateMultiFactorScore(
     inferIntent: options.inferIntent,
   });
 
+  const score = options.useEffectiveScore ? (factors.effectiveScore ?? factors.totalScore) : factors.totalScore;
+
   return {
     entry,
-    score: factors.totalScore,
+    score,
+    effectiveScore: factors.effectiveScore,
     factors,
     why_retrieved: deriveWhyRetrieved(factors, entry),
   };
@@ -147,6 +158,8 @@ export async function rankAndRetrieveMemories(
     /** T-118: Caller or detected task intent for query-intent bias. */
     taskIntent?: TaskIntent;
     inferIntent?: boolean;
+    /** T-119: Rank candidates by multiplicative effective_score (base × reinforcement × decay) instead of additive totalScore. */
+    useEffectiveScore?: boolean;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -259,12 +272,15 @@ export async function rankAndRetrieveMemories(
       blastRadiusFiles,
       semanticScores,
       taskIntent: effectiveTaskIntent,
+      useEffectiveScore: options.useEffectiveScore,
     }),
   );
 
-  // 5. Sort descending by totalScore and apply conditional rerank (T-115)
+  // 5. Sort descending by score (or effectiveScore if useEffectiveScore is true) and apply conditional rerank (T-115)
   scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+    const valA = options.useEffectiveScore ? (a.effectiveScore ?? a.score) : a.score;
+    const valB = options.useEffectiveScore ? (b.effectiveScore ?? b.score) : b.score;
+    if (valB !== valA) return valB - valA;
     const bU = Date.parse(b.entry.updated_at);
     const aU = Date.parse(a.entry.updated_at);
     return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
