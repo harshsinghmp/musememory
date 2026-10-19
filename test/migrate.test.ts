@@ -348,5 +348,30 @@ describe("T-086 migration v6 (conflicts table)", () => {
     db.close();
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("T-100 migration v10 (lineage FKs) > adds supersedes_id and conflicts_with_id columns and indexes to legacy store", () => {
+    const root = mkdtempSync(join(tmpdir(), "migrate-v10-"));
+    const { db } = legacyStore(root);
+
+    runMigrations(db);
+    expect(getSchemaVersion(db)).toBeGreaterThanOrEqual(10);
+
+    const cols = db
+      .query<{ name: string }>(`PRAGMA table_info(memories)`)
+      .all()
+      .map((c) => c.name);
+    expect(cols).toContain("supersedes_id");
+    expect(cols).toContain("conflicts_with_id");
+
+    const indexes = db
+      .query<{ name: string }>(`PRAGMA index_list(memories)`)
+      .all()
+      .map((r) => r.name);
+    expect(indexes).toContain("idx_memories_supersedes_id");
+    expect(indexes).toContain("idx_memories_conflicts_with_id");
+
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 

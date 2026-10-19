@@ -217,6 +217,10 @@ export interface MemoryEntry {
   salience?: number;
   supersedes?: string | string[] | null;
   superseded_by?: string | string[] | null;
+  /** T-100: First-class lineage foreign key pointing to superseded memory ID. */
+  supersedes_id?: string | null;
+  /** T-100: First-class lineage foreign key pointing to conflicting memory ID. */
+  conflicts_with_id?: string | null;
   disputed_by?: string[];
   verification?: Verification;
   last_confirmed_at?: string | null;

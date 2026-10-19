@@ -213,6 +213,39 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 10,
+    up(db) {
+      // T-100: supersedes_id and conflicts_with_id lineage FKs
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("supersedes_id")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN supersedes_id TEXT`);
+        db.exec(
+          `UPDATE memories SET supersedes_id = CASE
+            WHEN json_extract(data, '$.supersedes_id') IS NOT NULL THEN json_extract(data, '$.supersedes_id')
+            WHEN json_type(json_extract(data, '$.supersedes')) = 'text' THEN json_extract(data, '$.supersedes')
+            WHEN json_type(json_extract(data, '$.supersedes')) = 'array' THEN json_extract(data, '$.supersedes[0]')
+            ELSE NULL
+          END WHERE supersedes_id IS NULL`,
+        );
+      }
+      if (!memCols.includes("conflicts_with_id")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN conflicts_with_id TEXT`);
+        db.exec(
+          `UPDATE memories SET conflicts_with_id = CASE
+            WHEN json_extract(data, '$.conflicts_with_id') IS NOT NULL THEN json_extract(data, '$.conflicts_with_id')
+            WHEN json_type(json_extract(data, '$.conflict_ids')) = 'array' THEN json_extract(data, '$.conflict_ids[0]')
+            ELSE NULL
+          END WHERE conflicts_with_id IS NULL`,
+        );
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_supersedes_id ON memories(supersedes_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_conflicts_with_id ON memories(conflicts_with_id)`);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
