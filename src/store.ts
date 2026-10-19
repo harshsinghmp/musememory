@@ -182,7 +182,7 @@ function tombstonedIds(store: Store): Set<string> {
   }
 }
 
-function isTombstoned(store: Store, id: string): boolean {
+export function isTombstoned(store: Store, id: string): boolean {
   if (!store.db) return false;
   try {
     const row = store.db
@@ -1760,6 +1760,306 @@ export function repairFtsIndex(store: Store): FtsParityReport {
     }
   });
   return { ...checkFtsParity(store), repaired: true };
+}
+
+/**
+ * T-084: Five-Verb Lifecycle Interfaces & Engine
+ */
+export interface ChangeOptions {
+  valid_from?: string;
+  valid_to_exact?: boolean;
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `change`.
+ * Represents a historical state transition where a fact ceases to be valid going forward
+ * and is replaced by a new fact. The old fact is superseded and closed out bi-temporally.
+ */
+export function change(
+  store: Store,
+  oldId: string,
+  newDraftOrId: string | Parameters<typeof propose>[1],
+  options?: ChangeOptions,
+): { old: MemoryEntry; next: MemoryEntry } | null {
+  const old = get(store, oldId);
+  if (!old) return null;
+
+  let next: MemoryEntry | null = null;
+  const now = options?.valid_from ?? nowIso();
+
+  if (typeof newDraftOrId === "string") {
+    next = get(store, newDraftOrId);
+    if (!next) return null;
+    if (next.status !== "confirmed") {
+      confirm(store, next.id);
+      next = get(store, next.id)!;
+    }
+  } else {
+    next = propose(store, {
+      ...newDraftOrId,
+      project: newDraftOrId.project ?? old.project,
+      confirmed: newDraftOrId.confirmed ?? true,
+      valid_from: newDraftOrId.valid_from ?? now,
+    });
+  }
+
+  const superseded = supersede(store, old.id, next.id, {
+    valid_to: now,
+    valid_to_exact: options?.valid_to_exact ?? true,
+  });
+  if (!superseded) return null;
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_change",
+      entry_id: old.id,
+      project: old.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { new_id: next.id, verb: "change", valid_to: now },
+    });
+  }
+
+  return { old: get(store, old.id)!, next: get(store, next.id)! };
+}
+
+export interface EndOptions {
+  reason?: string;
+  valid_to?: string;
+  valid_to_exact?: boolean;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `end`.
+ * Concludes a fact's validity when it ceases to be true without a replacement fact.
+ * Closes out valid_to bi-temporally and transitions status to stale.
+ */
+export function end(
+  store: Store,
+  id: string,
+  options?: EndOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const validTo = options?.valid_to ?? nowIso();
+  const validToExact = options?.valid_to_exact ?? true;
+
+  entry.status = "stale";
+  entry.ended_at = validTo;
+  closeOutValidity(entry, { valid_to: validTo, valid_to_exact: validToExact });
+  if (options?.reason) {
+    entry.content = `${entry.content}\n\nEnded: ${options.reason}`;
+  }
+  entry.updated_at = nowIso();
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_end",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "end", valid_to: validTo, valid_to_exact: validToExact },
+    });
+  }
+
+  return entry;
+}
+
+export interface CorrectOptions {
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `correct`.
+ * Retroactively fixes an erroneous fact recorded by mistake.
+ * Unlike `change`, this does NOT imply historical continuity: the prior recording was wrong.
+ * Amends the entry directly with an audit trail note.
+ */
+export function correct(
+  store: Store,
+  id: string,
+  correction: string | Partial<MemoryEntry>,
+  options?: CorrectOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const prevContent = entry.content;
+  if (typeof correction === "string") {
+    entry.content = correction;
+  } else {
+    if (correction.content) entry.content = correction.content;
+    if (correction.title) entry.title = correction.title;
+    if (correction.tags) entry.tags = correction.tags;
+    if (correction.type) entry.type = correction.type;
+    if (correction.salience !== undefined) entry.salience = correction.salience;
+    if (correction.verification) entry.verification = correction.verification;
+  }
+
+  const now = nowIso();
+  entry.updated_at = now;
+  entry.corrected_at = now;
+  if (options?.reason) {
+    entry.correction_reason = options.reason;
+  }
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_correct",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "correct", previous_content: prevContent },
+    });
+  }
+
+  return entry;
+}
+
+export interface RevertOptions {
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `revert`.
+ * Restores a previously superseded, ended, or stale fact back into active confirmed knowledge.
+ * Clears valid_to and bi-temporal closeout, resets status to confirmed, and unlinks supersessions.
+ */
+export function revert(
+  store: Store,
+  id: string,
+  options?: RevertOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const prevStatus = entry.status;
+  const now = nowIso();
+  entry.status = "confirmed";
+  delete entry.valid_to;
+  delete entry.valid_to_exact;
+  delete entry.expired_at;
+  delete entry.expired_by;
+  delete entry.ended_at;
+  entry.reverted_at = now;
+  entry.reinforcement = (entry.reinforcement ?? 0) + 1;
+  entry.last_confirmed_at = now;
+  entry.updated_at = now;
+
+  // Unlink incoming supersession references from replacing memories
+  const supersededBy = normalizeIdArray(entry.superseded_by);
+  for (const sId of supersededBy) {
+    const sEntry = get(store, sId);
+    if (sEntry) {
+      const sSupersedes = normalizeIdArray(sEntry.supersedes).filter((x) => x !== id);
+      sEntry.supersedes = sSupersedes.length > 0 ? sSupersedes : null;
+      sEntry.updated_at = now;
+      save(store, sEntry);
+    }
+  }
+  entry.superseded_by = null;
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_revert",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "revert", previous_status: prevStatus },
+    });
+  }
+
+  return entry;
+}
+
+export interface ForgetOptions {
+  reason?: string;
+  actor?: string;
+  hard?: boolean;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `forget`.
+ * Right-to-be-forgotten / complete soft tombstone or hard erasure.
+ * Excludes the memory from all active recall, FTS, and indexing.
+ */
+export function forget(
+  store: Store,
+  id: string,
+  options?: ForgetOptions,
+): boolean {
+  if (options?.hard) {
+    const entry = get(store, id);
+    if (!entry) return false;
+    const file = fileForId(store, id);
+    if (existsSync(file)) unlinkSync(file);
+    if (store.db) {
+      store.db.run(`DELETE FROM memories WHERE id = ?`, [id]);
+      store.db.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
+    }
+    if (store.cache) store.cache.deleteEntry(id);
+    if (store.memoryDir) {
+      try {
+        const { removeIndexEntry } = require("./vector.ts");
+        removeIndexEntry(id, store.memoryDir);
+      } catch {}
+      recordAuditEvent(store.memoryDir, {
+        operation: "lifecycle_forget",
+        entry_id: id,
+        project: entry.project,
+        actor: options?.actor ?? "agent",
+        reason: options?.reason,
+        details: { verb: "forget", hard: true },
+      });
+    }
+    return true;
+  }
+
+  const ok = deleteEntry(store, id, options?.reason, options?.actor);
+  if (ok && store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_forget",
+      entry_id: id,
+      project: get(store, id)?.project ?? "default",
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "forget", hard: false },
+    });
+  }
+  return ok;
 }
 
 /**
