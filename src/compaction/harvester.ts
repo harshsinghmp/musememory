@@ -4,6 +4,7 @@ import type { HarvestedMemory } from "./types.ts";
 import { recordNegativeLesson } from "../learning/negative.ts";
 import { scanSecrets } from "../secrets.ts";
 import { isFactDigestRecorded, recordFactDigest } from "./dedup.ts";
+import { stripInjectedContextBlocks } from "../security/strip.ts";
 
 export interface HarvestOptions {
   project: string;
@@ -23,8 +24,11 @@ export function harvestSessionMemories(
 ): HarvestedMemory[] {
   if (!conversationText || !conversationText.trim()) return [];
 
+  const cleanText = stripInjectedContextBlocks(conversationText);
+  if (!cleanText || !cleanText.trim()) return [];
+
   // Protect against secrets
-  const secrets = scanSecrets(conversationText);
+  const secrets = scanSecrets(cleanText);
   if (secrets.length > 0) {
     // If text contains credentials, abort extraction to prevent leaks
     return [];
@@ -32,7 +36,7 @@ export function harvestSessionMemories(
 
   const memoryDir = store.memoryDir || store.dir;
   const harvested: HarvestedMemory[] = [];
-  const lines = conversationText.split("\n");
+  const lines = cleanText.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();

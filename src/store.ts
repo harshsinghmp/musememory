@@ -8,6 +8,7 @@ import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
+import { stripInjectedContextBlocks } from "./security/strip.ts";
 import { autoStampGraphMetadata } from "./graph.ts";
 import { workspaceRootFor } from "./root.ts";
 import { loadSources } from "./provenance.ts";
@@ -936,11 +937,17 @@ export function propose(
     throw new Error("Cannot propose memory entry with empty project");
   }
 
+  // T-110: Strip <memory-context> and injected context blocks before capture
+  const cleanContent = stripInjectedContextBlocks(opts.content);
+  if (!cleanContent || !cleanContent.trim()) {
+    throw new Error("Cannot propose memory entry consisting entirely of injected context blocks or empty content");
+  }
+
   // T-038 & T-039: Idempotency key handling (retry -> 0 writes; divergent retry -> named conflict)
   if (opts.idempotency_key && store.db) {
     const existing = getMemoryByIdempotencyKey(store.db, opts.idempotency_key);
     if (existing) {
-      const incomingHash = opts.content_hash ?? computeContentHash(opts.content);
+      const incomingHash = opts.content_hash ?? computeContentHash(cleanContent);
       const existingHash = existing.content_hash || computeContentHash(existing.content);
       if (existingHash === incomingHash) {
         return existing;
@@ -950,11 +957,11 @@ export function propose(
     }
   }
 
-  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
-  const content_hash = opts.content_hash ?? computeContentHash(opts.content);
+  const title = (opts.title ?? cleanContent.slice(0, 120)).slice(0, 120);
+  const content_hash = opts.content_hash ?? computeContentHash(cleanContent);
 
   // T-104: Retention admission gate
-  const retention = calculateRetentionScore(opts.content, {
+  const retention = calculateRetentionScore(cleanContent, {
     title,
     tags: opts.tags,
     salience: opts.salience,
@@ -987,7 +994,7 @@ export function propose(
         });
       }
     }
-    const dupes = findDuplicates(store, { title, content: opts.content, project: opts.project });
+    const dupes = findDuplicates(store, { title, content: cleanContent, project: opts.project });
     if (dupes.exact) {
       return consolidateIntoCanonical(store, dupes.exact.id, {
         source: opts.source,
@@ -999,7 +1006,7 @@ export function propose(
   const secrets = scanSecrets(
     extractEntryText({
       title,
-      content: opts.content,
+      content: cleanContent,
       tags: opts.tags,
       verification: opts.verification,
     }),
@@ -1011,8 +1018,8 @@ export function propose(
   const now = nowIso();
   const createdAt = opts.createdAt ?? opts.created_at ?? now;
   const updatedAt = opts.updatedAt ?? opts.updated_at ?? now;
-  const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
-  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
+  const fingerprint = opts.fingerprint ?? computeFingerprint(title, cleanContent);
+  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, cleanContent, opts.type);
   const trust = deriveTrustTier(opts.source, opts.trust);
 
   // T-090: src_ts evidence-age stamping (derive from explicit option or evidence items)
@@ -1042,7 +1049,7 @@ export function propose(
       if (customPolicy) {
         const candidateEntry: any = {
           title,
-          content: opts.content,
+          content: cleanContent,
           project: opts.project,
           type: opts.type ?? "discovery",
           tags: opts.tags ?? [],
@@ -1083,7 +1090,7 @@ export function propose(
         const scoredCandidates: { id: string; score: number }[] = [];
         const incomingTags = new Set((opts.tags ?? []).map((t) => t.toLowerCase()));
         const incomingTitleWords = new Set(
-          (title + " " + opts.content).toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3)
+          (title + " " + cleanContent).toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3)
         );
 
         for (const row of recentRows) {
@@ -1112,9 +1119,9 @@ export function propose(
   }
 
   const entry: MemoryEntry = {
-    id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
+    id: opts.id ?? makeId(opts.title ?? cleanContent.slice(0, 60)),
     title,
-    content: opts.content,
+    content: cleanContent,
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
     type: opts.type ?? "discovery",
