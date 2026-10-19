@@ -209,6 +209,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 ---
 
 ### Related Documentation
+- 🛡️ **[Ingestion, Suppression & Curation Gates](ingestion-suppression-and-curation.md)** — Curator empirical evidence protocol, two-tier promotion, 6-turn re-injection suppression, self-echo suppression, injected block stripping, seen-chunk TTL, topic-overlap prefetch skip, and trivial-prompt gates.
 - 🕸️ **[Graph, Provenance & Lineage Architecture](graph-provenance-and-lineage.md)** — Relational lineage foreign keys, walkLineageBfs DAG walker, progressive wikilink expansion, append-only fact provenance, and hash-chained audit ledgers.
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
 - ⏳ **[Temporal Transitions, Contradiction Engine & Verbs](temporal-contradiction-and-trust.md)** — Bi-temporal validity tracking, five-verb lifecycle, keep-both conflicts table, scoped invalidation, federation handshake, and veracity ranking.

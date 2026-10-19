@@ -116,14 +116,14 @@
 ### Gates + hygiene
 - [x] T-104 · landed Wave 2 — `scoreRetain` 0.3 write gate (refuse junk writes) · quality/retention, store · branch: feat/wave-2-trust-gates · U
 - [x] T-105 · landed Wave 2 — corroboration-gated promotion (≥2 independent days; machine sources excluded) · promotion · branch: feat/wave-2-trust-gates · U
-- [ ] T-106 · curator concept: agent appends evidence, deterministic promotion decides · promotion · new · U
-- [ ] T-107 · two-tier promotion (pending tier → session-end flush) · promotion · new · U
-- [ ] T-108 · re-injection suppression per session (6-turn LRU) · retrieval · new · U
-- [ ] T-109 · self-echo suppression via capture-side provenance (age-bounded) · retrieval · new · U
-- [ ] T-110 · `<memory-context>`/injected-block strip before capture · harvester, store · branch: poisoning-trust-tiers · U
-- [ ] T-111 · seen-chunk TTL · retrieval · new · U
-- [ ] T-112 · topic-overlap >0.6 prefetch skip · retrieval · new · U
-- [ ] T-113 · trivial-prompt gate (skip recall for greetings) · orchestrator · new · U
+- [x] T-106 · landed Wave 18 — curator concept: agent appends evidence, deterministic promotion decides · promotion · PR #256 · U
+- [x] T-107 · landed Wave 18 — two-tier promotion (pending tier → session-end flush) · promotion · PR #258 · U
+- [x] T-108 · landed Wave 18 — re-injection suppression per session (6-turn LRU) · retrieval · PR #260 · U
+- [x] T-109 · landed Wave 18 — self-echo suppression via capture-side provenance (age-bounded) · retrieval · PR #262 · U
+- [x] T-110 · landed Wave 18 — `<memory-context>`/injected-block strip before capture · harvester, store · PR #264 · U
+- [x] T-111 · landed Wave 18 — seen-chunk TTL · retrieval · PR #266 · U
+- [x] T-112 · landed Wave 18 — topic-overlap >0.6 prefetch skip · retrieval · PR #268 · U
+- [x] T-113 · landed Wave 18 — trivial-prompt gate (skip recall for greetings) · orchestrator · PR #270 · U
 - [x] T-114 · landed Wave 3 — soft-OR evidence fusion `P=1-(1-pv)(1-pl)` · ranking.ts, vector.ts · branch: feat/wave-3-retrieval-ranking · U
 - [x] T-115 · landed Wave 3 — `low_discrimination()` conditional rerank (tier/verification/recency tie-breaker) · retrieval.ts, ranking.ts · branch: feat/wave-3-retrieval-ranking · U
 - [x] MERGED→T-071 T-116 · semantic threshold gate BEFORE BM25/entity fusion · retrieval · branch: local-embeddings-llama-cpp · U
