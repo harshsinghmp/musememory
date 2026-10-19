@@ -185,6 +185,8 @@ export interface MemoryEntry {
   valid_to?: string;
   /** T-082: Explicit flag indicating whether valid_to is a known exact historical cessation boundary. */
   valid_to_exact?: boolean;
+  /** T-090: Original ISO 8601 timestamp of underlying source document or evidence. Memory freshness cannot exceed this timestamp. */
+  src_ts?: string;
   /** T-084: Five-verb lifecycle audit stamps */
   corrected_at?: string;
   correction_reason?: string;
