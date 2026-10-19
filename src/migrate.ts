@@ -111,6 +111,21 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score)`);
     },
   },
+  {
+    version: 5,
+    up(db) {
+      // T-082: valid_to_exact flag for bi-temporal transitions
+      const memCols = db
+        .query<{ name: string }>(`PRAGMA table_info(memories)`)
+        .all()
+        .map((c) => c.name);
+      if (!memCols.includes("valid_to_exact")) {
+        db.exec(`ALTER TABLE memories ADD COLUMN valid_to_exact INTEGER DEFAULT 0`);
+        db.exec(`UPDATE memories SET valid_to_exact = COALESCE(json_extract(data, '$.valid_to_exact'), 0)`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact)`);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

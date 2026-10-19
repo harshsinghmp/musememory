@@ -149,6 +149,7 @@ function initSchema(db: SqliteDatabase): void {
       expires_at TEXT,
       valid_from TEXT,
       valid_to TEXT,
+      valid_to_exact INTEGER DEFAULT 0,
       mem_path TEXT,
       last_accessed_at TEXT,
       access_count INTEGER,
@@ -169,6 +170,7 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
     CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score);
+    CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
@@ -218,6 +220,7 @@ export interface DbMemoryRow {
   expires_at: string | null;
   valid_from: string | null;
   valid_to: string | null;
+  valid_to_exact?: number | null;
   mem_path: string | null;
   last_accessed_at: string | null;
   access_count: number | null;
@@ -250,6 +253,12 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
     expires_at: row.expires_at !== null ? row.expires_at : parsedData.expires_at,
     valid_from: row.valid_from !== null ? row.valid_from : parsedData.valid_from,
     valid_to: row.valid_to !== null ? row.valid_to : parsedData.valid_to,
+    valid_to_exact:
+      row.valid_to_exact !== undefined && row.valid_to_exact !== null
+        ? Boolean(row.valid_to_exact)
+        : parsedData.valid_to_exact !== undefined
+        ? Boolean(parsedData.valid_to_exact)
+        : undefined,
     mem_path: row.mem_path !== null ? row.mem_path : parsedData.mem_path,
     last_accessed_at: row.last_accessed_at !== null ? row.last_accessed_at : parsedData.last_accessed_at,
     access_count: row.access_count !== null ? row.access_count : parsedData.access_count,
@@ -271,12 +280,12 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
     const sql = `
       INSERT OR REPLACE INTO memories (
         id, title, content, project, type, status, salience, reinforcement,
-        session_id, due_at, expires_at, valid_from, valid_to,
+        session_id, due_at, expires_at, valid_from, valid_to, valid_to_exact,
         mem_path, last_accessed_at, access_count, decay_score, idempotency_key, content_hash, data,
         created_at, updated_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?
       )
@@ -296,6 +305,7 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
       entry.expires_at ?? null,
       entry.valid_from ?? null,
       entry.valid_to ?? null,
+      entry.valid_to_exact ? 1 : 0,
       entry.mem_path ?? null,
       entry.last_accessed_at ?? null,
       typeof entry.access_count === "number" ? entry.access_count : null,
