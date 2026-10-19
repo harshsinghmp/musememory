@@ -2558,3 +2558,17 @@ export {
 
 export type { FactProvenanceRecord };
 
+export {
+  type L1Abstract,
+  type AbstractSidecar,
+  generateL0Abstract,
+  generateL1Abstract,
+  buildAbstractSidecar,
+  saveAbstractSidecar,
+  loadAbstractSidecar,
+  listAbstractSidecars,
+  saveAbstractSidecarToDb,
+  loadAbstractSidecarFromDb,
+  ensureAbstractSidecar,
+} from "./store/sidecars.ts";
+
