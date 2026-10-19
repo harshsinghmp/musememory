@@ -2121,3 +2121,10 @@ export async function closeStore(store: Store): Promise<void> {
   }
 }
 
+export {
+  resolveVeracityClass,
+  getVeracityWeight,
+  VERACITY_RANK_WEIGHTS,
+  type VeracityClass,
+} from "./retrieval.ts";
+

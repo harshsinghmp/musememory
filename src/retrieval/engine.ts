@@ -35,6 +35,8 @@ export interface UnifiedSearchResult {
   as_of?: string;
   /** T-083: Memories whose validity is undetermined at as_of */
   undetermined?: ScoredEntry[];
+  /** T-089: Memories withheld by provenance veracity or trust filters */
+  withheld?: Array<{ id: string; reason: string }>;
 }
 
 export interface ReindexReport {
@@ -240,6 +242,7 @@ export class RetrievalEngine {
       no_confident_match: exact.no_confident_match,
       as_of: exact.as_of,
       undetermined: exact.undetermined,
+      withheld: exact.withheld,
     };
   }
 

@@ -393,7 +393,11 @@ export interface SearchOptions {
   includeUntrusted?: boolean;
   /** T-021: Optional workspace root for memoized runtime file verification. */
   workspaceRoot?: string;
+  /** T-089: Minimum provenance veracity class or weight threshold (user: 1.0, agent: 0.7, external: 0.5, system: 0.3). */
+  minVeracity?: VeracityClass | number;
 }
+
+export type VeracityClass = "user" | "agent" | "external" | "system";
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;
 
