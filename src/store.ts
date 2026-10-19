@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, Verification, GraphMetadata, TrustTier } from "./types.ts";
+import type { MemoryEntry, MemoryType, Verification, GraphMetadata, TrustTier, FactProvenanceRecord } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
@@ -19,6 +19,9 @@ import {
   getMemoryByContentHash,
   listMemories,
   searchMemoriesFts,
+  insertFactProvenance,
+  getFactProvenanceRow,
+  listFactProvenanceRows,
   type SqliteDatabase,
   type FtsSearchHits,
 } from "./sqlite.ts";
@@ -44,6 +47,9 @@ import {
   evaluateScopedInvalidation,
   extractFactTriples,
   evaluateScopedAlignment,
+  normalizeTerm,
+  canonicalizeRelation,
+  canonicalizeScope,
   type SemanticFactTriple,
   type ScopedInvalidationResult,
 } from "./quality/index.ts";
@@ -742,7 +748,10 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
     if (store.db) {
       try {
         // T-025: memories row + FTS delete/insert as a single commit.
-        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, entry));
+        withTransaction(store.db, () => {
+          insertOrReplaceMemory(store.db!, entry);
+          recordFactProvenance(store, entry);
+        });
         store.circuit?.recordSuccess();
       } catch (err) {
         store.circuit?.recordFailure(err);
@@ -912,6 +921,8 @@ export function propose(
     session_id?: string;
     /** T-096: Prior memory ID(s) superseded by this proposal (supersede-not-delete). */
     supersedes?: string | string[];
+    /** T-087 & T-099: Semantic fact triples for scoped invalidation and fact_provenance. */
+    triples?: SemanticFactTriple[];
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -1130,6 +1141,8 @@ export function propose(
     temporal_mode,
     evidence: opts.evidence,
     conflict_ids: opts.conflict_ids,
+    triples: opts.triples,
+    session_id: opts.session_id,
     mem_path: opts.mem_path,
     idempotency_key: opts.idempotency_key,
     content_hash,
@@ -2219,6 +2232,102 @@ export function forget(
  * T-056 & T-055: Gracefully closes store, awaiting all in-flight async write workers
  * within a bounded join and running WAL checkpoint optimization to keep disk compact.
  */
+/**
+ * T-099: Records append-only fact provenance assertions for all explicit or heuristically
+ * extracted semantic fact triples from a memory entry.
+ * Uses INSERT OR IGNORE via idx_fact_provenance_triple to preserve original provenance.
+ */
+export function recordFactProvenance(
+  store: Store,
+  entry: MemoryEntry | { id: string; title: string; content: string; triples?: SemanticFactTriple[]; source?: string; session_id?: string; tags?: string[]; mem_path?: string },
+): FactProvenanceRecord[] {
+  if (!store.db) return [];
+  const triples = extractFactTriples(entry);
+  if (!triples || triples.length === 0) return [];
+
+  const records: FactProvenanceRecord[] = [];
+  for (const t of triples) {
+    const recordId = `fp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const now = nowIso();
+    const rec: FactProvenanceRecord = {
+      id: recordId,
+      memory_id: entry.id,
+      entity: t.entity,
+      relation: t.relation,
+      target: t.target,
+      scope: t.scope ?? "global",
+      source: (entry as any).source ?? (entry as any).provenance?.source ?? undefined,
+      session_id: (entry as any).session_id ?? undefined,
+      confidence: 1.0,
+      created_at: now,
+    };
+    insertFactProvenance(store.db, rec);
+    records.push(rec);
+  }
+  return records;
+}
+
+/**
+ * T-099: Retrieve fact provenance record for a specific canonical triple.
+ */
+export function getFactProvenance(
+  store: Store,
+  entity: string,
+  relation: string,
+  target: string,
+): FactProvenanceRecord | null {
+  if (!store.db) return null;
+  const normEntity = normalizeTerm(entity);
+  const normRelation = canonicalizeRelation(relation);
+  const normTarget = normalizeTerm(target);
+  const row = getFactProvenanceRow(store.db, normEntity, normRelation, normTarget);
+  if (!row) return null;
+  return {
+    id: row.id,
+    memory_id: row.memory_id,
+    entity: row.entity,
+    relation: row.relation,
+    target: row.target,
+    scope: row.scope,
+    source: row.source ?? undefined,
+    session_id: row.session_id ?? undefined,
+    confidence: row.confidence ?? 1.0,
+    data: row.data ?? undefined,
+    created_at: row.created_at,
+  };
+}
+
+/**
+ * T-099: List append-only fact provenance records matching optional filters.
+ */
+export function listFactProvenance(
+  store: Store,
+  filters: { memory_id?: string; entity?: string; relation?: string; target?: string; scope?: string } = {},
+): FactProvenanceRecord[] {
+  if (!store.db) return [];
+  const normalizedFilters = {
+    ...filters,
+    entity: filters.entity ? normalizeTerm(filters.entity) : undefined,
+    relation: filters.relation ? canonicalizeRelation(filters.relation) : undefined,
+    target: filters.target ? normalizeTerm(filters.target) : undefined,
+    scope: filters.scope ? canonicalizeScope(filters.scope) : undefined,
+  };
+  const rows = listFactProvenanceRows(store.db, normalizedFilters);
+  return rows.map((r) => ({
+    id: r.id,
+    memory_id: r.memory_id,
+    entity: r.entity,
+    relation: r.relation,
+    target: r.target,
+    scope: r.scope,
+    source: r.source ?? undefined,
+    session_id: r.session_id ?? undefined,
+    confidence: r.confidence ?? 1.0,
+    data: r.data ?? undefined,
+    created_at: r.created_at,
+  }));
+}
+
 export async function closeStore(store: Store): Promise<void> {
   try {
     await drainWriteWorkers(5000);
@@ -2240,4 +2349,6 @@ export {
   VERACITY_RANK_WEIGHTS,
   type VeracityClass,
 } from "./retrieval.ts";
+
+export type { FactProvenanceRecord };
 
