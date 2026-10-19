@@ -8,7 +8,11 @@ import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { gateCandidates } from "./freshness.ts";
 import type { MuseContextInput, FusedContextResult, ContextManifestItem } from "./types.ts";
 import { validateDigestIntegrity, dualMeasureTokens } from "../compaction/tokens.ts";
-import { defaultReinjectionTracker, filterSelfEchoes } from "../retrieval/suppression.ts";
+import {
+  defaultReinjectionTracker,
+  filterSelfEchoes,
+  defaultSeenChunkTracker,
+} from "../retrieval/suppression.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -159,6 +163,8 @@ export async function resolveMuseContext(
     sessionTurn: input.turn,
     suppressReinjection: false,
     suppressSelfEcho: false,
+    suppressSeenChunks: false,
+    recordSeenChunks: false,
     echoHorizonMs: input.echo_horizon_ms,
     agent: input.agent,
   });
@@ -232,6 +238,30 @@ export async function resolveMuseContext(
       withheldSuppressed.push({
         id: echo.entry.id,
         reason: echo.reason,
+        file_path: "",
+      });
+    }
+  }
+
+  // T-111: Seen-chunk TTL suppression
+  let seenChunkSuppressedCount = 0;
+  if (
+    input.session_id &&
+    (input.suppress_seen_chunks || input.seen_chunk_ttl_ms !== undefined)
+  ) {
+    const seenFiltered = defaultSeenChunkTracker.filterSeen(
+      input.session_id,
+      candidatePoolAfterSuppression,
+      {
+        ttlMs: input.seen_chunk_ttl_ms,
+      }
+    );
+    candidatePoolAfterSuppression = seenFiltered.allowed;
+    seenChunkSuppressedCount = seenFiltered.suppressed.length;
+    for (const seen of seenFiltered.suppressed) {
+      withheldSuppressed.push({
+        id: seen.item.id,
+        reason: seen.reason,
         file_path: "",
       });
     }
@@ -400,6 +430,14 @@ export async function resolveMuseContext(
     const injectedIds = [...packedMemories, ...packedNegative].map((m) => m.id);
     defaultReinjectionTracker.recordInjected(input.session_id, injectedIds, input.turn);
     defaultReinjectionTracker.advanceTurn(input.session_id);
+
+    // T-111: Record served chunks in seen-chunk tracker
+    if (input.record_seen_chunks !== false) {
+      const servedMemories = [...packedMemories, ...packedNegative];
+      defaultSeenChunkTracker.recordSeen(input.session_id, servedMemories, {
+        ttlMs: input.seen_chunk_ttl_ms,
+      });
+    }
   }
 
   return {
@@ -420,6 +458,7 @@ export async function resolveMuseContext(
     no_confident_match: !hasConfidentMatch,
     reinjection_suppressed_count: reinjectionSuppressedCount > 0 ? reinjectionSuppressedCount : undefined,
     self_echo_suppressed_count: selfEchoSuppressedCount > 0 ? selfEchoSuppressedCount : undefined,
+    seen_chunk_suppressed_count: seenChunkSuppressedCount > 0 ? seenChunkSuppressedCount : undefined,
   };
 }
 

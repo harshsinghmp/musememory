@@ -34,6 +34,12 @@ export interface MuseContextInput {
   echo_horizon_ms?: number;
   /** T-109: Active caller agent name for provenance matching. */
   agent?: string;
+  /** T-111: Whether to suppress memories already served within active TTL window (default: false, or true if seen_chunk_ttl_ms provided). */
+  suppress_seen_chunks?: boolean;
+  /** T-111: TTL in milliseconds for seen chunks (default: 300,000ms / 5 minutes). */
+  seen_chunk_ttl_ms?: number;
+  /** T-111: Whether to auto-record retrieved memories into seen-chunk tracker (default: true if session_id provided). */
+  record_seen_chunks?: boolean;
 }
 
 export interface ContextManifestItem {
@@ -72,6 +78,8 @@ export interface FusedContextResult {
   reinjection_suppressed_count?: number;
   /** T-109: Number of candidate memories withheld due to age-bounded self-echo suppression. */
   self_echo_suppressed_count?: number;
+  /** T-111: Number of candidate memories withheld due to seen-chunk TTL suppression. */
+  seen_chunk_suppressed_count?: number;
 }
 
 export interface CodeForMemoryResult {
