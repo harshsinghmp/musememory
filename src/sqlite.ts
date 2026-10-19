@@ -173,13 +173,34 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
-    CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score);
-    CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact);
-    CREATE INDEX IF NOT EXISTS idx_memories_src_ts ON memories(src_ts);
-    CREATE INDEX IF NOT EXISTS idx_memories_linked_ids ON memories(linked_memory_ids);
-    CREATE INDEX IF NOT EXISTS idx_memories_supersedes_id ON memories(supersedes_id);
-    CREATE INDEX IF NOT EXISTS idx_memories_conflicts_with_id ON memories(conflicts_with_id);
+  `);
 
+  // Guard post-v0 column indexes against missing columns on legacy databases prior to migration
+  const memCols = db
+    .query<{ name: string }>(`PRAGMA table_info(memories)`)
+    .all()
+    .map((c) => c.name);
+
+  if (memCols.includes("decay_score")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score)`);
+  }
+  if (memCols.includes("valid_to_exact")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact)`);
+  }
+  if (memCols.includes("src_ts")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_src_ts ON memories(src_ts)`);
+  }
+  if (memCols.includes("linked_memory_ids")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_linked_ids ON memories(linked_memory_ids)`);
+  }
+  if (memCols.includes("supersedes_id")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_supersedes_id ON memories(supersedes_id)`);
+  }
+  if (memCols.includes("conflicts_with_id")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_conflicts_with_id ON memories(conflicts_with_id)`);
+  }
+
+  db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
       title,
