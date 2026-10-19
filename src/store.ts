@@ -776,9 +776,14 @@ function normalizeIdArray(val: string | string[] | null | undefined): string[] {
   return val;
 }
 
-/** Bi-temporal close-out: stamp valid_to once and decrement reinforcement. */
-function closeOutValidity(entry: MemoryEntry): void {
-  if (!entry.valid_to) entry.valid_to = nowIso();
+/** Bi-temporal close-out: stamp valid_to once and decrement reinforcement. (T-082) */
+export function closeOutValidity(entry: MemoryEntry, options?: { valid_to_exact?: boolean; valid_to?: string }): void {
+  if (!entry.valid_to) entry.valid_to = options?.valid_to ?? nowIso();
+  if (options?.valid_to_exact !== undefined) {
+    entry.valid_to_exact = options.valid_to_exact;
+  } else if (entry.valid_to_exact === undefined) {
+    entry.valid_to_exact = false;
+  }
   entry.reinforcement = (entry.reinforcement ?? 0) - 1;
 }
 
@@ -818,10 +823,12 @@ export function propose(
     salience?: number;
     validFrom?: string;
     validTo?: string;
-    dueAt?: string;
-    expiresAt?: string | null;
+    validToExact?: boolean;
     valid_from?: string;
     valid_to?: string;
+    valid_to_exact?: boolean;
+    dueAt?: string;
+    expiresAt?: string | null;
     due_at?: string;
     expires_at?: string | null;
     createdAt?: string;
@@ -993,6 +1000,14 @@ export function propose(
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom ?? opts.valid_from,
     valid_to: opts.validTo ?? opts.valid_to,
+    valid_to_exact:
+      opts.validToExact !== undefined
+        ? opts.validToExact
+        : opts.valid_to_exact !== undefined
+        ? opts.valid_to_exact
+        : opts.validTo || opts.valid_to
+        ? true
+        : undefined,
     due_at: opts.dueAt ?? opts.due_at,
     expires_at,
     pinned,
@@ -1104,8 +1119,13 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   return entry;
 }
 
-/** Mark old superseded (sets superseded_by), sets new's supersedes. Requires new to be confirmed. */
-export function supersede(store: Store, oldId: string, newId: string): MemoryEntry | null {
+/** Mark old superseded (sets superseded_by), sets new's supersedes. Requires new to be confirmed. (T-082) */
+export function supersede(
+  store: Store,
+  oldId: string,
+  newId: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const old = get(store, oldId);
   const next = get(store, newId);
   if (!old || !next) return null;
@@ -1113,7 +1133,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (next.status !== "confirmed") return null;
 
   old.status = "superseded";
-  closeOutValidity(old);
+  closeOutValidity(old, options);
   old.quality = determineQuality(old);
   const prevOld = normalizeIdArray(old.superseded_by);
   if (!prevOld.includes(newId)) {
@@ -1146,13 +1166,18 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   return old;
 }
 
-/** Mark an entry stale; reason appended to content. */
-export function markStale(store: Store, id: string, reason?: string): MemoryEntry | null {
+/** Mark an entry stale; reason appended to content. (T-082) */
+export function markStale(
+  store: Store,
+  id: string,
+  reason?: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "stale";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -1175,14 +1200,19 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
 /**
  * Migration archive transition: candidate -> superseded for imported records whose
  * source state was archived/superseded and which have no replacement pair in this
- * store (pair-based supersessions must use supersede(oldId, newId)). Logs audit.
+ * store (pair-based supersessions must use supersede(oldId, newId)). Logs audit. (T-082)
  */
-export function markSuperseded(store: Store, id: string, reason?: string): MemoryEntry | null {
+export function markSuperseded(
+  store: Store,
+  id: string,
+  reason?: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "superseded";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -1215,6 +1245,8 @@ export function expireEntry(
     expired_at?: string;
     reason?: string;
     force?: boolean;
+    valid_to_exact?: boolean;
+    valid_to?: string;
   },
 ): MemoryEntry | null {
   const entry = get(store, id);
@@ -1232,7 +1264,10 @@ export function expireEntry(
   entry.expired_at = now;
   entry.expired_by = ruleName;
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, {
+    valid_to: options?.valid_to ?? now,
+    valid_to_exact: options?.valid_to_exact,
+  });
 
   if (options?.reason) {
     entry.content = `${entry.content}\n\nExpired: [${ruleName}] ${options.reason}`;
@@ -1338,13 +1373,17 @@ export function link(store: Store, id: string, relatedIds: string[]): MemoryEntr
   return primary;
 }
 
-/** Reject an entry. */
-export function reject(store: Store, id: string): MemoryEntry | null {
+/** Reject an entry. (T-082) */
+export function reject(
+  store: Store,
+  id: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "rejected";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   entry.updated_at = nowIso();
   save(store, entry);
   if (entry.type === "constraint" && store.memoryDir) {

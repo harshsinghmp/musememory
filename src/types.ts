@@ -176,6 +176,8 @@ export interface MemoryEntry {
   valid_from?: string;
   /** Valid-time end, set when an entry leaves active knowledge (stale/rejected/superseded). */
   valid_to?: string;
+  /** T-082: Explicit flag indicating whether valid_to is a known exact historical cessation boundary. */
+  valid_to_exact?: boolean;
   /** Reinforcement counter: +1 on confirm, -1 on stale/reject/supersede. */
   reinforcement?: number;
   source?: string;
