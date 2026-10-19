@@ -4,3 +4,5 @@ export * from "./tiered.ts";
 export * from "./ranking.ts";
 export * from "./suppression.ts";
 export * from "./prefetch.ts";
+export * from "./faults.ts";
+

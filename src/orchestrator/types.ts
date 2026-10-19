@@ -52,6 +52,12 @@ export interface MuseContextInput {
   constitutional_rules?: ConstitutionalRule[];
   /** T-132: Whether to include trim-exempt constitutional rules injected first (default: true). */
   include_constitution?: boolean;
+  /** T-133: Explicit degradation flag to simulate or propagate degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes to record in degraded signal. */
+  degraded_notes?: string[];
+  /** T-133: Diagnostic fault notes alias. */
+  fault_notes?: string[];
 }
 
 export interface ContextManifestItem {
@@ -65,6 +71,12 @@ export interface ContextManifestItem {
 export interface FusedContextResult {
   /** T-132: Trim-exempt constitutional rules injected at index 0. */
   constitutional_rules?: ConstitutionalRule[];
+  /** T-133: Flag indicating whether context orchestrator operated in degraded mode. */
+  degraded?: boolean;
+  /** T-133: Explicit fault notes explaining why retrieval or context degraded. */
+  degraded_notes?: string[];
+  /** T-133: Structured fault notes alias. */
+  fault_notes?: string[];
   active_constraints: Array<{ id: string; title: string; content: string }>;
   relevant_memories: MemoryEntry[];
   negative_lessons: MemoryEntry[];

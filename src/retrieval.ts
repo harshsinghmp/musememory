@@ -52,6 +52,12 @@ import {
   joinRecallUsageTelemetry,
   computeRoiScoreMultiplier,
 } from "./quality/telemetry.ts";
+import {
+  type DegradedFaultSignal,
+  createDegradedFaultSignal,
+  mergeDegradedFaults,
+  formatDegradedFaultNotice,
+} from "./retrieval/faults.ts";
 
 export type {
   VeracityClass,
@@ -237,6 +243,12 @@ export interface ContextQueryOptions extends SearchOptions {
   expandWikilinks?: boolean;
   /** Maximum hops for progressive wikilink expansion (default: 1, max: 3). */
   max_wikilink_hops?: number;
+  /** T-133: Explicit degradation flag to simulate or propagate degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes to record in degraded signal. */
+  degraded_notes?: string[];
+  /** T-133: Diagnostic fault notes alias. */
+  fault_notes?: string[];
 }
 
 export interface SearchResult {
@@ -245,6 +257,12 @@ export interface SearchResult {
   stale: boolean;
   fromCache?: boolean;
   totalTokensUsed?: number;
+  /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes explaining why retrieval degraded. */
+  degraded_notes?: string[];
+  /** T-133: Structured fault notes alias. */
+  fault_notes?: string[];
   /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
   withheld?: Array<{ id: string; reason: string }>;
   /** T-117: High-water mark timestamp of the most recent memory in the store. */
@@ -281,6 +299,12 @@ export interface FormattedContext {
   userProfile?: string | null;
   fromCache?: boolean;
   stale?: boolean;
+  /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes explaining why retrieval degraded. */
+  degraded_notes?: string[];
+  /** T-133: Structured fault notes alias. */
+  fault_notes?: string[];
   /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
@@ -1776,7 +1800,23 @@ export function queryContext(
     }
   }
 
-  const isDegraded = store.circuit?.isDegraded() ?? false;
+  const circuitDegraded = store.circuit?.isDegraded() ?? false;
+  const collectedFaultNotes: string[] = [];
+  if (options.degraded_notes) {
+    collectedFaultNotes.push(...options.degraded_notes);
+  }
+  if (options.fault_notes) {
+    collectedFaultNotes.push(...options.fault_notes);
+  }
+  if (circuitDegraded) {
+    collectedFaultNotes.push("circuit_breaker_open: circuit breaker open after failure threshold, operating in fallback cache mode");
+  }
+
+  const faultSignal = mergeDegradedFaults({
+    degraded: circuitDegraded || options.degraded === true,
+    degraded_notes: collectedFaultNotes,
+  });
+  const isDegraded = faultSignal.degraded;
   const minThreshold = options.minScoreThreshold ?? DEFAULT_MIN_RELEVANCE_SCORE;
   const confident_answers: ScoredEntry[] = [];
   const draft_answers: ScoredEntry[] = [];
@@ -1823,6 +1863,9 @@ export function queryContext(
     results,
     source: isDegraded ? "degraded" : "live",
     stale: isDegraded,
+    degraded: isDegraded ? true : undefined,
+    degraded_notes: faultSignal.degraded_notes,
+    fault_notes: faultSignal.fault_notes,
     fromCache: false,
     totalTokensUsed,
     withheld: withheld.length > 0 ? withheld : undefined,
@@ -1948,10 +1991,19 @@ export function formatPromptContext(
     const cached = store.cache.getContext(cacheKey);
     if (cached) {
       const isDegraded = store.circuit?.isDegraded() ?? false;
+      const cachedFault = mergeDegradedFaults(
+        cached,
+        isDegraded
+          ? { degraded: true, degraded_notes: ["circuit_breaker_open: circuit breaker open, served from cached context"] }
+          : undefined,
+      );
       return {
         ...cached,
         fromCache: true,
         stale: isDegraded || cached.stale || false,
+        degraded: cachedFault.degraded ? true : undefined,
+        degraded_notes: cachedFault.degraded_notes,
+        fault_notes: cachedFault.fault_notes,
         mode: cached.mode,
         no_confident_match: cached.no_confident_match,
         confident_answers: cached.confident_answers,
@@ -1966,6 +2018,11 @@ export function formatPromptContext(
   const coreBlock = formatCoreBlock(memoryDir);
 
   const parts: string[] = [];
+
+  // T-133: Degraded fault notice rendered at the top of formatted context
+  if (result.degraded && result.degraded_notes && result.degraded_notes.length > 0) {
+    parts.push(formatDegradedFaultNotice(result.degraded_notes));
+  }
 
   if (userProfile) {
     parts.push("### User Profile & Preferences (USER.md)");
@@ -2126,6 +2183,9 @@ export function formatPromptContext(
     userProfile,
     fromCache: false,
     stale: result.stale,
+    degraded: result.degraded,
+    degraded_notes: result.degraded_notes,
+    fault_notes: result.fault_notes,
     mode: result.mode,
     no_confident_match: result.no_confident_match,
     confident_answers: result.confident_answers,
@@ -2164,4 +2224,11 @@ export {
 } from "./retrieval/tier_budgets.ts";
 
 export { queryTieredContext, type TieredContextOptions } from "./retrieval/tiered.ts";
+export {
+  createDegradedFaultSignal,
+  formatDegradedFaultNotice,
+  mergeDegradedFaults,
+  type DegradedFaultSignal,
+} from "./retrieval/faults.ts";
+
 
