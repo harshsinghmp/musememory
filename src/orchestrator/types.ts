@@ -58,6 +58,8 @@ export interface MuseContextInput {
   degraded_notes?: string[];
   /** T-133: Diagnostic fault notes alias. */
   fault_notes?: string[];
+  /** T-135: Whether to enable tiered retrieval ladder fallback (default: false). */
+  enable_ladder?: boolean;
 }
 
 export interface ContextManifestItem {
@@ -124,6 +126,12 @@ export interface FusedContextResult {
   matched_routes?: RouteMatch[];
   /** T-124: Candidate memory IDs prioritized by resident route-map scoring. */
   route_prioritized_ids?: string[];
+  /** T-135: Ladder rungs traversed during retrieval. */
+  ladder_rungs_used?: number[];
+  /** T-135: Count of loosened matches admitted. */
+  loosened_matches_count?: number;
+  /** T-135: Matches admitted via loosened criteria. */
+  loosened_matches?: MemoryEntry[];
 }
 
 export interface CodeForMemoryResult {

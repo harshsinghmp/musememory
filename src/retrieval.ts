@@ -58,6 +58,14 @@ import {
   mergeDegradedFaults,
   formatDegradedFaultNotice,
 } from "./retrieval/faults.ts";
+import {
+  type RetrievalLadderRung,
+  type LadderRungName,
+  type LoosenedMatchLabel,
+  formatLoosenedBadge,
+  executeRetrievalLadder,
+  LADDER_DEFAULTS,
+} from "./retrieval/ladder.ts";
 
 export type {
   VeracityClass,
@@ -202,6 +210,12 @@ export interface ScoredEntry {
   keep_reasons?: CandidateKeepReason[];
   /** T-121: Typed drop reasons if candidate was evaluated and rejected. */
   drop_reasons?: CandidateDropReason[];
+  /** T-135: Retrieval ladder rung (1: strict, 2: standard, 3: loosened). */
+  ladder_rung?: RetrievalLadderRung;
+  /** T-135: Explicit flag indicating whether this match was admitted via a loosened ladder rung. */
+  is_loosened?: boolean;
+  /** T-135: Exact explanation of what constraints were relaxed to admit this memory. */
+  loosened_reason?: string;
 }
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
@@ -249,6 +263,18 @@ export interface ContextQueryOptions extends SearchOptions {
   degraded_notes?: string[];
   /** T-133: Diagnostic fault notes alias. */
   fault_notes?: string[];
+  /** T-135: Whether to execute progressive ladder matching. */
+  enable_ladder?: boolean;
+  /** T-135: Minimum number of confident matches before stopping ladder. */
+  min_confident_count?: number;
+  /** T-135: Score threshold for strict matching in Rung 1. */
+  strict_threshold?: number;
+  /** T-135: Score threshold for standard matching in Rung 2. */
+  standard_threshold?: number;
+  /** T-135: Score threshold for loosened matching in Rung 3. */
+  loosened_threshold?: number;
+  /** T-135: Whether to relax project scope to include global memories in Rung 3. */
+  allow_scope_relaxation?: boolean;
 }
 
 export interface SearchResult {
@@ -263,6 +289,12 @@ export interface SearchResult {
   degraded_notes?: string[];
   /** T-133: Structured fault notes alias. */
   fault_notes?: string[];
+  /** T-135: Ladder rungs traversed during retrieval. */
+  ladder_rungs_used?: RetrievalLadderRung[];
+  /** T-135: Count of loosened matches admitted. */
+  loosened_matches_count?: number;
+  /** T-135: Matches admitted via loosened criteria. */
+  loosened_matches?: ScoredEntry[];
   /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
   withheld?: Array<{ id: string; reason: string }>;
   /** T-117: High-water mark timestamp of the most recent memory in the store. */
@@ -305,6 +337,12 @@ export interface FormattedContext {
   degraded_notes?: string[];
   /** T-133: Structured fault notes alias. */
   fault_notes?: string[];
+  /** T-135: Ladder rungs traversed during retrieval. */
+  ladder_rungs_used?: RetrievalLadderRung[];
+  /** T-135: Count of loosened matches admitted. */
+  loosened_matches_count?: number;
+  /** T-135: Matches admitted via loosened criteria. */
+  loosened_matches?: ScoredEntry[];
   /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
@@ -1528,6 +1566,10 @@ export function queryContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): SearchResult {
+  if (options.enable_ladder) {
+    return executeRetrievalLadder(store, query, { ...options, enable_ladder: false });
+  }
+
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
   let entries = list(store);
@@ -1874,6 +1916,9 @@ export function queryContext(
     no_confident_match: !hasConfidentMatch,
     confident_answers,
     draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
+    ladder_rungs_used: [2],
+    loosened_matches_count: 0,
+    loosened_matches: [],
     as_of: asOfIso,
     undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
     hidden_count,
@@ -2106,7 +2151,8 @@ export function formatPromptContext(
     if (depth === "L1") {
       // One line per memory: id + title only
       for (const r of result.results) {
-        parts.push(`- ${r.entry.id} ${r.entry.title}`);
+        const loosened = r.is_loosened ? formatLoosenedBadge(r) : "";
+        parts.push(`- ${r.entry.id} ${r.entry.title}${loosened}`);
       }
       parts.push("");
     } else {
@@ -2114,11 +2160,15 @@ export function formatPromptContext(
         const e = r.entry;
         const typeBadge = e.type ? ` [${e.type.toUpperCase()}]` : "";
         const statusBadge = e.status === "confirmed" ? " (Confirmed)" : "";
-        parts.push(`#### ${e.title}${typeBadge}${statusBadge}`);
+        const loosenedBadge = r.is_loosened ? formatLoosenedBadge(r) : "";
+        parts.push(`#### ${e.title}${typeBadge}${statusBadge}${loosenedBadge}`);
         parts.push(e.content);
         if (depth === "L3") {
           // Full raw entry metadata
           const meta: string[] = [`id: ${e.id}`, `status: ${e.status}`, `project: ${e.project}`];
+          if (r.ladder_rung !== undefined) meta.push(`ladder_rung: ${r.ladder_rung}`);
+          if (r.is_loosened) meta.push(`is_loosened: true`);
+          if (r.loosened_reason) meta.push(`loosened_reason: ${r.loosened_reason}`);
           if (e.type) meta.push(`type: ${e.type}`);
           if (e.created_at) meta.push(`created_at: ${e.created_at}`);
           if (e.updated_at) meta.push(`updated_at: ${e.updated_at}`);
@@ -2190,6 +2240,9 @@ export function formatPromptContext(
     no_confident_match: result.no_confident_match,
     confident_answers: result.confident_answers,
     draft_answers: result.draft_answers,
+    ladder_rungs_used: result.ladder_rungs_used,
+    loosened_matches_count: result.loosened_matches_count,
+    loosened_matches: result.loosened_matches,
     as_of: result.as_of,
     undetermined: result.undetermined,
     hidden_count: result.hidden_count,
@@ -2230,5 +2283,15 @@ export {
   mergeDegradedFaults,
   type DegradedFaultSignal,
 } from "./retrieval/faults.ts";
+export {
+  executeRetrievalLadder,
+  formatLoosenedBadge,
+  labelEntryLadderRung,
+  type RetrievalLadderRung,
+  type LadderRungName,
+  type LoosenedMatchLabel,
+  type RetrievalLadderOptions,
+  LADDER_DEFAULTS,
+} from "./retrieval/ladder.ts";
 
 
