@@ -5,9 +5,11 @@ import {
   searchTemporal,
   formatPromptContext,
   clampLimit,
+  expandFusedWikilinks,
   type ContextQueryOptions,
   type FormattedContext,
   type ScoredEntry,
+  type ExpandedWikilink,
 } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
 import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
@@ -41,6 +43,10 @@ export interface UnifiedSearchResult {
   hidden_count?: number;
   /** T-097: Count of near-duplicate memories suppressed by prefer_observations */
   deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion */
+  expanded_count?: number;
 }
 
 export interface ReindexReport {
@@ -249,6 +255,8 @@ export class RetrievalEngine {
       withheld: exact.withheld,
       hidden_count: exact.hidden_count,
       deduped_count: exact.deduped_count,
+      expanded_wikilinks: exact.expanded_wikilinks,
+      expanded_count: exact.expanded_count,
     };
   }
 
