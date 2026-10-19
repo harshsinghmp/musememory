@@ -37,6 +37,8 @@ export interface UnifiedSearchResult {
   undetermined?: ScoredEntry[];
   /** T-089: Memories withheld by provenance veracity or trust filters */
   withheld?: Array<{ id: string; reason: string }>;
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval */
+  hidden_count?: number;
 }
 
 export interface ReindexReport {
@@ -243,6 +245,7 @@ export class RetrievalEngine {
       as_of: exact.as_of,
       undetermined: exact.undetermined,
       withheld: exact.withheld,
+      hidden_count: exact.hidden_count,
     };
   }
 
