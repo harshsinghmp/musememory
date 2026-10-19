@@ -1434,6 +1434,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               type: "boolean",
               description: "Include memories whose code anchors have drifted (default false: they are withheld by the freshness gate and reported instead)",
             },
+            session_id: { type: "string", description: "Optional session ID for 6-turn re-injection suppression and LRU tracking" },
+            turn: { type: "number", description: "Optional 1-indexed turn number within the session" },
+            suppress_reinjected: { type: "boolean", description: "Whether to suppress re-injecting recently seen memories (default: true if session_id provided)" },
           },
         },
       },
@@ -2815,6 +2818,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: a.project ? String(a.project) : undefined,
           dir: a.dir ? String(a.dir) : undefined,
           include_drifted: a.include_drifted === true,
+          session_id: a.session_id ? String(a.session_id) : undefined,
+          turn: typeof a.turn === "number" ? a.turn : undefined,
+          suppress_reinjected: a.suppress_reinjected !== undefined ? Boolean(a.suppress_reinjected) : undefined,
         });
         return toolResult(result);
       }
