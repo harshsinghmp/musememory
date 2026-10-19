@@ -1,16 +1,25 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.6.0`  
-> **Status**: Feature Release (Temporal Transitions, Contradiction Engine & Verbs, Keep-Both Conflicts, Bi-Temporal Boundaries, Scoped Invalidation, Federation Handshake, Veracity Ranking & Evidence-Age Stamping)
+> **Version**: `v2.7.0`  
+> **Status**: Feature Release (Packing, Graph, Lineage & Provenance: linked_memory_ids, supersede-not-delete, prefer_observations, progressive wikilinks, fact_provenance table, lineage FKs, lineage BFS walker, hash-chained audit & session Merkle checkpoints)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 16 Focus)
-- **Wave 17: Packing + Graph + Provenance**: `T-095` (`linked_memory_ids` write-time edges), `T-096` (supersede-not-delete + hidden-count-aware over-fetch), `T-097` (`prefer_observations` recall-time dedup), `T-098` (progressive wikilink expansion), `T-099` (`fact_provenance` append-only table), `T-100` (`supersedes_id`/`conflicts_with_id` lineage FKs), `T-101` (lineage BFS walker), `T-102` (hash-chained audit).
+## ⏭️ Next Up (Post-Wave 17 Focus)
+- **Wave 18: Ingestion, Suppression & Curation Gates**: `T-106` (curator concept), `T-107` (two-tier promotion), `T-108` (re-injection suppression 6-turn LRU), `T-109` (self-echo suppression), `T-110` (strip injected memory-context blocks), `T-111` (seen-chunk TTL), `T-112` (topic-overlap prefetch skip), `T-113` (trivial-prompt gate).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 17: Packing, Graph, Lineage & Provenance**:
+  - `T-095`: `linked_memory_ids` write-time graph edges auto-seeded during capture and indexed in SQLite (PR #239, Closes #238)
+  - `T-096`: HyAtlas supersede-not-delete lifecycle marking `valid_to`/`valid_to_exact` with hidden-count-aware over-fetching (PR #241, Closes #240)
+  - `T-097`: `prefer_observations` recall-time dedup scoped to top-2×budget candidate window with Jaccard threshold $\ge 0.65$ and $+0.10$ veracity boost (PR #243, Closes #242)
+  - `T-098`: Progressive multi-hop wikilink expansion after reciprocal rank fusion (`extractWikilinks`, `expandFusedWikilinks`) with token budget bounds (PR #245, Closes #244)
+  - `T-099`: Semantic `fact_provenance` append-only SQLite table with triple-unique index `(entity, relation, target)` (PR #247, Closes #246)
+  - `T-100`: First-class lineage foreign keys `supersedes_id` and `conflicts_with_id` in SQLite schema and indexing (PR #249, Closes #248)
+  - `T-101`: Lineage BFS DAG walker (`walkLineageBfs`) traversing ancestors, descendants, conflicts, and links with cycle prevention (PR #251, Closes #250)
+  - `T-102`: Tamper-evident cryptographic hash-chained audit ledger with per-day salt rotation (`audit_salts.json`) and session Merkle checkpoints (`createSessionMerkleCheckpoint`) (PR #253, Closes #252)
 - [x] **Wave 16: Temporal Transitions, Contradiction Engine & Verbs**:
   - `T-082`: `valid_to_exact` flag on transitions stamping exact historical cessation boundaries vs runtime transitions (PR #219, Closes #218)
   - `T-083`: `as_of` queries returning `{results, undetermined}` without date invention (PR #221, Closes #220)

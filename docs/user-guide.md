@@ -209,6 +209,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 ---
 
 ### Related Documentation
+- 🕸️ **[Graph, Provenance & Lineage Architecture](graph-provenance-and-lineage.md)** — Relational lineage foreign keys, walkLineageBfs DAG walker, progressive wikilink expansion, append-only fact provenance, and hash-chained audit ledgers.
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
 - ⏳ **[Temporal Transitions, Contradiction Engine & Verbs](temporal-contradiction-and-trust.md)** — Bi-temporal validity tracking, five-verb lifecycle, keep-both conflicts table, scoped invalidation, federation handshake, and veracity ranking.
 - ⏳ **[Expiry, Decay & Confidence Hardening](expiry-decay-and-confidence.md)** — Tokenizer-matched abstention gates, Bayesian corroboration confidence, trust-tier half-lives, pin-capable expiry policy YAML, and Weibull hazard curves.

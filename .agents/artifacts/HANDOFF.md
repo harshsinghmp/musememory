@@ -1,26 +1,25 @@
-# HANDOFF — 2026-10-19T08:50:00Z
-branch: dev @ 8b5acb4 | phase: Wave 16 complete; dev green 1020/0
+# HANDOFF — 2026-10-19T11:25:00Z
+branch: dev @ ffac3b9 | phase: Wave 17 complete; dev green 1073/0
 
 ## Next Step
-Advance to Wave 17 (Packing + Graph + Provenance: T-095–T-102).
+Advance to Wave 18 (Ingestion, Suppression & Curation Gates: T-106–T-113).
 
 ## In-Flight
-- Wave 16 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #219–#235):
-  - T-082: valid_to_exact transition flag & migration v5 (PR #219)
-  - T-083: evaluateAsOf queries returning {results, undetermined} (PR #221)
-  - T-084: Five-verb lifecycle (change/end/correct/revert/forget) (PR #223)
-  - T-085: searchTemporal(atTime) default-excluding superseded (PR #225)
-  - T-086: Keep-both conflicts table (migration v6) (PR #227)
-  - T-087: Scoped invalidation requiring (entity, relation, target, scope) (PR #229)
-  - T-088: Federation handshake for mesh-mode conflict dedup (PR #231)
-  - T-089: Veracity rank weights user 1.0/agent 0.7/ext 0.5/sys 0.3 (PR #233)
-  - T-090: src_ts evidence-age stamping (migration v7) (PR #235)
-- Docs pass: docs/temporal-contradiction-and-trust.md, user-guide.md, README.md (1020 passed).
+- Wave 17 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #239–#253):
+  - T-095: linked_memory_ids write-time graph auto-seeding & index (PR #239)
+  - T-096: HyAtlas supersede-not-delete & hidden-count-aware over-fetch (PR #241)
+  - T-097: prefer_observations recall dedup with +0.10 veracity boost (PR #243)
+  - T-098: Progressive multi-hop wikilink expansion after fusion (PR #245)
+  - T-099: fact_provenance append table with triple-unique index (PR #247)
+  - T-100: supersedes_id/conflicts_with_id lineage FKs & migration v10 (PR #249)
+  - T-101: Lineage BFS walker traversing provenance DAG edges (PR #251)
+  - T-102: Hash-chained audit with per-day salt & session Merkle checkpoints (PR #253)
+- Docs pass: docs/graph-provenance-and-lineage.md, user-guide.md, README.md (1073 passed).
 
 ## Decisions
-- Graphiti #1728 defense: distinct scopes (dev vs prod, macOS vs mobile) coexist without false contradiction.
-- Provenance veracity hierarchy: user +0.15 bonus, agent 0.0 baseline, external -0.10, system -0.20.
-- Evidence age invariant: memory freshness cannot exceed src_ts evidence timestamp.
+- Append-only fact registry: INSERT OR IGNORE preserves initial fact provenance.
+- Zero-deletion lineage: superseded nodes retain cessation bounds and FK links.
+- Cryptographic audit: daily salt rotation with SHA-256 chain and session Merkle roots.
 
 ## Verify
-`bun test` 1020/0 + `bunx tsc --noEmit` + `bun run build`
+`bun test` 1073/0 + `bunx tsc --noEmit` + `bun run build`
