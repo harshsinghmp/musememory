@@ -58,6 +58,8 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
     "memory_adr_list",
     "memory_evaluate_promotion",
     "memory_promote",
+    "memory_curate",
+    "memory_flush_pending",
     "memory_generalize",
     "memory_wiki_compile",
     "memory_wiki_get",

@@ -389,7 +389,10 @@ export type AuditOperation =
   | "lifecycle_correct"
   | "lifecycle_revert"
   | "lifecycle_forget"
-  | "merkle_checkpoint";
+  | "merkle_checkpoint"
+  | "stage_pending_promotion"
+  | "cancel_pending_promotion"
+  | "flush_pending_promotions";
 
 export interface AuditEntry {
   timestamp: string;

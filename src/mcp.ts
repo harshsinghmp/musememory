@@ -88,6 +88,9 @@ import {
   archiveMemory,
   rehydrateMemory,
   getLifecycleStats,
+  stagePendingPromotion,
+  flushPendingPromotions,
+  listPendingPromotions,
 } from "./promotion/index.ts";
 import {
   createCodeAnchor,
@@ -1266,17 +1269,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_promote",
-        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging",
+        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging. Can optionally stage in pending tier for session-end flush.",
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "ID of the memory entry to promote" },
             force_manual: { type: "boolean", description: "Manual promotion override bypassing automatic 5x threshold" },
+            stage_pending: { type: "boolean", description: "Stage promotion in pending tier instead of promoting immediately (T-107 two-tier promotion)" },
+            session_id: { type: "string", description: "Optional session ID for scoped pending promotions" },
             generalized_content: { type: "string", description: "Optional custom generalized principle text" },
             agent: { type: "string", description: "Optional agent or actor name" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
           required: ["id"],
+        },
+      },
+      {
+        name: "memory_flush_pending",
+        description: "Two-tier promotion protocol (T-107): Flushes staged pending promotions at session close or manual trigger, executing promotion for qualifying entries.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: { type: "string", description: "Optional session ID filter" },
+            dry_run: { type: "boolean", description: "Simulate flush without applying promotions" },
+            actor: { type: "string", description: "Optional actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
         },
       },
       {
@@ -2662,10 +2680,31 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(evaluation);
       }
       case "memory_promote": {
+        if (Boolean(a.stage_pending)) {
+          try {
+            const pending = stagePendingPromotion(activeStore, String(a.id), {
+              forceManual: Boolean(a.force_manual),
+              generalizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
+              actor: a.agent ? String(a.agent) : undefined,
+              sessionId: a.session_id ? String(a.session_id) : undefined,
+            });
+            return toolResult({ staged: true, pending });
+          } catch (err: any) {
+            return toolError(err.message || String(err));
+          }
+        }
         const result = promoteMemory(activeStore, String(a.id), {
           forceManual: Boolean(a.force_manual),
           customGeneralizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
           actor: a.agent ? String(a.agent) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_flush_pending": {
+        const result = flushPendingPromotions(activeStore, {
+          sessionId: a.session_id ? String(a.session_id) : undefined,
+          dryRun: Boolean(a.dry_run),
+          actor: a.actor ? String(a.actor) : undefined,
         });
         return toolResult(result);
       }
