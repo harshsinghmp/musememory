@@ -103,14 +103,14 @@
 - [x] T-092 · landed Wave 4 — never-drop manifest TOC + descending summary caps (entry line never omitted) · orchestrator · branch: feat/wave-4-compaction-distillation · U
 - [x] T-093 · landed Wave 4 — truncation order pin > provenance > recency > salience + `[N omitted — budget M]` marker · orchestrator · branch: feat/wave-4-compaction-distillation · U
 - [x] T-094 · landed Wave 4 — reserved slots for global/USER.md-class entries · orchestrator · branch: feat/wave-4-compaction-distillation · U
-- [ ] T-095 · `linked_memory_ids` write-time edges seeded during capture · schema, store · new · U
-- [ ] T-096 · supersede-not-delete + hidden-count-aware over-fetch · store, retrieval · branch: memory-tombstones · U
-- [ ] T-097 · `prefer_observations` recall-time dedup, top-2×budget scope · retrieval · new · U
-- [ ] T-098 · progressive wikilink expansion after fusion · retrieval · new · U
-- [ ] T-099 · `fact_provenance` append-only table, triple-unique index · schema, store · new · U
-- [ ] T-100 · `supersedes_id`/`conflicts_with_id` lineage FKs · schema · new · U
-- [ ] T-101 · lineage BFS walker · store · new · U
-- [ ] T-102 · hash-chained audit (per-day salt) + session Merkle checkpoints · audit · new · U
+- [x] T-095 · landed Wave 17 — `linked_memory_ids` write-time edges seeded during capture · schema, store · PR #239 (Closes #238) · U
+- [x] T-096 · landed Wave 17 — supersede-not-delete + hidden-count-aware over-fetch · store, retrieval · PR #241 (Closes #240) · U
+- [x] T-097 · landed Wave 17 — `prefer_observations` recall-time dedup, top-2×budget scope · retrieval · PR #243 (Closes #242) · U
+- [x] T-098 · landed Wave 17 — progressive wikilink expansion after fusion · retrieval · PR #245 (Closes #244) · U
+- [x] T-099 · landed Wave 17 — `fact_provenance` append-only table, triple-unique index · schema, store · PR #247 (Closes #246) · U
+- [x] T-100 · landed Wave 17 — `supersedes_id`/`conflicts_with_id` lineage FKs · schema · PR #249 (Closes #248) · U
+- [x] T-101 · landed Wave 17 — lineage BFS walker · store · PR #251 (Closes #250) · U
+- [x] T-102 · landed Wave 17 — hash-chained audit (per-day salt) + session Merkle checkpoints · audit · PR #253 (Closes #252) · U
 - [x] T-103 · landed Wave 2 — index-time credential redaction keeping text searchable · sqlite, store · branch: feat/wave-2-trust-gates · U
 
 ### Gates + hygiene
