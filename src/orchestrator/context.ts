@@ -209,30 +209,34 @@ export async function resolveMuseContext(
         taskIntent: input.task_intent,
       });
 
-  // T-124: Match resident routes using in-memory INDEX route-map
+  // T-124: Match resident routes using in-memory INDEX route-map (bypassed if trivial prompt)
   const residentRouteMap = getOrBuildResidentRouteMap(store);
-  const routeLookup = matchResidentRoutes(residentRouteMap, compositeQuery, {
-    project: input.project,
-    active_file: input.active_file,
-    symbol: input.symbol,
-  });
+  const routeLookup = trivialGate.isTrivial
+    ? { matched_routes: [], prioritized_entry_ids: [], duration_ms: 0 }
+    : matchResidentRoutes(residentRouteMap, compositeQuery, {
+        project: input.project,
+        active_file: input.active_file,
+        symbol: input.symbol,
+      });
 
   // Merge anchored memories to front of candidate pool
-  const candidatePool: MemoryEntry[] = [...entriesWithMatchingAnchors];
+  const candidatePool: MemoryEntry[] = trivialGate.isTrivial ? [] : [...entriesWithMatchingAnchors];
 
-  // Include route-prioritized entries
-  for (const pid of routeLookup.prioritized_entry_ids) {
-    if (!candidatePool.some((c) => c.id === pid)) {
-      const matchEntry = allEntries.find((e) => e.id === pid);
-      if (matchEntry) {
-        candidatePool.push(matchEntry);
+  if (!trivialGate.isTrivial) {
+    // Include route-prioritized entries
+    for (const pid of routeLookup.prioritized_entry_ids) {
+      if (!candidatePool.some((c) => c.id === pid)) {
+        const matchEntry = allEntries.find((e) => e.id === pid);
+        if (matchEntry) {
+          candidatePool.push(matchEntry);
+        }
       }
     }
-  }
 
-  for (const r of ranked) {
-    if (!candidatePool.some((c) => c.id === r.entry.id)) {
-      candidatePool.push(r.entry);
+    for (const r of ranked) {
+      if (!candidatePool.some((c) => c.id === r.entry.id)) {
+        candidatePool.push(r.entry);
+      }
     }
   }
 

@@ -209,6 +209,7 @@ Select your editor (Cursor, Opencode, Claude Code, Antigravity, or Windsurf) and
 ---
 
 ### Related Documentation
+- 🎛️ **[Scoring Refinements & Abstract Sidecars](scoring-refinements-and-sidecars.md)** — Query-intent bias multipliers, effective score calculation, RRF A/B tuning, typed candidate drop/keep reasons, L0/L1 abstract sidecars, ratio-batched refresh, resident INDEX route-mapping, and tier budgets with provenance.
 - 🛡️ **[Ingestion, Suppression & Curation Gates](ingestion-suppression-and-curation.md)** — Curator empirical evidence protocol, two-tier promotion, 6-turn re-injection suppression, self-echo suppression, injected block stripping, seen-chunk TTL, topic-overlap prefetch skip, and trivial-prompt gates.
 - 🕸️ **[Graph, Provenance & Lineage Architecture](graph-provenance-and-lineage.md)** — Relational lineage foreign keys, walkLineageBfs DAG walker, progressive wikilink expansion, append-only fact provenance, and hash-chained audit ledgers.
 - 🧠 **[Core Concepts & Architecture](concepts.md)** — In-depth architectural explanation (ACCA framework).
