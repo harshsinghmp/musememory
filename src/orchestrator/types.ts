@@ -40,6 +40,10 @@ export interface MuseContextInput {
   seen_chunk_ttl_ms?: number;
   /** T-111: Whether to auto-record retrieved memories into seen-chunk tracker (default: true if session_id provided). */
   record_seen_chunks?: boolean;
+  /** T-112: Whether to skip prefetch and reuse cached context when topic overlap > 0.6 (default: false, or true if topic_overlap_threshold provided). */
+  check_topic_overlap?: boolean;
+  /** T-112: Custom topic overlap threshold (default: 0.6). */
+  topic_overlap_threshold?: number;
 }
 
 export interface ContextManifestItem {
@@ -80,6 +84,12 @@ export interface FusedContextResult {
   self_echo_suppressed_count?: number;
   /** T-111: Number of candidate memories withheld due to seen-chunk TTL suppression. */
   seen_chunk_suppressed_count?: number;
+  /** T-112: Flag indicating whether context prefetch was skipped due to high topic overlap. */
+  prefetch_skipped?: boolean;
+  /** T-112: Measured topic overlap ratio (0.0 - 1.0) with prior session query. */
+  topic_overlap?: number;
+  /** T-112: Prior query text that triggered prefetch skip. */
+  topic_overlap_prior_query?: string;
 }
 
 export interface CodeForMemoryResult {
