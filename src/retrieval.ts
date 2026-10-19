@@ -2076,3 +2076,24 @@ export function formatPromptContext(
 
   return formatted;
 }
+
+export {
+  type RetrievalTier,
+  type BudgetProvenance,
+  type TierBudgetDefinition,
+  TIER_BUDGET_PROVENANCE,
+  TIER_0_DEFAULT_BUDGET,
+  TIER_0_MAX_BUDGET,
+  TIER_1_DEFAULT_BUDGET,
+  TIER_1_MAX_BUDGET,
+  TIER_2_DEFAULT_BUDGET,
+  TIER_2_MAX_BUDGET,
+  USER_PROFILE_DEFAULT_BUDGET,
+  USER_PROFILE_MAX_BUDGET,
+  USER_PROFILE_BUDGET_RATIO,
+  resolveTierBudget,
+  getTierBudgetProvenance,
+} from "./retrieval/tier_budgets.ts";
+
+export { queryTieredContext, type TieredContextOptions } from "./retrieval/tiered.ts";
+

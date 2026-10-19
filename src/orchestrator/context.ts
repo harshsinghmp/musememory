@@ -16,6 +16,11 @@ import {
 import { defaultPrefetchCache } from "../retrieval/prefetch.ts";
 import { evaluateTrivialPromptGate } from "./trivial_gate.ts";
 import { getOrBuildResidentRouteMap, matchResidentRoutes } from "./route_map.ts";
+import {
+  TIER_2_DEFAULT_BUDGET,
+  USER_PROFILE_BUDGET_RATIO,
+  USER_PROFILE_DEFAULT_BUDGET,
+} from "../retrieval/tier_budgets.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -35,7 +40,7 @@ export async function resolveMuseContext(
   workspaceRoot: string,
   input: MuseContextInput
 ): Promise<FusedContextResult> {
-  const budget = input.token_budget ?? 4000;
+  const budget = input.token_budget ?? TIER_2_DEFAULT_BUDGET;
   let remainingBudget = budget;
   let usedBudget = 0;
 
@@ -325,7 +330,7 @@ export async function resolveMuseContext(
   let userProfileReservedTokens: number | undefined;
   const hasGlobalEntries = allEntries.some((e) => e.project === "global" || e.scope === "global");
   if (hasGlobalEntries) {
-    userProfileReservedTokens = Math.min(Math.floor(budget * 0.20), 400);
+    userProfileReservedTokens = Math.min(Math.floor(budget * USER_PROFILE_BUDGET_RATIO), USER_PROFILE_DEFAULT_BUDGET);
   }
 
   // T-093: Truncation hierarchy (Pin > Provenance > Recency > Salience)
