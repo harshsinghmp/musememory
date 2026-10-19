@@ -1,6 +1,14 @@
 import type { Store } from "../store.ts";
 import { list, countMemories } from "../store.ts";
-import { queryContext, formatPromptContext, clampLimit, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
+import {
+  queryContext,
+  searchTemporal,
+  formatPromptContext,
+  clampLimit,
+  type ContextQueryOptions,
+  type FormattedContext,
+  type ScoredEntry,
+} from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
 import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
@@ -250,6 +258,33 @@ export class RetrievalEngine {
       as_of: asOfTime,
       mode: "exact",
     });
+  }
+
+  /**
+   * T-085: Point-in-time temporal search default-excluding superseded entries.
+   */
+  static searchTemporal(
+    store: Store,
+    _memoryDir: string,
+    query: string,
+    atTime: string | number,
+    options: UnifiedSearchOptions & { includeSuperseded?: boolean } = {},
+  ): UnifiedSearchResult {
+    const res = searchTemporal(store, query, atTime, {
+      ...options,
+      includeSuperseded: options.includeSuperseded === true,
+    });
+    return {
+      mode: "exact",
+      results: res.results,
+      totalTokensUsed: res.totalTokensUsed ?? 0,
+      stale: res.stale ?? false,
+      fromCache: res.fromCache ?? false,
+      confidence_mode: res.mode,
+      no_confident_match: res.no_confident_match,
+      as_of: res.as_of,
+      undetermined: res.undetermined,
+    };
   }
 
   /**

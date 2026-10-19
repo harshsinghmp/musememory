@@ -245,6 +245,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             status: { type: "string" },
             verified: { type: "boolean" },
             as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
+            at_time: { type: "string", description: "Temporal point-in-time timestamp (default-excludes superseded entries)" },
           },
           required: ["query"],
         },
@@ -1824,6 +1825,33 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "memory_recall":
         case "search": {
+          if (a.at_time) {
+            const res = RetrievalEngine.searchTemporal(activeStore, activeMemoryDir, String(a.query), String(a.at_time), {
+              project: a.project ? String(a.project) : undefined,
+              limit: clampLimit(a.limit, 10, 100, 1),
+              tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+              includeSuperseded: a.include_superseded === true,
+              type: a.type ? String(a.type) : undefined,
+              status: a.status ? String(a.status) : undefined,
+              verified: a.verified === true,
+            });
+            if (res.results.length > 0) {
+              const ids = res.results.map((r) => r.entry.id);
+              enqueueWrites([() => recordRetrievals(activeStore, ids)]);
+            }
+            return toolResult({
+              results: res.results.map((r) => ({ ...r.entry, score: r.score })),
+              source: res.mode,
+              stale: res.stale ?? false,
+              from_cache: res.fromCache ?? false,
+              total_tokens_used: res.totalTokensUsed,
+              explanation: res.explanation,
+              mode: res.confidence_mode ?? (res.no_confident_match ? "no_confident_match" : "confident_match"),
+              no_confident_match: res.no_confident_match ?? false,
+              as_of: res.as_of,
+              undetermined: res.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
+            });
+          }
           const mode = a.hybrid === true ? "hybrid" : a.tree === true ? "tree" : "auto";
           const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
             mode,

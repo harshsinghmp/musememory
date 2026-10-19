@@ -1216,6 +1216,62 @@ export function queryAsOf(
   };
 }
 
+export interface TemporalSearchOptions extends ContextQueryOptions {
+  /** Whether to include superseded memories (default: false — default-excluding superseded) */
+  includeSuperseded?: boolean;
+}
+
+/**
+ * T-085: Temporal search evaluated as of atTime.
+ * Default-excludes superseded entries (both memories superseded before/at atTime and entries
+ * currently superseded) unless explicitly enabled via options.includeSuperseded: true.
+ */
+export function searchTemporal(
+  store: Store,
+  query: string,
+  atTime: string | number,
+  options: TemporalSearchOptions = {},
+): SearchResult {
+  const targetMs = typeof atTime === "number" ? atTime : Date.parse(atTime);
+  if (isNaN(targetMs)) {
+    throw new Error(`Invalid temporal search timestamp: ${atTime}`);
+  }
+  const targetIso = new Date(targetMs).toISOString();
+  const includeSuperseded = options.includeSuperseded === true;
+
+  const result = queryContext(store, query, {
+    ...options,
+    as_of: targetIso,
+    includeSuperseded,
+  });
+
+  if (!includeSuperseded) {
+    const isSupersededAtTime = (e: MemoryEntry): boolean => {
+      if (e.status === "superseded") return true;
+      if (e.valid_to) {
+        const endMs = Date.parse(e.valid_to);
+        if (!isNaN(endMs) && targetMs >= endMs) return true;
+      }
+      return false;
+    };
+
+    const filtered = result.results.filter((r) => !isSupersededAtTime(r.entry));
+    const filteredUndetermined = result.undetermined?.filter((r) => !isSupersededAtTime(r.entry));
+
+    return {
+      ...result,
+      results: filtered,
+      undetermined: filteredUndetermined,
+      as_of: targetIso,
+    };
+  }
+
+  return {
+    ...result,
+    as_of: targetIso,
+  };
+}
+
 /**
  * Formats top-ranked context into a clean Markdown block ready for LLM prompt injection.
  * Integrates active constraints from CURRENT.md if memoryDir is available.
