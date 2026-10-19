@@ -1,4 +1,5 @@
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
+import type { RouteMatch } from "./route_map.ts";
 
 export type McpProfile =
   | "core"
@@ -96,6 +97,10 @@ export interface FusedContextResult {
   trivial_prompt_gated?: boolean;
   /** T-113: Reason why trivial prompt gate bypassed recall. */
   trivial_gate_reason?: string;
+  /** T-124: Matched resident routes from fast in-memory INDEX route-map. */
+  matched_routes?: RouteMatch[];
+  /** T-124: Candidate memory IDs prioritized by resident route-map scoring. */
+  route_prioritized_ids?: string[];
 }
 
 export interface CodeForMemoryResult {
