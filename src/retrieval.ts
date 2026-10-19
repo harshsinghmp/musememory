@@ -20,9 +20,19 @@ import {
   detectQueryIntent,
   computeIntentMultiplier,
 } from "./retrieval/intent_bias.ts";
+import {
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+} from "./retrieval/effective_score.ts";
 
 export type { VeracityClass, TaskIntent };
-export { INTENT_BIAS_TABLE, detectQueryIntent, computeIntentMultiplier };
+export {
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+};
 
 /**
  * T-089: Canonical provenance veracity weights:
@@ -666,6 +676,14 @@ export interface ScoreFactors {
   intentMultiplier?: number;
   /** T-118: Additive score bonus from query-intent bias multiplier. */
   intentBias?: number;
+  /** T-119: Base relevance score before multiplicative reinforcement and decay. */
+  baseRelevanceScore?: number;
+  /** T-119: Utility and confirmation reinforcement multiplier in [0.2, 2.0]. */
+  reinforcementMultiplier?: number;
+  /** T-119: Bi-temporal retention decay factor in (0.0, 1.0]. */
+  decayFactor?: number;
+  /** T-119: Unified closed-form composite score: base × reinforcement × decay. */
+  effectiveScore?: number;
   totalScore: number;
   decayScore?: number;
 }
@@ -885,6 +903,33 @@ export function computeFactors(
 
   const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
 
+  // T-119: Base relevance score before multiplicative reinforcement and decay
+  const baseRelevanceScore = Math.max(
+    0,
+    baseApplicability +
+      exactSymbolMatch +
+      graphOverlap +
+      pathMatch +
+      bm25Match +
+      blastRadius +
+      statusPenalty +
+      verificationBonus +
+      salienceBonus +
+      dueBonus +
+      negativeWarningBonus +
+      timelessBoost +
+      trustAdjustment +
+      veracityBonus +
+      accessBoost +
+      recentAccessBoost +
+      zeroMatchPenalty +
+      0.5 * semanticMatch +
+      intentBias,
+  );
+  const reinforcementMultiplier = computeReinforcementMultiplier(entry);
+  const decayFactor = typeof decayScore === "number" ? decayScore : 1.0;
+  const effectiveScore = computeEffectiveScore(baseRelevanceScore, reinforcementMultiplier, decayFactor);
+
   return {
     baseApplicability,
     exactSymbolMatch,
@@ -911,6 +956,10 @@ export function computeFactors(
     semanticMatch,
     intentMultiplier,
     intentBias,
+    baseRelevanceScore,
+    reinforcementMultiplier,
+    decayFactor,
+    effectiveScore,
     totalScore,
     decayScore,
   };
@@ -964,6 +1013,14 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
   // T-118: Intent bias boost
   if ((factors.intentBias && factors.intentBias > 0) || (factors.intentMultiplier && factors.intentMultiplier > 1.0)) {
     reasons.push("intent_bias_boost");
+  }
+
+  // T-119: Effective score multiplier reasons
+  if (factors.reinforcementMultiplier && factors.reinforcementMultiplier > 1.0) {
+    reasons.push("reinforcement_multiplier_boost");
+  }
+  if (factors.decayFactor !== undefined && factors.decayFactor < 0.5) {
+    reasons.push("decay_discounted");
   }
 
   // T-089: Veracity reasons

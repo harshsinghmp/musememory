@@ -898,6 +898,7 @@ export function propose(
     temporal_mode?: TemporalMode;
     quality?: MemoryQuality;
     utility?: MemoryUtility;
+    reinforcement?: number;
     evidence?: EvidenceItem[];
     conflict_ids?: string[];
     dedup?: boolean;
@@ -1166,6 +1167,8 @@ export function propose(
     trust,
     score_retain: retention.score,
     source_ids: opts.source_ids,
+    reinforcement: typeof opts.reinforcement === "number" ? opts.reinforcement : undefined,
+    utility: opts.utility,
     decay_score:
       typeof (opts as any).decay_score === "number"
         ? (opts as any).decay_score
