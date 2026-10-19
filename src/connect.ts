@@ -86,6 +86,8 @@ export const ALL_MEMORY_TOOLS = [
   "memory_harvest_turn",
   "memory_evaluate_promotion",
   "memory_promote",
+  "memory_curate",
+  "memory_flush_pending",
   "memory_generalize",
   "memory_archive",
   "memory_rehydrate",
