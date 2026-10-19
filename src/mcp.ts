@@ -82,6 +82,7 @@ import {
 import {
   evaluatePromotion,
   promoteMemory,
+  appendEvidence,
   generalizeContent,
   evaluateArchival,
   archiveMemory,
@@ -1273,6 +1274,24 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             force_manual: { type: "boolean", description: "Manual promotion override bypassing automatic 5x threshold" },
             generalized_content: { type: "string", description: "Optional custom generalized principle text" },
             agent: { type: "string", description: "Optional agent or actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_curate",
+        description: "Curator protocol (T-106): appends empirical evidence or application outcomes to an existing memory. Deterministic promotion rules evaluate eligibility and trigger promotion when criteria are satisfied.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to curate" },
+            type: { type: "string", enum: ["raw", "fetch", "search", "infer", "code", "test", "git", "doc", "human", "code_intelligence", "observed", "reproducible"], description: "Type of empirical evidence" },
+            source: { type: "string", description: "Source of the evidence (e.g. test runner, git log, developer)" },
+            excerpt: { type: "string", description: "Supporting text excerpt or error log" },
+            outcome: { type: "string", enum: ["success", "failure", "regression", "neutral"], description: "Application outcome" },
+            confidence: { type: "number", description: "Confidence score 0.0-1.0" },
+            auto_evaluate: { type: "boolean", description: "Whether to evaluate and execute promotion if criteria are met (default true)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
           required: ["id"],
@@ -2649,6 +2668,28 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           actor: a.agent ? String(a.agent) : undefined,
         });
         return toolResult(result);
+      }
+      case "memory_curate": {
+        try {
+          const result = appendEvidence(
+            activeStore,
+            String(a.id),
+            {
+              type: a.type as any,
+              source: a.source ? String(a.source) : undefined,
+              excerpt: a.excerpt ? String(a.excerpt) : undefined,
+              confidence: typeof a.confidence === "number" ? a.confidence : undefined,
+            },
+            {
+              actor: a.source ? String(a.source) : "agent",
+              applicationOutcome: a.outcome as any,
+              autoEvaluate: a.auto_evaluate !== false,
+            },
+          );
+          return toolResult(result);
+        } catch (err: any) {
+          return toolError(err.message || String(err));
+        }
       }
       case "memory_generalize": {
         const result = generalizeContent(String(a.content), {

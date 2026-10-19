@@ -3,8 +3,8 @@ import { get, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
 import { getGlobalMemoryDir } from "../root.ts";
 import { openStore } from "../store.ts";
-import type { MemoryEntry, MemoryScope, PromotionRecord } from "../types.ts";
-import type { PromotionEvaluation, PromotionResult } from "./types.ts";
+import type { MemoryEntry, MemoryScope, PromotionRecord, EvidenceItem, MemoryUtility } from "../types.ts";
+import type { PromotionEvaluation, PromotionResult, AppendEvidenceOptions, CurateResult } from "./types.ts";
 import { generalizeContent, isContentGeneralizable } from "./generalization.ts";
 import { evaluateCorroboration } from "../quality/corroboration.ts";
 
@@ -480,5 +480,99 @@ export function promoteMemory(
     target_entry_id: globalEntry.id,
     target_memory_dir: globalDir,
     message: `Successfully promoted entry '${id}' to global knowledge at ${globalDir}`,
+  };
+}
+
+/**
+ * T-106: Curator concept: agent appends empirical evidence or application outcomes,
+ * and deterministic promotion rules decide eligibility and execution.
+ */
+export function appendEvidence(
+  store: Store,
+  id: string,
+  evidence: {
+    id?: string;
+    type?: EvidenceItem["type"];
+    source?: string;
+    timestamp?: string;
+    excerpt?: string;
+    confidence?: number;
+  },
+  options: AppendEvidenceOptions = {},
+): CurateResult {
+  const entry = get(store, id);
+  if (!entry) {
+    throw new Error(`Cannot append evidence: memory entry '${id}' not found`);
+  }
+
+  const now = new Date().toISOString();
+  const evidenceId = evidence.id || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const fullEvidence: EvidenceItem = {
+    id: evidenceId,
+    type: evidence.type || ("observed" as any),
+    source: evidence.source || options.actor || "agent",
+    timestamp: evidence.timestamp || now,
+    excerpt: evidence.excerpt,
+    confidence: typeof evidence.confidence === "number" ? evidence.confidence : 1.0,
+  };
+
+  entry.evidence = [...(entry.evidence || []), fullEvidence];
+
+  // Initialize and update utility metrics
+  const utility: MemoryUtility = entry.utility || {
+    retrieval_count: 0,
+    application_count: 0,
+    successful_applications: 0,
+    failed_applications: 0,
+    regressions: 0,
+    contradictions: 0,
+  };
+
+  if (options.applicationOutcome === "success") {
+    utility.application_count++;
+    utility.successful_applications++;
+  } else if (options.applicationOutcome === "failure") {
+    utility.application_count++;
+    utility.failed_applications++;
+  } else if (options.applicationOutcome === "regression") {
+    utility.application_count++;
+    utility.regressions++;
+  }
+  utility.reuse_success_rate =
+    utility.application_count > 0 ? utility.successful_applications / utility.application_count : 0;
+  utility.last_applied_at = now;
+  entry.utility = utility;
+  entry.updated_at = now;
+
+  save(store, entry);
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "observation",
+      entry_id: id,
+      project: entry.project,
+      actor: options.actor || fullEvidence.source || "agent",
+      details: {
+        evidence_id: fullEvidence.id,
+        evidence_type: fullEvidence.type,
+        outcome: options.applicationOutcome,
+      },
+    });
+  }
+
+  const autoEvaluate = options.autoEvaluate !== false;
+  const evalResult = evaluatePromotion(entry);
+  let promoResult: PromotionResult | undefined;
+
+  if (autoEvaluate && evalResult.eligible) {
+    promoResult = promoteMemory(store, id, { actor: options.actor });
+  }
+
+  return {
+    memory_id: id,
+    evidence_added: fullEvidence,
+    utility,
+    promotion_evaluation: evalResult,
+    promotion_result: promoResult,
   };
 }

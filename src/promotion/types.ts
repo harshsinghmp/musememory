@@ -29,6 +29,20 @@ export interface PromotionResult {
   message: string;
 }
 
+export interface AppendEvidenceOptions {
+  actor?: string;
+  applicationOutcome?: "success" | "failure" | "regression" | "neutral";
+  autoEvaluate?: boolean;
+}
+
+export interface CurateResult {
+  memory_id: string;
+  evidence_added: import("../types.ts").EvidenceItem;
+  utility: import("../types.ts").MemoryUtility;
+  promotion_evaluation: PromotionEvaluation;
+  promotion_result?: PromotionResult;
+}
+
 export interface ArchivalEvaluation {
   id: string;
   current_status: MemoryStatus;

@@ -143,7 +143,7 @@ export interface FactProvenanceRecord {
 
 export interface EvidenceItem {
   id: string;
-  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";
+  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence" | "observed" | "reproducible";
   source?: string;
   timestamp: string;
   excerpt?: string;
