@@ -2561,6 +2561,10 @@ export type { FactProvenanceRecord };
 export {
   type L1Abstract,
   type AbstractSidecar,
+  type StaleSidecarCandidate,
+  type SidecarStalenessReport,
+  type SidecarRefreshOptions,
+  type SidecarRefreshResult,
   generateL0Abstract,
   generateL1Abstract,
   buildAbstractSidecar,
@@ -2570,5 +2574,7 @@ export {
   saveAbstractSidecarToDb,
   loadAbstractSidecarFromDb,
   ensureAbstractSidecar,
+  getSidecarStaleness,
+  refreshSidecarsRatioBatched,
 } from "./store/sidecars.ts";
 

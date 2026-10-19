@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { SqliteDatabase } from "../sqlite.ts";
 import type { MemoryEntry } from "../types.ts";
-import type { Store } from "../store.ts";
+import { list, type Store } from "../store.ts";
 
 export interface L1Abstract {
   summary: string;
@@ -332,4 +332,171 @@ export function ensureAbstractSidecar(
   }
 
   return sidecar;
+}
+
+export interface StaleSidecarCandidate {
+  id: string;
+  reason: "missing" | "hash_mismatch";
+  entry: MemoryEntry;
+  cachedHash?: string;
+  expectedHash: string;
+}
+
+export interface SidecarStalenessReport {
+  total: number;
+  fresh_count: number;
+  stale_count: number;
+  missing_count: number;
+  hash_mismatch_count: number;
+  stale_ratio: number;
+  stale_candidates: StaleSidecarCandidate[];
+}
+
+export interface SidecarRefreshOptions {
+  /** Maximum proportion of stale entries to refresh in this batch (0.0 to 1.0). Default: 0.25 (25%) */
+  ratio?: number;
+  /** Maximum hard cap of sidecars to refresh in a single batch. Default: 25 */
+  maxBatch?: number;
+  /** Minimum number of entries to process if stale entries exist. Default: 1 */
+  minBatch?: number;
+  /** Force regeneration even for sidecars with matching content hashes */
+  force?: boolean;
+}
+
+export interface SidecarRefreshResult {
+  total_entries: number;
+  stale_count: number;
+  refreshed_count: number;
+  skipped_count: number;
+  stale_ratio: number;
+  batch_size_applied: number;
+  refreshed_ids: string[];
+  duration_ms: number;
+}
+
+/**
+ * T-123: Computes staleness report comparing existing L0/L1 sidecars against current entry hashes.
+ */
+export function getSidecarStaleness(store: Store, entries?: MemoryEntry[]): SidecarStalenessReport {
+  const allEntries = entries ?? list(store);
+  const total = allEntries.length;
+  let missing_count = 0;
+  let hash_mismatch_count = 0;
+  const stale_candidates: StaleSidecarCandidate[] = [];
+
+  for (const entry of allEntries) {
+    const expectedHash = computeMemoryContentHash(entry.title, entry.content);
+    let cached: AbstractSidecar | null = null;
+
+    if (store.db) {
+      cached = loadAbstractSidecarFromDb(store.db, entry.id);
+    }
+    if (!cached && store.memoryDir) {
+      cached = loadAbstractSidecar(store.memoryDir, entry.id);
+    }
+
+    if (!cached) {
+      missing_count++;
+      stale_candidates.push({
+        id: entry.id,
+        reason: "missing",
+        entry,
+        expectedHash,
+      });
+    } else if (cached.source_content_hash !== expectedHash) {
+      hash_mismatch_count++;
+      stale_candidates.push({
+        id: entry.id,
+        reason: "hash_mismatch",
+        entry,
+        cachedHash: cached.source_content_hash,
+        expectedHash,
+      });
+    }
+  }
+
+  const stale_count = missing_count + hash_mismatch_count;
+  const fresh_count = total - stale_count;
+  const stale_ratio = total > 0 ? Number((stale_count / total).toFixed(4)) : 0;
+
+  return {
+    total,
+    fresh_count,
+    stale_count,
+    missing_count,
+    hash_mismatch_count,
+    stale_ratio,
+    stale_candidates,
+  };
+}
+
+/**
+ * T-123: Ratio-batched sidecar refresh.
+ * Refreshes a bounded proportion of stale/missing sidecars per call to avoid write latency spikes.
+ */
+export function refreshSidecarsRatioBatched(
+  store: Store,
+  options: SidecarRefreshOptions = {},
+  entries?: MemoryEntry[],
+): SidecarRefreshResult {
+  const start = performance.now();
+  const ratio = Math.max(0.01, Math.min(1.0, options.ratio ?? 0.25));
+  const maxBatch = Math.max(1, options.maxBatch ?? 25);
+  const minBatch = Math.max(1, options.minBatch ?? 1);
+  const force = options.force ?? false;
+
+  const allEntries = entries ?? list(store);
+  const total = allEntries.length;
+
+  let candidates: MemoryEntry[] = [];
+  let staleCount = 0;
+  let staleRatio = 0;
+
+  if (force) {
+    candidates = allEntries;
+    staleCount = total;
+    staleRatio = 1.0;
+  } else {
+    const staleness = getSidecarStaleness(store, allEntries);
+    candidates = staleness.stale_candidates.map((c) => c.entry);
+    staleCount = staleness.stale_count;
+    staleRatio = staleness.stale_ratio;
+  }
+
+  if (candidates.length === 0) {
+    return {
+      total_entries: total,
+      stale_count: 0,
+      refreshed_count: 0,
+      skipped_count: 0,
+      stale_ratio: 0,
+      batch_size_applied: 0,
+      refreshed_ids: [],
+      duration_ms: Number((performance.now() - start).toFixed(2)),
+    };
+  }
+
+  // Calculate batch size using ratio bounded by minBatch and maxBatch
+  const ratioCalculated = Math.ceil(candidates.length * ratio);
+  const batchSize = Math.min(candidates.length, Math.min(maxBatch, Math.max(minBatch, ratioCalculated)));
+  const batchToProcess = candidates.slice(0, batchSize);
+
+  const refreshedIds: string[] = [];
+  for (const entry of batchToProcess) {
+    ensureAbstractSidecar(store, entry, { force: true });
+    refreshedIds.push(entry.id);
+  }
+
+  const duration_ms = Number((performance.now() - start).toFixed(2));
+
+  return {
+    total_entries: total,
+    stale_count: staleCount,
+    refreshed_count: refreshedIds.length,
+    skipped_count: candidates.length - refreshedIds.length,
+    stale_ratio: staleRatio,
+    batch_size_applied: batchSize,
+    refreshed_ids: refreshedIds,
+    duration_ms,
+  };
 }
