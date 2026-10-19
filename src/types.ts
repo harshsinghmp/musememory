@@ -117,6 +117,13 @@ export type TemporalMode = "current" | "historical" | "timeless";
 
 export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED" | "STALE";
 
+export interface SemanticFactTriple {
+  entity: string;
+  relation: string;
+  target: string;
+  scope?: string;
+}
+
 export interface EvidenceItem {
   id: string;
   type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";
@@ -243,6 +250,8 @@ export interface MemoryEntry {
   content_hash?: string;
   /** T-075: Ingest provenance trust tier (trusted = user/direct, candidate = agent/inference, untrusted = web/external). */
   trust?: TrustTier;
+  /** T-087: Semantic (entity, relation, target, scope) fact triples for scoped invalidation. */
+  triples?: SemanticFactTriple[];
   /** T-104: Retention score computed at admission (must be >= 0.30 to pass write gate). */
   score_retain?: number;
   /** T-391: Validated citation source IDs referencing live sources in sources.json. */
