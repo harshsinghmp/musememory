@@ -22,6 +22,12 @@ export interface MuseContextInput {
   include_drifted?: boolean;
   /** T-075: Include memories with untrusted provenance (filtered by default). */
   include_untrusted?: boolean;
+  /** T-108: Session ID for turn-level re-injection suppression and LRU tracking. */
+  session_id?: string;
+  /** T-108: Turn number within session (1-indexed). Defaults to auto-incremented session turn. */
+  turn?: number;
+  /** T-108: Whether to suppress re-injection of memories injected in the last 6 turns (default: true if session_id provided). */
+  suppress_reinjected?: boolean;
 }
 
 export interface ContextManifestItem {
@@ -56,6 +62,8 @@ export interface FusedContextResult {
   mode?: "confident_match" | "no_confident_match";
   /** T-073: Explicit flag indicating whether confident memories were returned. */
   no_confident_match?: boolean;
+  /** T-108: Number of candidate memories withheld due to 6-turn re-injection suppression. */
+  reinjection_suppressed_count?: number;
 }
 
 export interface CodeForMemoryResult {

@@ -20,6 +20,7 @@ import {
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
+import { defaultReinjectionTracker } from "./suppression.ts";
 
 export type { ScoreFactors, AbstentionDecision, VeracityClass };
 export {
@@ -107,6 +108,14 @@ export async function rankAndRetrieveMemories(
     now?: number;
     /** R21: precomputed semantic cosine scores by entry id. */
     semanticScores?: Map<string, number>;
+    /** T-108: Session ID for turn-level re-injection suppression. */
+    sessionId?: string;
+    /** T-108: Session turn number. */
+    sessionTurn?: number;
+    /** T-108: Suppress memories injected in previous turns (default true if sessionId present). */
+    suppressReinjection?: boolean;
+    /** T-108: Turn window for suppression (default 6). */
+    reinjectionWindow?: number;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
@@ -165,6 +174,14 @@ export async function rankAndRetrieveMemories(
   }
   if (!options.includeSuperseded) {
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
+  }
+  // T-108: Re-injection suppression per session
+  if (options.sessionId && options.suppressReinjection !== false) {
+    const filtered = defaultReinjectionTracker.filterSuppressed(options.sessionId, entries, {
+      turn: options.sessionTurn,
+      window: options.reinjectionWindow,
+    });
+    entries = filtered.allowed;
   }
 
   // T-137: Vector-upgrade degradation path — resolve semantic scores if embedder configured

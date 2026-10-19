@@ -8,6 +8,7 @@ import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { gateCandidates } from "./freshness.ts";
 import type { MuseContextInput, FusedContextResult, ContextManifestItem } from "./types.ts";
 import { validateDigestIntegrity, dualMeasureTokens } from "../compaction/tokens.ts";
+import { defaultReinjectionTracker } from "../retrieval/suppression.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -191,6 +192,26 @@ export async function resolveMuseContext(
   });
   const gatedPool = gate.entries;
 
+  // T-108: Re-injection suppression per session (6-turn LRU)
+  const withheldSuppressed: Array<{ id: string; reason: string; file_path: string; symbol_name?: string }> = [];
+  let candidatePoolAfterSuppression = gatedPool;
+  let reinjectionSuppressedCount = 0;
+
+  if (input.session_id && input.suppress_reinjected !== false) {
+    const suppression = defaultReinjectionTracker.filterSuppressed(input.session_id, gatedPool, {
+      turn: input.turn,
+    });
+    candidatePoolAfterSuppression = suppression.allowed;
+    reinjectionSuppressedCount = suppression.suppressed.length;
+    for (const sup of suppression.suppressed) {
+      withheldSuppressed.push({
+        id: sup.item.id,
+        reason: `reinjection_suppressed (${sup.turnsAgo} turns ago, injected at turn ${sup.injectedAtTurn}; 6-turn LRU)`,
+        file_path: "",
+      });
+    }
+  }
+
   // T-094: Reserved slots for global / USER.md guidelines
   let userProfileReservedTokens: number | undefined;
   const hasGlobalEntries = allEntries.some((e) => e.project === "global" || e.scope === "global");
@@ -229,7 +250,7 @@ export async function resolveMuseContext(
   }
 
   // 5. Separate negative lessons & anti-patterns with truncation ranking
-  const sortedGatedPool = [...gatedPool].sort((a, b) => getTruncationRank(b) - getTruncationRank(a));
+  const sortedGatedPool = [...candidatePoolAfterSuppression].sort((a, b) => getTruncationRank(b) - getTruncationRank(a));
   const negativeLessons: MemoryEntry[] = [];
   const relevantMemories: MemoryEntry[] = [];
 
@@ -338,6 +359,7 @@ export async function resolveMuseContext(
       file_path: w.file_path,
       symbol_name: w.symbol_name,
     })),
+    ...withheldSuppressed,
     ...withheldUntrusted,
     ...withheldDigestErrors,
   ];
@@ -347,6 +369,13 @@ export async function resolveMuseContext(
     (!compositeQuery.trim() ||
       entriesWithMatchingAnchors.length > 0 ||
       ranked.some((r) => r.score >= 0.45));
+
+  // T-108: Record injected memory IDs for this session turn and advance session turn
+  if (input.session_id) {
+    const injectedIds = [...packedMemories, ...packedNegative].map((m) => m.id);
+    defaultReinjectionTracker.recordInjected(input.session_id, injectedIds, input.turn);
+    defaultReinjectionTracker.advanceTurn(input.session_id);
+  }
 
   return {
     active_constraints: activeConstraints,
@@ -364,6 +393,7 @@ export async function resolveMuseContext(
     user_profile_reserved_tokens: userProfileReservedTokens,
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
     no_confident_match: !hasConfidentMatch,
+    reinjection_suppressed_count: reinjectionSuppressedCount > 0 ? reinjectionSuppressedCount : undefined,
   };
 }
 
