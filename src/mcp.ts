@@ -219,6 +219,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             verified: { type: "boolean" },
             depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Progressive disclosure tier: L1 = id+title lines, L2 = title+content+tags (default), L3 = full raw entry" },
             tier: { type: "number", description: "Deterministic retrieval tier: 0 (manifest index), 1 (routing set), 2 (bounded bodies, default)" },
+            as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
           },
         },
       },
@@ -238,6 +239,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
+            as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
           },
           required: ["query"],
         },
@@ -1708,6 +1710,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 status: a.status ? String(a.status) : undefined,
                 verified: a.verified === true,
                 depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
+                as_of: a.as_of ? String(a.as_of) : undefined,
               });
 
           // Record Hebbian co-activation on retrieved memory units (SOW-204)
@@ -1753,6 +1756,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             from_cache: formatted.fromCache ?? false,
             mode: formatted.mode,
             no_confident_match: formatted.no_confident_match,
+            as_of: formatted.as_of,
+            undetermined: formatted.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
           });
         }
         case "memory_checkpoint": {
@@ -1795,6 +1800,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             type: a.type ? String(a.type) : undefined,
             status: a.status ? String(a.status) : undefined,
             verified: a.verified === true,
+            as_of: a.as_of ? String(a.as_of) : undefined,
           });
           // T-028: Record retrievals to update utility stats and salience
           if (res.results.length > 0) {
@@ -1811,6 +1817,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             explanation: res.explanation,
             mode: res.confidence_mode ?? (res.no_confident_match ? "no_confident_match" : "confident_match"),
             no_confident_match: res.no_confident_match ?? false,
+            as_of: res.as_of,
+            undetermined: res.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
           });
         }
         case "propose":
