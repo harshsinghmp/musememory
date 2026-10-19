@@ -40,8 +40,25 @@ import {
   getConflict,
   recordConflict,
   type ConflictRecord,
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
 } from "./quality/index.ts";
-export { listConflicts, getConflict, recordConflict, type ConflictRecord };
+export {
+  detectConflict,
+  flagConflict,
+  listConflicts,
+  getConflict,
+  recordConflict,
+  type ConflictRecord,
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+};
 import { recoverStaleLocks } from "./outbox.ts";
 export * from "./outbox.ts";
 import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } from "./lock.ts";

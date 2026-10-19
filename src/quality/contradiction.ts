@@ -11,6 +11,20 @@ import {
   findConflictBetween,
   listConflictsFromDb,
 } from "../sqlite.ts";
+import {
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+} from "./invalidation.ts";
+export {
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+};
 export type { ConflictRecord };
 
 export interface ConflictDetection {
@@ -33,10 +47,20 @@ const CONTRADICTORY_PAIRS: [RegExp, RegExp, string][] = [
 
 /**
  * Detects if a candidate memory contradicts an existing active or confirmed memory.
+ * Evaluates semantic (entity, relation, target) alignment to avoid false positive
+ * contradictions when facts apply to different scopes (e.g. dev vs prod, mobile vs desktop).
  */
 export function detectConflict(
   store: Store,
-  candidate: { title: string; content: string; project?: string; type?: MemoryType; id?: string },
+  candidate: {
+    title: string;
+    content: string;
+    project?: string;
+    type?: MemoryType;
+    id?: string;
+    triples?: SemanticFactTriple[];
+    tags?: string[];
+  },
 ): ConflictDetection {
   const candidateText = `${candidate.title} ${candidate.content}`.toLowerCase();
   const entries = list(store, candidate.project ? { project: candidate.project } : undefined);
@@ -46,6 +70,34 @@ export function detectConflict(
     if (candidate.id && entry.id === candidate.id) continue;
     // Only check active or confirmed memories
     if (entry.status !== "active" && entry.status !== "confirmed" && entry.status !== "conflicted") {
+      continue;
+    }
+
+    // T-087: Scoped invalidation requiring (entity, relation, target) alignment
+    const scopedCheck = evaluateScopedInvalidation(entry, candidate);
+    if (scopedCheck.shouldInvalidate) {
+      const entryText = `${entry.title} ${entry.content}`.toLowerCase();
+      let pairReason = "";
+      for (const [patternA, patternB, reason] of CONTRADICTORY_PAIRS) {
+        if ((patternA.test(candidateText) && patternB.test(entryText)) || (patternB.test(candidateText) && patternA.test(entryText))) {
+          pairReason = `${reason} between candidate and "${entry.title}" (${entry.id})`;
+          break;
+        }
+      }
+      const combinedReason = pairReason
+        ? `${pairReason}: ${scopedCheck.reason}`
+        : scopedCheck.reason || `Scoped contradiction detected with "${entry.title}" (${entry.id})`;
+
+      return {
+        conflicted: true,
+        conflictingEntry: entry,
+        confidence: scopedCheck.confidence,
+        reason: combinedReason,
+      };
+    }
+
+    // If scoped check explicitly detected an entity or scope differentiation (e.g. dev vs prod, macos vs mobile), skip polarity contradiction
+    if (scopedCheck.reason && !scopedCheck.aligned && !scopedCheck.shouldInvalidate) {
       continue;
     }
 

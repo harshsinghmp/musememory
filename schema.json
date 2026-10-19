@@ -22,6 +22,19 @@
     "ended_at": { "type": "string", "format": "date-time" },
     "reverted_at": { "type": "string", "format": "date-time" },
     "mem_path": { "type": "string" },
+    "triples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity": { "type": "string" },
+          "relation": { "type": "string" },
+          "target": { "type": "string" },
+          "scope": { "type": "string" }
+        },
+        "required": ["entity", "relation", "target"]
+      }
+    },
     "last_accessed_at": { "type": ["string", "null"], "format": "date-time" },
     "access_count": { "type": "number", "minimum": 0 },
     "idempotency_key": { "type": ["string", "null"] },
