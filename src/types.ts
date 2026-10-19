@@ -159,6 +159,10 @@ export interface MemoryUtility {
   contradictions: number;
   last_applied_at?: string;
   reuse_success_rate?: number;
+  /** T-127: Ratio of applications to retrievals (usage_rate = application_count / retrieval_count). */
+  usage_rate?: number;
+  /** T-127: Return-on-investment score reflecting value delivered per retrieval turn. */
+  roi_score?: number;
 }
 
 export type VerificationLevel =

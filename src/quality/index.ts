@@ -5,3 +5,4 @@ export * from "./retention.ts";
 export * from "./eval.ts";
 export * from "./corroboration.ts";
 export * from "./invalidation.ts";
+export * from "./telemetry.ts";

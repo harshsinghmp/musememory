@@ -41,6 +41,16 @@ import {
   deriveCandidateDropReason,
   evaluateCandidateDecisions,
 } from "./retrieval/candidate_reasons.ts";
+import {
+  type RecallUsageStatus,
+  type RecallUsageJoinRecord,
+  type RecallUsageTelemetryReport,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
+} from "./quality/telemetry.ts";
 
 export type {
   VeracityClass,
@@ -51,6 +61,9 @@ export type {
   CandidateKeepReason,
   CandidateDropReason,
   CandidateEvaluation,
+  RecallUsageStatus,
+  RecallUsageJoinRecord,
+  RecallUsageTelemetryReport,
 };
 export {
   INTENT_BIAS_TABLE,
@@ -65,6 +78,11 @@ export {
   deriveCandidateKeepReasons,
   deriveCandidateDropReason,
   evaluateCandidateDecisions,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
 };
 
 /**
@@ -723,6 +741,14 @@ export interface ScoreFactors {
   decayFactor?: number;
   /** T-119: Unified closed-form composite score: base × reinforcement × decay. */
   effectiveScore?: number;
+  /** T-127: Additive score bonus or penalty derived from recall-to-usage ROI telemetry. */
+  roiAdjustment?: number;
+  /** T-127: Multiplier derived from recall-to-usage telemetry. */
+  roiMultiplier?: number;
+  /** T-127: Measured usage rate (applications / retrievals). */
+  usageRate?: number;
+  /** T-127: Return-on-investment score [0.0 - 1.0]. */
+  roiScore?: number;
   totalScore: number;
   decayScore?: number;
 }
@@ -916,6 +942,10 @@ export function computeFactors(
   const matchingSignal = Math.max(0, baseApplicability + exactSymbolMatch + bm25Match + 0.5 * semanticMatch);
   const intentBias = intentMultiplier > 1.0 ? Number(((intentMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
 
+  // T-127: Recall-usage telemetry join & ROI score
+  const { multiplier: roiMultiplier } = computeRoiScoreMultiplier(entry);
+  const roiAdjustment = roiMultiplier !== 1.0 ? Number(((roiMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
+
   const totalScore =
     baseApplicability +
     exactSymbolMatch +
@@ -938,7 +968,8 @@ export function computeFactors(
     recentAccessBoost +
     zeroMatchPenalty +
     0.5 * semanticMatch +
-    intentBias;
+    intentBias +
+    roiAdjustment;
 
   const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
 
@@ -963,7 +994,8 @@ export function computeFactors(
       recentAccessBoost +
       zeroMatchPenalty +
       0.5 * semanticMatch +
-      intentBias,
+      intentBias +
+      roiAdjustment,
   );
   const reinforcementMultiplier = computeReinforcementMultiplier(entry);
   const decayFactor = typeof decayScore === "number" ? decayScore : 1.0;
@@ -995,6 +1027,10 @@ export function computeFactors(
     semanticMatch,
     intentMultiplier,
     intentBias,
+    roiAdjustment,
+    roiMultiplier,
+    usageRate: entry.utility?.usage_rate,
+    roiScore: entry.utility?.roi_score,
     baseRelevanceScore,
     reinforcementMultiplier,
     decayFactor,
@@ -1067,6 +1103,13 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
     reasons.push("user_veracity_boost");
   } else if (factors.veracityWeight !== undefined && factors.veracityWeight < 0.7) {
     reasons.push("discounted_veracity");
+  }
+
+  // T-127: ROI feedback reasons
+  if (factors.roiMultiplier && factors.roiMultiplier > 1.0) {
+    reasons.push("roi_high_value_boost");
+  } else if (factors.roiMultiplier && factors.roiMultiplier < 1.0) {
+    reasons.push("roi_dead_weight_penalty");
   }
 
   return reasons.sort();

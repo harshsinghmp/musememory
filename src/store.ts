@@ -2581,3 +2581,15 @@ export {
   refreshSidecarsRatioBatched,
 } from "./store/sidecars.ts";
 
+export {
+  type RecallUsageStatus,
+  type RecallUsageJoinRecord,
+  type RecallUsageTelemetryReport,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
+} from "./quality/telemetry.ts";
+
+
