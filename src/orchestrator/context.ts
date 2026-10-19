@@ -14,6 +14,7 @@ import {
   defaultSeenChunkTracker,
 } from "../retrieval/suppression.ts";
 import { defaultPrefetchCache } from "../retrieval/prefetch.ts";
+import { evaluateTrivialPromptGate } from "./trivial_gate.ts";
 
 function estimateTokens(text: string): number {
   return dualMeasureTokens(text).conservativeTokens;
@@ -177,21 +178,29 @@ export async function resolveMuseContext(
     }
   }
 
-  // 4. Retrieve ranked memories via multi-factor ranking engine
-  const ranked = await rankAndRetrieveMemories(store, compositeQuery, {
-    project: input.project,
-    activeFilePath: input.active_file,
-    targetSymbol: input.symbol,
-    limit: 15,
-    sessionId: input.session_id,
-    sessionTurn: input.turn,
-    suppressReinjection: false,
-    suppressSelfEcho: false,
-    suppressSeenChunks: false,
-    recordSeenChunks: false,
-    echoHorizonMs: input.echo_horizon_ms,
-    agent: input.agent,
-  });
+  // T-113: Trivial-prompt gate (skip recall for greetings and pleasantries)
+  const trivialGate =
+    input.enable_trivial_gate !== false
+      ? evaluateTrivialPromptGate(input)
+      : { isTrivial: false };
+
+  // 4. Retrieve ranked memories via multi-factor ranking engine (bypassed if trivial prompt)
+  const ranked = trivialGate.isTrivial
+    ? []
+    : await rankAndRetrieveMemories(store, compositeQuery, {
+        project: input.project,
+        activeFilePath: input.active_file,
+        targetSymbol: input.symbol,
+        limit: 15,
+        sessionId: input.session_id,
+        sessionTurn: input.turn,
+        suppressReinjection: false,
+        suppressSelfEcho: false,
+        suppressSeenChunks: false,
+        recordSeenChunks: false,
+        echoHorizonMs: input.echo_horizon_ms,
+        agent: input.agent,
+      });
 
   // Merge anchored memories to front of candidate pool
   const candidatePool: MemoryEntry[] = [...entriesWithMatchingAnchors];
@@ -444,10 +453,17 @@ export async function resolveMuseContext(
   ];
 
   const hasConfidentMatch =
+    !trivialGate.isTrivial &&
     (packedMemories.length > 0 || packedNegative.length > 0) &&
     (!compositeQuery.trim() ||
       entriesWithMatchingAnchors.length > 0 ||
       ranked.some((r) => r.score >= 0.45));
+
+  if (trivialGate.isTrivial) {
+    suggestedNextSteps.unshift(
+      "State a specific technical goal, file, symbol, or question to recall relevant memories."
+    );
+  }
 
   // T-108: Record injected memory IDs for this session turn and advance session turn
   if (input.session_id) {
@@ -483,6 +499,8 @@ export async function resolveMuseContext(
     reinjection_suppressed_count: reinjectionSuppressedCount > 0 ? reinjectionSuppressedCount : undefined,
     self_echo_suppressed_count: selfEchoSuppressedCount > 0 ? selfEchoSuppressedCount : undefined,
     seen_chunk_suppressed_count: seenChunkSuppressedCount > 0 ? seenChunkSuppressedCount : undefined,
+    trivial_prompt_gated: trivialGate.isTrivial ? true : undefined,
+    trivial_gate_reason: trivialGate.isTrivial ? trivialGate.reason : undefined,
   };
 
   // T-112: Record prefetch payload in session cache
@@ -505,6 +523,10 @@ export function formatCompactContextPack(result: FusedContextResult): string {
 
   if (result.budget_notice) {
     lines.push(`> ⚠️ **Budget Constraint**: ${result.budget_notice}`, "");
+  }
+
+  if (result.trivial_prompt_gated) {
+    lines.push("> ℹ️ _Conversational greeting or acknowledgement detected: memory recall bypassed to conserve tokens._", "");
   }
 
   if (result.context_manifest && result.context_manifest.length > 0) {

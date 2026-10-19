@@ -44,6 +44,8 @@ export interface MuseContextInput {
   check_topic_overlap?: boolean;
   /** T-112: Custom topic overlap threshold (default: 0.6). */
   topic_overlap_threshold?: number;
+  /** T-113: Whether to bypass memory recall for trivial greetings and pleasantries (default: true). */
+  enable_trivial_gate?: boolean;
 }
 
 export interface ContextManifestItem {
@@ -90,6 +92,10 @@ export interface FusedContextResult {
   topic_overlap?: number;
   /** T-112: Prior query text that triggered prefetch skip. */
   topic_overlap_prior_query?: string;
+  /** T-113: Flag indicating recall was bypassed due to trivial prompt detection. */
+  trivial_prompt_gated?: boolean;
+  /** T-113: Reason why trivial prompt gate bypassed recall. */
+  trivial_gate_reason?: string;
 }
 
 export interface CodeForMemoryResult {

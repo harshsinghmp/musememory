@@ -1446,6 +1446,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             seen_chunk_ttl_ms: { type: "number", description: "Seen-chunk TTL in ms (default: 300000 / 5 minutes)" },
             check_topic_overlap: { type: "boolean", description: "Whether to skip prefetch and reuse cached context when topic overlap > 0.6" },
             topic_overlap_threshold: { type: "number", description: "Custom topic overlap threshold (default: 0.6)" },
+            enable_trivial_gate: { type: "boolean", description: "Whether to bypass memory recall for trivial greetings or pleasantries (default: true)" },
           },
         },
       },
@@ -2838,6 +2839,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           seen_chunk_ttl_ms: typeof a.seen_chunk_ttl_ms === "number" ? a.seen_chunk_ttl_ms : undefined,
           check_topic_overlap: a.check_topic_overlap !== undefined ? Boolean(a.check_topic_overlap) : undefined,
           topic_overlap_threshold: typeof a.topic_overlap_threshold === "number" ? a.topic_overlap_threshold : undefined,
+          enable_trivial_gate: a.enable_trivial_gate !== undefined ? Boolean(a.enable_trivial_gate) : undefined,
         });
         return toolResult(result);
       }
