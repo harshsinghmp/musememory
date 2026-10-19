@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, resolve, relative } from "node:path";
 import type { Store } from "../store.ts";
 import { get, list, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
@@ -10,6 +10,7 @@ import type {
   AnchorStatus,
   AnchorVerificationResult,
   AnchorAuditReport,
+  GroundMovedReportItem,
   CreateAnchorOptions,
 } from "./types.ts";
 import { computeStructuralHash, extractSymbolBody } from "./fingerprint.ts";
@@ -120,17 +121,152 @@ export function createCodeAnchor(
   };
 }
 
+const IGNORED_SCAN_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".agents",
+  ".memory",
+  "coverage",
+  ".next",
+  ".turbo",
+  ".gemini",
+]);
+
+const SUPPORTED_CODE_EXTS = new Set([
+  ".ts",
+  ".js",
+  ".tsx",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".py",
+  ".rs",
+  ".go",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+]);
+
+/**
+ * Searches workspace source files for a relocated symbol.
+ */
+export function findRelocatedSymbol(
+  workspaceRoot: string,
+  symbolName: string,
+  originalPath: string,
+  expectedHash?: string
+): { found: boolean; relocated_path?: string; matched_hash?: boolean } {
+  if (!workspaceRoot || !existsSync(workspaceRoot) || !symbolName) {
+    return { found: false };
+  }
+
+  const normalizedOriginal = originalPath.replace(/\\/g, "/");
+  const candidates: Array<{ path: string; hash: string }> = [];
+
+  function scanDir(dir: string, depth = 0) {
+    if (depth > 6) return;
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (IGNORED_SCAN_DIRS.has(entry) || entry.startsWith(".")) continue;
+      const full = join(dir, entry);
+      let stat;
+      try {
+        stat = statSync(full);
+      } catch {
+        continue;
+      }
+
+      if (stat.isDirectory()) {
+        scanDir(full, depth + 1);
+      } else if (stat.isFile()) {
+        const dotIdx = entry.lastIndexOf(".");
+        const ext = dotIdx !== -1 ? entry.slice(dotIdx).toLowerCase() : "";
+        if (!SUPPORTED_CODE_EXTS.has(ext)) continue;
+
+        const rel = relative(workspaceRoot, full).replace(/\\/g, "/");
+        if (rel === normalizedOriginal) continue;
+
+        try {
+          const content = readFileSync(full, "utf8");
+          const extracted = extractSymbolBody(content, symbolName);
+          if (extracted.found) {
+            const hash = computeStructuralHash(extracted.body || extracted.signature || "");
+            candidates.push({ path: rel, hash });
+          }
+        } catch {}
+      }
+    }
+  }
+
+  scanDir(workspaceRoot);
+
+  if (candidates.length === 0) {
+    return { found: false };
+  }
+
+  // Exact hash match preferred
+  if (expectedHash) {
+    const exact = candidates.find((c) => c.hash === expectedHash);
+    if (exact) {
+      return { found: true, relocated_path: exact.path, matched_hash: true };
+    }
+  }
+
+  // If exactly one candidate exists across workspace
+  if (candidates.length === 1) {
+    return { found: true, relocated_path: candidates[0].path, matched_hash: false };
+  }
+
+  // Multiple candidates without hash match -> ambiguous / undeterminable
+  return { found: false };
+}
+
 /**
  * Verifies an existing code anchor against the actual filesystem code state.
+ * T-134: Reports proven ground movements while staying strictly silent when undeterminable.
  */
 export function verifyCodeAnchor(
   workspaceRoot: string,
-  anchor: CodeAnchor
+  anchor: CodeAnchor,
+  options?: { searchRelocation?: boolean }
 ): AnchorVerificationResult {
   const fullPath = resolveAnchorPath(workspaceRoot, anchor);
   const fileExists = existsSync(fullPath);
 
   if (!fileExists) {
+    let groundMoved = false;
+    let groundMovedDetails: string | undefined;
+    let relocatedPath: string | undefined;
+    let undeterminable = false;
+
+    if (options?.searchRelocation !== false && anchor.symbol_name) {
+      const rel = findRelocatedSymbol(workspaceRoot, anchor.symbol_name, anchor.file_path, anchor.structural_hash);
+      if (rel.found && rel.relocated_path) {
+        groundMoved = true;
+        relocatedPath = rel.relocated_path;
+        groundMovedDetails = `Symbol '${anchor.symbol_name}' relocated from '${anchor.file_path}' to '${rel.relocated_path}'`;
+      }
+    }
+
+    if (!groundMoved) {
+      if (anchor.structural_hash) {
+        groundMoved = true;
+        groundMovedDetails = `File '${anchor.file_path}' was removed from disk`;
+      } else {
+        undeterminable = true;
+      }
+    }
+
     return {
       anchor_id: anchor.id,
       kind: anchor.kind,
@@ -141,6 +277,10 @@ export function verifyCodeAnchor(
       symbol_exists: false,
       hash_matched: false,
       drift_details: `File '${anchor.file_path}' does not exist on disk`,
+      ground_moved: groundMoved,
+      ground_moved_details: groundMovedDetails,
+      relocated_path: relocatedPath,
+      undeterminable,
     };
   }
 
@@ -149,6 +289,29 @@ export function verifyCodeAnchor(
   if (anchor.symbol_name) {
     const extracted = extractSymbolBody(content, anchor.symbol_name);
     if (!extracted.found) {
+      let groundMoved = false;
+      let groundMovedDetails: string | undefined;
+      let relocatedPath: string | undefined;
+      let undeterminable = false;
+
+      if (options?.searchRelocation !== false) {
+        const rel = findRelocatedSymbol(workspaceRoot, anchor.symbol_name, anchor.file_path, anchor.structural_hash);
+        if (rel.found && rel.relocated_path) {
+          groundMoved = true;
+          relocatedPath = rel.relocated_path;
+          groundMovedDetails = `Symbol '${anchor.symbol_name}' relocated from '${anchor.file_path}' to '${rel.relocated_path}'`;
+        }
+      }
+
+      if (!groundMoved) {
+        if (anchor.structural_hash) {
+          groundMoved = true;
+          groundMovedDetails = `Symbol '${anchor.symbol_name}' removed or renamed in '${anchor.file_path}'`;
+        } else {
+          undeterminable = true;
+        }
+      }
+
       return {
         anchor_id: anchor.id,
         kind: anchor.kind,
@@ -159,6 +322,10 @@ export function verifyCodeAnchor(
         symbol_exists: false,
         hash_matched: false,
         drift_details: `Symbol '${anchor.symbol_name}' no longer found in '${anchor.file_path}'`,
+        ground_moved: groundMoved,
+        ground_moved_details: groundMovedDetails,
+        relocated_path: relocatedPath,
+        undeterminable,
       };
     }
 
@@ -178,8 +345,13 @@ export function verifyCodeAnchor(
         current_hash: currentHash,
         expected_hash: anchor.structural_hash,
         drift_details: `Structural code hash mismatch for symbol '${anchor.symbol_name}'`,
+        ground_moved: true,
+        ground_moved_details: `Structural code body changed for symbol '${anchor.symbol_name}' in '${anchor.file_path}'`,
+        undeterminable: false,
       };
     }
+
+    const undeterminable = !anchor.structural_hash;
 
     return {
       anchor_id: anchor.id,
@@ -192,6 +364,8 @@ export function verifyCodeAnchor(
       hash_matched: true,
       current_hash: currentHash,
       expected_hash: anchor.structural_hash,
+      ground_moved: false,
+      undeterminable,
     };
   }
 
@@ -211,8 +385,13 @@ export function verifyCodeAnchor(
       current_hash: currentFileHash,
       expected_hash: anchor.structural_hash,
       drift_details: `Structural code hash mismatch for file '${anchor.file_path}'`,
+      ground_moved: true,
+      ground_moved_details: `Structural code changed for file '${anchor.file_path}'`,
+      undeterminable: false,
     };
   }
+
+  const undeterminable = !anchor.structural_hash;
 
   return {
     anchor_id: anchor.id,
@@ -224,6 +403,8 @@ export function verifyCodeAnchor(
     hash_matched: true,
     current_hash: currentFileHash,
     expected_hash: anchor.structural_hash,
+    ground_moved: false,
+    undeterminable,
   };
 }
 
@@ -303,6 +484,8 @@ export function auditMemoryAnchors(
   let validCount = 0;
   let driftedCount = 0;
   let orphanedCount = 0;
+  let groundMovedCount = 0;
+  let undeterminableCount = 0;
 
   for (const entry of entries) {
     if (!entry.anchors || entry.anchors.length === 0) continue;
@@ -316,6 +499,9 @@ export function auditMemoryAnchors(
       if (result.status === "valid") validCount++;
       else if (result.status === "drifted") driftedCount++;
       else if (result.status === "orphaned") orphanedCount++;
+
+      if (result.ground_moved) groundMovedCount++;
+      if (result.undeterminable) undeterminableCount++;
 
       if (anchor.status !== result.status) {
         anchor.status = result.status;
@@ -344,12 +530,58 @@ export function auditMemoryAnchors(
   const total = details.length;
   const integrityScore = total > 0 ? Number((validCount / total).toFixed(2)) : 1.0;
 
+  const groundMovedReports: GroundMovedReportItem[] = details
+    .filter((d) => d.ground_moved)
+    .map((d) => ({
+      anchor_id: d.anchor_id,
+      memory_id: d.memory_id,
+      file_path: d.file_path,
+      symbol_name: d.symbol_name,
+      details: d.ground_moved_details || d.drift_details || "Ground movement detected",
+      relocated_path: d.relocated_path,
+    }));
+
   return {
     total_anchors: total,
     valid_anchors: validCount,
     drifted_anchors: driftedCount,
     orphaned_anchors: orphanedCount,
+    ground_moved_anchors: groundMovedCount,
+    undeterminable_anchors: undeterminableCount,
     integrity_score: integrityScore,
     details,
+    ground_moved_reports: groundMovedReports.length > 0 ? groundMovedReports : undefined,
   };
 }
+
+/**
+ * Formats an anchor audit report into clean Markdown, surfacing proven ground movements
+ * while staying strictly silent on undeterminable anchors to prevent false alarms.
+ */
+export function formatAnchorAuditReport(report: AnchorAuditReport): string {
+  const lines: string[] = [
+    "# ⚓ Code Anchor Audit & Integrity Report",
+    `> Total Anchors: ${report.total_anchors} | Valid: ${report.valid_anchors} | Drifted: ${report.drifted_anchors} | Orphaned: ${report.orphaned_anchors} | Ground-Moved: ${report.ground_moved_anchors} | Integrity Score: ${Math.round(report.integrity_score * 100)}%`,
+    "",
+  ];
+
+  if (report.ground_moved_reports && report.ground_moved_reports.length > 0) {
+    lines.push("## 🚨 Proven Ground-Moved Code Anchors");
+    for (const g of report.ground_moved_reports) {
+      const sym = g.symbol_name ? ` (symbol: \`${g.symbol_name}\`)` : "";
+      const rel = g.relocated_path ? ` -> Relocated to: \`${g.relocated_path}\`` : "";
+      lines.push(`- **[${g.anchor_id}] ${g.file_path}${sym}**: ${g.details}${rel}`);
+    }
+    lines.push("");
+  }
+
+  if (report.undeterminable_anchors > 0) {
+    lines.push(
+      `> ℹ️ _Silent Guard: ${report.undeterminable_anchors} anchor(s) had undeterminable baseline hashes; stayed silent without false alarms._`,
+      ""
+    );
+  }
+
+  return lines.join("\n");
+}
+
