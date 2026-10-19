@@ -617,6 +617,11 @@ export function formatCompactContextPack(result: FusedContextResult): string {
     lines.push(formatDegradedFaultNotice(result.degraded_notes).trim(), "");
   }
 
+  // T-135: Loosened ladder matches notice
+  if (result.loosened_matches_count && result.loosened_matches_count > 0) {
+    lines.push(`> ⚠️ **Loosened Matches Admitted**: ${result.loosened_matches_count} candidate(s) retrieved via relaxed criteria (Rung 3).`, "");
+  }
+
   if (result.trivial_prompt_gated) {
     lines.push("> ℹ️ _Conversational greeting or acknowledgement detected: memory recall bypassed to conserve tokens._", "");
   }
