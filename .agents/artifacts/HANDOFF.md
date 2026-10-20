@@ -1,19 +1,22 @@
-# HANDOFF — 2026-10-20T00:59:00Z
-branch: dev | phase: Wave 20 complete; dev green 1268/0 (v2.10.0)
+# HANDOFF — 2026-10-20T14:05:00Z
+branch: dev | phase: Wave 21 complete; dev green 1285/0 (v2.10.1)
 
 ## Next Step
-Advance to Wave 21 (Failure Attribution, Eval Harness & Interop: T-140+, T-159+, T-168+).
+Advance to Stage 2: Present muse-skills enhancement plan for review.
 
 ## In-Flight
-- Wave 20 landed on dev via Ticket=Issue=Branch=PR=Merge (PRs #291–#307):
-  - T-127..T-135: recall-usage telemetry join, draft marking, config-honesty AST audit, storage-version CI matrix, honest benchmarks, constitution contract, degraded fault signals, anchor ground-moved reports, tiered ladder labeling.
-- Docs pass: docs/quality-telemetry-and-honesty-gates.md, README.md (1268 passed), current.md (v2.10.0).
+- Wave 21 landed on dev via Ticket=Commit=Verify workflow:
+  - T-050: In-lock mutation safety guards (`verifyMutationSafety`, `allowDrastic`).
+  - T-177: Pre-mutation 30-snapshot rolling ring buffer (`captureSnapshotRing`).
+  - T-324: Diff-preserving `CURRENT.md` compaction handoff merge.
+  - Distillation Router: 3-channel router CLI (`distill-route`) & MCP (`memory_distill_route`).
+- Docs pass: `README.md` (1285 passed), `current.md`, `ticket-plan.md`.
 
 ## Decisions
-- Constitution Contract: Directives injected first, trim-exempt under 0 budget, write tools stripped.
-- Degraded Fault Signal: Structured fault notes surfaced in SearchResult/context instead of silent swallow.
-- Tiered Ladder: Loosened candidates explicitly badged [LOOSENED MATCH (Rung 3)] with rationale.
-- Anchor Audits: Strictly silent when baseline undeterminable; zero false alarms on unanchored files.
+- Safe Mutation Guard: Block drastic shrinks (>50%) & erosion (net -2 drops) unless `allowDrastic`.
+- Snapshot Ring: 30 rolling snapshots in `.memory/snapshots/` before mutations with zero daemons.
+- Checkpoint Merge: Union hand-added constraints with handoff constraints; never clobber.
+- Knowledge Router: 3 lanes (system, content, health) with SHA-256 dedupe to `.memory/distill_state.json`.
 
 ## Verify
-`bun test` 1268/0 + `bunx tsc --noEmit` + `bun run build`
+`bun test` 1285/0 + `bunx tsc --noEmit` + `bun run build`

@@ -90,3 +90,5 @@ apps/website/.gif-build/
 # git worktree lanes + docs content-hash scratch
 .worktrees/
 .docs.hash
+.context.hash
+**/.context.hash

@@ -204,3 +204,6 @@ Removed remaining competitor product names and external comparison links from we
 - **Zero External Daemons**: All operations must execute in-process via SQLite (`memory.db`) or flat files. Never depend on background servers.
 - **Fail Fast**: Throw loudly on secret detection, invalid schema shapes, or unconfirmed supersessions.
 - **Verification Gate**: Before declaring changes complete, `bun test`, `bun run build`, and `tsc --noEmit` must pass.
+
+## 1. Verified Shipped Reality
+- **2026-10-20**: Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)
