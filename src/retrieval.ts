@@ -828,6 +828,8 @@ export interface ScoreFactors {
   source_channels?: RetrievalSourceChannel[];
   /** T-314: Additive score bonus from candidate origin source channels. */
   sourceBonus?: number;
+  /** T-315: LangMem logarithmic frequency score [0.0 - 0.30]. */
+  frequencyScore?: number;
   totalScore: number;
   decayScore?: number;
 }
@@ -1000,6 +1002,25 @@ export function computeFactors(
   const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
   const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
 
+  // T-315: LangMem logarithmic frequency axis
+  const effectiveCount = (entry.access_count ?? 0) + 2 * (entry.utility?.successful_applications ?? 0);
+  let frequencyScore = 0;
+  if (effectiveCount > 0) {
+    const rawFreq = 0.25 * (Math.log(1 + effectiveCount) / Math.log(1 + 50));
+    let baseFreq = Math.min(0.25, Number(rawFreq.toFixed(4)));
+
+    // Recency modulation
+    if (entry.last_accessed_at) {
+      const days = daysSince(entry.last_accessed_at, now);
+      if (days <= 7) {
+        baseFreq = Math.min(0.30, Number((baseFreq + 0.05).toFixed(4)));
+      } else if (days > 60) {
+        baseFreq = Number((baseFreq * 0.7).toFixed(4));
+      }
+    }
+    frequencyScore = baseFreq;
+  }
+
   // T-089: Veracity rank weighting (user 1.0, agent 0.7, external 0.5, system 0.3)
   const veracityClass = resolveVeracityClass(entry);
   const veracityWeight = VERACITY_RANK_WEIGHTS[veracityClass];
@@ -1059,8 +1080,7 @@ export function computeFactors(
     recencyDecay +
     trustAdjustment +
     veracityBonus +
-    accessBoost +
-    recentAccessBoost +
+    frequencyScore +
     zeroMatchPenalty +
     0.5 * semanticMatch +
     intentBias +
@@ -1133,6 +1153,7 @@ export function computeFactors(
     effectiveScore,
     source_channels: sourceChannelList,
     sourceBonus,
+    frequencyScore,
     totalScore,
     decayScore,
   };
@@ -1215,6 +1236,13 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
     for (const channel of factors.source_channels) {
       reasons.push(`source:${channel}`);
     }
+  }
+
+  // T-315: Frequency tokens
+  if (factors.frequencyScore && factors.frequencyScore > 0.15) {
+    reasons.push("freq:high");
+  } else if (factors.frequencyScore && factors.frequencyScore > 0.08) {
+    reasons.push("freq:moderate");
   }
 
   return reasons.sort();
