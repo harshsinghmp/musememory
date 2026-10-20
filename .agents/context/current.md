@@ -1,16 +1,21 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v2.10.0`  
-> **Status**: Feature Release (Quality Telemetry, Honesty Gates & Retrieval Fault Signals: recall-usage telemetry join, draft marking, config-honesty AST audit, storage-version CI compat matrix, honest benchmark labels, constitution contract, degraded fault signals, ground-moved anchor reports, and tiered ladder labeling)
+> **Version**: `v3.0.0`  
+> **Status**: Major Release (Failure Attribution, Negative Memory Mining, HOT.md Working Set Compounding & LangMem Logarithmic Frequency Ranking)
 
 ---
 
-## ⏭️ Next Up (Post-Wave 21 Focus)
-- **Wave 22**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. failure attribution, eval harness, dashboard panels, and Hermes provider adapter).
+## ⏭️ Next Up (Post-Wave 22 Focus)
+- **Wave 23**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. Hebbian co-activation retrieval expansion, query-seeded PPR restart set, retrieval weight auto-tuner, and contradiction engine calibration).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 22: Failure Attribution, Negative Memory Mining & Retrieval Compounding**:
+  - `T-313`: Scoped failure attribution matching code anchors (`file_path`, `symbol_name`), affected paths, and reproduction commands; session-deduplicated strikes (max 1/session); dual-decay strike counter (2 clean runs or 30 days without failure); constitutional immunity protecting constraints, timeless memories, and salience $\ge 0.95$ from auto-dispute (`test/failure_attribution.test.ts`, commit `41feec4`, `3b270b5`).
+  - `T-144`: Trajectory fix-pair mining discovering negative memories (`AVOID: ...`) from *Error ➔ Remediation ➔ No Recurrence* observation sequences with affinity filters excluding non-mutating commands (`ls`, `cat`), dynamic line number normalization, Vibeguard secret scrubbing, and session volume cap of max 3 candidates (`test/fix_pair_mining.test.ts`, commit `cc4b5c5`).
+  - `T-314`: Source-tagged recall hits wiring `.memory/HOT.md` candidates into retrieval ranking with sub-millisecond memoized `mtime` cache, origin tagging (`source_channels: ("hot" | "fts" | "vector" | "tree" | "distilled")[]`), relevance-gated `sourceBonus` (+0.20), and explainability tokens (`source:hot`, `source:fts`) (`test/source_tagging_frequency.test.ts`, commit `f9f6a93`).
+  - `T-315`: LangMem logarithmic frequency rank curve ($0.25 \times \frac{\ln(1 + \text{effectiveCount})}{\ln(1 + 50)}$) replacing unbounded linear frequency scoring; weights verified memory applications $2\times$ over passive context loads; 7-day recency bonus (+0.05) capped at 0.30; outputs `freq:high` tokens (`test/source_tagging_frequency.test.ts`, commit `f3c8f1d`).
 - [x] **Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing**:
   - `T-050`: Overnight & in-lock mutation safety guards (`verifyMutationSafety`, `MutationSafetyError`, `ESUSPECT_SHRINK`, `ESUSPECT_EROSION`, `allowDrastic`) preventing accidental bulk erasure or semantic erosion during compaction/governance (`test/mutation_guards.test.ts`, commit `439e31c`).
   - `T-177`: Pre-mutation 30-snapshot rolling ring buffer (`captureSnapshotRing`, `listSnapshotRing`, `restoreSnapshotRing`) with zero resident daemons in `.memory/snapshots/` before write transactions and compaction handoffs (`test/snapshot_ring.test.ts`, commit `76c58eb`).

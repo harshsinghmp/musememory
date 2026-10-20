@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-20
+
+### Summary
+Major release introducing closed-loop failure attribution, trajectory fix-pair mining into negative lessons, active working set retrieval compounding via HOT.md, and LangMem logarithmic frequency ranking.
+
+### Added
+- **Scoped Failure Attribution Engine (`src/learning/feedback.ts`, `src/quality/utility.ts`) (T-313)**:
+  - Scopes failure attribution to memories with matching code anchors (`anchor.file_path`, `anchor.symbol_name`), `graph.affected_paths`, `test_command`, or distinctive keywords, eliminating bystander demotions.
+  - Per-session strike deduplication ensuring at most 1 strike is levied against a memory per working session regardless of retry attempts.
+  - Dual-decay strike counter decaying active strikes after 2 consecutive clean runs or 30 days of inactivity.
+  - Constitutional gate requiring 3 distinct corroborated strikes before demoting `status: "confirmed"` to `"disputed"`.
+  - Immunity protection against automated dispute for `type: "constraint"`, `temporal_mode: "timeless"`, and foundational memories with `salience >= 0.95`.
+  - Audit trail logging emitting `regression_strike`, `strike_decay`, and `dispute_triggered` events.
+- **Trajectory Fix-Pair Mining (`src/learning/distill.ts`, `src/learning/negative.ts`) (T-144)**:
+  - Discovers negative memories from sequential observation trajectories adhering to the *Error ➔ Remediation ➔ No Recurrence* pattern.
+  - Affinity filters rejecting informational and non-mutating commands (`ls`, `cat`, `grep`, `pwd`, `status`, `git branch`).
+  - Dynamic line number normalization in compiler and stack trace errors to prevent candidate duplicates across code shifts.
+  - Automated Vibeguard secret scrubbing across all error logs and remediation command snippets.
+  - Bounded session volume cap enforcing a maximum of 3 mined candidates per harvest pass.
+- **Source-Tagged Recall Hits & HOT.md Compounding (`src/compounding/temporal.ts`, `src/retrieval.ts`) (T-314)**:
+  - Extracts and caches candidate IDs from `.memory/HOT.md` with memoized filesystem `mtime` invalidation.
+  - Tags recall hits with origin channels (`source_channels: ("hot" | "fts" | "vector" | "tree" | "distilled")[]`).
+  - Applies a relevance-gated `sourceBonus` (+0.20) for candidates present in `HOT.md` matching active query semantics.
+  - Emits attribution tokens in explainability logs (`source:hot`, `source:fts`).
+- **LangMem Logarithmic Frequency Rank Axis (`src/retrieval.ts`, `src/retrieval/ranking.ts`) (T-315)**:
+  - Sub-linear logarithmic frequency curve ($0.25 \times \frac{\ln(1 + \text{effectiveCount})}{\ln(1 + 50)}$) replacing unbounded linear access counts.
+  - Multiplier weighting verified successful memory applications $2\times$ over passive context loads.
+  - 7-day recency bonus (+0.05) for freshly reinforced memories with smooth ceiling saturation at 0.30.
+  - Surfaces `freq:high` explainability tokens when frequency score exceeds 0.15.
+
+### Changed
+- **Failure Feedback**: `evaluateSessionOutcomes` no longer penalizes bystander memories recalled in a session when unrelated test commands fail.
+- **Audit Operations**: Extended `AuditOperation` union in `src/types.ts` with `regression_strike`, `strike_decay`, and `dispute_triggered`.
+- **Anchor Types**: Standardized `CodeAnchor` properties across failure attribution to `file_path` and `symbol_name` with backwards-compatible legacy fallbacks.
+
 ### Added
 - **Optional Local Semantic Embeddings (R21)**: an OpenAI-compatible `/v1/embeddings` endpoint (llama.cpp server, Ollama, or hosted) can supply a semantic cosine dimension to multi-factor ranking. Configured with `retrieval.embedderUrl` / `retrieval.embedderModel`; unset means retrieval is unchanged.
 - **`memory embed [status|build|reindex]`**: embedding lifecycle CLI. `status` runs offline; `build` and `reindex` probe the configured endpoint. Embeddings are cached as float32 blobs in SQLite behind a pipeline fingerprint (model, dimensions, endpoint) — a changed pipeline refuses recall until you run `memory embed reindex`.

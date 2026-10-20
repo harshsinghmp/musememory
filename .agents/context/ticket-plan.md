@@ -154,7 +154,7 @@
 - [x] T-141 · landed Wave 6 — frozen benchmark corpus + drift discipline · test · branch: feat/wave-6-embeddings-eval-harness · U
 - [x] T-142 · landed Wave 6 — p50 latency reported beside recall scores · benchmark · branch: feat/wave-6-embeddings-eval-harness · U
 - [x] T-143 · landed Wave 6 — fixture promotion requires usage telemetry · quality · branch: feat/wave-6-embeddings-eval-harness · U
-- [ ] T-144 · fix-pair mining (error→command→no-recurrence) → negative-memory candidates · harvester, learning · new · U
+- [x] T-144 · landed Wave 22 — fix-pair mining (error→command→no-recurrence) → negative-memory candidates · harvester, learning · branch: feat/wave-22-failure-attribution-negative-mining · U
 
 ## Wave E — P2 TEAM / SERVER / UI
 
@@ -241,9 +241,9 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 - [x] T-310 · landed Wave 14 — MEDIUM (B7) · word-boundary token matching: matchesWordBoundary prevents substring false matches (race⊂trace, port⊂report, lock⊂deadlock) · retrieval.ts, mesh/resolver.ts, quality/retention.ts · PR #196 · U
 - [x] T-311 · landed #74 — HIGH (B8) · unicode-aware tokenization: non-ASCII queries tokenize across scripts and return signal; non-lexical queries penalized · U
 - [x] T-312 · landed Wave 14 — HIGH (B9) · FTS failure distinguished from zero-match: returns degraded: true with loud [FTS5_DEGRADED] logging on failure vs degraded: false on 0-hit · sqlite.ts, store.ts, ranking.ts · PR #198 · U
-- [ ] T-313 · HIGH (B11) · failure attribution: `isRegression = exitCode !== 0` applies to ALL recalled memories; 3 strikes auto-flip confirmed→disputed → drops from sync + confirm() (learning/feedback.ts:30-44, quality/utility.ts:72-79). Scope regression to anchor-relevant memories + decaying counter + corroboration before demotion · dep: T-030 · F
-- [ ] T-314 · MEDIUM (A2) · source-tagged recall hits `_source ∈ {hot,fts,vector,tree,distilled}` feeding rank — HOT.md is built (compounding/temporal.ts:50) and never read · dep: T-028 · U
-- [ ] T-315 · MEDIUM (A3) · frequency as first-class rank axis (LangMem) · dep: T-028 · U
+- [x] T-313 · landed Wave 22 — HIGH (B11) · failure attribution: `isRegression = exitCode !== 0` applies to ALL recalled memories; 3 strikes auto-flip confirmed→disputed → drops from sync + confirm() (learning/feedback.ts:30-44, quality/utility.ts:72-79). Scope regression to anchor-relevant memories + decaying counter + corroboration before demotion · dep: T-030 · branch: feat/wave-22-failure-attribution-negative-mining · F
+- [x] T-314 · landed Wave 22 — MEDIUM (A2) · source-tagged recall hits `_source ∈ {hot,fts,vector,tree,distilled}` feeding rank — HOT.md is built (compounding/temporal.ts:50) and memoized read with mtime invalidation + relevance bonus · dep: T-028 · branch: feat/wave-22-failure-attribution-negative-mining · U
+- [x] T-315 · landed Wave 22 — MEDIUM (A3) · frequency as first-class rank axis (LangMem): logarithmic curve with 2x application weighting and 7-day recency bonus · dep: T-028 · branch: feat/wave-22-failure-attribution-negative-mining · U
 - [ ] T-316 · MEDIUM (A4) · promote Hebbian co-activation edges into write-time `linked_memory_ids` seeding + retrieval expansion (A-MEM note-evolution; substrate already written, never read) · dep: T-095 · U
 - [ ] T-317 · MEDIUM (A5) · split T-179: query-seeded PPR restart set + A/B on factual-recall-only fixture slice (HippoRAG v1 regressed factual recall) · dep: T-140, T-178 · U
 - [ ] T-318 · MEDIUM (A12) · retrieval weight auto-tuner from ROI telemetry, gated behind eval harness (memoria) · dep: T-127, T-140 · U
