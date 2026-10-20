@@ -33,12 +33,14 @@ import {
   type CandidateKeepReason,
   type CandidateDropReason,
   type CandidateEvaluation,
+  type RetrievalSourceChannel,
   deriveCandidateKeepReasons,
   deriveCandidateDropReason,
   evaluateCandidateDecisions,
 } from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
+import { getHotCandidateIds } from "../compounding/temporal.ts";
 import {
   defaultReinjectionTracker,
   filterSelfEchoes,
@@ -56,6 +58,7 @@ export type {
   CandidateKeepReason,
   CandidateDropReason,
   CandidateEvaluation,
+  RetrievalSourceChannel,
 };
 export {
   isLowDiscrimination,
@@ -120,6 +123,8 @@ export interface MultiFactorRankingOptions {
   inferIntent?: boolean;
   /** T-119: Use multiplicative effective_score (base × reinforcement × decay) for score. */
   useEffectiveScore?: boolean;
+  /** T-314: Source channels from which candidate memories were surfaced. */
+  sourceChannels?: Map<string, Set<RetrievalSourceChannel>>;
 }
 
 /**
@@ -142,6 +147,7 @@ export function calculateMultiFactorScore(
     blastRadiusFiles: options.blastRadiusFiles,
     taskIntent: options.taskIntent,
     inferIntent: options.inferIntent,
+    sourceChannels: options.sourceChannels,
   });
 
   const score = options.useEffectiveScore ? (factors.effectiveScore ?? factors.totalScore) : factors.totalScore;
@@ -305,7 +311,27 @@ export async function rankAndRetrieveMemories(
     }
   }
 
-  // 4. Score candidates
+  // 4. T-314: Ingest hot candidate IDs and build candidate origin sources
+  const candidateSources = new Map<string, Set<RetrievalSourceChannel>>();
+  const hotIds = getHotCandidateIds(store, store.memoryDir || store.dir);
+  for (const id of hotIds) {
+    if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+    candidateSources.get(id)!.add("hot");
+  }
+  for (const id of ftsMatchIds) {
+    if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+    candidateSources.get(id)!.add("fts");
+  }
+  if (semanticScores) {
+    for (const [id, score] of semanticScores) {
+      if (score >= 0.30) {
+        if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+        candidateSources.get(id)!.add("vector");
+      }
+    }
+  }
+
+  // Score candidates
   const scored = entries.map((entry) =>
     calculateMultiFactorScore(entry, queryTokens, {
       now,
@@ -317,6 +343,7 @@ export async function rankAndRetrieveMemories(
       semanticScores,
       taskIntent: effectiveTaskIntent,
       useEffectiveScore: options.useEffectiveScore,
+      sourceChannels: candidateSources,
     }),
   );
 

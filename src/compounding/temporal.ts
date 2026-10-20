@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
@@ -100,7 +100,54 @@ export function compileHotCache(store: Store, memoryDir: string): string {
   mkdirSync(memoryDir, { recursive: true });
   writeFileSync(hotPath, hotContent, "utf-8");
 
+  // Invalidate in-memory memo cache upon recompile
+  hotCacheMemo.delete(hotPath);
+
   return hotPath;
+}
+
+interface HotCacheState {
+  mtime: number;
+  ids: Set<string>;
+}
+
+const hotCacheMemo = new Map<string, HotCacheState>();
+
+/**
+ * T-314: Extracts memory IDs from .memory/HOT.md with mtime-synchronized memoization.
+ */
+export function getHotCandidateIds(store: Store, memoryDir?: string): Set<string> {
+  const dir = memoryDir || store.memoryDir || store.dir;
+  if (!dir) return new Set();
+
+  const hotPath = join(dir, "HOT.md");
+  if (!existsSync(hotPath)) {
+    return new Set();
+  }
+
+  try {
+    const stats = statSync(hotPath);
+    const existing = hotCacheMemo.get(hotPath);
+    if (existing && existing.mtime === stats.mtimeMs) {
+      return existing.ids;
+    }
+
+    const content = readFileSync(hotPath, "utf8");
+    const ids = new Set<string>();
+    const matches = content.matchAll(/\(`([a-zA-Z0-9_-]+)`\)/g);
+    for (const match of matches) {
+      if (match[1]) ids.add(match[1]);
+    }
+
+    const state: HotCacheState = {
+      mtime: stats.mtimeMs,
+      ids,
+    };
+    hotCacheMemo.set(hotPath, state);
+    return ids;
+  } catch {
+    return new Set();
+  }
 }
 
 /**

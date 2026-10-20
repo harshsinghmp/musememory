@@ -752,6 +752,8 @@ export function filterByRelevanceThreshold(
 }
 
 /** Inputs the single scorer accepts. Code-context signals are only supplied by muse_context. */
+export type RetrievalSourceChannel = "hot" | "fts" | "vector" | "tree" | "distilled";
+
 export interface ScoreContext {
   now: number;
   workspaceRoot?: string;
@@ -769,6 +771,8 @@ export interface ScoreContext {
   taskIntent?: TaskIntent;
   /** T-118: Infer intent heuristically from query if not provided (default false). */
   inferIntent?: boolean;
+  /** T-314: Source channels from which candidate memories were surfaced. */
+  sourceChannels?: Map<string, Set<RetrievalSourceChannel>>;
 }
 
 /** Every factor the unified scorer computes. One scorer, one factor set, one ordering (T-308). */
@@ -820,6 +824,10 @@ export interface ScoreFactors {
   usageRate?: number;
   /** T-127: Return-on-investment score [0.0 - 1.0]. */
   roiScore?: number;
+  /** T-314: Source channels from which this memory was surfaced. */
+  source_channels?: RetrievalSourceChannel[];
+  /** T-314: Additive score bonus from candidate origin source channels. */
+  sourceBonus?: number;
   totalScore: number;
   decayScore?: number;
 }
@@ -1017,6 +1025,22 @@ export function computeFactors(
   const { multiplier: roiMultiplier } = computeRoiScoreMultiplier(entry);
   const roiAdjustment = roiMultiplier !== 1.0 ? Number(((roiMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
 
+  // T-314: Source-tagged recall channels & HOT.md bonus
+  const entryChannels = ctx.sourceChannels?.get(entry.id);
+  const sourceChannelList: RetrievalSourceChannel[] = entryChannels ? Array.from(entryChannels) : [];
+  let rawSourceBonus = 0;
+  if (entryChannels && entryChannels.size > 0) {
+    if (entryChannels.has("hot")) rawSourceBonus += 0.20;
+    if (entryChannels.has("fts")) rawSourceBonus += 0.15;
+    if (entryChannels.has("vector")) rawSourceBonus += 0.15;
+    if (entryChannels.has("tree")) rawSourceBonus += 0.10;
+    if (entryChannels.has("distilled")) rawSourceBonus += 0.08;
+  }
+
+  // T-314 Relevance Gate: only apply source bonus if candidate has baseline matching signals
+  const hasRelevance = baseApplicability > 0 || bm25Match > 0 || exactSymbolMatch > 0 || semanticMatch > 0;
+  const sourceBonus = hasRelevance ? Math.min(0.25, rawSourceBonus) : 0;
+
   const totalScore =
     baseApplicability +
     exactSymbolMatch +
@@ -1040,7 +1064,8 @@ export function computeFactors(
     zeroMatchPenalty +
     0.5 * semanticMatch +
     intentBias +
-    roiAdjustment;
+    roiAdjustment +
+    sourceBonus;
 
   const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
 
@@ -1106,6 +1131,8 @@ export function computeFactors(
     reinforcementMultiplier,
     decayFactor,
     effectiveScore,
+    source_channels: sourceChannelList,
+    sourceBonus,
     totalScore,
     decayScore,
   };
@@ -1181,6 +1208,13 @@ export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): s
     reasons.push("roi_high_value_boost");
   } else if (factors.roiMultiplier && factors.roiMultiplier < 1.0) {
     reasons.push("roi_dead_weight_penalty");
+  }
+
+  // T-314: Source channel tokens
+  if (factors.source_channels && factors.source_channels.length > 0 && (factors.sourceBonus ?? 0) > 0) {
+    for (const channel of factors.source_channels) {
+      reasons.push(`source:${channel}`);
+    }
   }
 
   return reasons.sort();
