@@ -38,107 +38,33 @@
 
 ---
 
-## What changed
+## What's new
 
-### v3.0.0
-- Scoped failure attribution matching code anchors with decaying strike counter (#313)
-- Trajectory fix-pair mining discovering negative lessons from error sequences (#144)
-- Active working set compounding and memoized candidate scoring from HOT.md (#314)
-- LangMem logarithmic frequency rank curve with 2x application weighting (#315)
-- Multi-channel knowledge distillation router across system, content, and health (#324)
-- In-lock mutation safety guards preventing bulk deletion or semantic erosion (#50)
-- Pre-mutation 30-snapshot rolling ring buffer for zero-daemon recovery (#177)
-- Diff-preserving CURRENT.md checkpoint merge semantics for agent handoffs (#324)
+**v3.0.0** introduces closed-loop failure attribution, trajectory fix-pair mining, HOT.md compounding, and LangMem logarithmic frequency ranking.
 
-### v2.10.0
-- Tiered retrieval ladder labeling loosened matches with provenance badges (#307)
-- Ground-moved reporting for drifted structural code anchors (#305)
-- Degraded-notes fault signals on partial or fallback retrievals (#303)
-- Constitution contract injecting immutable rules ahead of prompt context (#301)
-- Honest benchmark labels comparing measured metrics against claims (#299)
-- Storage-version compatibility matrix in CI across schema versions (#297)
-- Config-honesty AST audit enforcing accurate feature reporting (#295)
-- Draft memory marking with separate confident-answer keys (#293)
-- Recall-to-usage telemetry join computing empirical memory ROI (#291)
+### New capabilities
+- Scoped failure attribution matching code anchors with decaying strike counters ([#313](https://github.com/harshsinghmp/musememory/pull/313))
+- Trajectory fix-pair mining discovering negative lessons from agent error sequences ([#144](https://github.com/harshsinghmp/musememory/pull/144))
+- Active working set compounding and candidate scoring directly from HOT.md ([#314](https://github.com/harshsinghmp/musememory/pull/314))
+- Multi-channel knowledge distillation router across system, content, and health ([#324](https://github.com/harshsinghmp/musememory/pull/324))
+- Pre-mutation 30-snapshot rolling ring buffer for zero-daemon recovery ([#177](https://github.com/harshsinghmp/musememory/pull/177))
 
-### v2.9.0
-- Tier budgets as named constants with provenance tracking (#288)
-- Resident INDEX route-map in orchestrator for instant lookups (#286)
-- Ratio-batched sidecar refresh during quiet periods (#284)
-- L0/L1 abstract sidecars with dual-layer caching (#282)
-- Typed candidate drop and keep reasons per retrieval hit (#280)
-- Reciprocal Rank Fusion weight tuning and A/B variant presets (#278)
-- Effective score formula combining base relevance, reinforcement, and decay (#276)
-- Query-intent bias multipliers tailoring recall to task type (#274)
+### Bug fixes
+- In-lock mutation safety guards preventing bulk deletion and semantic erosion ([#50](https://github.com/harshsinghmp/musememory/pull/50))
+- Strict CodeAnchor field alignment and dispute tracking type safety ([#325](https://github.com/harshsinghmp/musememory/pull/325))
 
-### v2.8.0
-- Trivial-prompt gate bypassing recall on conversational greetings (#270)
-- Topic-overlap prefetch skip avoiding duplicate context assembly (#268)
-- Seen-chunk TTL suppression preventing redundant context injection (#266)
-- Injected context stripping before memory capture and propose (#264)
-- Self-echo suppression within 10-minute conversational horizons (#262)
-- Re-injection suppression with 6-turn LRU window (#260)
-- Two-tier promotion staging for verified candidate insights (#258)
-- Curator empirical evidence protocol validating real tool outcomes (#256)
+### Improvements
+- LangMem logarithmic frequency rank curve with 2x application weighting ([#315](https://github.com/harshsinghmp/musememory/pull/315))
+- Diff-preserving CURRENT.md checkpoint merge semantics for agent handoffs ([#324](https://github.com/harshsinghmp/musememory/pull/324))
+- Constitutional immunity defending non-negotiable rules against strike decay ([#313](https://github.com/harshsinghmp/musememory/pull/313))
 
-### v2.7.0
-- Tamper-evident cryptographic audit ledger with per-day salt rotation (#253)
-- Lineage BFS DAG provenance walker traversing parent and conflict edges (#251)
-- First-class lineage foreign keys for supersession and conflict tracking (#249)
-- Semantic fact provenance append-only table with triple-unique index (#247)
-- Progressive multi-hop wikilink expansion after rank fusion (#245)
-- Observation-biased recall deduplication favoring verified empirical evidence (#243)
-- HyAtlas supersede-not-delete lifecycle with hidden-count over-fetching (#241)
-- Associative graph edges auto-seeded at memory capture time (#239)
-
-### v2.6.0
-- Evidence-age stamping bounding memory freshness by underlying source age (#235)
-- Provenance veracity rank weighting favoring user over automated sources (#233)
-- Federation handshake protocol for cross-project mesh sync (#231)
-- Scoped semantic invalidation preventing accidental cross-environment wipes (#229)
-- Keep-both conflicts table preserving contradictory viewpoints (#227)
-- Point-in-time temporal search excluding superseded knowledge by date (#225)
-- Five-verb lifecycle supporting change, end, correct, revert, and forget (#223)
-- Point-in-time as-of queries returning historical state without invention (#221)
-- Exact historical cessation boundaries on state transitions (#219)
-
-### v2.5.0
-- Optional Weibull hazard curves modeling realistic hardware-style decay (#216)
-- Declarative expiry policy YAML for per-type retention rules (#214)
-- Stamped expiry metadata tracking expired_at and expired_by (#212)
-- Per-type admission expiration defaults for fixes, ops, and architecture (#210)
-- Trust-tier keyed half-lives defending against malicious prompt poisoning (#208)
-- Bayesian corroboration confidence formula scaling with independent confirmations (#206)
-- Materialized decay score in SQLite for sub-millisecond sorting (#204)
-- No-confident-match abstention mode eliminating model hallucinations (#202)
-- FTS tokenizer abstention gate rejecting non-discriminating terms (#200)
-
-### v2.4.0
-- Explicit database degradation signals on FTS failure (#198)
-- Word-boundary token matching preventing substring false positives (#196)
-- IDF-weighted distinctive symbol matching prioritizing unique identifiers (#194)
-- Bounded Hebbian plasticity capping co-activation network density (#192)
-- Incremental vector index synchronization on memory save and delete (#190)
-- Read-path stale provenance tags on degraded retrievals (#186)
-- Model context budget clamping preventing token overflows (#182)
-- Dirty-gated store loads caching database reads between modifications (#176)
-- Precomputed WeakMap token sets for O(1) in-memory lookups (#174)
-- Memoized file verification avoiding repetitive disk stat calls (#172)
-
-### v2.3.0
-- Point-ID-only dry-run deletions preventing accidental wildcard purges (#184)
-- Autonomous Memory Optimizer with zero-daemon 7-day and 48h auto-cadence (#175)
-- Real-Time Agency Hub (SSE) for parallel multi-agent swarms (#166)
-- PageIndex hierarchical reasoning tree depth traversal controls (#164)
-- Harness-independent hook installation defaulting to standard layouts (#61)
-- Strict path containment defending against directory traversal escapes (#59)
-- Template-gated test command execution blocking arbitrary shell injection (#58)
+*For earlier releases, see the [Changelog](./CHANGELOG.md) or [GitHub Releases](https://github.com/harshsinghmp/musememory/releases).*
 
 ---
 
 ## 📑 Table of Contents
 
-- [What changed](#what-changed)
+- [What's new](#whats-new)
 - [What Muse Memory does](#what-muse-memory-does)
 - [Key capabilities](#key-capabilities)
 - [Start with one command](#start-with-one-command)
