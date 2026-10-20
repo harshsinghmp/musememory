@@ -67,7 +67,7 @@ const versionedReasons = [
   },
 ];
 
-/* ── Capabilities: the same six pillars, explained to two audiences ─────── */
+/* ── Capabilities: the core pillars, explained to two audiences ────────── */
 const pillars = [
   {
     tag: "verified",
@@ -75,6 +75,20 @@ const pillars = [
     title: "Refuses to save what it can't check",
     body: "A note that points at a file or function which doesn't exist is rejected on the spot. Your assistant can't quietly file facts about code that was never there — and a hallucinated citation never reaches the store.",
     stat: "citations verified at write time",
+  },
+  {
+    tag: "fair blame",
+    color: "cyan",
+    title: "Never blames the innocent note",
+    body: "When tests or commands fail, Muse scopes attribution strictly to memories that match the failed file or symbol. Retry loops are deduplicated to 1 strike, strikes decay after clean runs, and constitutional rules are immune from automated dispute.",
+    stat: "scoped failure attribution (v3.0)",
+  },
+  {
+    tag: "negative mining",
+    color: "amber",
+    title: "Turns errors into permanent lessons",
+    body: "Muse watches the Error ➔ Remediation ➔ Success sequence in your session logs and distills actionable 'AVOID' negative memories with normalized error signatures and zero secret leakage.",
+    stat: "fix-pair trajectory mining (v3.0)",
   },
   {
     tag: "instant",
@@ -119,7 +133,7 @@ const benchmarks = [
   { label: "Hot cache lookup", value: "<50µs", note: "L0 in-process cache" },
   { label: "AI tools supported", value: "80+", note: "detected and wired over MCP" },
   { label: "Import formats", value: "24+", note: "legacy memory systems" },
-  { label: "Tests passing", value: "527", note: "88 files, runs offline" },
+  { label: "Tests passing", value: "1,309", note: "203 files, runs offline" },
   { label: "Background services", value: "0", note: "nothing to keep running" },
 ];
 
@@ -216,9 +230,9 @@ const appJsonLd = JSON.stringify({
   name: "Muse Memory",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows",
-  softwareVersion: "2.3.0",
+  softwareVersion: "3.0.0",
   description:
-    "Persistent memory for AI coding agents that runs locally. Citations are verified at write time and stale memories are withheld at recall, so an assistant never acts on facts that are no longer true.",
+    "Persistent memory for AI coding agents that runs locally. Citations are verified at write time, stale memories are withheld at recall, failures are fairly attributed without bystander demotion, and negative lessons are autonomously mined from fix trajectories.",
   url: "https://harshsinghmp.github.io/musememory/",
   downloadUrl: "https://www.npmjs.com/package/musememory",
   codeRepository: "https://github.com/harshsinghmp/musememory",
@@ -232,6 +246,9 @@ const appJsonLd = JSON.stringify({
     "Deterministic lifecycle and forgetting",
     "Structural code anchors that survive refactors",
     "Credential scanning on every write",
+    "Scoped failure attribution and decaying strike engine (v3.0.0)",
+    "Trajectory fix-pair negative memory mining (v3.0.0)",
+    "HOT.md working set compounding & logarithmic frequency ranking (v3.0.0)",
   ],
 });
 
@@ -327,7 +344,7 @@ const marqueeWords = [
 
       <div class="container hero-inner scene-planes">
         <p class="hero-kicker layer z-1">
-          <span class="pulse" aria-hidden="true"></span> Runs on your computer · No account · MIT
+          <span class="pulse" aria-hidden="true"></span> v3.0.0 · Runs on your computer · No account · MIT
         </p>
 
         <h1 id="hero-title" class="layer z-2">
@@ -460,7 +477,7 @@ const marqueeWords = [
           <p class="eyebrow">Capabilities</p>
           <h2 id="pillars-title">What can it actually do?</h2>
           <p>
-            Six things, each with the everyday explanation first and the engineering detail
+            Eight core pillars, each with the everyday explanation first and the engineering detail
             underneath. Together they are what makes this a memory you can trust rather than
             a search box over old notes.
           </p>
