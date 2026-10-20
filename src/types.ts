@@ -163,6 +163,14 @@ export interface MemoryUtility {
   usage_rate?: number;
   /** T-127: Return-on-investment score reflecting value delivered per retrieval turn. */
   roi_score?: number;
+  /** T-313: Active un-decayed corroborated strikes (0-3). */
+  regression_strikes?: number;
+  /** T-313: ISO timestamp of latest attributed failure. */
+  last_regression_at?: string;
+  /** T-313: Session ID of latest regression to deduplicate retry loops. */
+  last_regression_session?: string;
+  /** T-313: Count of clean runs since last strike. */
+  clean_runs_since_regression?: number;
 }
 
 export type VerificationLevel =

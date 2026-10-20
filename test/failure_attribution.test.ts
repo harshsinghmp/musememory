@@ -206,4 +206,201 @@ describe("T-313: Scoped Failure Attribution", () => {
       expect(updatedUi.utility?.regressions ?? 0).toBe(0);
     });
   });
+
+  describe("Decaying Strike Engine & Constitutional Gate", () => {
+    it("deduplicates retry loop failures within same session (at most 1 strike per session)", () => {
+      const entry = propose(store, {
+        title: "Database Pool Rule",
+        content: "Pool config in src/db/pool.ts",
+        project: "test-proj",
+        type: "fix",
+      });
+      confirm(store, entry.id);
+
+      const { recordApplicationOutcome } = require("../src/quality/utility.ts");
+
+      // Failure attempt 1 in session-A
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-A",
+      });
+
+      // Failure attempt 2 in same session-A (retry 1)
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-A",
+      });
+
+      // Failure attempt 3 in same session-A (retry 2)
+      const after3Retries = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-A",
+      });
+
+      // Regressions count may be 3, but strikes MUST be 1
+      expect(after3Retries.utility?.regressions).toBe(3);
+      expect(after3Retries.utility?.regression_strikes).toBe(1);
+    });
+
+    it("decays active strikes after 2 consecutive clean runs", () => {
+      const entry = propose(store, {
+        title: "API Rate Limiter",
+        content: "Rate limiter in src/api/limit.ts",
+        project: "test-proj",
+        type: "fix",
+      });
+      confirm(store, entry.id);
+
+      const { recordApplicationOutcome } = require("../src/quality/utility.ts");
+
+      // Strike 1 in session-1
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-1",
+      });
+      // Strike 2 in session-2
+      const after2Strikes = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-2",
+      });
+      expect(after2Strikes.utility?.regression_strikes).toBe(2);
+
+      // Clean run 1
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: true,
+      });
+
+      // Clean run 2 -> should trigger strike decay!
+      const afterClean2 = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: true,
+      });
+
+      expect(afterClean2.utility?.regression_strikes).toBe(1);
+    });
+
+    it("decays active strikes when 30 days elapse without recurring failure", () => {
+      const entry = propose(store, {
+        title: "Cache Layer",
+        content: "Cache in src/cache.ts",
+        project: "test-proj",
+        type: "fix",
+      });
+      confirm(store, entry.id);
+
+      const { recordApplicationOutcome } = require("../src/quality/utility.ts");
+
+      const t0 = Date.now();
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-1",
+        now: t0,
+      });
+
+      // Simulate 31 days passing
+      const t31DaysLater = t0 + 31 * 86_400_000;
+      const afterTimeDecay = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: true,
+        now: t31DaysLater,
+      });
+
+      expect(afterTimeDecay.utility?.regression_strikes).toBe(0);
+    });
+
+    it("demotes memory to disputed only when 3 distinct corroborated strikes accumulate", () => {
+      const entry = propose(store, {
+        title: "Worker Thread Pool",
+        content: "Worker pool in src/worker.ts",
+        project: "test-proj",
+        type: "fix",
+      });
+      confirm(store, entry.id);
+
+      const { recordApplicationOutcome } = require("../src/quality/utility.ts");
+
+      // Strike 1
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-1",
+      });
+      // Strike 2
+      recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-2",
+      });
+      // After 2 strikes, still confirmed
+      const after2 = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: true,
+      });
+      expect(after2.status).toBe("confirmed");
+
+      // Strike 3
+      const after3 = recordApplicationOutcome(store, {
+        memoryId: entry.id,
+        success: false,
+        regression: true,
+        sessionId: "session-3",
+      });
+
+      // With 3 active strikes, status is flipped to disputed
+      expect(after3.utility?.regression_strikes).toBe(3);
+      expect(after3.status).toBe("disputed");
+    });
+
+    it("protects constitutional constraints and high-salience memories from auto-dispute", () => {
+      const constraint = propose(store, {
+        title: "Never commit secrets to git",
+        content: "Hard invariant: Zero secret exposure",
+        project: "test-proj",
+        type: "constraint",
+        salience: 1.0,
+      });
+      confirm(store, constraint.id);
+
+      const { recordApplicationOutcome } = require("../src/quality/utility.ts");
+
+      // 3 distinct failures in 3 sessions
+      recordApplicationOutcome(store, {
+        memoryId: constraint.id,
+        success: false,
+        regression: true,
+        sessionId: "session-1",
+      });
+      recordApplicationOutcome(store, {
+        memoryId: constraint.id,
+        success: false,
+        regression: true,
+        sessionId: "session-2",
+      });
+      const after3 = recordApplicationOutcome(store, {
+        memoryId: constraint.id,
+        success: false,
+        regression: true,
+        sessionId: "session-3",
+      });
+
+      // Strikes are tracked, but status is NEVER flipped to disputed!
+      expect(after3.utility?.regression_strikes).toBe(3);
+      expect(after3.status).toBe("confirmed");
+    });
+  });
 });
