@@ -7,3 +7,4 @@ export * from "./corroboration.ts";
 export * from "./invalidation.ts";
 export * from "./telemetry.ts";
 export * from "./config_honesty.ts";
+export * from "./guards.ts";
