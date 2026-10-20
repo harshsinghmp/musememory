@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
@@ -226,3 +226,84 @@ export function listExecutionSnapshots(memoryDir: string): ExecutionSnapshot[] {
   }
   return snapshots.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
+
+export interface SnapshotRingResult {
+  snapshotPath: string;
+  snapshotName: string;
+  target: "current" | "state";
+  prunedCount: number;
+}
+
+/**
+ * Captures an atomic pre-mutation snapshot into .memory/snapshots/ with rolling rotation.
+ * Closes T-177.
+ */
+export function captureSnapshotRing(
+  target: "current" | "state",
+  memoryDir: string,
+  maxSnapshots: number = 30,
+): SnapshotRingResult {
+  const snapshotsDir = join(memoryDir, "snapshots");
+  mkdirSync(snapshotsDir, { recursive: true });
+
+  const sourceFile = target === "current" ? "CURRENT.md" : "state.db";
+  const sourcePath = join(memoryDir, sourceFile);
+
+  if (!existsSync(sourcePath)) {
+    throw new Error(`Cannot capture snapshot: ${sourcePath} does not exist`);
+  }
+
+  const isoTimestamp = new Date().toISOString().replace(/[:.]/g, "-") + "_" + Math.random().toString(36).slice(2, 7);
+  const ext = target === "current" ? "md" : "db";
+  const snapshotName = `${target}__${isoTimestamp}.${ext}`;
+  const snapshotPath = join(snapshotsDir, snapshotName);
+
+  const content = readFileSync(sourcePath);
+  writeFileSync(snapshotPath, content);
+
+  // Rotate ring buffer
+  const prefix = `${target}__`;
+  const existing = readdirSync(snapshotsDir)
+    .filter((f) => f.startsWith(prefix) && f.endsWith(`.${ext}`))
+    .sort();
+
+  let prunedCount = 0;
+  if (existing.length > maxSnapshots) {
+    const toDelete = existing.slice(0, existing.length - maxSnapshots);
+    for (const f of toDelete) {
+      try {
+        unlinkSync(join(snapshotsDir, f));
+        prunedCount++;
+      } catch {
+        // ignore deletion failures
+      }
+    }
+  }
+
+  return { snapshotPath, snapshotName, target, prunedCount };
+}
+
+export function listSnapshotRing(target: "current" | "state", memoryDir: string): string[] {
+  const snapshotsDir = join(memoryDir, "snapshots");
+  if (!existsSync(snapshotsDir)) return [];
+  const ext = target === "current" ? "md" : "db";
+  return readdirSync(snapshotsDir)
+    .filter((f) => f.startsWith(`${target}__`) && f.endsWith(`.${ext}`))
+    .sort()
+    .reverse();
+}
+
+export function restoreSnapshotRing(snapshotName: string, memoryDir: string): void {
+  const snapshotsDir = join(memoryDir, "snapshots");
+  const snapPath = join(snapshotsDir, snapshotName);
+  if (!existsSync(snapPath)) {
+    throw new Error(`Snapshot not found: ${snapPath}`);
+  }
+
+  const targetFile = snapshotName.startsWith("current__") ? "CURRENT.md" : "state.db";
+  const targetPath = join(memoryDir, targetFile);
+
+  const content = readFileSync(snapPath);
+  writeFileSync(targetPath, content);
+}
+

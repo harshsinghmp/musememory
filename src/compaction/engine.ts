@@ -11,6 +11,7 @@ import { recordAuditEvent } from "../audit.ts";
 import type { Store } from "../store.ts";
 import { propose } from "../store.ts";
 import { verifyMutationSafety } from "../quality/guards.ts";
+import { captureSnapshotRing } from "../snapshot.ts";
 
 export const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
 export const COMPACTION_THRESHOLD_PERCENT = 70;
@@ -324,6 +325,11 @@ function commitHandoff(
   let effectiveConstraints = invariants.activeConstraints ?? [];
 
   if (existsSync(currentMdPath)) {
+    try {
+      captureSnapshotRing("current", memoryDir, 30);
+    } catch {
+      // ignore snapshot failure in edge environments
+    }
     try {
       const existingText = readFileSync(currentMdPath, "utf8");
       effectiveConstraints = mergeCurrentConstraints(
