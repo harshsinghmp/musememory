@@ -20,7 +20,7 @@ A comprehensive audit of LifeOS 7.40.4 (local installation and upstream `danielm
    - `T-050`: Overnight / compaction loss guard (`ESUSPECT_SHRINK` & `ESUSPECT_EROSION`).
    - `T-177`: Pre-mutation rolling snapshot ring buffer (`snapshotBeforeWrite`).
    - **Multi-Channel Distillation Router**: A structured router (`KnowledgeDistill`) directing synthesized knowledge into actionable operational lanes (`system`, `content`, `health`) with stateful deduplication.
-3. **`muse-skills` Separation**: Memory features and skills belong strictly in `musememory`. Non-memory LifeOS workings (e.g., threat modeling from `ThreatModel`, root-cause triage from `Vitals`, and rhetorical cadence from `WriteStory`) will later enhance existing `muse-skills` modes in a separate gated stage.
+3. **Repository Scope**: Memory features and cognitive memory tooling belong strictly in `musememory`. General agency workflows are maintained independently in their dedicated repositories.
 
 ---
 
@@ -222,13 +222,3 @@ Any memory ID or title hash present in `surfaced_ids` or `item_hashes` is skippe
    - `bunx tsc --noEmit` exits 0.
    - `bun test` passes 100% of suites.
    - `bun run build` succeeds clean.
-
----
-
-## 5. Future Stage 2: `muse-skills` Enhancements (Gated Preview)
-
-Per user directive, **no new skills will be created in `muse-skills`**. Stage 2 will exclusively enhance existing skill modes and references after Stage 1 is fully completed and verified:
-- `quality-review/muse-security`: Add quantitative threat modeling (STRIDE/PASTA Likelihood × Impact) to `references/audit.md`.
-- `agency-delivery/incident-response`: Add OS-level "Find Culprit" diagnostic playbooks (file descriptor and PID thread lock triage) to `references/triage.md`.
-- `quality-review/humanize`: Add classical rhetorical figures and anti-cliché cadence into `references/ast-shield-and-cadence.md`.
-- `quality-review/gauntlet-loop`: Add a Complexity Ratchet diff-budget gate to Automated Gate checks.

@@ -2,7 +2,7 @@
 branch: dev | phase: Wave 21 complete; dev green 1285/0 (v2.10.1)
 
 ## Next Step
-Advance to Stage 2: Present muse-skills enhancement plan for review.
+Advance to Wave 22: Review next backlog items from .agents/context/ticket-plan.md (failure attribution, eval harness, dashboard panels, Hermes provider adapter).
 
 ## In-Flight
 - Wave 21 landed on dev via Ticket=Commit=Verify workflow:
