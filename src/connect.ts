@@ -12,44 +12,138 @@ export const ALL_MEMORY_TOOLS = [
   "search",
   "memory_capture",
   "memory_current",
-  "memory_get_constraints",
-  "memory_set_constraints",
   "memory_harvest",
-  "memory_import_transcript",
-  "memory_search_transcripts",
-  "memory_get_user_profile",
-  "memory_set_user_profile",
-  "memory_recall",
   "memory_confirm",
   "memory_supersede",
   "memory_link",
   "memory_mark_stale",
   "memory_reject",
   "memory_delete",
+  "memory_restore",
   "memory_audit",
+  "memory_import_transcript",
   "memory_detect_providers",
-  "memory_migrate",
   "memory_detect_agents",
   "memory_connect",
+  "memory_migrate",
   "memory_export",
   "memory_import",
+  "confirm_fix",
+  "record_session",
+  "memory_checkpoint",
   "memory_validate",
+  "memory_get_user_profile",
+  "memory_set_user_profile",
+  "memory_search_transcripts",
+  "memory_core",
+  "memory_consolidate",
+  "memory_trace",
+  "memory_loops",
+  "memory_distill",
+  "memory_distill_route",
+  "memory_verify",
   "graph_status",
+  "graph_index",
   "memory_tree_search",
-  "memory_wiki_compile",
-  "memory_wiki_search",
   "memory_wiki_get",
-  "memory_entities_search",
+  "memory_wiki_search",
+  "memory_wiki_compile",
   "memory_entities_get",
+  "memory_entities_search",
   "memory_pageindex_index",
   "memory_pageindex_search",
   "memory_pageindex_import",
   "memory_disconnect_pageindex",
   "memory_settings_get",
   "memory_settings_set",
+  "memory_drift",
+  "memory_compress",
+  "memory_source_add",
+  "memory_source_list",
+  "memory_claim_record",
+  "memory_claim_list",
+  "memory_freeze_run",
+  "memory_freeze_list",
+  "memory_prompt_list",
+  "memory_prompt_get",
+  "memory_prompt_run",
+  "memory_rollup",
+  "memory_loop_record",
+  "memory_loop_status",
+  "memory_verify_strict",
+  "memory_feedback",
+  "memory_resolve_conflict",
+  "memory_roi",
+  "memory_observe",
+  "memory_distill_observations",
+  "memory_negative_capture",
+  "memory_code_intel_status",
+  "memory_code_intel_symbols",
+  "memory_code_intel_blast_radius",
+  "memory_enrich",
+  "memory_ranked_retrieval",
+  "memory_compaction_check",
+  "memory_compact_handoff",
+  "memory_harvest_turn",
+  "memory_evaluate_promotion",
+  "memory_promote",
+  "memory_curate",
+  "memory_flush_pending",
+  "memory_generalize",
+  "memory_archive",
+  "memory_rehydrate",
+  "memory_lifecycle_status",
+  "memory_lifecycle",
+  "memory_anchor_create",
+  "memory_anchor_verify",
+  "memory_anchor_audit",
+  "muse_context",
+  "muse_code_for_memory",
+  "muse_memory_for_code",
+  "muse_profile_list",
+  "memory_adr_record",
+  "memory_adr_list",
+  "memory_drift_audit",
+  "muse_why",
+  "muse_bug_clusters",
+  "muse_tech_debt",
+  "muse_health",
+  "muse_sync_broadcast",
+  "muse_sync_ingest",
+  "muse_sync_status",
+  "muse_sync_pool",
+  "muse_mesh_status",
+  "muse_mesh_query",
+  "muse_mesh_audit",
+  "muse_mesh_link",
+  "muse_code_impact",
+  "muse_pr_context",
+  "muse_reconcile_anchors",
 ];
 
 export { ConnectOptions, ConnectReport };
+
+/**
+ * Harness opt-in. Claude Code's paths live under `~/.claude*`, so writing them
+ * requires naming the harness explicitly (`--harness claude`) — a pre-existing
+ * Claude config is never enough on its own (constitution R1).
+ */
+export interface HarnessOptIn {
+  harness?: string;
+}
+
+/** True when the caller explicitly opted in to this agent's harness. */
+function harnessOptedIn(agent: AgentDefinition, requested?: string): boolean {
+  const name = requested?.toLowerCase().trim();
+  if (!name) return false;
+  const lowerName = agent.name.toLowerCase();
+  return (
+    name === agent.id ||
+    name === agent.id.replace(/-cli$/, "") ||
+    name === lowerName.replace(/\s+/g, "-") ||
+    name === lowerName.split(" ")[0]
+  );
+}
 
 function safeReadJson(path: string): Record<string, any> {
   if (!existsSync(path)) return {};
@@ -111,7 +205,7 @@ function resolveAgentConfigFile(agent: AgentDefinition, home: string, foundConfi
 function wireAgentFormat(
   agent: AgentDefinition,
   home: string,
-  options: ConnectOptions = {},
+  options: ConnectOptions & HarnessOptIn = {},
   foundConfig?: string | null,
 ): ConnectReport {
   const configPath = resolveAgentConfigFile(agent, home, foundConfig);
@@ -133,6 +227,20 @@ function wireAgentFormat(
   try {
     switch (agent.mcpFormat) {
     case "claude-json": {
+      // Claude Code is harness-specific: never write ~/.claude* without an
+      // explicit opt-in, no matter what already exists on disk.
+      if (!harnessOptedIn(agent, options.harness)) {
+        return {
+          agent: agent.id,
+          agentName: agent.name,
+          configPath,
+          updated: false,
+          installed: false,
+          permissionAutoApproved: false,
+          message: `Skipped ${agent.name}: harness-specific paths need an explicit opt-in (pass --harness claude)`,
+        };
+      }
+
       const claudeJsonPath = join(home, ".claude.json");
       const settingsJsonPath = join(home, ".claude", "settings.json");
 
@@ -336,7 +444,7 @@ function wireAgentFormat(
 export function connectAgent(
   target: string = "all",
   home: string = homedir(),
-  options: ConnectOptions = {},
+  options: ConnectOptions & HarnessOptIn = {},
 ): ConnectReport[] {
   const targetLower = target.toLowerCase().trim();
   const detected = detectAgents(home);
@@ -382,7 +490,7 @@ export function connectAgent(
  * via connectAgent → wireAgentFormat.
  */
 function makeNamedConnector(agentId: string) {
-  return (home: string = homedir(), options: ConnectOptions = {}): ConnectReport =>
+  return (home: string = homedir(), options: ConnectOptions & HarnessOptIn = {}): ConnectReport =>
     connectAgent(agentId, home, options)[0];
 }
 
@@ -470,3 +578,61 @@ export function disconnectAllAgents(home: string = homedir(), options: ConnectOp
   }
   return reports;
 }
+
+export interface ClientConfigRecipes {
+  endpoint: string;
+  cursor: Record<string, any>;
+  opencode: Record<string, any>;
+  claude: Record<string, any>;
+  generic: Record<string, any>;
+}
+
+/**
+ * T-387: Generate client configuration recipes for remote/team MCP HTTP server endpoints.
+ */
+export function generateClientConfigRecipe(
+  endpoint = "http://127.0.0.1:31338/mcp",
+  token = "<YOUR_BEARER_TOKEN>",
+  peerId?: string,
+): ClientConfigRecipes {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (peerId) {
+    headers["mcp-peer-id"] = peerId;
+  }
+
+  return {
+    endpoint,
+    cursor: {
+      mcpServers: {
+        musememory: {
+          url: endpoint,
+          headers,
+        },
+      },
+    },
+    opencode: {
+      mcp: {
+        musememory: {
+          type: "remote",
+          url: endpoint,
+          headers,
+        },
+      },
+    },
+    claude: {
+      mcpServers: {
+        musememory: {
+          url: endpoint,
+          transport: "http",
+          headers,
+        },
+      },
+    },
+    generic: {
+      name: "musememory",
+      url: endpoint,
+      headers,
+    },
+  };
+}
+

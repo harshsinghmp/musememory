@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { resolveWithin } from "../paths.ts";
 import { scanSecrets } from "../secrets.ts";
 import { tokenize } from "../retrieval.ts";
 import type { PageIndexDocument, PageIndexNode, PageIndexSearchResult } from "./types.ts";
@@ -10,6 +12,16 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
+}
+
+/**
+ * Rejects anything that is not a bare filename (`/`, `\`, `..`, NUL, leading dot).
+ * Defense-in-depth for index ids that reach the persist step.
+ */
+export function assertBareFilename(name: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
+    throw new Error(`indexId "${name}" is not a bare filename`);
+  }
 }
 
 export function buildPageIndex(
@@ -31,7 +43,8 @@ export function buildPageIndex(
   const project = options.project;
   const title = options.title || content.slice(0, 50).trim() || "Untitled Document";
   const maxDepth = options.maxDepth ?? 5;
-  const indexId = `idx_${Date.now()}_${slugify(title) || "doc"}`;
+  const shortUuid = randomUUID().replace(/-/g, "").slice(0, 8);
+  const indexId = `idx_${Date.now()}_${shortUuid}_${slugify(title) || "doc"}`;
   const now = new Date().toISOString();
 
   // 2. Parse Markdown/Text into hierarchical sections
@@ -108,8 +121,10 @@ export function buildPageIndex(
 
   // 3. Persist if memoryDir provided and !dryRun
   if (options.memoryDir && !options.dryRun) {
-    const dir = join(options.memoryDir, "pageindex", project);
+    const dir = resolveWithin(options.memoryDir, "pageindex", project);
     mkdirSync(dir, { recursive: true });
+    // resolveWithin only guards `dir`; a traversal in the file name would still write outside it.
+    assertBareFilename(indexId);
     writeFileSync(join(dir, `${indexId}.json`), JSON.stringify(doc, null, 2), "utf8");
   }
 
@@ -128,6 +143,8 @@ export function searchPageIndex(
 ): PageIndexSearchResult {
   const query = options.query;
   const maxNodes = options.maxNodes ?? 50;
+  const maxDepth = options.maxDepth;
+  const disclosureDepth = options.disclosureDepth ?? "L2";
   const tokenBudget = options.tokenBudget ?? 4000;
   const queryTokens = new Set(tokenize(query));
 
@@ -135,6 +152,9 @@ export function searchPageIndex(
   let totalNodesSearched = 0;
 
   function traverse(node: PageIndexNode) {
+    if (maxDepth !== undefined && node.depth > maxDepth) {
+      return;
+    }
     totalNodesSearched++;
     const haystack = tokenize(`${node.title} ${node.summary} ${node.content} ${node.path}`);
     const haySet = new Set(haystack);
@@ -170,16 +190,36 @@ export function searchPageIndex(
   const results: PageIndexSearchResult["results"] = [];
 
   for (const item of matched) {
-    const approxTokens = Math.max(10, Math.ceil((item.node.title.length + item.node.summary.length + item.node.content.length) / 4));
+    const baseLen = item.node.title.length + (item.node.summary?.length || 0);
+    const contentLen = item.node.content?.length || 0;
+    const citationsLen = item.node.citations ? JSON.stringify(item.node.citations).length : 0;
+
+    let approxTokens: number;
+    switch (disclosureDepth) {
+      case "L1":
+        approxTokens = Math.max(5, Math.ceil(baseLen / 4));
+        break;
+      case "L2":
+        approxTokens = Math.max(10, Math.ceil((baseLen + contentLen) / 4));
+        break;
+      case "L3":
+      default:
+        approxTokens = Math.max(10, Math.ceil((baseLen + contentLen + citationsLen) / 4));
+        break;
+    }
+
     if (tokensUsed + approxTokens > tokenBudget && results.length > 0) break;
 
     results.push({
       nodeId: item.node.id,
       title: item.node.title,
-      summary: item.node.summary || item.node.title,
+      summary:
+        disclosureDepth === "L3" && item.node.content
+          ? `${item.node.summary || item.node.title}\n\n${item.node.content}`
+          : item.node.summary || item.node.title,
       path: item.node.path,
       score: Number(item.score.toFixed(2)),
-      citations: item.node.citations,
+      citations: disclosureDepth === "L1" ? undefined : item.node.citations,
     });
     tokensUsed += approxTokens;
   }
@@ -202,7 +242,13 @@ export function loadPageIndex(
   project: string,
   indexId: string,
 ): PageIndexDocument | null {
-  const filePath = join(memoryDir, "pageindex", project, `${indexId}.json`);
+  // Hostile project/indexId are a miss, not a throw: load stays a read-only query.
+  let filePath: string;
+  try {
+    filePath = resolveWithin(memoryDir, "pageindex", project, `${indexId}.json`);
+  } catch {
+    return null;
+  }
   if (!existsSync(filePath)) return null;
   try {
     return JSON.parse(readFileSync(filePath, "utf8")) as PageIndexDocument;
@@ -219,7 +265,9 @@ export function listPageIndexes(memoryDir: string, project?: string): PageIndexD
   const projects = project ? [project] : readdirSync(base);
 
   for (const p of projects) {
-    const pDir = join(base, p);
+    // Caller-supplied `project` is untrusted — resolveWithin, not join.
+    // Names from readdirSync are single FS segments and pass through unchanged.
+    const pDir = resolveWithin(base, p);
     if (!existsSync(pDir)) continue;
     for (const f of readdirSync(pDir)) {
       if (f.endsWith(".json")) {
@@ -237,7 +285,7 @@ export function deletePageIndex(
   project?: string,
   indexId?: string,
 ): { deletedCount: number } {
-  const base = join(memoryDir, "pageindex");
+  const base = resolveWithin(memoryDir, "pageindex");
   if (!existsSync(base)) return { deletedCount: 0 };
 
   let count = 0;
@@ -247,13 +295,13 @@ export function deletePageIndex(
   }
 
   if (project && !indexId) {
-    const pDir = join(base, project);
+    const pDir = resolveWithin(base, project);
     if (existsSync(pDir)) {
       rmSync(pDir, { recursive: true, force: true });
       count++;
     }
   } else if (project && indexId) {
-    const file = join(base, project, `${indexId}.json`);
+    const file = resolveWithin(base, project, `${indexId}.json`);
     if (existsSync(file)) {
       rmSync(file, { force: true });
       count++;

@@ -5,6 +5,7 @@ import type { Store } from "./store.ts";
 import { list, get, extractEntryText } from "./store.ts";
 import { scanSecrets } from "./secrets.ts";
 import { stalePolicyDays, daysSince } from "./retrieval.ts";
+import { parseTestCommand } from "./verify.ts";
 import type { MemoryEntry } from "./types.ts";
 
 let cachedValidate: ValidateFunction | null = null;
@@ -71,7 +72,45 @@ export function validateEntry(entry: unknown): ValidationResult {
       errors.push(`${err.instancePath || "/"} ${err.message}`);
     }
   }
+  errors.push(...validateTestCommands(entry));
   return { valid: errors.length === 0, errors };
+}
+
+/** Cap on a stored test_command; execution is template-gated to a fixed argv, so this only bounds blast radius of junk. */
+const MAX_TEST_COMMAND_LENGTH = 500;
+
+/**
+ * Defense in depth for test_command: reject commands the oracle could never execute
+ * anyway, so hostile strings fail at write/validate time instead of silently existing.
+ * Authoritative enforcement stays in verify.ts parseTestCommand, which additionally
+ * resolves the path against the workspace root at execution time.
+ */
+function validateTestCommands(entry: unknown): string[] {
+  const errors: string[] = [];
+  if (typeof entry !== "object" || entry === null) return errors;
+  const rec = entry as Record<string, unknown>;
+  // /test_command is a top-level string; /verification/test_command is nested.
+  const sites: { where: string; cmd: unknown }[] = [{ where: "/test_command", cmd: rec.test_command }];
+  const verification = rec.verification;
+  if (typeof verification === "object" && verification !== null) {
+    sites.push({ where: "/verification/test_command", cmd: (verification as Record<string, unknown>).test_command });
+  }
+
+  for (const { where, cmd } of sites) {
+    if (cmd === undefined || cmd === null) continue;
+    if (typeof cmd !== "string") {
+      errors.push(`${where} must be a string`);
+      continue;
+    }
+    if (cmd.length > MAX_TEST_COMMAND_LENGTH) {
+      errors.push(`${where} must NOT have more than ${MAX_TEST_COMMAND_LENGTH} characters`);
+    }
+    const parsed = parseTestCommand(cmd);
+    if (!parsed.ok) {
+      errors.push(`${where} is not an executable command: ${parsed.error}`);
+    }
+  }
+  return errors;
 }
 
 function normalizeIdList(val: string | string[] | null | undefined): string[] {
@@ -173,3 +212,27 @@ export function validateStore(store: Store): StoreValidationReport {
     isValid: errorIdSet.size === 0,
   };
 }
+
+export interface StoredCommandAuditResult {
+  inspected: number;
+  invalidCount: number;
+  invalidEntries: { id: string; command: string }[];
+}
+
+/**
+ * T-403: Sweep stored memories for non-template test_commands.
+ */
+export function auditStoredCommands(entries: MemoryEntry[]): StoredCommandAuditResult {
+  const invalidEntries: { id: string; command: string }[] = [];
+  for (const entry of entries) {
+    if (entry.test_command && !parseTestCommand(entry.test_command).ok) {
+      invalidEntries.push({ id: entry.id, command: entry.test_command });
+    }
+  }
+  return {
+    inspected: entries.length,
+    invalidCount: invalidEntries.length,
+    invalidEntries,
+  };
+}
+

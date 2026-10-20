@@ -2,7 +2,30 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
+import { resolveExternal } from "../paths.ts";
 import type { MeshTopology, MeshContractAuditResult, MeshContractItem } from "./types.ts";
+
+/** Upper bound on an anchor file the audit will read (F-21). */
+const MAX_ANCHOR_BYTES = 1024 * 1024;
+
+/**
+ * Reads a memory-supplied anchor path. Mesh links are intentionally external
+ * (T-363), so we normalize instead of confining — but the target must be a real,
+ * non-symlink, size-capped file so an anchor cannot exfiltrate arbitrary disk content.
+ *
+ * shortcut: symlinks rejected outright rather than resolved and re-checked; upgrade if
+ * linked repos need to anchor through symlinked paths.
+ */
+function readAnchorFile(resolvedPath: string): string {
+  const stat = fs.lstatSync(resolvedPath);
+  if (!stat.isFile()) {
+    throw new Error(`Mesh anchor target is not a regular file (symlinks and directories rejected): ${resolvedPath}`);
+  }
+  if (stat.size > MAX_ANCHOR_BYTES) {
+    throw new Error(`Mesh anchor target exceeds the ${MAX_ANCHOR_BYTES} byte read cap: ${resolvedPath}`);
+  }
+  return fs.readFileSync(resolvedPath, "utf-8");
+}
 
 /**
  * Cross-Package / Monorepo Mesh Contract Auditor
@@ -108,9 +131,19 @@ export function auditMeshContracts(topology: MeshTopology, store: Store): MeshCo
             }
           }
 
-          const resolvedPath = path.isAbsolute(relativePath.replace(/^repo:[^/]+\//, ""))
-            ? relativePath.replace(/^repo:[^/]+\//, "")
-            : path.resolve(topology.rootPath, relativePath.replace(/^repo:[^/]+\//, ""));
+          const stripped = relativePath.replace(/^repo:[^/]+\//, "");
+          // External by design (T-363): normalize + reject NUL, never confine.
+          let resolvedPath = resolveExternal(
+            path.isAbsolute(stripped)
+              ? stripped
+              : path.join(anchor.base_path || topology.rootPath, stripped),
+          );
+          if (!fs.existsSync(resolvedPath) && anchor.base_path && topology.rootPath) {
+            const fallbackPath = resolveExternal(path.join(topology.rootPath, stripped));
+            if (fs.existsSync(fallbackPath)) {
+              resolvedPath = fallbackPath;
+            }
+          }
 
           if (!fs.existsSync(resolvedPath)) {
             items.push({
@@ -121,7 +154,7 @@ export function auditMeshContracts(topology: MeshTopology, store: Store): MeshCo
               detail: `Cross-project anchor '${val}' points to missing file '${resolvedPath}'`,
             });
           } else if (targetSymbol) {
-            const content = fs.readFileSync(resolvedPath, "utf-8");
+            const content = readAnchorFile(resolvedPath);
             if (!content.includes(targetSymbol)) {
               items.push({
                 sourcePackage: path.basename(store.dir),

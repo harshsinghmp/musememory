@@ -2,7 +2,15 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
-import { tokenize } from "./retrieval.ts";
+import { tokenize, isExpired, safeMax } from "./retrieval.ts";
+import { softOrFusion } from "./retrieval/ranking.ts";
+import {
+  type RrfConfig,
+  type RrfVariant,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+} from "./retrieval/rrf.ts";
 import type { MemoryEntry } from "./types.ts";
 
 const DIMS = 256;
@@ -17,11 +25,15 @@ export interface IndexedEntry {
   /** Term frequencies over word tokens. */
   tf: Record<string, number>;
   /** Total term count (for BM25 length normalization). */
-  len: number;
+  len?: number;
+  magnitude?: number;
+  tokens?: string[];
 }
 
 export interface VectorIndex {
   version: 1;
+  updated_at?: string;
+  dimension?: number;
   entries: Record<string, IndexedEntry>;
 }
 
@@ -73,7 +85,7 @@ export function termFrequencies(text: string): { tf: Record<string, number>; len
 
 /** Build a full index over the store. ponytail: O(n) full rebuild every time — fine to ~10k entries; switch to incremental per-entry upserts if stores grow past that. */
 export function rebuildIndex(store: Store): VectorIndex {
-  const index: VectorIndex = { version: 1, entries: {} };
+  const index: VectorIndex = { version: 1, updated_at: new Date().toISOString(), entries: {} };
   for (const e of list(store)) {
     const text = `${e.title} ${e.content} ${(e.tags ?? []).join(" ")}`;
     const { tf, len } = termFrequencies(text);
@@ -85,6 +97,45 @@ export function rebuildIndex(store: Store): VectorIndex {
 export function saveIndex(index: VectorIndex, memoryDir: string): void {
   if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
   writeFileSync(indexFilePath(memoryDir), JSON.stringify(index), "utf8");
+}
+
+/**
+ * T-304: Incrementally upsert an entry into index.json if the index file exists.
+ * Does not force index creation if none exists yet (rebuildIndex handles cold stores).
+ */
+export function upsertIndexEntry(entry: MemoryEntry, memoryDir: string): boolean {
+  const p = indexFilePath(memoryDir);
+  if (!existsSync(p)) return false;
+  try {
+    const index = loadIndex(memoryDir);
+    if (!index) return false;
+    const text = `${entry.title} ${entry.content} ${(entry.tags ?? []).join(" ")}`;
+    const { tf, len } = termFrequencies(text);
+    index.entries[entry.id] = { vector: embed(text), tf, len };
+    index.updated_at = new Date().toISOString();
+    saveIndex(index, memoryDir);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * T-304: Remove an entry from index.json upon deletion or tombstoning.
+ */
+export function removeIndexEntry(id: string, memoryDir: string): boolean {
+  const p = indexFilePath(memoryDir);
+  if (!existsSync(p)) return false;
+  try {
+    const index = loadIndex(memoryDir);
+    if (!index || !index.entries[id]) return false;
+    delete index.entries[id];
+    index.updated_at = new Date().toISOString();
+    saveIndex(index, memoryDir);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadIndex(memoryDir: string): VectorIndex | null {
@@ -105,25 +156,45 @@ export function bm25Score(queryTf: Record<string, number>, entry: IndexedEntry, 
     const f = entry.tf[term];
     if (!f) continue;
     const idfTerm = idf[term] ?? 0;
-    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * (entry.len / Math.max(1, avgLen)))));
+    score += idfTerm * ((f * (K1 + 1)) / (f + K1 * (1 - B + B * ((entry.len ?? 0) / Math.max(1, avgLen)))));
     void qCount;
   }
   return score;
 }
 
-function inverseDocumentFrequencies(index: VectorIndex): { idf: Record<string, number>; avgLen: number } {
-  const total = Object.keys(index.entries).length || 1;
+interface IdfCacheEntry {
+  updated_at?: string;
+  count: number;
+  result: { idf: Record<string, number>; avgLen: number };
+}
+
+const idfCache = new WeakMap<VectorIndex, IdfCacheEntry>();
+
+export function inverseDocumentFrequencies(index: VectorIndex): { idf: Record<string, number>; avgLen: number } {
+  const cached = idfCache.get(index);
+  const entryCount = Object.keys(index.entries).length;
+  if (cached && cached.updated_at === index.updated_at && cached.count === entryCount) {
+    return cached.result;
+  }
+
+  const total = entryCount || 1;
   const df: Record<string, number> = {};
   let lenSum = 0;
   for (const e of Object.values(index.entries)) {
-    lenSum += e.len;
+    lenSum += e.len ?? 0;
     for (const term of Object.keys(e.tf)) df[term] = (df[term] ?? 0) + 1;
   }
   const idf: Record<string, number> = {};
   for (const [term, count] of Object.entries(df)) {
     idf[term] = Math.log(1 + (total - count + 0.5) / (count + 0.5));
   }
-  return { idf, avgLen: lenSum / total };
+  const result = { idf, avgLen: lenSum / total };
+  idfCache.set(index, {
+    updated_at: index.updated_at,
+    count: entryCount,
+    result,
+  });
+  return result;
 }
 
 export interface HybridResult {
@@ -131,6 +202,36 @@ export interface HybridResult {
   score: number;
   cosine: number;
   bm25: number;
+}
+
+export interface HybridSearchOptions {
+  limit?: number;
+  /** Restrict candidate rows to this project (undefined = cross-project search). */
+  project?: string;
+  includeSuperseded?: boolean;
+  includeArchived?: boolean;
+  includeExpired?: boolean;
+  /** Clock for expiry evaluation; defaults to Date.now(). */
+  now?: number;
+  /** Fusion strategy: 'linear' (default for legacy compatibility), 'soft_or' (T-114), or 'rrf' (T-120). */
+  fusion?: "linear" | "soft_or" | "rrf";
+  /** T-120: RRF configuration when fusion === 'rrf'. */
+  rrfConfig?: RrfConfig;
+  /** T-120: A/B variant for RRF presets ('A'/'control' vs 'B'/'treatment'). */
+  rrfVariant?: RrfVariant;
+}
+
+/**
+ * Row-level lifecycle/project gate (T-303). Applied to candidate rows BEFORE fusion so
+ * superseded/archived/expired and cross-project entries never influence ranking or context.
+ * Mirrors queryContext semantics so both backends expose the same behaviour.
+ */
+function passesRowFilter(entry: MemoryEntry, o: HybridSearchOptions, now: number): boolean {
+  if (o.project && entry.project !== o.project) return false;
+  if (!o.includeSuperseded && (entry.status === "superseded" || entry.status === "rejected")) return false;
+  if (!o.includeArchived && entry.status === "archived") return false;
+  if (!o.includeExpired && isExpired(entry, now)) return false;
+  return true;
 }
 
 /**
@@ -142,11 +243,12 @@ export function hybridSearch(
   store: Store,
   memoryDir: string,
   query: string,
-  options: { limit?: number } = {},
+  options: HybridSearchOptions = {},
 ): HybridResult[] | null {
   const index = loadIndex(memoryDir);
   if (!index) return null;
 
+  const now = options.now ?? Date.now();
   const qVec = embed(query);
   const { tf: qTf } = termFrequencies(query);
   const { idf, avgLen } = inverseDocumentFrequencies(index);
@@ -159,6 +261,7 @@ export function hybridSearch(
   for (const [id, indexed] of Object.entries(index.entries)) {
     const entry = byId.get(id);
     if (!entry) continue;
+    if (!passesRowFilter(entry, options, now)) continue;
     scored.push({
       entry,
       indexed,
@@ -166,15 +269,54 @@ export function hybridSearch(
       bm25: bm25Score(qTf, indexed, idf, avgLen),
     });
   }
-  const maxBm25 = Math.max(...scored.map((s) => s.bm25), Number.EPSILON);
+  const maxBm25 = safeMax(scored.map((s) => s.bm25), Number.EPSILON);
 
-  for (const s of scored) {
-    results.push({
-      entry: s.entry,
-      cosine: s.cosine,
-      bm25: s.bm25,
-      score: 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25),
-    });
+  if (options.fusion === "rrf") {
+    const { k, weights } = resolveRrfConfig(
+      options.rrfConfig ?? (options.rrfVariant ? { variant: options.rrfVariant } : {}),
+    );
+    const cosineRanked = [...scored].sort((a, b) => b.cosine - a.cosine);
+    const bm25Ranked = [...scored].sort((a, b) => b.bm25 - a.bm25);
+
+    const cosineRanks = new Map<string, number>();
+    cosineRanked.forEach((s, idx) => cosineRanks.set(s.entry.id, idx + 1));
+
+    const bm25Ranks = new Map<string, number>();
+    bm25Ranked.forEach((s, idx) => bm25Ranks.set(s.entry.id, idx + 1));
+
+    const semWeight = weights.semantic ?? 1.0;
+    const lexWeight = weights.lexical ?? 1.0;
+
+    for (const s of scored) {
+      const cRank = cosineRanks.get(s.entry.id) ?? 999;
+      const bRank = bm25Ranks.get(s.entry.id) ?? 999;
+      const score = calculateRrfItemScore(
+        [
+          { rank: cRank, weight: semWeight, signal: "semantic" },
+          { rank: bRank, weight: lexWeight, signal: "lexical" },
+        ],
+        k,
+      );
+      results.push({
+        entry: s.entry,
+        cosine: s.cosine,
+        bm25: s.bm25,
+        score,
+      });
+    }
+  } else {
+    const useSoftOr = options.fusion === "soft_or";
+    for (const s of scored) {
+      const pv = Math.max(0, s.cosine);
+      const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
+      const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
+      results.push({
+        entry: s.entry,
+        cosine: s.cosine,
+        bm25: s.bm25,
+        score,
+      });
+    }
   }
 
   results.sort((a, b) => b.score - a.score);

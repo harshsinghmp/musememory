@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
+import { join, relative } from "node:path";
+import { assertBareFilename, buildPageIndex, searchPageIndex, loadPageIndex, listPageIndexes, deletePageIndex } from "../src/pageindex/index.ts";
+import { resolveExternal, resolveWithin } from "../src/paths.ts";
 
 describe("PageIndex Native Engine", () => {
   let testDir: string;
@@ -71,6 +72,46 @@ Argon2id is used for password hashing.
     expect(search.reasoning).toContain("Session Tokens");
   });
 
+  it("T-356: searchPageIndex respects maxDepth pruning and disclosureDepth options", () => {
+    const markdown = `
+# Engineering System
+
+## Architecture
+Overview of architecture.
+
+### Database Layer
+Postgres database details.
+
+#### Sharding Details
+Deep sharding specifics for high throughput.
+`;
+
+    const doc = buildPageIndex(markdown, { project: "testproj", title: "Engineering System", memoryDir });
+
+    // With maxDepth = 2, deep level 4 headers (Sharding Details) should not be traversed
+    const shallowSearch = searchPageIndex(doc, { query: "sharding", maxDepth: 2 });
+    expect(shallowSearch.results.some((r) => r.title.includes("Sharding"))).toBe(false);
+
+    // Without maxDepth constraint (or maxDepth = 4), deep headers are found
+    const deepSearch = searchPageIndex(doc, { query: "sharding", maxDepth: 4 });
+    expect(deepSearch.results.some((r) => r.title.includes("Sharding"))).toBe(true);
+
+    // disclosureDepth L1 omits citations and uses lower token estimates
+    const l1Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L1" });
+    expect(l1Search.results.length).toBeGreaterThan(0);
+    expect(l1Search.results[0].citations).toBeUndefined();
+
+    // disclosureDepth L2 includes citations
+    const l2Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L2" });
+    expect(l2Search.results.length).toBeGreaterThan(0);
+    expect(l2Search.results[0].citations).toBeDefined();
+
+    // disclosureDepth L3 includes content in summary and has higher token accounting
+    const l3Search = searchPageIndex(doc, { query: "architecture", disclosureDepth: "L3" });
+    expect(l3Search.results.length).toBeGreaterThan(0);
+    expect(l3Search.tokensUsed).toBeGreaterThanOrEqual(l1Search.tokensUsed);
+  });
+
   it("intercepts and rejects secrets via Vibeguard", () => {
     const leakMarkdown = "# Leaked Keys\nsk-1234567890abcdef1234567890abcdef";
     expect(() => {
@@ -85,5 +126,136 @@ Argon2id is used for password hashing.
     const del = deletePageIndex(memoryDir, "testproj", doc.id);
     expect(del.deletedCount).toBe(1);
     expect(listPageIndexes(memoryDir, "testproj").length).toBe(0);
+  });
+
+  it("loadPageIndex returns null instead of reading outside the pageindex base", () => {
+    const doc = buildPageIndex("# Hostile Doc\nSome text", { project: "testproj", memoryDir });
+    expect(loadPageIndex(memoryDir, "testproj", doc.id)).not.toBeNull();
+
+    expect(loadPageIndex(memoryDir, "../../etc", "passwd")).toBeNull();
+    expect(loadPageIndex(memoryDir, "testproj", "../../../etc/passwd")).toBeNull();
+  });
+
+  it("rejects traversal and absolute indexIds and writes nothing outside", () => {
+    for (const hostile of ["../../evil", "/abs", "a/b", "a\\b", "..", ".hidden", "evil\0.json"]) {
+      expect(() => assertBareFilename(hostile)).toThrow(/bare filename/i);
+    }
+    // Nothing was created anywhere by the rejected ids.
+    expect(existsSync(join(memoryDir, "pageindex", "evil.json"))).toBe(false);
+    expect(existsSync(join(testDir, "evil.json"))).toBe(false);
+
+    // A legit id still validates.
+    expect(() => assertBareFilename("my-doc_1")).not.toThrow();
+
+    // The real persist path still writes, and what it writes passes the guard.
+    const doc = buildPageIndex("# Ok Doc\ntext", { project: "testproj", memoryDir });
+    expect(() => assertBareFilename(doc.id)).not.toThrow();
+    expect(existsSync(join(memoryDir, "pageindex", "testproj", `${doc.id}.json`))).toBe(true);
+    expect(loadPageIndex(memoryDir, "testproj", doc.id)?.title).toBe(doc.title);
+  });
+
+  it("deletePageIndex refuses to delete a directory outside the pageindex base", () => {
+    buildPageIndex("# Hostile Doc\nSome text", { project: "testproj", memoryDir });
+
+    const evil = join(tmpdir(), "evil");
+    rmSync(evil, { recursive: true, force: true });
+    mkdirSync(evil, { recursive: true });
+    writeFileSync(join(evil, "precious.txt"), "precious");
+
+    try {
+      const traversal = relative(join(memoryDir, "pageindex"), evil);
+      expect(() => deletePageIndex(memoryDir, traversal)).toThrow(/escap/i);
+      expect(existsSync(join(evil, "precious.txt"))).toBe(true);
+    } finally {
+      rmSync(evil, { recursive: true, force: true });
+    }
+  });
+
+  it("deletePageIndex rejects '..' but still deletes a real pageindex base", () => {
+    buildPageIndex("# Temp Doc\nSome text", { project: "testproj", memoryDir });
+
+    expect(() => deletePageIndex(memoryDir, "..")).toThrow(/escap/i);
+    expect(listPageIndexes(memoryDir, "testproj").length).toBe(1);
+
+    expect(deletePageIndex(memoryDir).deletedCount).toBe(1);
+    expect(listPageIndexes(memoryDir).length).toBe(0);
+  });
+
+  it("rejects every hostile project/indexId shape on load and delete", () => {
+    const doc = buildPageIndex("# Guard Doc\ntext", { project: "testproj", memoryDir });
+
+    // A real directory outside the pageindex base that must survive every attempt.
+    const evilDir = mkdtempSync(join(tmpdir(), "musememory-evil-"));
+    const sentinel = join(evilDir, "precious.txt");
+    writeFileSync(sentinel, "precious");
+
+    const escape = relative(join(memoryDir, "pageindex"), evilDir);
+    for (const hostile of [escape, "../../tmp/evil", "..", evilDir]) {
+      // load stays a read-only query: hostile input is a miss, never a throw.
+      expect(loadPageIndex(memoryDir, hostile, doc.id)).toBeNull();
+      // delete refuses instead of resolving outside the base...
+      expect(() => deletePageIndex(memoryDir, hostile)).toThrow(/escap|relative/i);
+      // ...whether the traversal rides in the project or the indexId.
+      expect(() => deletePageIndex(memoryDir, hostile, doc.id)).toThrow(/escap|relative/i);
+      expect(() => deletePageIndex(memoryDir, "testproj", escape)).toThrow(/escap|relative/i);
+      expect(existsSync(sentinel)).toBe(true);
+    }
+
+    // Nothing escaped: the outside directory is still intact and empty of new entries.
+    expect(readdirSync(evilDir)).toEqual(["precious.txt"]);
+    // Established behavior kept: the real base still deletes.
+    expect(deletePageIndex(memoryDir).deletedCount).toBe(1);
+
+    rmSync(evilDir, { recursive: true, force: true });
+  });
+});
+
+describe("Path containment primitives", () => {
+  it("rejects NUL bytes in base, segment and external paths", () => {
+    expect(() => resolveWithin("/tmp/pi\0base", "a.md")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "a\0.md")).toThrow();
+    expect(() => resolveExternal("/tmp/pi-base/a\0.md")).toThrow();
+  });
+
+  it("rejects absolute segments inside the base but not for external paths", () => {
+    expect(() => resolveWithin("/tmp/pi-base", "/etc/passwd")).toThrow();
+    expect(resolveExternal("/etc/passwd")).toBe("/etc/passwd");
+  });
+
+  it("rejects traversal, including sibling prefixes of the base", () => {
+    expect(() => resolveWithin("/tmp/pi-base", "..")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "a", "..", "..", "b")).toThrow();
+    expect(() => resolveWithin("/tmp/pi-base", "../pi-base-evil/x.md")).toThrow();
+    expect(resolveWithin("/tmp/pi-base", "a", "b.md")).toBe("/tmp/pi-base/a/b.md");
+  });
+
+  it("treats a trailing separator on the base as the same directory", () => {
+    expect(resolveWithin("/tmp/pi-base/", "a.md")).toBe("/tmp/pi-base/a.md");
+    expect(() => resolveWithin("/tmp/pi-base/", "../pi-base-evil")).toThrow();
+  });
+
+  it("resolves a non-existent leaf without touching the filesystem", () => {
+    const leaf = "/tmp/pi-base/missing/deep/x.json";
+    expect(resolveWithin("/tmp/pi-base", "missing/deep/x.json")).toBe(leaf);
+    expect(existsSync(leaf)).toBe(false);
+  });
+
+  it("normalizes external paths", () => {
+    expect(resolveExternal("/tmp/a/../b/./c")).toBe("/tmp/b/c");
+  });
+
+  it("listPageIndexes refuses a traversal project and still lists legit ones", () => {
+    const dir = mkdtempSync(join(tmpdir(), "musememory-pi-list-"));
+    const mem = join(dir, ".memory");
+    mkdirSync(join(mem, "pageindex"), { recursive: true });
+    const outside = mkdtempSync(join(tmpdir(), "musememory-pi-outside-"));
+    writeFileSync(join(outside, "loot.json"), '{"x":1}');
+    expect(() => listPageIndexes(mem, "../../tmp")).toThrow();
+    expect(() => listPageIndexes(mem, "..")).toThrow();
+    expect(existsSync(join(outside, "looted.json"))).toBe(false);
+    rmSync(outside, { recursive: true, force: true });
+    // Legit project list still works (empty store → empty list, no throw).
+    expect(listPageIndexes(mem, "testproj")).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

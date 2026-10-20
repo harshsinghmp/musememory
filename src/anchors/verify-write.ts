@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { Store } from "../store.ts";
 import type { MemoryEntry, CodeAnchor } from "../types.ts";
 import { computeStructuralHash, extractSymbolBody } from "./fingerprint.ts";
+import { resolveAnchorPath } from "./resolver.ts";
 import { recordAuditEvent } from "../audit.ts";
 
 /**
@@ -56,7 +57,7 @@ interface AnchorCheck {
 
 /** Verify a single anchor against the live filesystem. */
 function checkAnchor(workspaceRoot: string, anchor: CodeAnchor): AnchorCheck {
-  const fullPath = resolve(workspaceRoot, anchor.file_path);
+  const fullPath = resolveAnchorPath(workspaceRoot, anchor);
 
   if (!existsSync(fullPath)) {
     return {

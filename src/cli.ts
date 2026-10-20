@@ -30,6 +30,7 @@ import {
   handleReindexCommand,
 } from "./cli/retrieval.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
+import { handleEmbedCommand } from "./cli/embed.ts";
 import { handleWikiCommand } from "./cli/wiki.ts";
 import { handleEntitiesCommand, handleExtractEntitiesCommand } from "./cli/entities.ts";
 import { handleSettingsCommand } from "./cli/settings.ts";
@@ -42,6 +43,7 @@ import {
   handleMarkStaleCommand,
   handleRejectCommand,
   handleDeleteCommand,
+  handleRestoreCommand,
   handleAuditCommand,
   handleExportCommand,
   handleImportCommand,
@@ -57,6 +59,7 @@ import {
   handleNudgeCommand,
   handleRoutineCommand,
   handleDistillCommand,
+  handleDistillRouteCommand,
   handleVerifyCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
@@ -77,6 +80,7 @@ import {
 } from "./cli/health.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
+import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -99,7 +103,8 @@ Core Memory Lifecycle Commands:
   link <id> --related <id,...>  Link related memories bidirectionally
   mark-stale <id> [--reason R]  Deprecate decaying knowledge
   reject <id>                   Reject candidate entry
-  delete <id> [--reason R]      Permanently delete entry and log audit record
+  delete <id> [--reason R]      Tombstone entry (soft delete), log audit, restorable
+  restore <id> [--replay [--apply]]  Restore a tombstoned entry; --replay rebuilds content from audit.jsonl
   list / ls [--status S] [--type T] [--project P] List memory entries with multi-field filtering
   stats                         Display total memory counts and status/type distribution
   stale [--days N]              List entries exceeding staleness policy
@@ -126,6 +131,7 @@ Context & Retrieval Commands:
   context [query] [--limit N] [--token-budget N] [--depth L1|L2|L3] [--tier 0|1|2] Top-ranked prompt context
   search <query> [--limit N] [--token-budget N] [--hybrid] [--tree] Scored token retrieval (hybrid: vector+BM25, tree: hierarchical reasoning)
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
+  embed [status|build|reindex]  Manage semantic embeddings (llama.cpp / OpenAI-compatible endpoint; opt-in)
   recall [query]                Search active/confirmed memories with filters
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
@@ -141,9 +147,10 @@ Persona, Settings & Constraints Commands:
   core [tier] [--set T|--remove|--show] Manage CORE.md permanent partitions (identity|directives|conventions|context)
 
 Ecosystem, Migration & Connectivity:
-  connect [agent|all] [--force] [--with-hooks]
+  connect [agent|all] [--force] [--with-hooks] [--harness H]
                                  Auto-wire MCP into detected coding agents; --with-hooks also installs
-                                 the Claude Code lifecycle hook pack (SessionStart/PostToolUse/Stop)
+                                 the lifecycle hook pack (SessionStart/PostToolUse/Stop) into .agents/hooks.json;
+                                 --harness claude is the explicit opt-in for harness-specific paths like ~/.claude
   agents / detect-agents        Scan workstation for 80+ coding agent platforms
   detect                        Scan machine for 24+ external memory formats
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
@@ -166,6 +173,12 @@ Ecosystem, Migration & Connectivity:
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms
+
+Version Control (R23):
+  branch <id> --path <path> [--label L] Tag a memory with semantic dotted-path addressing
+  checkout <path|id>              Retrieve memory by mem_path or entry id
+  blame <id>                      Show access history & staleness metadata for a memory
+  ls-branches [--project P]       List all branch references
 `;
 
 export async function main(argv: string[]): Promise<number> {
@@ -212,7 +225,12 @@ export async function main(argv: string[]): Promise<number> {
     case "compress":
       return handleCompressCommand(parsed);
     case "mcp":
-      return handleMcpCommand();
+      return handleMcpCommand(parsed);
+    case "serve":
+      return handleMcpCommand({
+        ...parsed,
+        flags: { ...parsed.flags, http: "true" },
+      });
     case "daemon":
       return handleDaemonCommand(parsed);
 
@@ -239,6 +257,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleHooksCommand(parsed);
     case "reindex":
       return handleReindexCommand(parsed);
+    case "embed":
+      return handleEmbedCommand(parsed);
     case "import-transcript":
     case "import-jsonl":
       return handleImportTranscriptCommand(parsed);
@@ -268,6 +288,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleRejectCommand(parsed);
     case "delete":
       return handleDeleteCommand(parsed);
+    case "restore":
+      return handleRestoreCommand(parsed);
     case "audit":
       return handleAuditCommand(parsed);
     case "export":
@@ -299,6 +321,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleRoutineCommand(parsed);
     case "distill":
       return handleDistillCommand(parsed);
+    case "distill-route":
+      return handleDistillRouteCommand(parsed);
     case "verify":
       return handleVerifyCommand(parsed);
     case "session":
@@ -344,6 +368,16 @@ export async function main(argv: string[]): Promise<number> {
       return handleSyncCommand(parsed);
     case "mesh":
       return handleMeshCommand(parsed);
+
+    // R23 Versioning Commands
+    case "branch":
+      return handleBranchCommand(parsed);
+    case "checkout":
+      return handleCheckoutCommand(parsed);
+    case "blame":
+      return handleBlameCommand(parsed);
+    case "ls-branches":
+      return handleLsBranchesCommand(parsed);
 
     default:
       console.error(`Error: unknown command "${cmd}"`);

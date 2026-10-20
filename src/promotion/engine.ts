@@ -3,9 +3,10 @@ import { get, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
 import { getGlobalMemoryDir } from "../root.ts";
 import { openStore } from "../store.ts";
-import type { MemoryEntry, MemoryScope, PromotionRecord } from "../types.ts";
-import type { PromotionEvaluation, PromotionResult } from "./types.ts";
+import type { MemoryEntry, MemoryScope, PromotionRecord, EvidenceItem, MemoryUtility } from "../types.ts";
+import type { PromotionEvaluation, PromotionResult, AppendEvidenceOptions, CurateResult } from "./types.ts";
 import { generalizeContent, isContentGeneralizable } from "./generalization.ts";
+import { evaluateCorroboration } from "../quality/corroboration.ts";
 
 /** Minimum successful reuse applications required for automatic global promotion */
 export const MIN_PROMOTION_SUCCESSFUL_USES = 5;
@@ -21,12 +22,149 @@ export function getEntryScope(entry: MemoryEntry): MemoryScope {
 }
 
 /**
+ * T-105b: Syntax-only promotion rule.
+ * Enforces AST, schema, command, and JSON block syntax verification before promotion.
+ */
+export interface SyntaxValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+export function validateMemorySyntax(entry: MemoryEntry): SyntaxValidationResult {
+  const content = entry.content ?? "";
+
+  // 1. Validate JSON code blocks (```json ... ```)
+  const jsonBlockRegex = /```(?:json|jsonc)\s*\n([\s\S]*?)\n```/gi;
+  let match: RegExpExecArray | null;
+  while ((match = jsonBlockRegex.exec(content)) !== null) {
+    const jsonText = match[1].trim();
+    try {
+      JSON.parse(jsonText);
+    } catch (err) {
+      return {
+        valid: false,
+        reason: `Syntax gate failure: malformed JSON code block (${err instanceof Error ? err.message : String(err)})`,
+      };
+    }
+  }
+
+  // 2. Validate test_command if present
+  if (entry.test_command && entry.test_command.trim()) {
+    const cmd = entry.test_command.trim();
+    let singleQuotes = 0;
+    let doubleQuotes = 0;
+    for (const char of cmd) {
+      if (char === "'") singleQuotes++;
+      if (char === '"') doubleQuotes++;
+    }
+    if (singleQuotes % 2 !== 0 || doubleQuotes % 2 !== 0) {
+      return {
+        valid: false,
+        reason: "Syntax gate failure: unbalanced quotes in test_command",
+      };
+    }
+    let parens = 0;
+    for (const char of cmd) {
+      if (char === "(") parens++;
+      if (char === ")") parens--;
+      if (parens < 0) break;
+    }
+    if (parens !== 0) {
+      return {
+        valid: false,
+        reason: "Syntax gate failure: unbalanced parentheses in test_command",
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * T-105: Corroboration-gated promotion.
+ * Requires evidence spanning >= 2 independent calendar days from non-synthetic sources.
+ */
+export interface CorroborationResult {
+  corroborated: boolean;
+  distinctDays: number;
+  nonSyntheticSources: string[];
+  reason?: string;
+  /** T-076: Bayesian confidence score 1 - 0.7^n based on corroboration count. */
+  confidence?: number;
+  corroborationCount?: number;
+}
+
+export function checkCorroboration(entry: MemoryEntry): CorroborationResult {
+  const dates = new Set<string>();
+  const nonSyntheticSources = new Set<string>();
+
+  const isSynthetic = (source?: string, type?: string) => {
+    const s = (source ?? "").toLowerCase();
+    const t = (type ?? "").toLowerCase();
+    return (
+      s === "agent" ||
+      s === "transcript" ||
+      s === "assistant" ||
+      s === "inference" ||
+      s === "distillation" ||
+      s === "machine" ||
+      s === "synthetic" ||
+      t === "synthetic" ||
+      t === "infer"
+    );
+  };
+
+  if (entry.evidence && entry.evidence.length > 0) {
+    for (const ev of entry.evidence) {
+      if (ev.timestamp) {
+        dates.add(ev.timestamp.slice(0, 10));
+      }
+      if (!isSynthetic(ev.source, ev.type)) {
+        nonSyntheticSources.add(ev.source || ev.type);
+      }
+    }
+  }
+
+  if (entry.created_at) dates.add(entry.created_at.slice(0, 10));
+  if (entry.last_confirmed_at) dates.add(entry.last_confirmed_at.slice(0, 10));
+  if (entry.updated_at) dates.add(entry.updated_at.slice(0, 10));
+
+  if (!isSynthetic(entry.source, entry.type)) {
+    nonSyntheticSources.add(entry.source ?? "human");
+  }
+
+  const distinctDays = dates.size;
+  const nonSynthList = Array.from(nonSyntheticSources);
+  const corroborated = distinctDays >= 2 && nonSynthList.length >= 1;
+
+  let reason: string | undefined;
+  if (!corroborated) {
+    if (distinctDays < 2) {
+      reason = `requires evidence spanning >= 2 independent calendar days (found ${distinctDays})`;
+    } else {
+      reason = "requires at least one non-synthetic source (all sources are machine/agent)";
+    }
+  }
+
+  const evalRes = evaluateCorroboration(entry);
+
+  return {
+    corroborated,
+    distinctDays,
+    nonSyntheticSources: nonSynthList,
+    reason,
+    confidence: evalRes.confidence,
+    corroborationCount: evalRes.n,
+  };
+}
+
+/**
  * Evaluates whether a memory entry qualifies for promotion along the ladder:
  * LOCAL -> PROJECT -> GLOBAL
  */
 export function evaluatePromotion(
   entry: MemoryEntry,
-  options: { forceManual?: boolean } = {}
+  options: { forceManual?: boolean; requireCorroboration?: boolean } = {}
 ): PromotionEvaluation {
   const currentScope = getEntryScope(entry);
   const targetScope: MemoryScope = currentScope === "local" ? "project" : "global";
@@ -46,6 +184,26 @@ export function evaluatePromotion(
   const isGeneralizable = isContentGeneralizable(entry.content);
   const genResult = generalizeContent(entry.content, { projectName: entry.project });
 
+  // T-105b: Universal syntax gate check
+  const syntax = validateMemorySyntax(entry);
+  if (!syntax.valid) {
+    reasons.push(syntax.reason ?? "Syntax check failed");
+    return {
+      eligible: false,
+      current_scope: currentScope,
+      target_scope: targetScope,
+      successful_uses: successfulUses,
+      total_uses: totalUses,
+      success_rate: successRate,
+      regressions,
+      conflicts,
+      has_sufficient_evidence: hasSufficientEvidence,
+      is_generalizable: isGeneralizable,
+      has_valid_syntax: false,
+      reasons,
+    };
+  }
+
   if (currentScope === "global") {
     reasons.push("Entry is already at maximum scope (global)");
     return {
@@ -59,6 +217,7 @@ export function evaluatePromotion(
       conflicts,
       has_sufficient_evidence: hasSufficientEvidence,
       is_generalizable: isGeneralizable,
+      has_valid_syntax: true,
       reasons,
     };
   }
@@ -140,6 +299,17 @@ export function evaluatePromotion(
     reasons.push("Content cannot be generalized into reusable cross-project principle");
   }
 
+  // T-105: Corroboration gate (evaluated when requireCorroboration: true or when evidence is present)
+  let isCorroborated: boolean | undefined = undefined;
+  if (options.requireCorroboration || (entry.evidence && entry.evidence.length > 0)) {
+    const corroboration = checkCorroboration(entry);
+    isCorroborated = corroboration.corroborated;
+    if (!corroboration.corroborated) {
+      eligible = false;
+      reasons.push(`Corroboration gate failed: ${corroboration.reason}`);
+    }
+  }
+
   if (eligible) {
     reasons.push(`Met all policy gates: >= ${MIN_PROMOTION_SUCCESSFUL_USES} successful uses, 100% success rate, 0 regressions, 0 conflicts`);
   }
@@ -155,6 +325,8 @@ export function evaluatePromotion(
     conflicts,
     has_sufficient_evidence: hasSufficientEvidence,
     is_generalizable: isGeneralizable,
+    is_corroborated: isCorroborated,
+    has_valid_syntax: true,
     generalized_content: genResult.generalized,
     reasons,
   };
@@ -308,5 +480,99 @@ export function promoteMemory(
     target_entry_id: globalEntry.id,
     target_memory_dir: globalDir,
     message: `Successfully promoted entry '${id}' to global knowledge at ${globalDir}`,
+  };
+}
+
+/**
+ * T-106: Curator concept: agent appends empirical evidence or application outcomes,
+ * and deterministic promotion rules decide eligibility and execution.
+ */
+export function appendEvidence(
+  store: Store,
+  id: string,
+  evidence: {
+    id?: string;
+    type?: EvidenceItem["type"];
+    source?: string;
+    timestamp?: string;
+    excerpt?: string;
+    confidence?: number;
+  },
+  options: AppendEvidenceOptions = {},
+): CurateResult {
+  const entry = get(store, id);
+  if (!entry) {
+    throw new Error(`Cannot append evidence: memory entry '${id}' not found`);
+  }
+
+  const now = new Date().toISOString();
+  const evidenceId = evidence.id || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const fullEvidence: EvidenceItem = {
+    id: evidenceId,
+    type: evidence.type || ("observed" as any),
+    source: evidence.source || options.actor || "agent",
+    timestamp: evidence.timestamp || now,
+    excerpt: evidence.excerpt,
+    confidence: typeof evidence.confidence === "number" ? evidence.confidence : 1.0,
+  };
+
+  entry.evidence = [...(entry.evidence || []), fullEvidence];
+
+  // Initialize and update utility metrics
+  const utility: MemoryUtility = entry.utility || {
+    retrieval_count: 0,
+    application_count: 0,
+    successful_applications: 0,
+    failed_applications: 0,
+    regressions: 0,
+    contradictions: 0,
+  };
+
+  if (options.applicationOutcome === "success") {
+    utility.application_count++;
+    utility.successful_applications++;
+  } else if (options.applicationOutcome === "failure") {
+    utility.application_count++;
+    utility.failed_applications++;
+  } else if (options.applicationOutcome === "regression") {
+    utility.application_count++;
+    utility.regressions++;
+  }
+  utility.reuse_success_rate =
+    utility.application_count > 0 ? utility.successful_applications / utility.application_count : 0;
+  utility.last_applied_at = now;
+  entry.utility = utility;
+  entry.updated_at = now;
+
+  save(store, entry);
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "observation",
+      entry_id: id,
+      project: entry.project,
+      actor: options.actor || fullEvidence.source || "agent",
+      details: {
+        evidence_id: fullEvidence.id,
+        evidence_type: fullEvidence.type,
+        outcome: options.applicationOutcome,
+      },
+    });
+  }
+
+  const autoEvaluate = options.autoEvaluate !== false;
+  const evalResult = evaluatePromotion(entry);
+  let promoResult: PromotionResult | undefined;
+
+  if (autoEvaluate && evalResult.eligible) {
+    promoResult = promoteMemory(store, id, { actor: options.actor });
+  }
+
+  return {
+    memory_id: id,
+    evidence_added: fullEvidence,
+    utility,
+    promotion_evaluation: evalResult,
+    promotion_result: promoResult,
   };
 }

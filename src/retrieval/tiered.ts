@@ -9,8 +9,20 @@ import {
 import { syncConstraints } from "../governor.ts";
 import { getUserProfile } from "../user.ts";
 import { formatCoreBlock } from "../core.ts";
+import { formatDegradedFaultNotice } from "./faults.ts";
 
-export type RetrievalTier = 0 | 1 | 2;
+
+import {
+  type RetrievalTier,
+  resolveTierBudget,
+  TIER_0_DEFAULT_BUDGET,
+  TIER_1_DEFAULT_BUDGET,
+  TIER_2_DEFAULT_BUDGET,
+  getTierBudgetProvenance,
+} from "./tier_budgets.ts";
+
+export type { RetrievalTier };
+export { resolveTierBudget, getTierBudgetProvenance };
 
 export interface TieredContextOptions extends ContextQueryOptions {
   tier?: RetrievalTier;
@@ -18,9 +30,9 @@ export interface TieredContextOptions extends ContextQueryOptions {
 
 /**
  * Deterministic Tiered Retrieval Engine:
- * - Tier 0 (Manifest): Ultra-compact index of memory IDs, types, and titles (~50 tokens).
- * - Tier 1 (Routing Set): Active USER.md, CURRENT.md, and routed invariant headers (~300 tokens).
- * - Tier 2 (Bounded Bodies): Full memory bodies fitted greedily into token knapsack budget.
+ * - Tier 0 (Manifest): Ultra-compact index of memory IDs, types, and titles (default: ~80 tokens).
+ * - Tier 1 (Routing Set): Active USER.md, CURRENT.md, and routed invariant headers (default: ~400 tokens).
+ * - Tier 2 (Bounded Bodies): Full memory bodies fitted greedily into token knapsack budget (default: ~4000 tokens).
  */
 export function queryTieredContext(
   store: Store,
@@ -41,6 +53,9 @@ export function queryTieredContext(
 
   if (tier === 0) {
     const parts: string[] = [];
+    if (queryResult.degraded && queryResult.degraded_notes && queryResult.degraded_notes.length > 0) {
+      parts.push(formatDegradedFaultNotice(queryResult.degraded_notes));
+    }
     parts.push("### Memory Manifest (Tier 0)");
     if (queryResult.results.length === 0) {
       parts.push("*(No matching memories)*");
@@ -58,11 +73,23 @@ export function queryTieredContext(
       totalTokensUsed,
       constraints,
       userProfile,
+      fromCache: false,
+      stale: queryResult.stale,
+      degraded: queryResult.degraded,
+      degraded_notes: queryResult.degraded_notes,
+      fault_notes: queryResult.fault_notes,
+      mode: queryResult.mode,
+      no_confident_match: queryResult.no_confident_match,
+      confident_answers: queryResult.confident_answers,
+      draft_answers: queryResult.draft_answers,
     };
   }
 
   // Tier 1: Routing Set
   const parts: string[] = [];
+  if (queryResult.degraded && queryResult.degraded_notes && queryResult.degraded_notes.length > 0) {
+    parts.push(formatDegradedFaultNotice(queryResult.degraded_notes));
+  }
   if (userProfile) {
     parts.push("### User Profile & Preferences (USER.md)");
     parts.push(userProfile);
@@ -103,5 +130,14 @@ export function queryTieredContext(
     totalTokensUsed,
     constraints,
     userProfile,
+    fromCache: false,
+    stale: queryResult.stale,
+    degraded: queryResult.degraded,
+    degraded_notes: queryResult.degraded_notes,
+    fault_notes: queryResult.fault_notes,
+    mode: queryResult.mode,
+    no_confident_match: queryResult.no_confident_match,
+    confident_answers: queryResult.confident_answers,
+    draft_answers: queryResult.draft_answers,
   };
 }

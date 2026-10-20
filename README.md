@@ -20,18 +20,19 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-502%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1285%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
-![Agent Coverage](https://img.shields.io/badge/Agents-80+_Supported-4F46E5?style=for-the-badge&logo=openai)
+![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
 
 **Persistent, local-first memory for AI agents and the projects they work on.**
 
 [Visit the live site](https://harshsinghmp.github.io/musememory/) · [Docs](https://harshsinghmp.github.io/musememory/docs) · [Comparison](https://harshsinghmp.github.io/musememory/compare) · [Install](#start-with-one-command)
 
-https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000
+<img src="./assets/muse-memory-demo.gif" alt="Muse Memory in action — memory init, propose, context recall, and R23 version control (branch / blame / checkout) with access-weighted decay" width="100%" />
 
 *→ Prefer the raw clip? [`apps/website/public/showreel.mp4`](./apps/website/public/showreel.mp4) (10s, 1280×720, 240KB) — or watch it embedded on the [live site](https://harshsinghmp.github.io/musememory/#showreel).*
+*Rebuild the GIF with `bun run build:gif` (deterministic — renders from a declarative scene script, not a screen recording).*
 
 </div>
 
@@ -39,6 +40,17 @@ https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000
 
 ## What changed
 
+- **Failure Attribution, Negative Mining & Compounding (Wave 22 / v3.0.0)**: Scoped failure attribution matching code anchors, affected paths, and reproduction commands with deduplicated per-session strikes and a dual-axis decaying strike counter (2 clean runs or 30 days) to prevent wrongful demotions; constitutional dispute immunity for constraints and timeless invariants; trajectory fix-pair mining discovering negative memories from Error ➔ Remediation sequences; active working set retrieval compounding via memoized `.memory/HOT.md` candidates with relevance-gated source bonuses; and LangMem sub-linear logarithmic frequency ranking with 2x application weighting ([docs/failure-attribution-and-negative-mining.md](docs/failure-attribution-and-negative-mining.md)).
+- **Graph, Provenance & Lineage Architecture (Wave 17)**: Write-time associative graph edge auto-seeding (`linked_memory_ids`), HyAtlas supersede-not-delete lifecycle with hidden-count-aware over-fetching, empirical observation-biased recall deduplication (`prefer_observations`), progressive multi-hop wikilink expansion after reciprocal rank fusion (`extractWikilinks`, `expandFusedWikilinks`), immutable semantic fact provenance append-only table (`fact_provenance` with triple-unique indexing), first-class relational lineage foreign keys (`supersedes_id`, `conflicts_with_id`), lineage BFS provenance DAG walker (`walkLineageBfs`), and tamper-evident cryptographic hash-chained audit ledger with per-day salt rotation and session Merkle tree checkpoints ([docs/graph-provenance-and-lineage.md](docs/graph-provenance-and-lineage.md)).
+- **Temporal Transitions, Contradiction Engine & Verbs (Wave 16)**: Bi-temporal validity tracking with explicit historical cessation flags (`valid_to_exact`), point-in-time `as_of` queries returning `{results, undetermined}` without date invention, five-verb lifecycle (`change`, `end`, `correct`, `revert`, `forget` with GDPR hard/soft tombstones), point-in-time `searchTemporal(atTime)` default-excluding superseded knowledge, keep-both `conflicts` table preserving contradictions without deletion, scoped invalidation requiring semantic `(entity, relation, target, scope)` alignment to prevent over-eager invalidations across environments, federation handshake protocol for mesh-mode conflict deduplication and resolution propagation, provenance veracity rank weighting (`user` 1.0, `agent` 0.7, `external` 0.5, `system` 0.3) with tie-breaker bonuses, and `src_ts` evidence-age stamping ensuring memory freshness never exceeds underlying evidence ([docs/temporal-contradiction-and-trust.md](docs/temporal-contradiction-and-trust.md)).
+- **Expiry, Decay & Confidence Hardening (Wave 15)**: Tokenizer-matched abstention gates (`evaluateAbstentionGate`), explicit `no_confident_match` mode eliminating model hallucination, materialized `decay_score` in SQLite with importance gating (0.4x to 3.0x), Bayesian corroboration confidence ($C(n) = 1 - 0.7^n$), trust-tier-keyed half-lives (T1 365d → T4 30d) defending against OWASP ASI06 poisoning, per-type admission `expires_at` defaults (fix 90d, op 180d, arch 365d, disc 30d), stamped `status: 'expired'`, `expired_at`, and `expired_by` rule tracking, pin-capable first-match-wins declarative expiry policy YAML (`.memory/expiry.yaml`), and optional Weibull hazard curve modeling ($R(t) = \exp(-(t/\lambda)^k)$) ([docs/expiry-decay-and-confidence.md](docs/expiry-decay-and-confidence.md)).
+- **Invalidation, Attribution & Ranking Rigor (Wave 14)**: Incremental `index.json` vector synchronization on `save()` and `deleteEntry()`, bounded Hebbian co-activation plasticity (8 seeds, 30 edges, 500 nodes), IDF-weighted symbol matching (generic verbs downweighted to 0.05, compound identifiers scored 1.0), Unicode word-boundary matching blocking false positives (`race⊂trace`, `port⊂report`), and explicit SQLite FTS failure degradation signals with `[FTS5_DEGRADED]` logging ([docs/retrieval-ranking-and-invalidation.md](docs/retrieval-ranking-and-invalidation.md)).
+- **Retrieval Performance & Hot-Path Hardening (Wave 13)**: Precomputed WeakMap token sets ($O(1)$ lookup), memoized runtime code-anchor verification, dirty-gated store loads (`count(*)` + `max(updated_at)` fingerprinting), input limit clamping, and `stale: boolean` provenance tags for degraded reads ([docs/retrieval-performance-and-limits.md](docs/retrieval-performance-and-limits.md)).
+- **Point-ID-Only Dry-Run Deletions**: Hardened destructive deletion commands (`memory delete`, `memory_delete`) defaulting to dry-run previews and blocking wildcard expressions to prevent accidental data loss.
+- **Real-Time Agency Hub (SSE)**: Fast event fan-out on `http://localhost:31338/events` for parallel agent swarms, featuring CSRF origin filtering and clean socket disposal (`memory daemon`).
+- **Living ADR & Drift Sentry**: Binding Architecture Decision Records to line-independent structural code anchors with write-time `base_path` normalization and pure read-path drift auditing (`memory adr`, `memory check --drift`).
+- **Reasoning Tree PageIndex Depth Controls**: Hierarchical document navigation with configurable `maxDepth` traversal limits and tiered `disclosureDepth` (`L1`/`L2`/`L3`) for token economics.
+- **Hardened Upgrade & CI Verification**: Deterministic exit code contracts (`--check`, `--fail-on-update`, `--strict`), real Vibeguard credential audits, and structured repair error surfacing (`memory upgrade`).
 - **Autonomous Memory Optimizer (`memory optimize`)**: High-precision noise and junk pruning engine with zero-daemon auto-cadence (every 7 days or after 48h idle) and SQLite WAL defragmentation (`VACUUM;` + `PRAGMA optimize;`).
 - **Dashboard "⚡ Optimize" Trigger**: Live visual optimization controls directly inside the Web Observability Studio (`memory ui` / `memory studio`) with real-time feedback on items pruned and bytes reclaimed.
 - **Concurrent Multi-Agent Workstream Tracking**: Live coordination table in `CURRENT.md` enabling multiple agents across parallel chats to monitor active tasks and target scopes without collisions.
@@ -54,7 +66,9 @@ https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000
 - [What Muse Memory does](#what-muse-memory-does)
 - [Key capabilities](#key-capabilities)
 - [Start with one command](#start-with-one-command)
+- [📖 Documentation & User Guides](#-documentation--user-guides)
 - [🔄 Upgrading & Self-Healing Maintenance](#-upgrading--self-healing-maintenance)
+- [👥 Team & Multi-Member Setup](#-team--multi-member-setup)
 - [🧠 Shipped Agent Skills (`.agents/skills/`)](#-shipped-agent-skills-agentsskills)
 - [👤 5 Role Archetypes (`USER.md`)](#-5-zero-fingerprint-role-archetypes-usermd)
 - [🔌 Full CLI Command Matrix](#-full-cli-command-matrix)
@@ -119,11 +133,12 @@ Store working constraints, decisions, handoffs, and verified facts in one local 
 - 📐 **Real-Time Active Constraints (`CURRENT.md`)**: Bi-temporal working constraints and invariant tracking synchronized on every mutation to eliminate amnesia during task handoffs.
 - 💾 **SQLite Primary + Dual-Persisted YAML Mirror**: Sub-millisecond queries via SQLite with transparent human-readable `.yaml` files in `.memory/memories/` for seamless Git diffs.
 - ⚖️ **Token Knapsack Retrieval**: Multi-factor scoring (applicability, verification bonus, AST graph overlap, time decay, due date urgency) tightly packed under prompt token ceilings.
+- 🧭 **Optional Local Semantic Recall (`memory embed`)**: Point `retrieval.embedderUrl` at any OpenAI-compatible `/v1/embeddings` endpoint (llama.cpp server, Ollama, or hosted) to add a semantic cosine dimension to ranking. Embeddings are cached as float32 blobs inside SQLite, so nothing changes and no network call happens until you configure an endpoint.
 - 🌐 **Pluggable AST CodeGraph & Symbol Indexing**: Native CodeGraph & Graphify integration that indexes codebase AST symbols, auto-tags memories, and awards graph overlap bonuses.
 - 🌳 **Hierarchical Tree Retrieval & Progressive Disclosure**: Sharded tree partitions with 3-tier progressive disclosure (`L1` abstracts, `L2` summaries, `L3` full context) for massive knowledge bases.
 - 📚 **Obsidian Markdown Wiki & Entity Graph Compiler**: Dual-persistence knowledge compounding compiling linked Markdown pages (`wiki/concepts/`, `wiki/entities/`) with bidirectional `[[wikilinks]]`.
 - 🛡️ **Vibeguard Zero-Leakage Secret Scanner**: Regex-powered memory defense intercepting and rejecting API keys, AWS credentials, private keys, database URIs, and passwords before writes.
-- 🔌 **Zero-Permission Auto-Wiring (80+ Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
+- 🔌 **Zero-Permission Auto-Wiring (52 Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
 - 🔄 **Universal Memory Migrator (29 Engines)**: One-click migration from Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, and more with state preservation.
 - 🎨 **Cognitive Studio Visual Dashboard (`memory ui`)**: Embedded zero-dependency web interface featuring 3D force-directed knowledge graphs, live `CURRENT.md` monitor, wiki reader, and persona editor.
 - ⏰ **Proactive Nudges & Routines Scheduler**: Cron-invoked daily briefings, staleness policy tracking, and ambient open-loop trackers with zero resident background daemons.
@@ -168,8 +183,24 @@ git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
 
-> [!NOTE]
-> ### 📊 How does Muse Memory compare to other solutions?
+---
+
+## 📖 Documentation & User Guides
+
+Explore comprehensive documentation tailored for both solo developers and engineering leadership:
+
+| Guide | Intent & Framework | Target Audience |
+| :--- | :--- | :--- |
+| 🧠 **[Core Concepts & Architecture](docs/concepts.md)** | **ACCA Framework**: Explains the guarded 7-state lifecycle machine, dual-scope engine, knapsack scoring, and zero-daemon architecture. | Tech Leads, Architects, Evaluators |
+| 🛡️ **[Failure Attribution & Negative Mining](docs/failure-attribution-and-negative-mining.md)** | **QUEST Framework**: Scoped attribution, decaying strikes, trajectory fix-pair mining, HOT.md compounding, and logarithmic frequency ranking. | AI Engineers, Systems Architects |
+| 🛠️ **[Developer Daily User Guide](docs/user-guide.md)** | **QUEST Framework**: The 3-phase daily pair-programming loop (`/muse-ground` → `CURRENT.md` → `/muse-capture`). | Solo Developers, Daily AI Coders |
+| ⚡ **[Retrieval Performance & Guardrails](docs/retrieval-performance-and-limits.md)** | **QUEST Framework**: WeakMap token sets, memoized runtime anchors, dirty-gating, limit clamping, and dry-run safety. | Platform Engineers, AI Architects |
+| 🏛️ **[Living Architecture & Drift Auditing](docs/living-architecture-and-drift.md)** | **ACCA Framework**: Binding ADRs to line-independent code anchors, write-time `base_path` normalization, and pure read-path drift sentry. | System Architects, Tech Leads |
+| ⚡ **[Real-Time Daemon & Observability](docs/daemon-and-observability.md)** | **QUEST Framework**: Real-time SSE event hub (`memory daemon`), CI upgrade gates (`--check`, `--strict`), and PageIndex depth parameters. | Swarm Engineers, DevOps, Builders |
+| 👥 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** | Single-host server deployment, systemd/Docker setups, and per-editor client recipes (Cursor, Opencode, Claude Code, Antigravity, Windsurf). | Engineering Managers, Team Leads |
+| 🏛️ **[Team Slice Wiring & Architecture](docs/architecture/team-slice-wiring.md)** | Technical deep-dive into in-process SQLite WAL vs corrupted network mounts. | Infrastructure Engineers, Systems Architects |
+| 📊 **[Agent Memory Comparison Dossier](https://harshsinghmp.github.io/musememory/musememory-comparison.html)** | 68-engine benchmark comparing storage, retrieval, privacy, and token economics. | Decision Makers, Evaluators |
+
 ---
 
 ## 🔄 Upgrading & Self-Healing Maintenance
@@ -189,7 +220,7 @@ npx musememory upgrade
 #### What `memory upgrade` automatically handles:
 1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
 2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
-3. **80+ Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
+3. **52 Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
 4. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
 
 ---
@@ -205,8 +236,14 @@ npx musememory upgrade
 | **NPX** (Zero-Install) | `npx musememory@latest upgrade` | `npx musememory doctor` |
 
 ```bash
-# Check if updates are available without applying
+# Check if updates are available without applying (exits 0 if up to date, 1 if registry fails)
 memory upgrade --check
+
+# Enforce up-to-date installation in CI pipelines (exits 1 if update is available)
+memory upgrade --check --strict
+
+# Preview upgrade actions in dry-run mode
+memory upgrade --dry-run
 
 # Force re-installation and complete platform re-wiring
 memory upgrade --force
@@ -237,7 +274,7 @@ npx musememory stats
 npx musememory briefing
 ```
 
-### 3️⃣ Connect Coding Agents (80+ Platforms)
+### 3️⃣ Connect Coding Agents (52 Platforms)
 ```bash
 # Scan workstation for installed AI coding agents
 npx musememory agents
@@ -251,6 +288,10 @@ npx musememory connect cursor
 npx musememory connect antigravity
 npx musememory connect windsurf
 npx musememory connect opencode
+
+# Claude Code lives under ~/.claude*, so it needs an explicit harness opt-in.
+# Without this flag the Claude config is reported as skipped and nothing is written.
+npx musememory connect claude-code --harness claude
 ```
 
 ### 4️⃣ Clean Uninstallation & Removal
@@ -261,7 +302,7 @@ npx musememory connect opencode
 Muse Memory can be cleanly and completely removed with zero trace left on your machine.
 
 #### Step 1: Unwire Coding Agents (Zero-Trace MCP Cleanup)
-Remove the memory MCP server configuration from all 80+ detected agent config files (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
+Remove the memory MCP server configuration from all 52 detected agent config files (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
 
 ```bash
 # Preview changes before modifying any configuration
@@ -313,6 +354,42 @@ If you installed the pre-commit transcript harvester hook or injected agent prom
 
 ---
 
+## 👥 Team & Multi-Member Setup
+
+Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-06-18)** with Bearer token authentication.
+
+```
+                    Central Team Server (`team.db` + `CURRENT.md`)
+                                       ▲
+                                       │ MCP Streamable HTTP (Bearer Auth)
+         ┌───────────────────┬─────────┴─────────┬───────────────────┐
+      Cursor              Opencode          Antigravity         Claude Code
+```
+
+### 1-Line Team Server Start
+Run on your team's internal VM, build server, or workstation:
+```bash
+# Start server with individual or shared Bearer auth tokens
+musememory serve --port 31338 --host 0.0.0.0 --tokens alice:tok_alice_123,bob:tok_bob_456
+```
+
+### 1-Line Client Recipe Generator
+Generate ready-to-paste configurations tailored to each engineer's specific editor:
+```bash
+# Interactive editor selector
+musememory connect
+
+# Or output directly into console:
+musememory connect --recipe --endpoint http://192.168.1.50:31338/mcp --token tok_alice_123
+```
+
+### Complete Getting Started & Architecture Guide
+For full server setup (systemd service, Docker, reverse proxy), editor-specific client JSON configs, team memory scoping rules (`team.db` vs personal `tenant_<id>.db`), and prompt injection defenses, see:
+- 👉 **[Team Quickstart & Deployment Guide](docs/team-getting-started.md)** — Step-by-step setup for Team Leads and Engineers.
+- 👉 **[Team Slice Wiring & Architecture Spec](docs/architecture/team-slice-wiring.md)** — Technical deep dive into in-process SQLite vs networked mounts.
+
+---
+
 ## 🏛️ System Capabilities & Architecture
 
 ### 1. Dual-Scope Storage (Local vs Global)
@@ -338,6 +415,8 @@ Retrieval dynamically ranks knowledge using a calibrated multi-factor formula:
 $$\text{Score} = 1.0 \times \text{Applicability} + \text{StatusBonus} + \text{VerificationBonus} + \text{GraphBonus} + \text{SalienceBonus} + 0.3 \times e^{-\frac{\Delta t}{90\text{ days}}}$$
 The engine greedily packs ranked memories up to the requested `--token-budget` to guarantee zero prompt overflow.
 
+When a local embedder is configured (`retrieval.embedderUrl`), a semantic cosine dimension (`0.5 ×` cosine similarity) joins the ranking, so paraphrases match even without shared trigrams. Leave the embedder unset and ranking is identical to the lexical behaviour above — no network calls, no new dependency.
+
 ### 4. Real-Time `CURRENT.md` Synchronization & Session Handoff
 - Active constraint memories automatically mirror into `CURRENT.md`.
 - In-flight task states, agent checkpoints, and active loops persist across terminal restarts, context compactions, and sudden interruptions.
@@ -359,7 +438,7 @@ memory migrate --provider mem0
 memory migrate --provider beads
 memory migrate --all
 ```
-> See [`web/musememory-comparison.html`](./web/musememory-comparison.html) for the matching comparison page and architectural dossier.
+> See [`web/musememory-comparison.html`](./web/musememory-comparison.html) for the published comparison page, and [`docs/research/musememory-comparison.html`](docs/research/musememory-comparison.html) for the research survey dossier (68 systems).
 
 ---
 
@@ -417,7 +496,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `muse_mesh_query` | **Cross-Project Query** | Queries memories across the entire workspace mesh with origin package provenance tags. |
 | `muse_mesh_audit` | **Contract Verification** | Audits cross-package dependency contracts, entrypoint exports, and cross-repo code anchors. |
 | `muse_mesh_link` | **Mesh Linking** | Explicitly links or unlinks external repository paths into the workspace mesh registry. |
-| `profile_list` / `profile_switch` | **Tool Management** | Lists and switches task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
+| `profile_list` | **Tool Management** | Lists task-focused MCP profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`). |
 | `get_context` | **Session Start** | Fetches Top-$K$ ranked memories, `USER.md` profile, active `CURRENT.md` constraints, and supports `--tier 0|1|2`. |
 | `search` | **Investigation** | Searches memory units with query, token budget, project, type, and verification filters. |
 | `memory_current` | **Constraints** | Reads or appends active project working constraints (`CURRENT.md`). |
@@ -448,7 +527,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 | `memory_harvest` | **Session End** | Distills conversation turns into structured fix/outcome units. |
 | `memory_import_transcript` | **Transcript Sync** | Ingests `.jsonl` transcript and auto-binds memories to session nodes. |
 | `memory_audit` | **Governance** | Queries the append-only operational audit ledger. |
-| `memory_detect_agents` | **Onboarding** | Scans workstation for 80+ coding agent installations. |
+| `memory_detect_agents` | **Onboarding** | Scans workstation for 52 coding agent installations. |
 | `memory_connect` | **Setup** | Auto-wires MCP server into detected installed agents with zero permissions. |
 | `memory_detect_providers` | **Migration** | Scans machine for 29 external memory formats. |
 | `memory_migrate` | **Migration** | Ingests external memories with state preservation and secret scrubbing. |
@@ -461,7 +540,7 @@ When registered as an MCP server, `musememory` exposes the following native tool
 </details>
 
 <details>
-<summary><b>💻 Full CLI Command Matrix (47 Commands)</b> — <i>Click to expand</i></summary>
+<summary><b>💻 Full CLI Command Matrix (54 Commands)</b> — <i>Click to expand</i></summary>
 
 ```bash
 memory <command> [arguments] [flags]  # alias: musememory
@@ -480,14 +559,15 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `uninstall` | `[agent] [--purge] [--dry-run]` | **Clean uninstaller**: unwires MCP configs (and optionally purges `.memory/`). |
 | `init` | `[path] [--legacy] [--global]` | Initialize `.memory/` directory and SQLite database. |
 | `user` | `[get\|init\|set] [args] [--global]` | Manage `USER.md` persona & preferences across 5 clean archetypes. |
-| `connect` | `[agent] [--all] [--force] [--dry-run]` | Auto-wire MCP into detected installed agents with zero permissions. |
-| `agents` | *(none)* | Scan workstation for 80+ coding agents (Cursor, Claude Code, Antigravity, etc.). |
+| `connect` | `[agent] [--all] [--force] [--dry-run] [--harness H]` | Auto-wire MCP into detected installed agents with zero permissions. Harness-specific paths (e.g. `~/.claude*`) are only written with an explicit `--harness claude` opt-in. |
+| `agents` | *(none)* | Scan workstation for 52 coding agents (Cursor, Claude Code, Antigravity, etc.). |
 | `detect` | *(none)* | Scan workstation and local workspace for 29 external memory systems. |
 | `migrate` | `[--provider P] [--all] [--dry-run] [--overwrite]` | Migrate memories into Muse Memory preserving active/archived state. |
 | `context` | `[query] [--token-budget N] [--limit N] [--tier 0\|1\|2]` | Retrieve Top-$K$ ranked active context for prompt injection. |
 | `search` | `<query> [--limit N] [--token-budget N] [--type T]` | Ranked multi-factor token search with score breakdown. |
 | `search-transcript` | `<query> [file.jsonl] [--window N]` | Full-text search past transcripts with dialogue context windows. |
 | `learn` / `sync-chats` | `[--confirm] [--force] [--max N]` | **Universal auto-learner**: auto-discovers and distills memories from all agent chats across host machine. |
+| `distill-route` | `[--force] [--dry-run]` | **Multi-channel knowledge distillation router**: triages memories across system (rules/fixes), content (architecture concepts), and health (contradictions/staleness) lanes with SHA-256 deduplication and draft generation. |
 | `harvest` | `<text\|file> --project P [--confirmed]` | Distill conversation turns into structured fix/decision memory units. |
 | `import-transcript` | `<file.jsonl> [--project P] [--confirmed]` | Ingest raw `.jsonl` session transcripts from coding agents. |
 | `capture` / `propose` | `<text> --project P [--title T] [--type T]` | Propose a memory entry with inline Vibeguard secret inspection. |
@@ -517,6 +597,11 @@ memory <command> [arguments] [flags]  # alias: musememory
 | `settings` | `get\|set\|reset\|export\|import` | Manage unified settings across retrieval, wiki, PageIndex, and UI. |
 | `current` | `get` / `set <text> --project P` | Read or append hard constraints in `.memory/CURRENT.md`. |
 | `graph` | `status` / `index` | Query active CodeGraph provider status or index AST symbol map. |
+| `branch` | `<id> --path <mem_path> [--label L]` | **Version control (R23)**: tag a memory with semantic dotted-path addressing. |
+| `checkout` | `<path\|id>` | **Version control (R23)**: retrieve a memory by its `mem_path` or entry id. |
+| `blame` | `<id>` | **Version control (R23)**: show access history, staleness score, and audit trail. |
+| `ls-branches` | `[--project P]` | List all registered branch references. |
+| `embed` | `status\|build\|reindex` | **Semantic embeddings (R21)**: inspect, build, or rebuild the local embedding index. `status` runs offline; `build`/`reindex` probe the configured endpoint. |
 | `mcp` | *(none)* | Start stdio MCP server (Protocol 2024-11-05). |
 
 </details>
@@ -573,10 +658,13 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 497 passed across 84 test files (2190 assertions)
+bun test          # 1309 pass, 0 fail, 5872 assertions across 203 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
+bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch/PR model, the per-commit gate, and the post-merge sequence.
 
 ---
 
@@ -640,7 +728,7 @@ Muse Memory features are developed in structured sprints moving across 4 determi
 | ✅ | Multi-Hop Causality Graph Tracer (`memory trace <id>`) | [#3](https://github.com/harshsinghmp/musememory/issues/3) |
 | ✅ | In-Place Core Memory Partitioning (`memory core`) | [#4](https://github.com/harshsinghmp/musememory/issues/4) |
 | ✅ | Automated Post-Turn Transcript Harvester Hook | [#5](https://github.com/harshsinghmp/musememory/issues/5) |
-| ✅ | Real-Time Agency WebSocket Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
+| ✅ | Real-Time Agency SSE Hub (`memory daemon`) | [#6](https://github.com/harshsinghmp/musememory/issues/6) |
 | ✅ | Local Offline Hybrid Vector Engine | [#7](https://github.com/harshsinghmp/musememory/issues/7) |
 | ✅ | Delete Deprecated `MemoryStore` Shim | [#8](https://github.com/harshsinghmp/musememory/issues/8) / v1.5.0 |
 | ✅ | Self-Evolving Skill Distillation | [#9](https://github.com/harshsinghmp/musememory/issues/9) |

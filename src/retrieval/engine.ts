@@ -1,9 +1,20 @@
 import type { Store } from "../store.ts";
-import { list } from "../store.ts";
-import { queryContext, formatPromptContext, type ContextQueryOptions, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
+import { list, countMemories } from "../store.ts";
+import {
+  queryContext,
+  searchTemporal,
+  formatPromptContext,
+  clampLimit,
+  expandFusedWikilinks,
+  type ContextQueryOptions,
+  type FormattedContext,
+  type ScoredEntry,
+  type ExpandedWikilink,
+} from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
-import { hybridSearch, rebuildIndex, saveIndex, indexFilePath } from "../vector.ts";
+import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
+import { isDraftMemory } from "../drafts.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -19,6 +30,28 @@ export interface UnifiedSearchResult {
   results: ScoredEntry[];
   totalTokensUsed: number;
   explanation?: string;
+  stale?: boolean;
+  fromCache?: boolean;
+  confidence_mode?: "confident_match" | "no_confident_match";
+  no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
+  /** T-083: Point-in-time timestamp if as_of evaluation was requested */
+  as_of?: string;
+  /** T-083: Memories whose validity is undetermined at as_of */
+  undetermined?: ScoredEntry[];
+  /** T-089: Memories withheld by provenance veracity or trust filters */
+  withheld?: Array<{ id: string; reason: string }>;
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval */
+  hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations */
+  deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion */
+  expanded_count?: number;
 }
 
 export interface ReindexReport {
@@ -43,6 +76,9 @@ export class RetrievalEngine {
     options: UnifiedSearchOptions = {},
   ): UnifiedSearchResult {
     const mode = options.mode ?? "auto";
+    const isDegraded = store.circuit?.isDegraded() ?? false;
+    let fallbackStale = false;
+    let fallbackExplanation: string | undefined;
 
     // 1. PageIndex Document Search
     if (mode === "pageindex" || (options.docPath && existsSync(options.docPath))) {
@@ -63,24 +99,40 @@ export class RetrievalEngine {
             },
             score: r.score,
           }));
+          const minScore = options.minScoreThreshold ?? 0.45;
+          const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+          const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+          const hasConfidentMatch = confident_answers.length > 0;
           return {
             mode: "pageindex",
             results: mapped,
             totalTokensUsed: pageResults.tokensUsed,
             explanation: pageResults.reasoning,
+            stale: isDegraded,
+            fromCache: false,
+            confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+            no_confident_match: !hasConfidentMatch,
+            confident_answers,
+            draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
           };
+        } else if (mode === "pageindex") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested pageindex search has no index; fell back to exact search";
         }
-      } catch {
-        // Fallback to exact if pageindex evaluation fails
+      } catch (err: unknown) {
+        if (mode === "pageindex") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: pageindex search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
     // 2. Partitioned Tree Index Search
     const treeDir = join(memoryDir, "tree");
     const hasTree = existsSync(treeDir);
-    const allEntries = list(store);
+    const memCount = countMemories(store);
 
-    if (mode === "tree" || (mode === "auto" && hasTree && allEntries.length >= 500)) {
+    if (mode === "tree" || (mode === "auto" && hasTree && memCount >= 500)) {
       try {
         const treeIndex = loadTreeIndex(memoryDir);
         if (treeIndex) {
@@ -107,16 +159,33 @@ export class RetrievalEngine {
               score: sn.score,
             }));
 
+            const minScore = options.minScoreThreshold ?? 0.45;
+            const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+            const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+            const hasConfidentMatch = confident_answers.length > 0;
             return {
               mode: "tree",
               results: mapped,
               totalTokensUsed: treeRes.tokensUsed,
               explanation: `Tree search evaluated ${treeRes.shardsSearched} shards with progressive disclosure ${options.depth ?? "L2"}`,
+              stale: isDegraded,
+              fromCache: false,
+              confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+              no_confident_match: !hasConfidentMatch,
+              confident_answers,
+              draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
             };
           }
         }
-      } catch {
-        // Fallback to exact
+        if (mode === "tree") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested tree search found no index or matches; fell back to exact search";
+        }
+      } catch (err: unknown) {
+        if (mode === "tree") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: tree search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
@@ -124,10 +193,17 @@ export class RetrievalEngine {
     const vecPath = indexFilePath(memoryDir);
     const hasVec = existsSync(vecPath);
 
-    if (mode === "hybrid" || (mode === "auto" && hasVec && allEntries.length > 100)) {
+    if (mode === "hybrid" || (mode === "auto" && hasVec && memCount > 100)) {
       try {
         const hybridResults = hybridSearch(store, memoryDir, query, {
-          limit: options.limit ?? 10,
+          limit: options.limit !== undefined ? clampLimit(options.limit, 10, 200, 1) : 10,
+          // T-303: hybrid is scale-gated, so it must apply the same lifecycle/project
+          // row filter as the exact path or stale/cross-project rows leak into context.
+          project: options.project,
+          includeSuperseded: options.includeSuperseded,
+          includeArchived: options.includeArchived,
+          includeExpired: options.includeExpired,
+          now: options.now,
         });
 
         if (hybridResults && hybridResults.length > 0) {
@@ -135,15 +211,45 @@ export class RetrievalEngine {
             entry: r.entry,
             score: r.score,
           }));
+
+          // T-064 / T-304: check if vector index is stale compared to store memory count
+          let isVectorStale = false;
+          try {
+            const idx = loadIndex(memoryDir);
+            if (idx && Object.keys(idx.entries).length !== memCount) {
+              isVectorStale = true;
+            }
+          } catch {}
+
+          const minScore = options.minScoreThreshold ?? 0.45;
+          const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));
+          const draft_answers = mapped.filter((r) => isDraftMemory(r.entry));
+          const hasConfidentMatch = confident_answers.length > 0;
+
           return {
             mode: "hybrid",
             results: mapped,
             totalTokensUsed: Math.ceil(mapped.reduce((acc, r) => acc + r.entry.content.length, 0) / 4),
-            explanation: `Hybrid BM25 + Vector search retrieved ${mapped.length} entries`,
+            explanation: isVectorStale
+              ? `Degraded read: Hybrid BM25 + Vector search retrieved ${mapped.length} entries (vector index is stale)`
+              : `Hybrid BM25 + Vector search retrieved ${mapped.length} entries`,
+            stale: isDegraded || isVectorStale,
+            fromCache: false,
+            confidence_mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+            no_confident_match: !hasConfidentMatch,
+            confident_answers,
+            draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
           };
         }
-      } catch {
-        // Fallback to exact
+        if (mode === "hybrid") {
+          fallbackStale = true;
+          fallbackExplanation = "Degraded read: requested hybrid vector index missing or returned no results; fell back to exact search";
+        }
+      } catch (err: unknown) {
+        if (mode === "hybrid") {
+          fallbackStale = true;
+          fallbackExplanation = `Degraded read: hybrid vector search failed (${err instanceof Error ? err.message : String(err)}); fell back to exact search`;
+        }
       }
     }
 
@@ -153,6 +259,64 @@ export class RetrievalEngine {
       mode: "exact",
       results: exact.results,
       totalTokensUsed: exact.totalTokensUsed ?? 0,
+      stale: isDegraded || fallbackStale || exact.stale,
+      fromCache: exact.fromCache ?? false,
+      explanation: fallbackExplanation ?? (isDegraded ? "Degraded read: circuit breaker is open" : undefined),
+      confidence_mode: exact.mode,
+      no_confident_match: exact.no_confident_match,
+      confident_answers: exact.confident_answers,
+      draft_answers: exact.draft_answers,
+      as_of: exact.as_of,
+      undetermined: exact.undetermined,
+      withheld: exact.withheld,
+      hidden_count: exact.hidden_count,
+      deduped_count: exact.deduped_count,
+      expanded_wikilinks: exact.expanded_wikilinks,
+      expanded_count: exact.expanded_count,
+    };
+  }
+
+  /**
+   * T-083: Bi-temporal point-in-time search returning results and undetermined candidates.
+   */
+  static searchAsOf(
+    store: Store,
+    memoryDir: string,
+    query: string,
+    asOfTime: string | number,
+    options: UnifiedSearchOptions = {},
+  ): UnifiedSearchResult {
+    return RetrievalEngine.search(store, memoryDir, query, {
+      ...options,
+      as_of: asOfTime,
+      mode: "exact",
+    });
+  }
+
+  /**
+   * T-085: Point-in-time temporal search default-excluding superseded entries.
+   */
+  static searchTemporal(
+    store: Store,
+    _memoryDir: string,
+    query: string,
+    atTime: string | number,
+    options: UnifiedSearchOptions & { includeSuperseded?: boolean } = {},
+  ): UnifiedSearchResult {
+    const res = searchTemporal(store, query, atTime, {
+      ...options,
+      includeSuperseded: options.includeSuperseded === true,
+    });
+    return {
+      mode: "exact",
+      results: res.results,
+      totalTokensUsed: res.totalTokensUsed ?? 0,
+      stale: res.stale ?? false,
+      fromCache: res.fromCache ?? false,
+      confidence_mode: res.mode,
+      no_confident_match: res.no_confident_match,
+      as_of: res.as_of,
+      undetermined: res.undetermined,
     };
   }
 

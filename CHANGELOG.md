@@ -5,6 +5,65 @@ All notable changes to the **Muse Memory** (`musememory`) project will be docume
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [3.0.0] - 2026-10-20
+
+### Summary
+Major release introducing closed-loop failure attribution, trajectory fix-pair mining into negative lessons, active working set retrieval compounding via HOT.md, and LangMem logarithmic frequency ranking.
+
+### Added
+- **Scoped Failure Attribution Engine (`src/learning/feedback.ts`, `src/quality/utility.ts`) (T-313)**:
+  - Scopes failure attribution to memories with matching code anchors (`anchor.file_path`, `anchor.symbol_name`), `graph.affected_paths`, `test_command`, or distinctive keywords, eliminating bystander demotions.
+  - Per-session strike deduplication ensuring at most 1 strike is levied against a memory per working session regardless of retry attempts.
+  - Dual-decay strike counter decaying active strikes after 2 consecutive clean runs or 30 days of inactivity.
+  - Constitutional gate requiring 3 distinct corroborated strikes before demoting `status: "confirmed"` to `"disputed"`.
+  - Immunity protection against automated dispute for `type: "constraint"`, `temporal_mode: "timeless"`, and foundational memories with `salience >= 0.95`.
+  - Audit trail logging emitting `regression_strike`, `strike_decay`, and `dispute_triggered` events.
+- **Trajectory Fix-Pair Mining (`src/learning/distill.ts`, `src/learning/negative.ts`) (T-144)**:
+  - Discovers negative memories from sequential observation trajectories adhering to the *Error ➔ Remediation ➔ No Recurrence* pattern.
+  - Affinity filters rejecting informational and non-mutating commands (`ls`, `cat`, `grep`, `pwd`, `status`, `git branch`).
+  - Dynamic line number normalization in compiler and stack trace errors to prevent candidate duplicates across code shifts.
+  - Automated Vibeguard secret scrubbing across all error logs and remediation command snippets.
+  - Bounded session volume cap enforcing a maximum of 3 mined candidates per harvest pass.
+- **Source-Tagged Recall Hits & HOT.md Compounding (`src/compounding/temporal.ts`, `src/retrieval.ts`) (T-314)**:
+  - Extracts and caches candidate IDs from `.memory/HOT.md` with memoized filesystem `mtime` invalidation.
+  - Tags recall hits with origin channels (`source_channels: ("hot" | "fts" | "vector" | "tree" | "distilled")[]`).
+  - Applies a relevance-gated `sourceBonus` (+0.20) for candidates present in `HOT.md` matching active query semantics.
+  - Emits attribution tokens in explainability logs (`source:hot`, `source:fts`).
+- **LangMem Logarithmic Frequency Rank Axis (`src/retrieval.ts`, `src/retrieval/ranking.ts`) (T-315)**:
+  - Sub-linear logarithmic frequency curve ($0.25 \times \frac{\ln(1 + \text{effectiveCount})}{\ln(1 + 50)}$) replacing unbounded linear access counts.
+  - Multiplier weighting verified successful memory applications $2\times$ over passive context loads.
+  - 7-day recency bonus (+0.05) for freshly reinforced memories with smooth ceiling saturation at 0.30.
+  - Surfaces `freq:high` explainability tokens when frequency score exceeds 0.15.
+
+### Changed
+- **Failure Feedback**: `evaluateSessionOutcomes` no longer penalizes bystander memories recalled in a session when unrelated test commands fail.
+- **Audit Operations**: Extended `AuditOperation` union in `src/types.ts` with `regression_strike`, `strike_decay`, and `dispute_triggered`.
+- **Anchor Types**: Standardized `CodeAnchor` properties across failure attribution to `file_path` and `symbol_name` with backwards-compatible legacy fallbacks.
+
+### Added
+- **Optional Local Semantic Embeddings (R21)**: an OpenAI-compatible `/v1/embeddings` endpoint (llama.cpp server, Ollama, or hosted) can supply a semantic cosine dimension to multi-factor ranking. Configured with `retrieval.embedderUrl` / `retrieval.embedderModel`; unset means retrieval is unchanged.
+- **`memory embed [status|build|reindex]`**: embedding lifecycle CLI. `status` runs offline; `build` and `reindex` probe the configured endpoint. Embeddings are cached as float32 blobs in SQLite behind a pipeline fingerprint (model, dimensions, endpoint) — a changed pipeline refuses recall until you run `memory embed reindex`.
+- **Recall quality eval harness (R27)**: a golden-fixture suite that fails when recall@5 drops below its configured floor, so retrieval regressions break the build instead of shipping silently.
+- **Memory versioning CLI (R23)**: `memory branch`, `memory checkout`, `memory blame`, and `memory ls-branches` add Git-like variant tagging over memories.
+- **Access-weighted retention (R23)**: half-life decay curves where frequently accessed entries are retained longer.
+
+### Changed
+- **Ranking**: the semantic cosine dimension is opt-in and additive — with no embedder configured, scoring is unchanged.
+- **Hook pack install is harness-independent (T-390)**: `memory hooks install` and `memory connect --with-hooks` now target `<project>/.agents/hooks.json` (or `~/.agents/hooks.json`) instead of `~/.claude/settings.json`. Reaching `~/.claude/settings.json` requires an explicit `--harness claude`; a pre-existing Claude config no longer implies consent.
+- **Claude Code MCP wiring requires explicit opt-in (T-390)**: `memory connect` skips `~/.claude*` paths and reports the skip unless `--harness claude` is passed.
+
+### Security
+- **`test_command` is template-gated (T-001)**: `memory verify` no longer runs entry commands through a shell. A command must match one of three fixed templates — `bun test <relative *.test|*.spec path>`, `node --check <relative path>`, or `bunx tsc --noEmit` — and is executed as a direct argv with no shell. Shell metacharacters, absolute paths, `..` traversal, flag-smuggling paths, and code-execution flags (`-e`, `--import`, `--env-file`, …) are refused. Refusals execute nothing and are recorded in the audit trail as `verify_refused`, so probing attempts stay visible.
+- **`test_command` schema guard (T-001)**: `validateEntry` now rejects non-string, over-long (500 chars), or non-executable `test_command` values at both `/test_command` and `/verification/test_command`.
+- **Strict path containment (T-363)**: new `src/paths.ts` guards `.memory`-relative writes. Wiki concept/entity lookups and PageIndex build/load/delete resolve through `resolveWithin`, which rejects absolute segments, NUL bytes, and lexical escapes including sibling prefixes such as `../memory-evil`. PageIndex index ids must additionally be bare filenames.
+- **External paths stay explicit (T-363)**: shared-pool sync directories and `mesh link` targets are legitimately outside `.memory`; they now route through `resolveExternal`, which normalizes and rejects NUL bytes without confining them.
+
+### Fixed
+- **`connect` no longer writes a Claude config the user did not ask for (T-390)**: `~/.claude.json`, `~/.claude/settings.json`, and injected `allowedTools` are only touched with `--harness claude`.
+- **PageIndex reads fail soft on hostile ids (T-363)**: a traversing `project`/`indexId` is a miss (`null`), not an exception, so `loadPageIndex` stays a safe read-only query.
+
 ## [2.3.0] - 2026-09-03
 
 ### Summary

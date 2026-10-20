@@ -49,20 +49,7 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
     refreshIntervalMs: 30000,
   },
   mcp: {
-    enabledTools: [
-      "memory_read", "get_context", "search", "memory_capture", "memory_harvest",
-      "memory_import_transcript", "memory_search_transcripts",
-      "memory_get_user_profile", "memory_set_user_profile", "memory_recall",
-      "memory_confirm", "memory_supersede", "memory_link", "memory_mark_stale",
-      "memory_reject", "memory_delete", "memory_audit", "memory_detect_providers",
-      "memory_migrate", "memory_detect_agents", "memory_export", "memory_import",
-      "memory_validate", "graph_status", "memory_core", "memory_consolidate",
-      "memory_trace", "memory_loops", "memory_distill", "memory_verify",
-      "memory_tree_search", "memory_wiki_get", "memory_wiki_search", "memory_wiki_compile",
-      "memory_entities_get", "memory_entities_search",
-      "memory_pageindex_index", "memory_pageindex_search", "memory_pageindex_import", "memory_disconnect_pageindex",
-      "memory_settings_get", "memory_settings_set"
-    ],
+    enabledTools: [],
     pageindexEnabled: true,
     autoConnectAgents: false,
     defaultProject: "default",

@@ -15,6 +15,7 @@ export interface RecordNegativeLessonOptions {
   tags?: string[];
   source?: string;
   confirmed?: boolean;
+  source_ids?: string[];
 }
 
 /**
@@ -75,6 +76,9 @@ export function recordNegativeLesson(
   });
 
   entry.negative = negativeDetails;
+  if (options.source_ids && options.source_ids.length > 0) {
+    entry.source_ids = options.source_ids;
+  }
   save(store, entry);
 
   if (store.memoryDir) {

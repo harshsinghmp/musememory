@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
+import { resolve, sep } from "node:path";
 import type { Store } from "./store.ts";
 import { get, confirm, save } from "./store.ts";
 import { recordAuditEvent } from "./audit.ts";
-import type { MemoryEntry } from "./types.ts";
+import type { AuditOperation, MemoryEntry } from "./types.ts";
 
 export interface VerifyResult {
   ok: boolean;
@@ -20,11 +21,128 @@ export interface VerifyOptions {
   now?: number;
 }
 
-function runCommand(command: string, cwd: string, timeoutSec: number): Promise<VerifyResult> {
+/** Shell syntax that must never reach the parser unquoted. */
+const SHELL_METACHARS = /[|;&$`><\r\n]/;
+
+/**
+ * Runtime flags that execute attacker-supplied code rather than checking anything.
+ * The templates below already exclude them; the explicit list only buys a precise
+ * refusal reason for the audit trail.
+ */
+const CODE_EXEC_FLAGS = new Set([
+  "-e", "--eval", "-p", "--print", "--input-type",
+  "-r", "--require", "--import", "--loader", "--experimental-loader", "--env-file",
+]);
+
+/** The only command shapes the oracle ever executes. Memory selects WHICH file, never WHAT code. */
+const ALLOWED_TEMPLATES = ["bun test <relative-path>", "bunx tsc --noEmit", "node --check <relative-path>"];
+
+export type ParsedCommand = { ok: true; argv: string[] } | { ok: false; error: string };
+
+/** A path is usable only if it is relative, free of `..`, and stays inside the workspace root. */
+function checkRelativePath(path: string, workspaceRoot?: string): string | null {
+  if (!path) return "path is empty";
+  if (path.includes("\0")) return "path contains a null byte";
+  // A legitimate target is always a file path — a leading dash means flag
+  // smuggling (`--preload=./evil.js`, `--import=./hook.mjs`), not a file.
+  if (path.startsWith("-")) return `flag-like path '${path}' is not allowed — target must be a file`;
+  if (path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(path)) {
+    return `absolute path '${path}' is not allowed`;
+  }
+  if (path.split(/[\\/]/).includes("..")) return `'..' traversal is not allowed in '${path}'`;
+  if (workspaceRoot) {
+    const root = resolve(workspaceRoot);
+    const full = resolve(root, path);
+    if (full !== root && !full.startsWith(root + sep)) {
+      return `path '${path}' resolves outside the workspace root`;
+    }
+  }
+  return null;
+}
+
+/** Matches argv against the fixed templates; returns a refusal reason or null when it fits. */
+function checkTemplate(argv: string[], workspaceRoot?: string): string | null {
+  if (argv.length === 3 && argv[0] === "bun" && argv[1] === "test") {
+    const pathError = checkRelativePath(argv[2], workspaceRoot);
+    if (pathError) return pathError;
+    // The oracle runs the test suite — the target must be a test file, never an
+    // arbitrary script (`bun test ./evil.js` executes it).
+    if (!/\.(test|spec)\.[jt]s$/.test(argv[2])) return `'${argv[2]}' is not a test file (expected *.test.ts or *.spec.js)`;
+    return null;
+  }
+  if (argv.length === 3 && argv[0] === "node" && argv[1] === "--check") return checkRelativePath(argv[2], workspaceRoot);
+  // Pinned verbatim: no extra flags, no project override, no second package.
+  if (argv.length === 3 && argv[0] === "bunx" && argv[1] === "tsc" && argv[2] === "--noEmit") return null;
+  return `command does not match an allowed template (allowed: ${ALLOWED_TEMPLATES.join(", ")})`;
+}
+
+/**
+ * Parse a test_command into argv for direct exec. There is no shell: quoted spans
+ * become inert argument text handed verbatim to the child, so a metacharacter only
+ * carries meaning when it appears unquoted. Fails closed on any unquoted shell
+ * syntax, an unterminated quote, an empty command, a code-execution flag, or any
+ * command that is not one of the fixed templates.
+ *
+ * `workspaceRoot`, when given, additionally requires a relative path to resolve
+ * inside it — the schema-time guard passes none and stays purely syntactic.
+ */
+export function parseTestCommand(command: string, workspaceRoot?: string): ParsedCommand {
+  const argv: string[] = [];
+  let current = "";
+  let hasCurrent = false;
+  let quote: '"' | "'" | null = null;
+
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+        continue;
+      }
+      current += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      hasCurrent = true;
+      continue;
+    }
+    if (ch === " " || ch === "\t") {
+      if (hasCurrent) {
+        argv.push(current);
+        current = "";
+        hasCurrent = false;
+      }
+      continue;
+    }
+    if (SHELL_METACHARS.test(ch)) {
+      return { ok: false, error: `shell metacharacter '${ch === "\n" ? "\\n" : ch}' is not allowed` };
+    }
+    current += ch;
+    hasCurrent = true;
+  }
+
+  if (quote) return { ok: false, error: "unterminated quote" };
+  if (hasCurrent) argv.push(current);
+
+  const binary = argv[0];
+  if (!binary) return { ok: false, error: "empty command" };
+  for (const arg of argv) {
+    // Prefix-match on the `name` half so `--flag=value` single-token forms
+    // cannot slip past the denylist by string inequality.
+    if (CODE_EXEC_FLAGS.has(arg.split("=")[0])) {
+      return { ok: false, error: `'${arg}' executes arbitrary code — not allowed in a test_command` };
+    }
+  }
+  const templateError = checkTemplate(argv, workspaceRoot);
+  if (templateError) return { ok: false, error: templateError };
+  return { ok: true, argv };
+}
+
+function runCommand(argv: string[], cwd: string, timeoutSec: number): Promise<VerifyResult> {
   return new Promise((resolve) => {
     execFile(
-      "/bin/sh",
-      ["-c", command],
+      argv[0],
+      argv.slice(1),
       { cwd, timeout: timeoutSec * 1000, killSignal: "SIGKILL", maxBuffer: 4 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (!err) {
@@ -54,6 +172,7 @@ function runCommand(command: string, cwd: string, timeoutSec: number): Promise<V
  * executes a fix entry's test_command in the workspace root. Exit 0 promotes a
  * candidate to confirmed and stamps verification as independently-verified.
  * Non-zero leaves the entry untouched; both outcomes are audit-logged.
+ * A refused command executes nothing and is audit-logged as `verify_refused`.
  * Never executes without an explicit verify invocation.
  */
 export async function verifyEntry(
@@ -77,7 +196,24 @@ export async function verifyEntry(
     return { ok: false, ran: false, message: `entry ${id} carries no test_command` };
   }
 
-  const result = await runCommand(entry.test_command.trim(), workspaceRoot, options.timeout ?? 60);
+  const parsed = parseTestCommand(entry.test_command.trim(), workspaceRoot);
+  if (!parsed.ok) {
+    // Fail closed: nothing is executed and no `verify` event is written, but the
+    // refusal leaves a forensic trace so an attacker probing the oracle is visible.
+    if (memoryDir) {
+      recordAuditEvent(memoryDir, {
+        operation: "verify_refused",
+        entry_id: id,
+        project: entry.project,
+        actor: "oracle",
+        reason: "refused test_command",
+        details: { error: parsed.error, command: entry.test_command },
+      });
+    }
+    return { ok: false, ran: false, message: `refused test_command for ${id}: ${parsed.error}` };
+  }
+
+  const result = await runCommand(parsed.argv, workspaceRoot, options.timeout ?? 60);
   const nowIso = new Date(options.now ?? Date.now()).toISOString();
 
   if (result.ok) {

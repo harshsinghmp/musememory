@@ -95,4 +95,41 @@ describe("CLI Subcommand Parsing & Scoping Tests", () => {
     });
     expect(exitCode).toBe(0);
   });
+
+  it("handleSearchCommand --hybrid forwards project into hybridSearch (T-303 follow-up)", async () => {
+    const store = openStore(memoryDir);
+    const { rebuildIndex, saveIndex } = await import("../src/vector.ts");
+    propose(store, {
+      content: "Auth token handler for project alpha",
+      title: "Alpha Auth",
+      project: "alpha",
+      confirmed: true,
+    });
+    propose(store, {
+      content: "Auth token handler for project beta",
+      title: "Beta Auth",
+      project: "beta",
+      confirmed: true,
+    });
+    saveIndex(rebuildIndex(store), memoryDir);
+
+    const logged: string[] = [];
+    const realLog = console.log;
+    console.log = (...args: unknown[]) => logged.push(args.join(" "));
+    let exitCode: number;
+    try {
+      exitCode = await handleSearchCommand({
+        positional: ["Auth"],
+        flags: { dir: tmpDir, project: "alpha", hybrid: "true" },
+      });
+    } finally {
+      console.log = realLog;
+    }
+
+    const out = logged.join("\n");
+    expect(exitCode).toBe(0);
+    expect(out).toContain("source=hybrid");
+    expect(out).toContain("(alpha) Alpha Auth");
+    expect(out).not.toContain("(beta) Beta Auth");
+  });
 });

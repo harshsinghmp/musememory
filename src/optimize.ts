@@ -21,6 +21,7 @@ export interface OptimizeOptions {
 
 export interface OptimizeReport {
   timestamp: string;
+  dryRun?: boolean;
   totalBefore: number;
   totalAfter: number;
   prunedNoise: number;
@@ -74,10 +75,17 @@ export function writeOptimizationMetadata(memoryDir: string, meta: OptimizationM
   } catch {}
 }
 
-export function touchActivity(memoryDir: string): void {
+const lastTouchedMap = new Map<string, number>();
+
+export function touchActivity(memoryDir: string, force: boolean = false): void {
   try {
+    const now = Date.now();
+    const last = lastTouchedMap.get(memoryDir) ?? 0;
+    if (!force && now - last < 1000) return;
+    lastTouchedMap.set(memoryDir, now);
+
     const meta = readOptimizationMetadata(memoryDir);
-    meta.last_activity_at = new Date().toISOString();
+    meta.last_activity_at = new Date(now).toISOString();
     writeOptimizationMetadata(memoryDir, meta);
   } catch {}
 }
@@ -322,6 +330,7 @@ export function optimizeStore(store: Store, options: OptimizeOptions = {}): Opti
 
   const report: OptimizeReport = {
     timestamp: new Date().toISOString(),
+    dryRun: !!options.dryRun,
     totalBefore,
     totalAfter,
     prunedNoise: toDeleteNoise.length,
@@ -353,20 +362,4 @@ export function optimizeStore(store: Store, options: OptimizeOptions = {}): Opti
   }
 
   return report;
-}
-
-/**
- * Pre-flight hook: automatically runs optimization if cadence thresholds are met.
- * Can be safely called on CLI commands or session initializations with negligible overhead.
- */
-export function maybeAutoOptimize(store: Store, memoryDir?: string): OptimizeReport | null {
-  const dir = memoryDir || store.memoryDir || ".memory";
-  const check = shouldAutoOptimize(dir);
-  if (!check.shouldRun) return null;
-
-  try {
-    return optimizeStore(store, { memoryDir: dir, force: true });
-  } catch {
-    return null;
-  }
 }

@@ -1,10 +1,123 @@
-import { existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { CompactionInvariants, CompactionEvaluation, HandoffResult } from "./types.ts";
+import type {
+  CompactionInvariants,
+  CompactionEvaluation,
+  HandoffResult,
+  HandoffOptions,
+  HarvestedMemory,
+} from "./types.ts";
 import { recordAuditEvent } from "../audit.ts";
+import type { Store } from "../store.ts";
+import { propose } from "../store.ts";
+import { verifyMutationSafety } from "../quality/guards.ts";
+import { captureSnapshotRing } from "../snapshot.ts";
 
 export const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
 export const COMPACTION_THRESHOLD_PERCENT = 70;
+
+/**
+ * Validates that compaction invariants conform to the never-empty contract.
+ * Checkpoints must never be partial or empty.
+ */
+export function validateCompactionInvariants(invariants: CompactionInvariants): void {
+  if (!invariants.highLevelGoal || !invariants.highLevelGoal.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: highLevelGoal must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  if (!invariants.currentArchitecture || !invariants.currentArchitecture.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: currentArchitecture must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  if (!invariants.nextConcreteTask || !invariants.nextConcreteTask.trim()) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: nextConcreteTask must not be empty. Checkpoints must never be partial or empty.",
+    );
+  }
+  const completedCount = invariants.completedTasks?.length ?? 0;
+  const openCount = invariants.openTasks?.length ?? 0;
+  if (completedCount + openCount === 0) {
+    throw new Error(
+      "Cannot generate handoff: Compaction checkpoint violation: task list must contain at least one completed or open task. Checkpoints must never be partial or empty.",
+    );
+  }
+}
+
+import { isFactDigestRecorded, recordFactDigest } from "./dedup.ts";
+
+/**
+ * Extracts durable architectural decisions and active constraints into memory entries
+ * before context compression or session handoff.
+ */
+export function extractInvariantsPreCompress(
+  invariants: CompactionInvariants,
+  store: Store,
+  options?: { project?: string; actor?: string },
+): HarvestedMemory[] {
+  const project = options?.project ?? "workspace";
+  const actor = options?.actor ?? "compaction_pre_compress";
+  const memoryDir = store.memoryDir || store.dir;
+  const harvested: HarvestedMemory[] = [];
+
+  if (invariants.decisionsMade && invariants.decisionsMade.length > 0) {
+    for (const d of invariants.decisionsMade) {
+      if (!d.trim()) continue;
+      if (isFactDigestRecorded(memoryDir, d)) continue;
+
+      const title = d.slice(0, 100);
+      const entry = propose(store, {
+        title,
+        content: d,
+        project,
+        type: "decision",
+        source: actor,
+        confirmed: true,
+        tags: ["architecture", "decision", "pre-compress"],
+      });
+      recordFactDigest(memoryDir, d, entry.id, "decision");
+
+      harvested.push({
+        id: entry.id,
+        type: "decision",
+        title: entry.title,
+        content: entry.content,
+        source: actor,
+      });
+    }
+  }
+
+  if (invariants.activeConstraints && invariants.activeConstraints.length > 0) {
+    for (const c of invariants.activeConstraints) {
+      if (!c.trim()) continue;
+      if (isFactDigestRecorded(memoryDir, c)) continue;
+
+      const title = c.slice(0, 100);
+      const entry = propose(store, {
+        title,
+        content: c,
+        project,
+        type: "constraint",
+        temporal_mode: "timeless",
+        source: actor,
+        confirmed: true,
+        tags: ["constraint", "invariant", "pre-compress"],
+      });
+      recordFactDigest(memoryDir, c, entry.id, "constraint");
+
+      harvested.push({
+        id: entry.id,
+        type: "constraint",
+        title: entry.title,
+        content: entry.content,
+        source: actor,
+      });
+    }
+  }
+
+  return harvested;
+}
 
 /**
  * Evaluates current context usage against the 70% threshold invariant.
@@ -125,23 +238,116 @@ export function generateResumptionPrompt(invariants: CompactionInvariants): stri
 }
 
 /**
- * Commits an interruption-proof checkpoint handoff into CURRENT.md.
+ * Parses active working constraints from an existing CURRENT.md markdown string.
  */
-export function generateSessionHandoff(
-  memoryDir: string,
-  invariants: CompactionInvariants,
-  options?: { agent?: string; sessionId?: string; project?: string },
-): HandoffResult {
-  if (!invariants.highLevelGoal || !invariants.nextConcreteTask) {
-    throw new Error("Cannot generate handoff: highLevelGoal and nextConcreteTask are mandatory");
+export function parseCurrentConstraints(content: string): string[] {
+  if (!content) return [];
+  const lines = content.split("\n");
+  const constraints: string[] = [];
+  let inConstraintsSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+      if (
+        trimmed.toLowerCase().includes("active working constraints") ||
+        trimmed.toLowerCase().includes("active constraints")
+      ) {
+        inConstraintsSection = true;
+        continue;
+      } else if (inConstraintsSection) {
+        break;
+      }
+    }
+
+    if (inConstraintsSection) {
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        const raw = trimmed.replace(/^[-*]\s+(\[[ xX]\]\s+)?/, "").trim();
+        if (raw && !raw.toLowerCase().startsWith("none recorded")) {
+          constraints.push(raw);
+        }
+      }
+    }
   }
 
+  return constraints;
+}
+
+/**
+ * Merges proposed constraints with existing constraints, preserving hand-added rules.
+ * Applies in-lock mutation safety validation.
+ */
+export function mergeCurrentConstraints(
+  existingText: string,
+  proposed: string[],
+  options?: { allowDrastic?: boolean },
+): string[] {
+  const existing = parseCurrentConstraints(existingText);
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  // Add existing constraints first
+  for (const c of existing) {
+    const key = c.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(c);
+    }
+  }
+
+  // Count additions from proposed
+  let additionsCount = 0;
+  for (const p of proposed) {
+    const key = p.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(p);
+      additionsCount++;
+    }
+  }
+
+  // Verify mutation safety
+  verifyMutationSafety(existing.length, merged.length, additionsCount, options);
+
+  return merged;
+}
+
+function commitHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options?: HandoffOptions,
+): HandoffResult {
   if (!existsSync(memoryDir)) {
     mkdirSync(memoryDir, { recursive: true });
   }
 
   const currentMdPath = join(memoryDir, "CURRENT.md");
-  const markdownContent = renderCurrentMdContent(invariants, options);
+  let effectiveConstraints = invariants.activeConstraints ?? [];
+
+  if (existsSync(currentMdPath)) {
+    try {
+      captureSnapshotRing("current", memoryDir, 30);
+    } catch {
+      // ignore snapshot failure in edge environments
+    }
+    try {
+      const existingText = readFileSync(currentMdPath, "utf8");
+      effectiveConstraints = mergeCurrentConstraints(
+        existingText,
+        effectiveConstraints,
+        { allowDrastic: (options as any)?.allowDrastic },
+      );
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  const invariantsWithMerged: CompactionInvariants = {
+    ...invariants,
+    activeConstraints: effectiveConstraints,
+  };
+
+  const markdownContent = renderCurrentMdContent(invariantsWithMerged, options);
   writeFileSync(currentMdPath, markdownContent, "utf8");
 
   recordAuditEvent(memoryDir, {
@@ -165,4 +371,35 @@ export function generateSessionHandoff(
     resumptionPrompt,
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Commits an interruption-proof checkpoint handoff into CURRENT.md.
+ * Triggers onPreCompress fact extraction if provided and validates all 5 core invariants.
+ */
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options: HandoffOptions & { onPreCompress: (invariants: CompactionInvariants, store?: any) => Promise<any> },
+): Promise<HandoffResult>;
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options?: HandoffOptions,
+): HandoffResult;
+export function generateSessionHandoff(
+  memoryDir: string,
+  invariants: CompactionInvariants,
+  options?: HandoffOptions,
+): HandoffResult | Promise<HandoffResult> {
+  validateCompactionInvariants(invariants);
+
+  if (options?.onPreCompress) {
+    const hookResult = options.onPreCompress(invariants, options.store);
+    if (hookResult instanceof Promise) {
+      return hookResult.then(() => commitHandoff(memoryDir, invariants, options));
+    }
+  }
+
+  return commitHandoff(memoryDir, invariants, options);
 }

@@ -1,20 +1,241 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
-import { list } from "./store.ts";
+import { list, get, slugifyId as slugify } from "./store.ts";
 import { getCurrent, syncConstraints, getSessionHandoff, parseCurrentFile } from "./governor.ts";
-import { listWikiPages } from "./wiki/compiler.ts";
+import { listWikiPages, getWikiPage } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
 import { formatCoreBlock } from "./core.ts";
-import type { MemoryEntry, SearchOptions } from "./types.ts";
-import { STATUS_PENALTY, VERIFICATION_BONUS, DEFAULT_STALE_DAYS } from "./types.ts";
+import type { MemoryEntry, SearchOptions, VeracityClass } from "./types.ts";
+import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
+import { nowIso } from "./store.ts";
+import { hasSecret } from "./secrets.ts";
+import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
+import { buildSafeFtsQuery } from "./sqlite.ts";
+import { computeDecayScore } from "./retention.ts";
+import { computeJaccardSimilarity } from "./quality/dedup.ts";
+import { isDraftMemory } from "./drafts.ts";
+import {
+  type TaskIntent,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+} from "./retrieval/intent_bias.ts";
+import {
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+} from "./retrieval/effective_score.ts";
+import {
+  type RrfConfig,
+  type RrfVariant,
+  type RrfWeights,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
+} from "./retrieval/rrf.ts";
+import {
+  type CandidateKeepReason,
+  type CandidateDropReason,
+  type CandidateEvaluation,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
+} from "./retrieval/candidate_reasons.ts";
+import {
+  type RecallUsageStatus,
+  type RecallUsageJoinRecord,
+  type RecallUsageTelemetryReport,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
+} from "./quality/telemetry.ts";
+import {
+  type DegradedFaultSignal,
+  createDegradedFaultSignal,
+  mergeDegradedFaults,
+  formatDegradedFaultNotice,
+} from "./retrieval/faults.ts";
+import {
+  type RetrievalLadderRung,
+  type LadderRungName,
+  type LoosenedMatchLabel,
+  formatLoosenedBadge,
+  executeRetrievalLadder,
+  LADDER_DEFAULTS,
+} from "./retrieval/ladder.ts";
+
+export type {
+  VeracityClass,
+  TaskIntent,
+  RrfConfig,
+  RrfVariant,
+  RrfWeights,
+  CandidateKeepReason,
+  CandidateDropReason,
+  CandidateEvaluation,
+  RecallUsageStatus,
+  RecallUsageJoinRecord,
+  RecallUsageTelemetryReport,
+};
+export {
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
+};
+
+/**
+ * T-089: Canonical provenance veracity weights:
+ * user 1.0, agent 0.7, external 0.5, system 0.3.
+ */
+export const VERACITY_RANK_WEIGHTS: Record<VeracityClass, number> = {
+  user: 1.0,
+  agent: 0.7,
+  external: 0.5,
+  system: 0.3,
+};
+
+/**
+ * Resolves the veracity class from memory provenance attributes.
+ * Precedence: specific source origin > verification level > broad trust tier.
+ */
+export function resolveVeracityClass(entry: {
+  source?: string;
+  trust?: string;
+  verification?: { verified_by?: string; level?: string };
+}): VeracityClass {
+  const src = (entry.source || "").toLowerCase().trim();
+
+  // 1. Direct source origin check
+  if (
+    src === "user" ||
+    src === "user_input" ||
+    src === "human" ||
+    src === "principal" ||
+    src === "manual"
+  ) {
+    return "user";
+  }
+  if (
+    src === "system" ||
+    src === "system_generated" ||
+    src === "rule" ||
+    src === "daemon" ||
+    src === "background" ||
+    src === "sweep"
+  ) {
+    return "system";
+  }
+  if (
+    src === "external" ||
+    src === "external_data" ||
+    src === "web" ||
+    src === "crawler" ||
+    src === "import" ||
+    src === "doc" ||
+    src === "article"
+  ) {
+    return "external";
+  }
+  if (
+    src === "agent" ||
+    src === "agent_inferred" ||
+    src === "ai" ||
+    src === "assistant" ||
+    src === "subagent"
+  ) {
+    return "agent";
+  }
+
+  // 2. Verification level check
+  if (
+    entry.verification?.level === "user-confirmed" ||
+    entry.verification?.level === "authoritative"
+  ) {
+    return "user";
+  }
+
+  // 3. Trust tier fallback
+  const trust = (entry.trust || "").toLowerCase().trim();
+  if (trust === "trusted" || trust === "t1") {
+    return "user";
+  }
+  if (trust === "untrusted" || trust === "t3") {
+    return "external";
+  }
+  if (trust === "t4") {
+    return "system";
+  }
+  if (trust === "candidate" || trust === "t2") {
+    return "agent";
+  }
+
+  return "agent";
+}
+
+/**
+ * Returns the numerical veracity rank weight for an entry.
+ */
+export function getVeracityWeight(entry: {
+  source?: string;
+  trust?: string;
+  verification?: { verified_by?: string; level?: string };
+}): number {
+  const cls = resolveVeracityClass(entry);
+  return VERACITY_RANK_WEIGHTS[cls];
+}
 
 export interface ScoredEntry {
   entry: MemoryEntry;
   score: number;
+  /** T-126: Deterministic reason tokens explaining why this memory was retrieved. */
+  why_retrieved?: string[];
+  /** T-121: Typed keep reasons explaining why this memory was preserved. */
+  keep_reasons?: CandidateKeepReason[];
+  /** T-121: Typed drop reasons if candidate was evaluated and rejected. */
+  drop_reasons?: CandidateDropReason[];
+  /** T-135: Retrieval ladder rung (1: strict, 2: standard, 3: loosened). */
+  ladder_rung?: RetrievalLadderRung;
+  /** T-135: Explicit flag indicating whether this match was admitted via a loosened ladder rung. */
+  is_loosened?: boolean;
+  /** T-135: Exact explanation of what constraints were relaxed to admit this memory. */
+  loosened_reason?: string;
 }
 
 export type DisclosureDepth = "L1" | "L2" | "L3";
+
+/**
+ * T-098: Progressively expanded wikilink target resolved from primary fused candidates.
+ */
+export interface ExpandedWikilink {
+  target: string;
+  sourceId: string;
+  hop: number;
+  entry?: MemoryEntry;
+  wikiPage?: {
+    slug: string;
+    title: string;
+    type: string;
+    summary?: string;
+  };
+  score: number;
+}
 
 export interface ContextQueryOptions extends SearchOptions {
   query?: string;
@@ -22,13 +243,84 @@ export interface ContextQueryOptions extends SearchOptions {
   now?: number;
   /** Progressive disclosure tier for formatted context (default L2). */
   depth?: DisclosureDepth;
+  /** R21: precomputed semantic cosine scores by entry id (ranking dim #12). */
+  semanticScores?: Map<string, number>;
+  /** T-073: Optional minimum score threshold to consider a match confident (default: DEFAULT_MIN_RELEVANCE_SCORE = 0.45). */
+  minScoreThreshold?: number;
+  /** T-083: Bi-temporal point-in-time query timestamp (ISO string or epoch ms). */
+  as_of?: string | number;
+  /** T-097: Hindsight recall-time deduplication favoring concrete observations over abstract inferences (scoped to top-2x limit). */
+  prefer_observations?: boolean;
+  preferObservations?: boolean;
+  /** T-098: Progressive wikilink expansion after fusion (resolves [[target]] and linked_memory_ids). */
+  expand_wikilinks?: boolean;
+  expandWikilinks?: boolean;
+  /** Maximum hops for progressive wikilink expansion (default: 1, max: 3). */
+  max_wikilink_hops?: number;
+  /** T-133: Explicit degradation flag to simulate or propagate degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes to record in degraded signal. */
+  degraded_notes?: string[];
+  /** T-133: Diagnostic fault notes alias. */
+  fault_notes?: string[];
+  /** T-135: Whether to execute progressive ladder matching. */
+  enable_ladder?: boolean;
+  /** T-135: Minimum number of confident matches before stopping ladder. */
+  min_confident_count?: number;
+  /** T-135: Score threshold for strict matching in Rung 1. */
+  strict_threshold?: number;
+  /** T-135: Score threshold for standard matching in Rung 2. */
+  standard_threshold?: number;
+  /** T-135: Score threshold for loosened matching in Rung 3. */
+  loosened_threshold?: number;
+  /** T-135: Whether to relax project scope to include global memories in Rung 3. */
+  allow_scope_relaxation?: boolean;
 }
 
 export interface SearchResult {
   results: ScoredEntry[];
-  source: "live";
+  source: "live" | "cache" | "degraded";
   stale: boolean;
+  fromCache?: boolean;
   totalTokensUsed?: number;
+  /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes explaining why retrieval degraded. */
+  degraded_notes?: string[];
+  /** T-133: Structured fault notes alias. */
+  fault_notes?: string[];
+  /** T-135: Ladder rungs traversed during retrieval. */
+  ladder_rungs_used?: RetrievalLadderRung[];
+  /** T-135: Count of loosened matches admitted. */
+  loosened_matches_count?: number;
+  /** T-135: Matches admitted via loosened criteria. */
+  loosened_matches?: ScoredEntry[];
+  /** T-075 & T-058: Memories filtered out by trust tiers or read-path re-validation. */
+  withheld?: Array<{ id: string; reason: string }>;
+  /** T-117: High-water mark timestamp of the most recent memory in the store. */
+  watermark?: string;
+  /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
+  mode?: "confident_match" | "no_confident_match";
+  /** T-073: Explicit flag indicating whether confident memories were returned. */
+  no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
+  /** T-083: Target timestamp when as_of evaluation was requested. */
+  as_of?: string;
+  /** T-083: Memories whose validity at as_of is undetermined without date invention. */
+  undetermined?: ScoredEntry[];
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
+  hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
+  deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates. */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion. */
+  expanded_count?: number;
+  /** T-121: Typed evaluation outcomes (keep/drop with structured reasons) for all evaluated candidates. */
+  candidate_evaluations?: CandidateEvaluation[];
 }
 
 export interface FormattedContext {
@@ -37,6 +329,40 @@ export interface FormattedContext {
   totalTokensUsed: number;
   constraints: string[];
   userProfile?: string | null;
+  fromCache?: boolean;
+  stale?: boolean;
+  /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
+  degraded?: boolean;
+  /** T-133: Diagnostic fault notes explaining why retrieval degraded. */
+  degraded_notes?: string[];
+  /** T-133: Structured fault notes alias. */
+  fault_notes?: string[];
+  /** T-135: Ladder rungs traversed during retrieval. */
+  ladder_rungs_used?: RetrievalLadderRung[];
+  /** T-135: Count of loosened matches admitted. */
+  loosened_matches_count?: number;
+  /** T-135: Matches admitted via loosened criteria. */
+  loosened_matches?: ScoredEntry[];
+  /** T-073: Result mode indicating whether matches met confident threshold or fell into no_confident_match. */
+  mode?: "confident_match" | "no_confident_match";
+  /** T-073: Explicit flag indicating whether confident memories were returned. */
+  no_confident_match?: boolean;
+  /** T-128: Confident non-draft answers meeting confidence threshold. */
+  confident_answers?: ScoredEntry[];
+  /** T-128: Draft answers segregated from confident answers. */
+  draft_answers?: ScoredEntry[];
+  /** T-083: Target timestamp when as_of evaluation was requested. */
+  as_of?: string;
+  /** T-083: Memories whose validity at as_of is undetermined. */
+  undetermined?: ScoredEntry[];
+  /** T-096: Count of superseded or inactive memories filtered out during retrieval. */
+  hidden_count?: number;
+  /** T-097: Count of near-duplicate memories suppressed by prefer_observations. */
+  deduped_count?: number;
+  /** T-098: Progressively expanded wikilinks resolved from primary fused candidates. */
+  expanded_wikilinks?: ExpandedWikilink[];
+  /** T-098: Count of wikilinks expanded after fusion. */
+  expanded_count?: number;
 }
 
 /** Stopwords filtered out during tokenization */
@@ -63,10 +389,233 @@ const STOPWORDS = new Set([
   "yourself", "yourselves",
 ]);
 
-/** Lowercase alphanumeric-only tokens, split on non-alphanumeric. */
+/**
+ * T-061: Compound-token expansion.
+ * Splits camelCase (getUserProfile -> get, user, profile, getuserprofile),
+ * snake_case (auth_token -> auth, token, auth_token), and kebab-case.
+ * Returns unique array containing both the decomposed sub-tokens and the normalized full token.
+ */
+export function splitCompoundToken(token: string): string[] {
+  if (!token || typeof token !== "string") return [];
+  const results = new Set<string>();
+
+  const lowerFull = token.toLowerCase();
+  results.add(lowerFull);
+
+  const stripped = lowerFull.replace(/[_\-.]+/g, "");
+  if (stripped.length > 0) {
+    results.add(stripped);
+  }
+
+  // Split on camelCase/PascalCase boundaries and delimiter boundaries
+  const parts = token
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[\s_\-.]+/);
+
+  for (const p of parts) {
+    const clean = p.toLowerCase().trim();
+    if (clean.length > 0) {
+      results.add(clean);
+    }
+  }
+
+  return [...results];
+}
+
+/**
+ * Unicode-aware lowercase word/number tokens with compound token expansion (T-061, T-311).
+ * `\p{L}\p{N}` keeps ASCII behavior identical while giving CJK, Cyrillic and
+ * accented words whole tokens. Compound tokens (camelCase, PascalCase) are expanded into sub-tokens.
+ */
 export function tokenize(text: string): string[] {
   if (!text || typeof text !== "string") return [];
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const rawMatches = text.match(/[\p{L}\p{N}]+/gu);
+  if (!rawMatches) return [];
+
+  const tokens: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawMatches) {
+    // Expand camelCase / PascalCase compound words (e.g., getUserProfile -> getuserprofile, get, user, profile)
+    if (/[a-z\p{Ll}][A-Z\p{Lu}]|[A-Z\p{Lu}]{2,}[a-z\p{Ll}]/u.test(raw)) {
+      const expanded = splitCompoundToken(raw);
+      for (const t of expanded) {
+        if (!seen.has(t)) {
+          seen.add(t);
+          tokens.push(t);
+        }
+      }
+    } else {
+      const lower = raw.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        tokens.push(lower);
+      }
+    }
+  }
+
+  return tokens;
+}
+
+/**
+ * T-310: Matches a query token against text using Unicode-aware word boundaries.
+ * Prevents substring false positives such as "race" matching "trace" or "port" matching "report".
+ */
+export function matchesWordBoundary(text: string, term: string): boolean {
+  if (!text || !term) return false;
+  const trimmedTerm = term.trim();
+  if (!trimmedTerm) return false;
+  const escaped = trimmedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}([^\\p{L}\\p{N}_]|$)`, "iu");
+  return regex.test(text);
+}
+
+const TRIVIAL_GREETINGS = new Set([
+  "hi", "hello", "hey", "hey there", "good morning", "good evening", "good afternoon",
+  "thank you", "thanks", "ok", "okay", "bye", "goodbye", "yo", "sup",
+]);
+
+/**
+ * T-070: IDF-weighted relevance gate before FTS5 search (0.3 threshold, identifier-decisive, greeting short-circuit).
+ * Returns whether query possesses sufficient informational signal to justify recall passes.
+ */
+export function evaluateQueryRelevance(query: string): {
+  relevant: boolean;
+  score: number;
+  reason?: string;
+} {
+  if (!query || typeof query !== "string") {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return { relevant: false, score: 0, reason: "empty_query" };
+  }
+
+  // 1. Greeting short-circuit
+  const normalized = trimmed.toLowerCase().replace(/[!?.,;:]+$/g, "").trim();
+  if (TRIVIAL_GREETINGS.has(normalized)) {
+    return { relevant: false, score: 0.05, reason: "trivial_greeting" };
+  }
+
+  // 2. Identifier-decisive check: code syntax, paths, camelCase, backticks
+  const hasBackticks = /`[^`]+`/.test(trimmed);
+  const hasPath = /[\/\\]|\.[a-z0-9]{1,5}\b/i.test(trimmed);
+  const hasCamelOrSnake = /[a-z][A-Z]|[A-Z]{2,}[a-z]|_/.test(trimmed);
+
+  if (hasBackticks || hasPath || hasCamelOrSnake) {
+    return { relevant: true, score: 0.85 };
+  }
+
+  // 3. Informational density scoring over non-stopword tokens
+  const tokens = tokenize(trimmed);
+  const informativeTokens = tokens.filter((t) => !STOPWORDS.has(t));
+
+  if (informativeTokens.length === 0) {
+    return { relevant: false, score: 0.1, reason: "stopwords_only" };
+  }
+
+  const informativeRatio = informativeTokens.length / Math.max(1, tokens.length);
+  const avgLen = informativeTokens.reduce((sum, t) => sum + t.length, 0) / informativeTokens.length;
+
+  let score = 0.25 * informativeRatio + Math.min(0.5, (avgLen / 10) * 0.5);
+  if (informativeTokens.length >= 2) score += 0.15;
+  if (informativeTokens.length >= 4) score += 0.15;
+
+  const threshold = 0.30;
+  const relevant = score >= threshold;
+
+  return {
+    relevant,
+    score: Math.min(1.0, score),
+    reason: relevant ? undefined : "low_relevance_score",
+  };
+}
+
+export interface AbstentionDecision {
+  abstain: boolean;
+  score: number;
+  reason?: string;
+  searchableTerms?: string;
+}
+
+/**
+ * T-072: FTS5-tokenizer-matched abstention gate.
+ * Evaluates whether a query possesses valid searchable terms under SQLite FTS5 tokenization rules.
+ * Automatically abstains on syntax-only operators, pure punctuation, trivial greetings,
+ * or queries containing only stopwords, short-circuiting expensive candidate scans.
+ */
+export function evaluateAbstentionGate(query: string): AbstentionDecision {
+  if (!query || typeof query !== "string") {
+    return { abstain: true, score: 0, reason: "empty_query" };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return { abstain: true, score: 0, reason: "empty_query" };
+  }
+
+  // 1. Trivial greeting short-circuit
+  const normalized = trimmed.toLowerCase().replace(/[!?.,;:]+$/g, "").trim();
+  if (TRIVIAL_GREETINGS.has(normalized)) {
+    return { abstain: true, score: 0.05, reason: "trivial_greeting" };
+  }
+
+  // 2. FTS5 tokenizer extraction check
+  const safeFts = buildSafeFtsQuery(trimmed);
+  if (!safeFts || safeFts.trim().length === 0) {
+    return { abstain: true, score: 0, reason: "fts_no_searchable_terms" };
+  }
+
+  // 3. Informational density check over non-stopword tokens
+  const tokens = tokenize(trimmed);
+  const informativeTokens = tokens.filter((t) => !STOPWORDS.has(t));
+  if (informativeTokens.length === 0) {
+    return { abstain: true, score: 0.1, reason: "stopwords_only" };
+  }
+
+  const relevance = evaluateQueryRelevance(trimmed);
+  if (!relevance.relevant) {
+    return { abstain: true, score: relevance.score, reason: relevance.reason };
+  }
+
+  return {
+    abstain: false,
+    score: relevance.score,
+    searchableTerms: safeFts,
+  };
+}
+
+/**
+ * T-035: Iterative safe maximum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMax(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let max = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val > max) {
+      max = val;
+    }
+  }
+  return max === -Infinity ? defaultValue : max;
+}
+
+/**
+ * T-035: Iterative safe minimum calculation that prevents RangeError call stack overflow on large arrays.
+ */
+export function safeMin(arr: number[], defaultValue: number = 0): number {
+  if (!arr || arr.length === 0) return defaultValue;
+  let min = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const val = arr[i];
+    if (val !== undefined && !Number.isNaN(val) && val < min) {
+      min = val;
+    }
+  }
+  return min === Infinity ? defaultValue : min;
 }
 
 /** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
@@ -79,24 +628,29 @@ export function computeApplicability(entryTokens: Set<string>, queryTokens: stri
   return matched / queryTokens.length;
 }
 
-/** Staleness policy in days per memory type. null = never stale. */
-export function stalePolicyDays(type?: string): number | null {
-  if (!type) return DEFAULT_STALE_DAYS;
-  switch (type) {
-    case "fix":
-      return 90;
-    case "operation":
-      return 180;
-    case "architecture":
-      return 365;
-    case "discovery":
-      return 30;
-    case "preference":
-      return null;
-    default:
-      return DEFAULT_STALE_DAYS;
+/**
+ * T-062: Safely parse and clamp model-supplied limit values within [minVal, maxVal].
+ */
+export function clampLimit(
+  val: unknown,
+  defaultVal: number = 10,
+  maxVal: number = 100,
+  minVal: number = 1,
+): number {
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return Math.max(minVal, Math.min(Math.floor(val), maxVal));
   }
+  if (typeof val === "string" && val.trim()) {
+    const parsed = parseInt(val.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return Math.max(minVal, Math.min(parsed, maxVal));
+    }
+  }
+  return defaultVal;
 }
+
+/** Staleness policy in days per memory type. null = never stale. */
+export { stalePolicyDays } from "./retention.ts";
 
 /** Estimates prompt token count for a memory entry (~4 characters per token heuristic). */
 export function estimateEntryTokens(entry: MemoryEntry): number {
@@ -110,13 +664,41 @@ export function daysSince(iso: string, now: number): number {
   return Math.max(0, (now - t) / 86_400_000);
 }
 
-export function applicability(entry: MemoryEntry, queryTokens: string[]): number {
+/** T-022: Memoized token, symbol, and path sets per memory entry to avoid redundant re-tokenization. */
+const entryTokenSetCache = new WeakMap<MemoryEntry, Set<string>>();
+const entrySymbolsCache = new WeakMap<MemoryEntry, Set<string>>();
+const entryPathsCache = new WeakMap<MemoryEntry, Set<string>>();
+
+/**
+ * Returns or precomputes the set of lowercase lexical tokens for a memory entry.
+ */
+export function getEntryTokenSet(entry: MemoryEntry): Set<string> {
+  let set = entryTokenSetCache.get(entry);
+  if (!set) {
+    const graphSymbols = (entry.graph?.symbol_names ?? []).join(" ");
+    const haystack = tokenize(
+      `${entry.content} ${entry.title} ${entry.project} ${(entry.tags ?? []).join(" ")} ${graphSymbols}`,
+    );
+    set = new Set(haystack);
+    entryTokenSetCache.set(entry, set);
+  }
+  return set;
+}
+
+/** Invalidates cached precomputed token and structural sets for an entry. */
+export function invalidateEntryTokenSet(entry: MemoryEntry): void {
+  entryTokenSetCache.delete(entry);
+  entrySymbolsCache.delete(entry);
+  entryPathsCache.delete(entry);
+}
+
+export function applicability(
+  entry: MemoryEntry,
+  queryTokens: string[],
+  cachedSet?: Set<string>,
+): number {
   if (queryTokens.length === 0) return 0;
-  const graphSymbols = (entry.graph?.symbol_names ?? []).join(" ");
-  const haystack = tokenize(
-    `${entry.content} ${entry.title} ${entry.project} ${(entry.tags ?? []).join(" ")} ${graphSymbols}`,
-  );
-  const hay = new Set(haystack);
+  const hay = cachedSet || getEntryTokenSet(entry);
   const overlap = queryTokens.filter((t) => hay.has(t)).length;
   return overlap / Math.max(1, queryTokens.length);
 }
@@ -135,8 +717,9 @@ export function dueDateBonus(entry: MemoryEntry, now: number): number {
   return 0;
 }
 
-/** True when entry.expires_at is set and in the past (unparseable dates never expire). */
+/** True when entry.expires_at is set and in the past, or status is "expired" (unparseable dates never expire). */
 export function isExpired(entry: MemoryEntry, now: number): boolean {
+  if (entry.status === "expired") return true;
   if (!entry.expires_at) return false;
   const t = Date.parse(entry.expires_at);
   return !Number.isNaN(t) && t <= now;
@@ -168,54 +751,609 @@ export function filterByRelevanceThreshold(
   return entries.filter((e) => e.score >= minScore);
 }
 
+/** Inputs the single scorer accepts. Code-context signals are only supplied by muse_context. */
+export type RetrievalSourceChannel = "hot" | "fts" | "vector" | "tree" | "distilled";
+
+export interface ScoreContext {
+  now: number;
+  workspaceRoot?: string;
+  /** Precomputed semantic cosine in [-1, 1] (R21 embedder), already looked up by entry id. */
+  semanticScore?: number;
+  activeFilePath?: string;
+  targetSymbol?: string;
+  ftsMatchIds?: Set<string>;
+  blastRadiusFiles?: Set<string>;
+  /** T-021: Memoized cache of verified entry verdicts across candidate ranking. */
+  fileVerificationCache?: Map<string, RuntimeVerificationVerdict>;
+  /** T-021: Memoized cache of individual file existence checks. */
+  filePathCache?: Map<string, boolean>;
+  /** T-118: Caller or detected task intent for query-intent bias. */
+  taskIntent?: TaskIntent;
+  /** T-118: Infer intent heuristically from query if not provided (default false). */
+  inferIntent?: boolean;
+  /** T-314: Source channels from which candidate memories were surfaced. */
+  sourceChannels?: Map<string, Set<RetrievalSourceChannel>>;
+}
+
+/** Every factor the unified scorer computes. One scorer, one factor set, one ordering (T-308). */
+export interface ScoreFactors {
+  /** Lexical applicability: matched query tokens / query tokens. */
+  baseApplicability: number;
+  exactSymbolMatch: number;
+  graphOverlap: number;
+  pathMatch: number;
+  bm25Match: number;
+  blastRadius: number;
+  statusPenalty: number;
+  verificationBonus: number;
+  salienceBonus: number;
+  reinforcementBonus: number;
+  dueBonus: number;
+  utilityBonus: number;
+  negativeWarningBonus: number;
+  timelessBoost: number;
+  recencyDecay: number;
+  trustAdjustment: number;
+  /** T-089: Numerical provenance veracity rank weight (user 1.0, agent 0.7, external 0.5, system 0.3). */
+  veracityWeight: number;
+  /** T-089: Resolved provenance veracity category. */
+  veracityClass: VeracityClass;
+  /** T-089: Additive rank bonus/discount computed from veracity weight. */
+  veracityBonus: number;
+  accessBoost: number;
+  recentAccessBoost: number;
+  zeroMatchPenalty: number;
+  semanticMatch: number;
+  /** T-118: Query-intent bias multiplier applied to candidate matching signals. */
+  intentMultiplier?: number;
+  /** T-118: Additive score bonus from query-intent bias multiplier. */
+  intentBias?: number;
+  /** T-119: Base relevance score before multiplicative reinforcement and decay. */
+  baseRelevanceScore?: number;
+  /** T-119: Utility and confirmation reinforcement multiplier in [0.2, 2.0]. */
+  reinforcementMultiplier?: number;
+  /** T-119: Bi-temporal retention decay factor in (0.0, 1.0]. */
+  decayFactor?: number;
+  /** T-119: Unified closed-form composite score: base × reinforcement × decay. */
+  effectiveScore?: number;
+  /** T-127: Additive score bonus or penalty derived from recall-to-usage ROI telemetry. */
+  roiAdjustment?: number;
+  /** T-127: Multiplier derived from recall-to-usage telemetry. */
+  roiMultiplier?: number;
+  /** T-127: Measured usage rate (applications / retrievals). */
+  usageRate?: number;
+  /** T-127: Return-on-investment score [0.0 - 1.0]. */
+  roiScore?: number;
+  /** T-314: Source channels from which this memory was surfaced. */
+  source_channels?: RetrievalSourceChannel[];
+  /** T-314: Additive score bonus from candidate origin source channels. */
+  sourceBonus?: number;
+  /** T-315: LangMem logarithmic frequency score [0.0 - 0.30]. */
+  frequencyScore?: number;
+  totalScore: number;
+  decayScore?: number;
+}
+
+/** Symbol-like identifiers an entry declares: AST symbols, single-word tags, backticked code. */
+function entrySymbols(entry: MemoryEntry): Set<string> {
+  let symbols = entrySymbolsCache.get(entry);
+  if (symbols) return symbols;
+  symbols = new Set<string>();
+  for (const s of entry.graph?.symbol_names ?? []) symbols.add(s.toLowerCase());
+  for (const tag of entry.tags ?? []) {
+    if (tag.length > 3 && !tag.includes("-") && !tag.includes(" ")) symbols.add(tag.toLowerCase());
+  }
+  for (const m of `${entry.title} ${entry.content}`.toLowerCase().match(/`([a-z0-9_$]+)`/g) ?? []) {
+    symbols.add(m.replace(/`/g, ""));
+  }
+  entrySymbolsCache.set(entry, symbols);
+  return symbols;
+}
+
+/** Files an entry touches: AST affected paths plus evidence sources. */
+function entryPaths(entry: MemoryEntry): Set<string> {
+  let paths = entryPathsCache.get(entry);
+  if (paths) return paths;
+  paths = new Set<string>();
+  for (const p of entry.graph?.affected_paths ?? []) paths.add(p.toLowerCase());
+  for (const ev of entry.evidence ?? []) if (ev.source) paths.add(ev.source.toLowerCase());
+  entryPathsCache.set(entry, paths);
+  return paths;
+}
+
 /**
- * Multi-factor score formula:
- * score = 1.0 * applicability + statusPenalty + verificationBonus + salienceBonus
- *       + reinforcementBonus + dueDateBonus + graphBonus + trustBonus + 0.3 * exp(-daysSince(decayBase)/90)
+ * Common generic programming verbs and high-frequency terms with near-zero identifier specificity.
+ * When matching query tokens against entry symbols, these must not award full symbol match points.
+ */
+export const GENERIC_COMMON_SYMBOLS = new Set([
+  "get", "set", "run", "do", "use", "make", "add", "call", "new", "all",
+  "init", "data", "test", "item", "val", "key", "list", "check", "put", "let",
+  "has", "is", "log", "req", "res", "out", "err", "msg", "type", "name",
+]);
+
+/**
+ * T-309: Calculate IDF-weighted specificity score for a symbol match.
+ * Prevents generic verbs (`get`, `set`) in tags/backticks from hijacking ranking over lexically-relevant memories.
+ */
+export function calculateSymbolSpecificity(symbol: string): number {
+  if (!symbol || typeof symbol !== "string") return 0;
+  const s = symbol.toLowerCase().trim();
+  if (STOPWORDS.has(s)) return 0;
+  if (GENERIC_COMMON_SYMBOLS.has(s) || s.length <= 2) return 0.05;
+  if (s.length <= 3) return 0.15;
+  // Compound identifiers (e.g. SessionManager, getUserProfile, auth_token, jwt.verify) have highest specificity
+  if (/[_.]|[a-z][A-Z]/.test(symbol)) return 1.0;
+  if (s.length >= 8) return 0.85;
+  if (s.length >= 5) return 0.60;
+  return 0.35;
+}
+
+/**
+ * The single multi-factor scorer behind every retrieval path (T-308).
+ * get_context scores through it via scoreEntry, muse_context through
+ * calculateMultiFactorScore — same store, same factors, same order.
  *
- * Bi-temporal: decay uses valid_from (event time) when set, else updated_at (system time).
- * Reinforcement: +0.05 per confirm up to 5; negative reinforcement applies a matching penalty.
- * AST Graph: +0.2 bonus for matching indexed symbol names.
- * Runtime Trust (SOW-201): +0.15 for verified strong disk files, -0.4 for stale missing paths.
+ * score = applicability + exactSymbol + graphOverlap + pathMatch + bm25 + blastRadius
+ *       + statusPenalty + verificationBonus + salience + reinforcement + dueDate
+ *       + utility + negativeWarning + timeless + recencyDecay + trust + access
+ *       + recentAccess + zeroMatchPenalty + 0.5 * cosine
+ *
+ * Bi-temporal: recency decays from valid_from (event time) when set, else updated_at.
+ */
+export function computeFactors(
+  entry: MemoryEntry,
+  queryTokens: string[],
+  ctx: ScoreContext,
+): ScoreFactors {
+  const now = ctx.now;
+  const lowerTokens = queryTokens.map((t) => t.toLowerCase());
+
+  const baseApplicability = applicability(entry, queryTokens);
+  const symbols = entrySymbols(entry);
+  const pathList = [...entryPaths(entry)];
+
+  // T-309: IDF-weighted symbol matching instead of flat binary 1.0
+  let exactSymbolMatch = 0;
+  if (ctx.targetSymbol && symbols.has(ctx.targetSymbol.toLowerCase())) {
+    exactSymbolMatch = 1.0;
+  } else {
+    for (let i = 0; i < lowerTokens.length; i++) {
+      const lt = lowerTokens[i];
+      if (symbols.has(lt)) {
+        const rawToken = queryTokens[i] || lt;
+        const spec = Math.max(
+          calculateSymbolSpecificity(rawToken),
+          calculateSymbolSpecificity(lt)
+        );
+        if (spec > exactSymbolMatch) exactSymbolMatch = spec;
+      }
+    }
+  }
+
+  let pathMatch = 0;
+  if (ctx.activeFilePath) {
+    const active = ctx.activeFilePath.toLowerCase();
+    if (pathList.some((p) => active.includes(p) || p.includes(active))) pathMatch = 0.4;
+  }
+  if (pathMatch === 0) {
+    for (const token of lowerTokens) {
+      if (token.includes("/") || /\.(ts|js|py)$/.test(token)) {
+        if (pathList.some((p) => p.includes(token))) {
+          pathMatch = 0.4;
+          break;
+        }
+      }
+    }
+  }
+
+  const graphOverlap = graphSymbolOverlapBonus(entry, queryTokens);
+  const bm25Match = ctx.ftsMatchIds?.has(entry.id) ? 0.3 : 0;
+  const blastRadius =
+    ctx.blastRadiusFiles && ctx.blastRadiusFiles.size > 0 && pathList.some((p) => ctx.blastRadiusFiles!.has(p))
+      ? 0.25
+      : 0;
+
+  const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
+  const verificationBonus = VERIFICATION_BONUS[entry.verification?.level ?? "unverified"] ?? 0;
+  const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
+  const reinforcement = entry.reinforcement ?? 0;
+  const reinforcementBonus = Math.sign(reinforcement) * 0.05 * Math.min(Math.abs(reinforcement), 5);
+  const dueBonus = dueDateBonus(entry, now);
+
+  let utilityBonus = 0;
+  if (entry.utility && entry.utility.application_count >= 1) {
+    const successRate = entry.utility.reuse_success_rate ?? 1.0;
+    if (successRate >= 0.75) utilityBonus = 0.25;
+    else if (successRate < 0.4) utilityBonus = -0.25;
+  }
+
+  const isNegative = entry.type === "negative" || entry.tags?.includes("anti-pattern") || entry.negative;
+  const negativeWarningBonus =
+    isNegative && (baseApplicability > 0 || exactSymbolMatch > 0 || pathMatch > 0) ? 0.3 : 0;
+  const timelessBoost = entry.temporal_mode === "timeless" || entry.type === "constraint" ? 0.2 : 0;
+
+  // T-090: src_ts evidence-age stamping (memory freshness cannot exceed evidence freshness)
+  const effectiveRecencyDays = entry.src_ts
+    ? Math.max(daysSince(entry.valid_from ?? entry.updated_at, now), daysSince(entry.src_ts, now))
+    : daysSince(entry.valid_from ?? entry.updated_at, now);
+
+  const recencyDecay =
+    entry.temporal_mode !== "timeless" && entry.type !== "constraint"
+      ? -0.05 * Math.min(Math.floor(effectiveRecencyDays / 30), 6)
+      : 0;
+
+  // Runtime trust verdict bonus/penalty (SOW-201, T-021 memoized)
+  let trustAdjustment = 0;
+  if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
+    let verdict: RuntimeVerificationVerdict;
+    const cacheKey = ctx.fileVerificationCache ? `${ctx.workspaceRoot || ""}:${entry.id}` : undefined;
+    if (cacheKey && ctx.fileVerificationCache?.has(cacheKey)) {
+      verdict = ctx.fileVerificationCache.get(cacheKey)!;
+    } else {
+      verdict = verifyRuntimeFiles(entry, ctx.workspaceRoot, ctx.filePathCache);
+      if (cacheKey && ctx.fileVerificationCache) {
+        ctx.fileVerificationCache.set(cacheKey, verdict);
+      }
+    }
+    if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
+    else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
+  }
+
+  const accessBoost = Math.min(0.2, (entry.access_count ?? 0) * 0.02);
+  const recentAccessBoost = entry.last_accessed_at && daysSince(entry.last_accessed_at, now) <= 7 ? 0.1 : 0;
+
+  // T-315: LangMem logarithmic frequency axis
+  const effectiveCount = (entry.access_count ?? 0) + 2 * (entry.utility?.successful_applications ?? 0);
+  let frequencyScore = 0;
+  if (effectiveCount > 0) {
+    const rawFreq = 0.25 * (Math.log(1 + effectiveCount) / Math.log(1 + 50));
+    let baseFreq = Math.min(0.25, Number(rawFreq.toFixed(4)));
+
+    // Recency modulation
+    if (entry.last_accessed_at) {
+      const days = daysSince(entry.last_accessed_at, now);
+      if (days <= 7) {
+        baseFreq = Math.min(0.30, Number((baseFreq + 0.05).toFixed(4)));
+      } else if (days > 60) {
+        baseFreq = Number((baseFreq * 0.7).toFixed(4));
+      }
+    }
+    frequencyScore = baseFreq;
+  }
+
+  // T-089: Veracity rank weighting (user 1.0, agent 0.7, external 0.5, system 0.3)
+  const veracityClass = resolveVeracityClass(entry);
+  const veracityWeight = VERACITY_RANK_WEIGHTS[veracityClass];
+  const veracityBonus = Number(((veracityWeight - 0.7) * 0.5).toFixed(4));
+
+  // A query whose tokens match nothing — including a degenerate query that tokenizes
+  // to nothing at all — is not evidence of relevance (SOW-202, T-311).
+  const zeroMatchPenalty = baseApplicability === 0 && graphOverlap === 0 ? -0.35 : 0;
+
+  // T-071 & T-116: semantic threshold gate before fusion — zero out sub-threshold noise
+  const rawSemantic = ctx.semanticScore ?? 0;
+  const semanticMatch = rawSemantic >= 0.30 ? rawSemantic : 0;
+
+  // T-118: Query-intent bias multiplier
+  const effectiveIntent =
+    ctx.taskIntent ??
+    (ctx.inferIntent && queryTokens.length > 0 ? detectQueryIntent(queryTokens.join(" ")) : undefined);
+  const intentMultiplier = effectiveIntent ? computeIntentMultiplier(effectiveIntent, entry) : 1.0;
+  const matchingSignal = Math.max(0, baseApplicability + exactSymbolMatch + bm25Match + 0.5 * semanticMatch);
+  const intentBias = intentMultiplier > 1.0 ? Number(((intentMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
+
+  // T-127: Recall-usage telemetry join & ROI score
+  const { multiplier: roiMultiplier } = computeRoiScoreMultiplier(entry);
+  const roiAdjustment = roiMultiplier !== 1.0 ? Number(((roiMultiplier - 1.0) * matchingSignal).toFixed(4)) : 0;
+
+  // T-314: Source-tagged recall channels & HOT.md bonus
+  const entryChannels = ctx.sourceChannels?.get(entry.id);
+  const sourceChannelList: RetrievalSourceChannel[] = entryChannels ? Array.from(entryChannels) : [];
+  let rawSourceBonus = 0;
+  if (entryChannels && entryChannels.size > 0) {
+    if (entryChannels.has("hot")) rawSourceBonus += 0.20;
+    if (entryChannels.has("fts")) rawSourceBonus += 0.15;
+    if (entryChannels.has("vector")) rawSourceBonus += 0.15;
+    if (entryChannels.has("tree")) rawSourceBonus += 0.10;
+    if (entryChannels.has("distilled")) rawSourceBonus += 0.08;
+  }
+
+  // T-314 Relevance Gate: only apply source bonus if candidate has baseline matching signals
+  const hasRelevance = baseApplicability > 0 || bm25Match > 0 || exactSymbolMatch > 0 || semanticMatch > 0;
+  const sourceBonus = hasRelevance ? Math.min(0.25, rawSourceBonus) : 0;
+
+  const totalScore =
+    baseApplicability +
+    exactSymbolMatch +
+    graphOverlap +
+    pathMatch +
+    bm25Match +
+    blastRadius +
+    statusPenalty +
+    verificationBonus +
+    salienceBonus +
+    reinforcementBonus +
+    dueBonus +
+    utilityBonus +
+    negativeWarningBonus +
+    timelessBoost +
+    recencyDecay +
+    trustAdjustment +
+    veracityBonus +
+    frequencyScore +
+    zeroMatchPenalty +
+    0.5 * semanticMatch +
+    intentBias +
+    roiAdjustment +
+    sourceBonus;
+
+  const decayScore = typeof entry.decay_score === "number" ? entry.decay_score : computeDecayScore(entry, now);
+
+  // T-119: Base relevance score before multiplicative reinforcement and decay
+  const baseRelevanceScore = Math.max(
+    0,
+    baseApplicability +
+      exactSymbolMatch +
+      graphOverlap +
+      pathMatch +
+      bm25Match +
+      blastRadius +
+      statusPenalty +
+      verificationBonus +
+      salienceBonus +
+      dueBonus +
+      negativeWarningBonus +
+      timelessBoost +
+      trustAdjustment +
+      veracityBonus +
+      accessBoost +
+      recentAccessBoost +
+      zeroMatchPenalty +
+      0.5 * semanticMatch +
+      intentBias +
+      roiAdjustment,
+  );
+  const reinforcementMultiplier = computeReinforcementMultiplier(entry);
+  const decayFactor = typeof decayScore === "number" ? decayScore : 1.0;
+  const effectiveScore = computeEffectiveScore(baseRelevanceScore, reinforcementMultiplier, decayFactor);
+
+  return {
+    baseApplicability,
+    exactSymbolMatch,
+    graphOverlap,
+    pathMatch,
+    bm25Match,
+    blastRadius,
+    statusPenalty,
+    verificationBonus,
+    salienceBonus,
+    reinforcementBonus,
+    dueBonus,
+    utilityBonus,
+    negativeWarningBonus,
+    timelessBoost,
+    recencyDecay,
+    trustAdjustment,
+    veracityWeight,
+    veracityClass,
+    veracityBonus,
+    accessBoost,
+    recentAccessBoost,
+    zeroMatchPenalty,
+    semanticMatch,
+    intentMultiplier,
+    intentBias,
+    roiAdjustment,
+    roiMultiplier,
+    usageRate: entry.utility?.usage_rate,
+    roiScore: entry.utility?.roi_score,
+    baseRelevanceScore,
+    reinforcementMultiplier,
+    decayFactor,
+    effectiveScore,
+    source_channels: sourceChannelList,
+    sourceBonus,
+    frequencyScore,
+    totalScore,
+    decayScore,
+  };
+}
+
+/**
+ * Total score for a single entry — the get_context entry point into computeFactors.
+ * Signature is unchanged; only the shared factor set behind it is (T-308).
  */
 export function scoreEntry(
   entry: MemoryEntry,
   queryTokens: string[],
   now: number = Date.now(),
   workspaceRoot?: string,
+  semanticScore: number = 0,
 ): number {
-  const app = applicability(entry, queryTokens);
-  const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
-  const vLevel = entry.verification?.level ?? "unverified";
-  const verificationBonus = VERIFICATION_BONUS[vLevel] ?? 0;
-  const salienceBonus = entry.salience !== undefined ? Math.max(0, Math.min(1, entry.salience)) * 0.1 : 0;
-  const r = entry.reinforcement ?? 0;
-  const reinforcementBonus = Math.sign(r) * 0.05 * Math.min(Math.abs(r), 5);
-  const dueBonus = dueDateBonus(entry, now);
-  const graphBonus = graphSymbolOverlapBonus(entry, queryTokens);
-  
-  // Runtime trust verdict bonus/penalty (SOW-201)
-  let trustAdjustment = 0;
-  if (entry.graph?.affected_paths && entry.graph.affected_paths.length > 0) {
-    const { verifyRuntimeFiles } = require("./graph.ts");
-    const verdict = verifyRuntimeFiles(entry, workspaceRoot);
-    if (verdict.verdict === "STRONG") trustAdjustment = 0.15;
-    else if (verdict.verdict === "STALE") trustAdjustment = -0.4;
-  }
-
-  const decayBase = entry.valid_from ?? entry.updated_at;
-  const decay = 0.3 * Math.exp(-daysSince(decayBase, now) / 90);
-  
-  // If query tokens exist but there is zero token/graph overlap, apply a relevance penalty (SOW-202)
-  const zeroMatchPenalty = queryTokens.length > 0 && app === 0 && graphBonus === 0 ? -0.35 : 0;
-
-  return app + statusPenalty + verificationBonus + salienceBonus + reinforcementBonus + dueBonus + graphBonus + trustAdjustment + decay + zeroMatchPenalty;
+  return computeFactors(entry, queryTokens, { now, workspaceRoot, semanticScore }).totalScore;
 }
 
-/** Sort by score desc, tiebreak updated_at desc then created_at desc. */
-export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[], now: number): ScoredEntry[] {
+/**
+ * T-126: Derives deterministic reason tokens from contributing factors and memory attributes.
+ */
+export function deriveWhyRetrieved(factors: ScoreFactors, entry: MemoryEntry): string[] {
+  const reasons: string[] = [];
+  if (factors.exactSymbolMatch > 0) reasons.push("exact_symbol_match");
+  if (factors.bm25Match > 0) reasons.push("bm25_fts_hit");
+  if (factors.semanticMatch > 0) reasons.push("semantic_vector_match");
+  if (factors.graphOverlap > 0) reasons.push("graph_symbol_overlap");
+  if (factors.pathMatch > 0) reasons.push("path_proximity");
+  if (factors.blastRadius > 0) reasons.push("blast_radius_impact");
+  if (factors.verificationBonus > 0 || (entry.verification?.level && entry.verification.level !== "unverified")) {
+    reasons.push("verified_memory");
+  }
+  if (factors.salienceBonus > 0) reasons.push("high_salience");
+  if (factors.reinforcementBonus > 0) reasons.push("reinforcement_bonus");
+  if (factors.dueBonus > 0) reasons.push("due_date_urgency");
+  if (factors.utilityBonus > 0) reasons.push("utility_reward");
+  if (
+    factors.negativeWarningBonus > 0 ||
+    entry.type === "negative" ||
+    entry.tags?.includes("anti-pattern") ||
+    entry.negative
+  ) {
+    reasons.push("negative_pattern_warning");
+  }
+  if (entry.type === "constraint") reasons.push("active_constraint");
+  if (entry.temporal_mode === "timeless") reasons.push("timeless_rule");
+  if (factors.recentAccessBoost > 0) reasons.push("recent_access");
+  if (factors.baseApplicability > 0) reasons.push("lexical_overlap");
+
+  // T-118: Intent bias boost
+  if ((factors.intentBias && factors.intentBias > 0) || (factors.intentMultiplier && factors.intentMultiplier > 1.0)) {
+    reasons.push("intent_bias_boost");
+  }
+
+  // T-119: Effective score multiplier reasons
+  if (factors.reinforcementMultiplier && factors.reinforcementMultiplier > 1.0) {
+    reasons.push("reinforcement_multiplier_boost");
+  }
+  if (factors.decayFactor !== undefined && factors.decayFactor < 0.5) {
+    reasons.push("decay_discounted");
+  }
+
+  // T-089: Veracity reasons
+  if (factors.veracityClass === "user" || (factors.veracityWeight !== undefined && factors.veracityWeight >= 1.0)) {
+    reasons.push("user_veracity_boost");
+  } else if (factors.veracityWeight !== undefined && factors.veracityWeight < 0.7) {
+    reasons.push("discounted_veracity");
+  }
+
+  // T-127: ROI feedback reasons
+  if (factors.roiMultiplier && factors.roiMultiplier > 1.0) {
+    reasons.push("roi_high_value_boost");
+  } else if (factors.roiMultiplier && factors.roiMultiplier < 1.0) {
+    reasons.push("roi_dead_weight_penalty");
+  }
+
+  // T-314: Source channel tokens
+  if (factors.source_channels && factors.source_channels.length > 0 && (factors.sourceBonus ?? 0) > 0) {
+    for (const channel of factors.source_channels) {
+      reasons.push(`source:${channel}`);
+    }
+  }
+
+  // T-315: Frequency tokens
+  if (factors.frequencyScore && factors.frequencyScore > 0.15) {
+    reasons.push("freq:high");
+  } else if (factors.frequencyScore && factors.frequencyScore > 0.08) {
+    reasons.push("freq:moderate");
+  }
+
+  return reasons.sort();
+}
+
+/**
+ * T-115: Checks whether top candidate scores lack discrimination (tightly clustered spread <= threshold).
+ */
+export function isLowDiscrimination(scores: number[], threshold: number = 0.04): boolean {
+  if (!scores || scores.length < 2) return false;
+  const topScore = scores[0];
+  const compareIdx = Math.min(2, scores.length - 1);
+  return Math.abs(topScore - scores[compareIdx]) <= threshold;
+}
+
+/**
+ * T-115: Conditional secondary reranking for candidates when primary scores are tightly clustered.
+ * Uses verification level, trust tier, recency, historical access, and provenance veracity to break ties deterministically.
+ */
+export function conditionalRerank<T extends { entry: MemoryEntry; score: number }>(candidates: T[]): T[] {
+  if (!candidates || candidates.length < 2) return candidates;
+  const scores = candidates.map((c) => c.score);
+  if (!isLowDiscrimination(scores)) return candidates;
+
+  const vBonus = (e: MemoryEntry) =>
+    e.verification?.level === "authoritative" ||
+    e.verification?.level === "user-confirmed" ||
+    e.verification?.level === "independently-verified"
+      ? 0.05
+      : e.verification?.level && e.verification.level !== "unverified"
+      ? 0.03
+      : 0;
+  const tBonus = (e: MemoryEntry) => (e.trust === "trusted" ? 0.02 : e.trust === "untrusted" ? -0.05 : 0);
+  const recencyBonus = (e: MemoryEntry) => {
+    const ts = Date.parse(e.updated_at || e.created_at || "");
+    return Number.isNaN(ts) ? 0 : Math.min(0.01, (ts / 2e12) * 0.01);
+  };
+  const accessBonus = (e: MemoryEntry) => Math.min(0.005, (e.access_count ?? 0) * 0.001);
+  // T-089: Veracity tie-breaker bonus (user +0.015, agent 0, external -0.01, system -0.02)
+  const veracityBonus = (e: MemoryEntry) => {
+    const w = getVeracityWeight(e);
+    return (w - 0.7) * 0.05;
+  };
+
   return candidates
-    .map((entry) => ({ entry, score: scoreEntry(entry, queryTokens, now) }))
+    .map((c) => {
+      const adj =
+        vBonus(c.entry) +
+        tBonus(c.entry) +
+        recencyBonus(c.entry) +
+        accessBonus(c.entry) +
+        veracityBonus(c.entry);
+      return {
+        ...c,
+        score: Number((c.score + adj).toFixed(5)),
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * T-117: Retrieves the data high-water mark timestamp from last_memory_seen_at / max(updated_at, created_at).
+ * Enables data-driven staleness tracking rather than relying on wall-clock drift.
+ */
+export function getStoreWatermark(store: Store): string {
+  if (store.db) {
+    try {
+      const row = store.db
+        .query<{ watermark: string }>(
+          `SELECT MAX(COALESCE(updated_at, created_at)) as watermark FROM memories WHERE (deleted_at IS NULL OR deleted_at = '')`,
+        )
+        .get();
+      if (row?.watermark) return row.watermark;
+    } catch {}
+  }
+  const entries = list(store);
+  if (entries.length === 0) return new Date(0).toISOString();
+  let maxTs = "";
+  for (const e of entries) {
+    const ts = e.updated_at || e.created_at || "";
+    if (ts > maxTs) maxTs = ts;
+  }
+  return maxTs || new Date(0).toISOString();
+}
+
+/** Sort by score desc, tiebreak updated_at desc then created_at desc, and apply conditional rerank. */
+export function sortCandidates(
+  candidates: MemoryEntry[],
+  queryTokens: string[],
+  now: number,
+  semanticScores?: Map<string, number>,
+  workspaceRoot?: string,
+): ScoredEntry[] {
+  const fileVerificationCache = new Map<string, RuntimeVerificationVerdict>();
+  const filePathCache = new Map<string, boolean>();
+
+  const scored = candidates
+    .map((entry) => {
+      const factors = computeFactors(entry, queryTokens, {
+        now,
+        workspaceRoot,
+        semanticScore: semanticScores?.get(entry.id) ?? 0,
+        fileVerificationCache,
+        filePathCache,
+      });
+      return {
+        entry,
+        score: factors.totalScore,
+        why_retrieved: deriveWhyRetrieved(factors, entry),
+      };
+    })
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const bU = Date.parse(b.entry.updated_at);
@@ -226,6 +1364,181 @@ export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[],
       const aC = Date.parse(a.entry.created_at);
       return (Number.isNaN(bC) ? 0 : bC) - (Number.isNaN(aC) ? 0 : aC);
     });
+
+  return conditionalRerank(scored);
+}
+
+/**
+ * T-098: Extracts [[target]] and [[target|alias]] wikilink references from text.
+ */
+export function extractWikilinks(text: string): string[] {
+  if (!text) return [];
+  const regex = /\[\[([a-zA-Z0-9_\-\.\/ ]+?)(?:[|#][^\]]+)?\]\]/g;
+  const links: string[] = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const raw = match[1].trim();
+    if (raw && !links.includes(raw)) {
+      links.push(raw);
+    }
+  }
+  return links;
+}
+
+/**
+ * T-098: Progressively expands wikilinks and linked_memory_ids after fusion retrieval.
+ * Resolves targets to related memories or compiled wiki pages within token budget and hop limits.
+ */
+export function expandFusedWikilinks(
+  store: Store,
+  primaryResults: ScoredEntry[],
+  options: {
+    tokenBudgetRemaining?: number;
+    maxHops?: number;
+    depth?: DisclosureDepth;
+    includeSuperseded?: boolean;
+    memoryDir?: string;
+  } = {},
+): {
+  expanded: ExpandedWikilink[];
+  tokensUsed: number;
+} {
+  const maxHops = Math.min(3, Math.max(1, options.maxHops ?? 1));
+  const expanded: ExpandedWikilink[] = [];
+  let tokensUsed = 0;
+  let remainingBudget = options.tokenBudgetRemaining;
+
+  // Track all visited targets (primary results + expanded) to prevent duplicates & cycles
+  const visited = new Set<string>();
+  for (const r of primaryResults) {
+    visited.add(r.entry.id);
+    if (r.entry.title) visited.add(r.entry.title);
+  }
+
+  const memoryDir = options.memoryDir || store.memoryDir || store.dir;
+
+  // Level-by-level BFS frontier for multi-hop expansion
+  let currentFrontier: Array<{ id: string; content: string; title: string; linked_memory_ids?: string[]; score: number }> =
+    primaryResults.map((r) => ({
+      id: r.entry.id,
+      content: r.entry.content,
+      title: r.entry.title,
+      linked_memory_ids: r.entry.linked_memory_ids,
+      score: r.score,
+    }));
+
+  for (let hop = 1; hop <= maxHops; hop++) {
+    const nextFrontier: Array<{ id: string; content: string; title: string; linked_memory_ids?: string[]; score: number }> = [];
+
+    for (const source of currentFrontier) {
+      // Collect candidate targets from [[wikilinks]] and linked_memory_ids
+      const extractedLinks = extractWikilinks(source.content + " " + source.title);
+      const linkedIds = source.linked_memory_ids ?? [];
+      const targets = Array.from(new Set([...extractedLinks, ...linkedIds]));
+
+      for (const target of targets) {
+        if (!target || visited.has(target)) continue;
+        visited.add(target);
+
+        // Try resolving target as a MemoryEntry in store
+        let resolvedEntry: MemoryEntry | null = null;
+        try {
+          resolvedEntry = get(store, target);
+        } catch {}
+
+        if (!resolvedEntry && store.db) {
+          try {
+            const row = store.db.query("SELECT data FROM memories WHERE id = ? OR title = ? LIMIT 1").get([target, target]) as { data: string } | null;
+            if (row?.data) {
+              resolvedEntry = JSON.parse(row.data);
+            }
+          } catch {}
+        }
+
+        if (resolvedEntry) {
+          visited.add(resolvedEntry.id);
+          if (resolvedEntry.title) visited.add(resolvedEntry.title);
+
+          if (!options.includeSuperseded && (resolvedEntry.status === "superseded" || resolvedEntry.valid_to)) {
+            if (resolvedEntry.status === "superseded") continue;
+          }
+
+          const entryTokens = estimateEntryTokens(resolvedEntry);
+          const compactTokens = Math.max(8, Math.ceil((resolvedEntry.title.length + resolvedEntry.id.length) / 4));
+
+          if (remainingBudget !== undefined) {
+            if (remainingBudget < compactTokens) {
+              continue; // Budget exhausted
+            }
+          }
+
+          const hopDecay = Math.pow(0.85, hop);
+          const score = Number((source.score * hopDecay).toFixed(4));
+          const actualTokens = remainingBudget !== undefined && remainingBudget < entryTokens ? compactTokens : entryTokens;
+
+          if (remainingBudget !== undefined) {
+            remainingBudget -= actualTokens;
+          }
+          tokensUsed += actualTokens;
+
+          expanded.push({
+            target,
+            sourceId: source.id,
+            hop,
+            entry: resolvedEntry,
+            score,
+          });
+
+          nextFrontier.push({
+            id: resolvedEntry.id,
+            content: resolvedEntry.content,
+            title: resolvedEntry.title,
+            linked_memory_ids: resolvedEntry.linked_memory_ids,
+            score,
+          });
+          continue;
+        }
+
+        // Try resolving target as a compiled wiki page
+        if (memoryDir && existsSync(join(memoryDir, "wiki"))) {
+          try {
+            const page = getWikiPage(memoryDir, target) || getWikiPage(memoryDir, slugify(target));
+            if (page) {
+              const summary = (page as any).summary || "";
+              const pageTokens = Math.max(12, Math.ceil((page.title.length + summary.length) / 4));
+
+              if (remainingBudget !== undefined) {
+                if (remainingBudget < pageTokens) continue;
+                remainingBudget -= pageTokens;
+              }
+              tokensUsed += pageTokens;
+
+              const hopDecay = Math.pow(0.80, hop);
+              const score = Number((source.score * hopDecay).toFixed(4));
+
+              expanded.push({
+                target,
+                sourceId: source.id,
+                hop,
+                wikiPage: {
+                  slug: page.slug,
+                  title: page.title,
+                  type: page.type,
+                  summary: summary || undefined,
+                },
+                score,
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+
+    currentFrontier = nextFrontier;
+    if (currentFrontier.length === 0) break;
+  }
+
+  return { expanded, tokensUsed };
 }
 
 /**
@@ -234,23 +1547,158 @@ export function sortCandidates(candidates: MemoryEntry[], queryTokens: string[],
  */
 export const searchMemories = queryContext;
 
+const loggedRevalidationWarnings = new Set<string>();
+
+/**
+ * T-058 & T-059: Read-path re-validation defense-in-depth.
+ * Excludes prompt injection markup, leaked credentials, and invisible/bidi control characters.
+ * Logs a warning at most once per memory ID.
+ */
+export function validateRecalledEntry(entry: MemoryEntry): { valid: boolean; reason?: string } {
+  const text = `${entry.title}\n${entry.content}`;
+
+  // 1. Prompt injection / instruction override markup
+  if (
+    /(?:<system>|<\/system>|\[INST\]|\[\/INST\]|<memory-context>|<\/memory-context>|ignore previous instructions|disregard earlier instructions|system prompt override)/i.test(
+      text,
+    )
+  ) {
+    return { valid: false, reason: "prompt_injection_markup" };
+  }
+
+  // 2. Secret credential leak
+  if (hasSecret(entry.content) || hasSecret(entry.title)) {
+    return { valid: false, reason: "credential_leak" };
+  }
+
+  // 3. Invisible / bidi control characters
+  if (/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/.test(text)) {
+    return { valid: false, reason: "invisible_control_characters" };
+  }
+
+  return { valid: true };
+}
+
+export interface AsOfEvaluation {
+  status: "valid" | "undetermined" | "invalid";
+  reason?: string;
+}
+
+/**
+ * T-083: Evaluates bi-temporal validity of a memory entry as of targetTime without inventing dates.
+ * - valid: entry was definitely valid at targetTime (either active with no cessation or exact cessation >= targetTime)
+ * - undetermined: entry was created before targetTime, but closed out at/after targetTime with valid_to_exact: false
+ * - invalid: entry was not yet created at targetTime, or ceased prior to targetTime
+ */
+export function evaluateAsOf(entry: MemoryEntry, asOfTime: string | number): AsOfEvaluation {
+  const targetMs = typeof asOfTime === "number" ? asOfTime : Date.parse(asOfTime);
+  if (isNaN(targetMs)) {
+    throw new Error(`Invalid as_of timestamp: ${asOfTime}`);
+  }
+
+  const startIso = entry.valid_from ?? entry.created_at;
+  const startMs = Date.parse(startIso);
+  if (!isNaN(startMs) && targetMs < startMs) {
+    return { status: "invalid", reason: "not_yet_valid" };
+  }
+
+  if (!entry.valid_to) {
+    return { status: "valid", reason: "active_no_cessation" };
+  }
+
+  const endMs = Date.parse(entry.valid_to);
+  if (isNaN(endMs)) {
+    return { status: "valid", reason: "unparseable_valid_to" };
+  }
+
+  if (targetMs > endMs) {
+    return { status: "invalid", reason: "ceased_before_target" };
+  }
+
+  // targetMs <= endMs
+  if (entry.valid_to_exact === true) {
+    return { status: "valid", reason: "exact_boundary_valid" };
+  }
+
+  return { status: "undetermined", reason: "inexact_boundary_observation_lag" };
+}
+
 export function queryContext(
   store: Store,
   query: string = "",
   options: ContextQueryOptions = {},
 ): SearchResult {
+  if (options.enable_ladder) {
+    return executeRetrievalLadder(store, query, { ...options, enable_ladder: false });
+  }
+
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
   let entries = list(store);
+  const withheld: Array<{ id: string; reason: string }> = [];
+
+  // T-075: Untrusted provenance filter (default excluded, opt-in with includeUntrusted: true)
+  if (!options.includeUntrusted) {
+    entries = entries.filter((e) => {
+      if (e.trust === "untrusted") {
+        withheld.push({ id: e.id, reason: "untrusted_source" });
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // T-058: Defense-in-depth read-path revalidation
+  entries = entries.filter((e) => {
+    const val = validateRecalledEntry(e);
+    if (!val.valid) {
+      if (!loggedRevalidationWarnings.has(e.id)) {
+        loggedRevalidationWarnings.add(e.id);
+        console.warn(`[ReadPathValidation] Withheld memory ${e.id}: detected ${val.reason}`);
+      }
+      withheld.push({ id: e.id, reason: val.reason! });
+      return false;
+    }
+    return true;
+  });
+
+  // T-089: Minimum provenance veracity filter
+  if (options.minVeracity !== undefined) {
+    const minThreshold =
+      typeof options.minVeracity === "number"
+        ? options.minVeracity
+        : (VERACITY_RANK_WEIGHTS[options.minVeracity] ?? 0);
+    entries = entries.filter((e) => {
+      const weight = getVeracityWeight(e);
+      if (weight < minThreshold) {
+        withheld.push({ id: e.id, reason: "low_veracity_source" });
+        return false;
+      }
+      return true;
+    });
+  }
 
   if (options.project) {
     entries = entries.filter((e) => e.project === options.project);
   }
-  if (!options.includeSuperseded) {
-    entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
-  }
-  if (!options.includeArchived && options.status !== "archived") {
-    entries = entries.filter((e) => e.status !== "archived");
+  let hidden_count = 0;
+  // When as_of is NOT provided, apply current active lifecycle filters
+  if (options.as_of === undefined) {
+    entries = entries.filter((e) => {
+      if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
+        hidden_count++;
+        return false;
+      }
+      if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
+        hidden_count++;
+        return false;
+      }
+      if (!options.includeExpired && isExpired(e, now)) {
+        hidden_count++;
+        return false;
+      }
+      return true;
+    });
   }
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
@@ -272,30 +1720,155 @@ export function queryContext(
         e.status !== "candidate",
     );
   }
-  if (!options.includeExpired) {
-    entries = entries.filter((e) => !isExpired(e, now));
+
+  // T-083: Bi-temporal point-in-time partitioning
+  let undeterminedEntries: MemoryEntry[] = [];
+  if (options.as_of !== undefined) {
+    const validEntries: MemoryEntry[] = [];
+    for (const e of entries) {
+      const evaluation = evaluateAsOf(e, options.as_of);
+      if (evaluation.status === "valid") {
+        validEntries.push(e);
+      } else if (evaluation.status === "undetermined") {
+        undeterminedEntries.push(e);
+      }
+      // "invalid" entries are dropped
+    }
+    entries = validEntries;
   }
 
-  const scored = sortCandidates(entries, queryTokens, now);
-  const limit = options.limit ?? 10;
+  const scored = sortCandidates(entries, queryTokens, now, options.semanticScores, options.workspaceRoot);
+  const scoredUndetermined =
+    options.as_of !== undefined && undeterminedEntries.length > 0
+      ? sortCandidates(undeterminedEntries, queryTokens, now, options.semanticScores, options.workspaceRoot)
+      : [];
+
+  // R23: Record access for top results (updates last_accessed_at and access_count)
+  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 500, 1) : 10;
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
 
+  // T-097: Hindsight recall-time dedup scoped to top-2x limit/budget window
+  const preferObs = Boolean(options.prefer_observations ?? options.preferObservations);
+  let dedupedCandidates = scored;
+  let deduped_count = 0;
+
+  if (preferObs && scored.length > 1) {
+    const windowSize = Math.min(scored.length, limit * 2);
+    const topSlice = scored.slice(0, windowSize);
+    const remainingSlice = scored.slice(windowSize);
+
+    const isObservation = (e: MemoryEntry): boolean => {
+      if (e.evidence && e.evidence.length > 0) return true;
+      if (e.type === "fix" || e.type === "failure" || (e.type as string) === "observation") return true;
+      if (e.source === "test" || e.source === "tool" || e.source === "build" || e.source === "terminal" || e.source === "file_edit") return true;
+      return false;
+    };
+
+    // Apply observation bonus (+0.10) to observation-backed entries within the top window
+    const boostedTop = topSlice.map((s) => ({
+      ...s,
+      score: isObservation(s.entry) ? s.score + 0.1 : s.score,
+    }));
+    boostedTop.sort((a, b) => b.score - a.score);
+
+    const kept: typeof scored = [];
+    const suppressedIds = new Set<string>();
+
+    for (let i = 0; i < boostedTop.length; i++) {
+      const itemA = boostedTop[i];
+      if (suppressedIds.has(itemA.entry.id)) continue;
+
+      for (let j = i + 1; j < boostedTop.length; j++) {
+        const itemB = boostedTop[j];
+        if (suppressedIds.has(itemB.entry.id)) continue;
+
+        const sim = computeJaccardSimilarity(itemA.entry.content, itemB.entry.content);
+        if (sim >= 0.65) {
+          const aObs = isObservation(itemA.entry);
+          const bObs = isObservation(itemB.entry);
+
+          if (aObs && !bObs) {
+            suppressedIds.add(itemB.entry.id);
+            withheld.push({ id: itemB.entry.id, reason: "observation_preferred" });
+            deduped_count++;
+          } else if (bObs && !aObs) {
+            suppressedIds.add(itemA.entry.id);
+            withheld.push({ id: itemA.entry.id, reason: "observation_preferred" });
+            deduped_count++;
+            break;
+          } else {
+            suppressedIds.add(itemB.entry.id);
+            withheld.push({ id: itemB.entry.id, reason: "observation_preferred_dedup" });
+            deduped_count++;
+          }
+        }
+      }
+
+      if (!suppressedIds.has(itemA.entry.id)) {
+        kept.push(itemA);
+      }
+    }
+
+    dedupedCandidates = [...kept, ...remainingSlice];
+  }
+
+  const recordAccessFor = (store: Store | undefined, entry: MemoryEntry) => {
+    if (!store) return;
+    const now = nowIso();
+    const currentCount = entry.access_count ?? 0;
+    entry.last_accessed_at = now;
+    entry.access_count = currentCount + 1;
+    if (store.db) {
+      try {
+        store.db.run(
+          `UPDATE memories SET last_accessed_at = ?, access_count = ? WHERE id = ?`,
+          [now, entry.access_count, entry.id],
+        );
+      } catch {}
+    }
+  };
+
   if (options.tokenBudget !== undefined) {
     if (options.tokenBudget > 0) {
-      for (const item of scored) {
+      const packedIds = new Set<string>();
+      const isPriorityGuardrail = (e: MemoryEntry) =>
+        e.type === "constraint" ||
+        e.temporal_mode === "timeless" ||
+        e.type === "negative" ||
+        e.tags?.includes("anti-pattern") ||
+        e.negative;
+
+      // First pass: pack priority guardrails (constraints, timeless rules, negative anti-patterns)
+      for (const item of dedupedCandidates) {
         if (results.length >= limit) break;
+        if (!isPriorityGuardrail(item.entry)) continue;
+        const tokens = estimateEntryTokens(item.entry);
+        if (totalTokensUsed + tokens <= options.tokenBudget) {
+          results.push(item);
+          packedIds.add(item.entry.id);
+          totalTokensUsed += tokens;
+          recordAccessFor(store, item.entry);
+        }
+      }
+
+      // Second pass: pack remaining highest-scoring entries
+      for (const item of dedupedCandidates) {
+        if (results.length >= limit) break;
+        if (packedIds.has(item.entry.id)) continue;
         const tokens = estimateEntryTokens(item.entry);
         if (totalTokensUsed + tokens <= options.tokenBudget) {
           results.push(item);
           totalTokensUsed += tokens;
+          recordAccessFor(store, item.entry);
         }
       }
     }
   } else {
-    for (const item of scored.slice(0, limit)) {
+    for (const item of dedupedCandidates.slice(0, limit)) {
       results.push(item);
       totalTokensUsed += estimateEntryTokens(item.entry);
+      recordAccessFor(store, item.entry);
     }
   }
 
@@ -311,11 +1884,199 @@ export function queryContext(
     }
   }
 
+  // T-098: Progressive wikilink expansion after fusion
+  let expanded_wikilinks: ExpandedWikilink[] | undefined;
+  let expanded_count = 0;
+
+  if (options.expand_wikilinks || options.expandWikilinks) {
+    const budgetRemaining = options.tokenBudget ? Math.max(0, options.tokenBudget - totalTokensUsed) : undefined;
+    const expansion = expandFusedWikilinks(store, results, {
+      tokenBudgetRemaining: budgetRemaining,
+      maxHops: options.max_wikilink_hops,
+      depth: options.depth,
+      includeSuperseded: options.includeSuperseded,
+      memoryDir: store.memoryDir || store.dir,
+    });
+    if (expansion.expanded.length > 0) {
+      expanded_wikilinks = expansion.expanded;
+      expanded_count = expansion.expanded.length;
+      totalTokensUsed += expansion.tokensUsed;
+    }
+  }
+
+  const circuitDegraded = store.circuit?.isDegraded() ?? false;
+  const collectedFaultNotes: string[] = [];
+  if (options.degraded_notes) {
+    collectedFaultNotes.push(...options.degraded_notes);
+  }
+  if (options.fault_notes) {
+    collectedFaultNotes.push(...options.fault_notes);
+  }
+  if (circuitDegraded) {
+    collectedFaultNotes.push("circuit_breaker_open: circuit breaker open after failure threshold, operating in fallback cache mode");
+  }
+
+  const faultSignal = mergeDegradedFaults({
+    degraded: circuitDegraded || options.degraded === true,
+    degraded_notes: collectedFaultNotes,
+  });
+  const isDegraded = faultSignal.degraded;
+  const minThreshold = options.minScoreThreshold ?? DEFAULT_MIN_RELEVANCE_SCORE;
+  const confident_answers: ScoredEntry[] = [];
+  const draft_answers: ScoredEntry[] = [];
+
+  for (const r of results) {
+    if (isDraftMemory(r.entry)) {
+      draft_answers.push(r);
+    } else {
+      if (r.score >= minThreshold) {
+        if (queryTokens.length > 0) {
+          const app = applicability(r.entry, queryTokens);
+          const hasQuerySignal =
+            app > 0 ||
+            (r.why_retrieved &&
+              r.why_retrieved.some(
+                (w) =>
+                  w === "lexical_overlap" ||
+                  w === "exact_symbol_match" ||
+                  w === "path_match" ||
+                  w === "bm25_match" ||
+                  w === "semantic_match" ||
+                  w === "graph_overlap",
+              ));
+          if (hasQuerySignal) {
+            confident_answers.push(r);
+          }
+        } else {
+          confident_answers.push(r);
+        }
+      }
+    }
+  }
+
+  const hasConfidentMatch = confident_answers.length > 0;
+
+  const asOfIso =
+    options.as_of !== undefined
+      ? typeof options.as_of === "number"
+        ? new Date(options.as_of).toISOString()
+        : String(options.as_of)
+      : undefined;
+
   return {
     results,
-    source: "live",
-    stale: false,
+    source: isDegraded ? "degraded" : "live",
+    stale: isDegraded,
+    degraded: isDegraded ? true : undefined,
+    degraded_notes: faultSignal.degraded_notes,
+    fault_notes: faultSignal.fault_notes,
+    fromCache: false,
     totalTokensUsed,
+    withheld: withheld.length > 0 ? withheld : undefined,
+    watermark: getStoreWatermark(store),
+    mode: hasConfidentMatch ? "confident_match" : "no_confident_match",
+    no_confident_match: !hasConfidentMatch,
+    confident_answers,
+    draft_answers: draft_answers.length > 0 ? draft_answers : undefined,
+    ladder_rungs_used: [2],
+    loosened_matches_count: 0,
+    loosened_matches: [],
+    as_of: asOfIso,
+    undetermined: options.as_of !== undefined ? scoredUndetermined.slice(0, limit) : undefined,
+    hidden_count,
+    deduped_count: preferObs ? deduped_count : undefined,
+    expanded_wikilinks,
+    expanded_count: expanded_count > 0 ? expanded_count : undefined,
+  };
+}
+
+export interface AsOfQueryResult {
+  as_of: string;
+  results: ScoredEntry[];
+  undetermined: ScoredEntry[];
+  totalTokensUsed: number;
+  mode?: "confident_match" | "no_confident_match";
+  no_confident_match?: boolean;
+}
+
+/**
+ * T-083: Point-in-time bi-temporal query returning confirmed valid results and undetermined facts.
+ * Avoids date invention by cleanly segregating facts whose historical status is ambiguous.
+ */
+export function queryAsOf(
+  store: Store,
+  query: string,
+  asOfTime: string | number,
+  options: ContextQueryOptions = {},
+): AsOfQueryResult {
+  const result = queryContext(store, query, {
+    ...options,
+    as_of: asOfTime,
+  });
+  const asOfIso = typeof asOfTime === "number" ? new Date(asOfTime).toISOString() : String(asOfTime);
+  return {
+    as_of: asOfIso,
+    results: result.results,
+    undetermined: result.undetermined ?? [],
+    totalTokensUsed: result.totalTokensUsed ?? 0,
+    mode: result.mode,
+    no_confident_match: result.no_confident_match,
+  };
+}
+
+export interface TemporalSearchOptions extends ContextQueryOptions {
+  /** Whether to include superseded memories (default: false — default-excluding superseded) */
+  includeSuperseded?: boolean;
+}
+
+/**
+ * T-085: Temporal search evaluated as of atTime.
+ * Default-excludes superseded entries (both memories superseded before/at atTime and entries
+ * currently superseded) unless explicitly enabled via options.includeSuperseded: true.
+ */
+export function searchTemporal(
+  store: Store,
+  query: string,
+  atTime: string | number,
+  options: TemporalSearchOptions = {},
+): SearchResult {
+  const targetMs = typeof atTime === "number" ? atTime : Date.parse(atTime);
+  if (isNaN(targetMs)) {
+    throw new Error(`Invalid temporal search timestamp: ${atTime}`);
+  }
+  const targetIso = new Date(targetMs).toISOString();
+  const includeSuperseded = options.includeSuperseded === true;
+
+  const result = queryContext(store, query, {
+    ...options,
+    as_of: targetIso,
+    includeSuperseded,
+  });
+
+  if (!includeSuperseded) {
+    const isSupersededAtTime = (e: MemoryEntry): boolean => {
+      if (e.status === "superseded") return true;
+      if (e.valid_to) {
+        const endMs = Date.parse(e.valid_to);
+        if (!isNaN(endMs) && targetMs >= endMs) return true;
+      }
+      return false;
+    };
+
+    const filtered = result.results.filter((r) => !isSupersededAtTime(r.entry));
+    const filteredUndetermined = result.undetermined?.filter((r) => !isSupersededAtTime(r.entry));
+
+    return {
+      ...result,
+      results: filtered,
+      undetermined: filteredUndetermined,
+      as_of: targetIso,
+    };
+  }
+
+  return {
+    ...result,
+    as_of: targetIso,
   };
 }
 
@@ -330,12 +2091,32 @@ export function formatPromptContext(
   options: ContextQueryOptions = {},
 ): FormattedContext {
   const cacheKey = store.cache
-    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}`
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}`
     : undefined;
 
   if (cacheKey && store.cache) {
     const cached = store.cache.getContext(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      const isDegraded = store.circuit?.isDegraded() ?? false;
+      const cachedFault = mergeDegradedFaults(
+        cached,
+        isDegraded
+          ? { degraded: true, degraded_notes: ["circuit_breaker_open: circuit breaker open, served from cached context"] }
+          : undefined,
+      );
+      return {
+        ...cached,
+        fromCache: true,
+        stale: isDegraded || cached.stale || false,
+        degraded: cachedFault.degraded ? true : undefined,
+        degraded_notes: cachedFault.degraded_notes,
+        fault_notes: cachedFault.fault_notes,
+        mode: cached.mode,
+        no_confident_match: cached.no_confident_match,
+        confident_answers: cached.confident_answers,
+        draft_answers: cached.draft_answers,
+      };
+    }
   }
 
   const result = queryContext(store, query, options);
@@ -344,6 +2125,11 @@ export function formatPromptContext(
   const coreBlock = formatCoreBlock(memoryDir);
 
   const parts: string[] = [];
+
+  // T-133: Degraded fault notice rendered at the top of formatted context
+  if (result.degraded && result.degraded_notes && result.degraded_notes.length > 0) {
+    parts.push(formatDegradedFaultNotice(result.degraded_notes));
+  }
 
   if (userProfile) {
     parts.push("### User Profile & Preferences (USER.md)");
@@ -420,10 +2206,15 @@ export function formatPromptContext(
   if (result.results.length > 0) {
     const depth = options.depth ?? "L2";
     parts.push("### Relevant Memories & Learned Patterns");
+    if (query.trim() && result.no_confident_match) {
+      parts.push("_No confident prior memories matched this query._");
+      parts.push("");
+    }
     if (depth === "L1") {
       // One line per memory: id + title only
       for (const r of result.results) {
-        parts.push(`- ${r.entry.id} ${r.entry.title}`);
+        const loosened = r.is_loosened ? formatLoosenedBadge(r) : "";
+        parts.push(`- ${r.entry.id} ${r.entry.title}${loosened}`);
       }
       parts.push("");
     } else {
@@ -431,11 +2222,15 @@ export function formatPromptContext(
         const e = r.entry;
         const typeBadge = e.type ? ` [${e.type.toUpperCase()}]` : "";
         const statusBadge = e.status === "confirmed" ? " (Confirmed)" : "";
-        parts.push(`#### ${e.title}${typeBadge}${statusBadge}`);
+        const loosenedBadge = r.is_loosened ? formatLoosenedBadge(r) : "";
+        parts.push(`#### ${e.title}${typeBadge}${statusBadge}${loosenedBadge}`);
         parts.push(e.content);
         if (depth === "L3") {
           // Full raw entry metadata
           const meta: string[] = [`id: ${e.id}`, `status: ${e.status}`, `project: ${e.project}`];
+          if (r.ladder_rung !== undefined) meta.push(`ladder_rung: ${r.ladder_rung}`);
+          if (r.is_loosened) meta.push(`is_loosened: true`);
+          if (r.loosened_reason) meta.push(`loosened_reason: ${r.loosened_reason}`);
           if (e.type) meta.push(`type: ${e.type}`);
           if (e.created_at) meta.push(`created_at: ${e.created_at}`);
           if (e.updated_at) meta.push(`updated_at: ${e.updated_at}`);
@@ -454,6 +2249,39 @@ export function formatPromptContext(
         parts.push("");
       }
     }
+  } else if (query.trim() && result.no_confident_match) {
+    parts.push("### Relevant Memories & Learned Patterns");
+    parts.push("_No confident prior memories matched this query._");
+    parts.push("");
+  }
+
+  if (result.undetermined && result.undetermined.length > 0) {
+    parts.push(`### Undetermined Historical Memories (as_of: ${result.as_of})`);
+    parts.push("_The following facts had inexact historical boundaries; validity at target time is undetermined:_");
+    for (const r of result.undetermined) {
+      parts.push(`- ${r.entry.id} ${r.entry.title} (valid_to: ${r.entry.valid_to}, exact: false)`);
+    }
+    parts.push("");
+  }
+
+  if (result.expanded_wikilinks && result.expanded_wikilinks.length > 0) {
+    parts.push("### Progressively Expanded Wiki Links & Related Memories");
+    for (const exp of result.expanded_wikilinks) {
+      if (exp.entry) {
+        const typeBadge = exp.entry.type ? ` [${exp.entry.type.toUpperCase()}]` : "";
+        if (options.depth === "L1") {
+          parts.push(`- **[[${exp.target}]]**: ${exp.entry.id} ${exp.entry.title}${typeBadge} (via ${exp.sourceId}, hop ${exp.hop})`);
+        } else {
+          parts.push(`#### [[${exp.target}]] — ${exp.entry.title}${typeBadge} (via ${exp.sourceId}, hop ${exp.hop})`);
+          parts.push(exp.entry.content);
+          parts.push("");
+        }
+      } else if (exp.wikiPage) {
+        const sum = exp.wikiPage.summary ? ` — ${exp.wikiPage.summary}` : "";
+        parts.push(`- **[[${exp.wikiPage.slug}]]** (${exp.wikiPage.type}): ${exp.wikiPage.title}${sum} (via ${exp.sourceId}, hop ${exp.hop})`);
+      }
+    }
+    parts.push("");
   }
 
   parts.push("---");
@@ -465,6 +2293,24 @@ export function formatPromptContext(
     totalTokensUsed: result.totalTokensUsed ?? 0,
     constraints,
     userProfile,
+    fromCache: false,
+    stale: result.stale,
+    degraded: result.degraded,
+    degraded_notes: result.degraded_notes,
+    fault_notes: result.fault_notes,
+    mode: result.mode,
+    no_confident_match: result.no_confident_match,
+    confident_answers: result.confident_answers,
+    draft_answers: result.draft_answers,
+    ladder_rungs_used: result.ladder_rungs_used,
+    loosened_matches_count: result.loosened_matches_count,
+    loosened_matches: result.loosened_matches,
+    as_of: result.as_of,
+    undetermined: result.undetermined,
+    hidden_count: result.hidden_count,
+    deduped_count: result.deduped_count,
+    expanded_wikilinks: result.expanded_wikilinks,
+    expanded_count: result.expanded_count,
   };
 
   if (cacheKey && store.cache) {
@@ -473,3 +2319,41 @@ export function formatPromptContext(
 
   return formatted;
 }
+
+export {
+  type RetrievalTier,
+  type BudgetProvenance,
+  type TierBudgetDefinition,
+  TIER_BUDGET_PROVENANCE,
+  TIER_0_DEFAULT_BUDGET,
+  TIER_0_MAX_BUDGET,
+  TIER_1_DEFAULT_BUDGET,
+  TIER_1_MAX_BUDGET,
+  TIER_2_DEFAULT_BUDGET,
+  TIER_2_MAX_BUDGET,
+  USER_PROFILE_DEFAULT_BUDGET,
+  USER_PROFILE_MAX_BUDGET,
+  USER_PROFILE_BUDGET_RATIO,
+  resolveTierBudget,
+  getTierBudgetProvenance,
+} from "./retrieval/tier_budgets.ts";
+
+export { queryTieredContext, type TieredContextOptions } from "./retrieval/tiered.ts";
+export {
+  createDegradedFaultSignal,
+  formatDegradedFaultNotice,
+  mergeDegradedFaults,
+  type DegradedFaultSignal,
+} from "./retrieval/faults.ts";
+export {
+  executeRetrievalLadder,
+  formatLoosenedBadge,
+  labelEntryLadderRung,
+  type RetrievalLadderRung,
+  type LadderRungName,
+  type LoosenedMatchLabel,
+  type RetrievalLadderOptions,
+  LADDER_DEFAULTS,
+} from "./retrieval/ladder.ts";
+
+

@@ -190,7 +190,7 @@ describe("cli e2e", () => {
     // 4. Propose and Delete
     const p = run(root, ["propose", "temporary note to delete", "--project", "aria"]);
     const id = p.stdout.match(/created (m_\d+_\w+)/)![1];
-    const del = run(root, ["delete", id, "--reason", "obsolete test entry"]);
+    const del = run(root, ["delete", id, "--reason", "obsolete test entry", "--yes"]);
     expect(del.code).toBe(0);
     expect(del.stdout).toContain(`deleted entry ${id}`);
 
@@ -281,6 +281,27 @@ describe("cli e2e", () => {
     expect(sTrans.code).toBe(0);
     expect(sTrans.stdout).toContain("Conversation Overview");
     expect(sTrans.stdout).toContain("Fixing GraphQL schema caching bug");
+
+    cleanup(root);
+  });
+
+  test("T-063: CLI delete enforces point-ID-only and dry-run by default", () => {
+    const { root } = setupFixtureRoot();
+
+    // 1. Rejects wildcards
+    const wild = run(root, ["delete", "*"]);
+    expect(wild.code).not.toBe(0);
+    expect(wild.stderr).toContain("bulk or wildcard patterns are forbidden");
+
+    // 2. Dry run by default
+    const dry = run(root, ["delete", "m_1700000001000_auth"]);
+    expect(dry.code).toBe(0);
+    expect(dry.stdout).toContain("[dry-run] Would tombstone entry");
+
+    // 3. Executes with --yes
+    const del = run(root, ["delete", "m_1700000001000_auth", "--yes"]);
+    expect(del.code).toBe(0);
+    expect(del.stdout).toContain("deleted entry m_1700000001000_auth");
 
     cleanup(root);
   });

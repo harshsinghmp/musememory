@@ -62,6 +62,7 @@ Thumbs.db
 
 # Deepwork state (git-local)
 .slim/deepwork/
+docs/superpowers/**
 
 # bun local state
 .bun/
@@ -81,3 +82,13 @@ dogfood-output/
 
 # HyperFrames render artifacts (rebuilt via: bun run site:showreel)
 apps/website/showreel-hf/renders/
+
+# README demo GIF intermediates (rebuilt via: bun run build:gif)
+# The committed deliverable is assets/muse-memory-demo.gif; this is scratch.
+apps/website/.gif-build/
+
+# git worktree lanes + docs content-hash scratch
+.worktrees/
+.docs.hash
+.context.hash
+**/.context.hash

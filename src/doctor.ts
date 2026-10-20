@@ -2,12 +2,21 @@ import { existsSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
-import { openStore, list } from "./store.ts";
-import { validateStore } from "./schema.ts";
+import { openStore, list, getStorageLayout } from "./store.ts";
+import { validateStore, auditStoredCommands, type StoredCommandAuditResult } from "./schema.ts";
 import { getAuditTrail } from "./audit.ts";
+import { getSchemaVersion, LATEST_SCHEMA_VERSION } from "./migrate.ts";
+import { openDatabase } from "./sqlite.ts";
 import { detectAgents, findBinary } from "./agents/detect.ts";
+import { embedStatus } from "./retrieval/embed-store.ts";
 
 export interface DoctorReport {
+  embeddings?: {
+    configured: boolean;
+    vectorCount: number;
+    staleEmbedderCount: number;
+    mismatch: boolean;
+  };
   storage: {
     type: "local" | "global" | "uninitialized";
     path: string;
@@ -23,6 +32,7 @@ export interface DoctorReport {
     invalidCount: number;
     secretLeaksCount: number;
     brokenLinksCount: number;
+    storedCommandAudit?: StoredCommandAuditResult;
   };
   audit: {
     exists: boolean;
@@ -49,6 +59,14 @@ export interface DoctorReport {
     globalBinaryFound: boolean;
     binaryPath?: string;
     npxReady: boolean;
+  };
+  /** T-368 parity: the store's `PRAGMA user_version` stamp vs the migrations this build ships. */
+  schema: {
+    /** Stamp found on disk before this run's open migrated the store. */
+    storeVersion: number;
+    /** LATEST_SCHEMA_VERSION in the running build. */
+    codeVersion: number;
+    upToDate: boolean;
   };
 }
 
@@ -80,6 +98,9 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   let invalidCount = 0;
   let secretLeaksCount = 0;
   let brokenLinksCount = 0;
+  let storedCommandAudit: StoredCommandAuditResult | undefined;
+  // Read before openStore: its runMigrations() normalises the stamp, so afterwards a mismatch is invisible.
+  let storeVersion = 0;
 
   if (isInitialized) {
     const currentPath = join(storagePath, "CURRENT.md");
@@ -88,6 +109,18 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       const content = readFileSync(currentPath, "utf8");
       currentMdLines = content.split("\n").filter((l) => l.trim().length > 0).length;
     }
+
+    try {
+      const dbPath = getStorageLayout(storagePath).dbPath;
+      if (existsSync(dbPath)) {
+        const raw = openDatabase(dbPath);
+        try {
+          storeVersion = getSchemaVersion(raw);
+        } finally {
+          raw.close();
+        }
+      }
+    } catch {}
 
     try {
       const store = openStore(storagePath);
@@ -103,6 +136,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       invalidCount = valReport.schemaErrors.length + valReport.integrityErrors.length;
       secretLeaksCount = valReport.secretErrors.length;
       brokenLinksCount = valReport.brokenLinks.length;
+      storedCommandAudit = auditStoredCommands(entries);
     } catch {
       valid = false;
     }
@@ -146,7 +180,25 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   const memBin = findBinary("memory", home) || findBinary("musememory", home);
   const bunVer = typeof (globalThis as any).Bun !== "undefined" ? (globalThis as any).Bun.version : undefined;
 
+  // 6. Embeddings status
+  let embeddingsReport: DoctorReport["embeddings"] = undefined;
+  if (isInitialized) {
+    try {
+      const store = openStore(storagePath);
+      const es = embedStatus(store);
+      embeddingsReport = {
+        configured: es.configured,
+        vectorCount: es.vectorCount,
+        staleEmbedderCount: es.staleEmbedderCount ?? 0,
+        mismatch: es.mismatch,
+      };
+    } catch {
+      // ignore
+    }
+  }
+
   return {
+    embeddings: embeddingsReport,
     storage: {
       type: options.global ? "global" : (isInitialized ? "local" : "uninitialized"),
       path: storagePath,
@@ -162,6 +214,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       invalidCount,
       secretLeaksCount,
       brokenLinksCount,
+      storedCommandAudit,
     },
     audit: {
       exists: auditExists,
@@ -189,6 +242,11 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
       binaryPath: memBin || undefined,
       npxReady: true,
     },
+    schema: {
+      storeVersion,
+      codeVersion: LATEST_SCHEMA_VERSION,
+      upToDate: storeVersion >= LATEST_SCHEMA_VERSION,
+    },
   };
 }
 
@@ -208,6 +266,21 @@ export function printDoctorReport(report: DoctorReport): void {
   console.log(`  Total Memory Units: ${report.storage.totalEntries}`);
   console.log(`    -> Confirmed: ${report.storage.statusCounts.confirmed || 0} | Candidate: ${report.storage.statusCounts.candidate || 0} | Stale: ${report.storage.statusCounts.stale || 0} | Superseded: ${report.storage.statusCounts.superseded || 0}`);
 
+  // Embeddings
+  if (report.embeddings) {
+    console.log(`\n[EMBEDDINGS] Semantic Vector Store:`);
+    console.log(`  Configured: ${report.embeddings.configured ? "[OK] Yes" : "[INFO] Not configured (using BM25/FTS5)"}`);
+    console.log(`  Vectors:    ${report.embeddings.vectorCount}`);
+    if (report.embeddings.staleEmbedderCount > 0) {
+      console.log(`  [WARN] Missing / Stale Embeddings: ${report.embeddings.staleEmbedderCount} (run 'memory embed reindex')`);
+    } else if (report.embeddings.configured) {
+      console.log(`  [OK] All entries have current embeddings`);
+    }
+    if (report.embeddings.mismatch) {
+      console.log(`  [WARN] Pipeline mismatch detected — run 'memory embed reindex'`);
+    }
+  }
+
   // Validation
   console.log(`\n[SECURITY] Store Integrity & Vibeguard Secret Scan:`);
   if (report.validation.valid) {
@@ -217,6 +290,9 @@ export function printDoctorReport(report: DoctorReport): void {
   } else {
     console.log(`  [WARN] Schema / Integrity issues detected:`);
     if (report.validation.invalidCount > 0) console.log(`     - Invalid schema files: ${report.validation.invalidCount}`);
+    if (report.validation.storedCommandAudit && report.validation.storedCommandAudit.invalidCount > 0) {
+      console.log(`     - [SECURITY] Non-template test_commands detected: ${report.validation.storedCommandAudit.invalidCount}`);
+    }
     if (report.validation.secretLeaksCount > 0) console.log(`     - [SECURITY] Credential leaks found: ${report.validation.secretLeaksCount}`);
     if (report.validation.brokenLinksCount > 0) console.log(`     - Broken links: ${report.validation.brokenLinksCount}`);
   }
@@ -263,8 +339,21 @@ export function printDoctorReport(report: DoctorReport): void {
   }
   console.log(`  [OK] NPX One-Line Command: 'npx musememory <command>' ready.`);
 
+  // Schema Version
+  console.log(`\n[SCHEMA] Store Migration Stamp (T-368):`);
+  if (report.schema.upToDate) {
+    console.log(`  [OK] Store schema v${report.schema.storeVersion} matches code schema v${report.schema.codeVersion}`);
+  } else {
+    console.log(`  [WARN] Store schema v${report.schema.storeVersion} != code schema v${report.schema.codeVersion}`);
+    if (report.schema.storeVersion < report.schema.codeVersion) {
+      console.log(`     -> Pending additive migrations were applied on open. Re-run 'memory doctor' to confirm.`);
+    } else {
+      console.log(`     -> Store is ahead of this build (likely an older install). Upgrade Muse Memory to the latest version.`);
+    }
+  }
+
   console.log(`\n====================================================`);
-  if (report.validation.valid && report.storage.initialized && report.agents.unwiredCount === 0) {
+  if (report.validation.valid && report.storage.initialized && report.schema.upToDate && report.agents.unwiredCount === 0) {
     console.log(`[SUCCESS] System Status: 100% HEALTHY & OPTIMAL\n`);
   } else {
     console.log(`[TIP] Recommended Action: Run 'memory connect --all' to wire any unwired coding agents.\n`);

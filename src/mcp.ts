@@ -1,6 +1,9 @@
 import { basename } from "node:path";
+import { createServer as createHttpServer, type Server as HttpServer, type IncomingMessage } from "node:http";
+import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -17,10 +20,17 @@ import {
   markStale,
   reject,
   deleteEntry,
+  restoreEntry,
+  replayFromAudit,
   harvestMemories,
+  change,
+  end,
+  correct,
+  revert,
+  forget,
   type Store,
 } from "./store.ts";
-import { queryContext, formatPromptContext } from "./retrieval.ts";
+import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
 import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
@@ -72,11 +82,15 @@ import {
 import {
   evaluatePromotion,
   promoteMemory,
+  appendEvidence,
   generalizeContent,
   evaluateArchival,
   archiveMemory,
   rehydrateMemory,
   getLifecycleStats,
+  stagePendingPromotion,
+  flushPendingPromotions,
+  listPendingPromotions,
 } from "./promotion/index.ts";
 import {
   createCodeAnchor,
@@ -93,6 +107,7 @@ import {
   explainWhyCodeIsTheWayItIs,
   clusterRecurringBugsAndFriction,
   analyzeTechnicalDebt,
+  runDistillRouter,
 } from "./cognition/index.ts";
 import { evaluateProjectHealth, reconcileCodeAnchors } from "./health/index.ts";
 import { analyzeMemoryCodeImpact } from "./intelligence/index.ts";
@@ -124,7 +139,36 @@ import { rollupTemporal } from "./compounding/temporal.ts";
 import { recordIteration, detectIterationStatus } from "./iterations.ts";
 import { verifyStrictIntegrity } from "./verify.ts";
 import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "./retrieval/index.ts";
-import type { MemoryEntry, MemoryType } from "./types.ts";
+import type { MemoryEntry, MemoryType, TrustTier } from "./types.ts";
+
+// --- T-301: in-process async write queue -------------------------------------
+// Read tools must never mutate the store synchronously. Handlers compute the
+// response from a consistent snapshot, enqueue their write side-effects, and the
+// queue is flushed after the response (scheduled task) or on process exit.
+const pendingWrites: Array<() => void> = [];
+let writeFlushScheduled = false;
+
+/** Apply every queued write in FIFO order. Safe to call when idle. */
+export function flushPendingWrites(): void {
+  writeFlushScheduled = false;
+  while (pendingWrites.length > 0) {
+    try {
+      pendingWrites.shift()!();
+    } catch {
+      // A deferred write must never break the response path.
+    }
+  }
+}
+
+function enqueueWrites(writes: Array<() => void>): void {
+  if (writes.length === 0) return;
+  pendingWrites.push(...writes);
+  if (writeFlushScheduled) return;
+  writeFlushScheduled = true;
+  setTimeout(flushPendingWrites, 0);
+}
+
+process.on("exit", flushPendingWrites);
 
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
@@ -185,6 +229,8 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             verified: { type: "boolean" },
             depth: { type: "string", enum: ["L1", "L2", "L3"], description: "Progressive disclosure tier: L1 = id+title lines, L2 = title+content+tags (default), L3 = full raw entry" },
             tier: { type: "number", description: "Deterministic retrieval tier: 0 (manifest index), 1 (routing set), 2 (bounded bodies, default)" },
+            as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
+            min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
           },
         },
       },
@@ -204,6 +250,9 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
+            as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
+            at_time: { type: "string", description: "Temporal point-in-time timestamp (default-excludes superseded entries)" },
+            min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
           },
           required: ["query"],
         },
@@ -214,13 +263,43 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         inputSchema: {
           type: "object",
           properties: {
-            content: { type: "string" },
-            project: { type: "string" },
+            content: { type: "string", description: "Memory content / body text" },
+            project: { type: "string", description: "Project name (default: workspace root basename)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
-            title: { type: "string" },
-            tags: { type: "array", items: { type: "string" } },
-            type: { type: "string" },
-            confirmed: { type: "boolean" },
+            title: { type: "string", description: "Optional short title (derived from content if omitted)" },
+            tags: { type: "array", items: { type: "string" }, description: "Tags for categorization and search" },
+            type: { type: "string", description: "Memory type (discovery, decision, constraint, pattern, etc.)" },
+            confirmed: { type: "boolean", description: "Whether to mark entry as confirmed (default: false)" },
+            source: { type: "string", description: "Origin URI, transcript path, or agent name" },
+            evidence: {
+              type: "array",
+              description: "Supporting evidence items backing this memory",
+              items: { type: "object" },
+            },
+            verification: {
+              type: "object",
+              description: "Verification metadata (level, method, verified_by, test_command)",
+            },
+            dedup: { type: "boolean", description: "Whether to run similarity deduplication before write" },
+            valid_from: { type: "string", description: "Valid-time start ISO timestamp" },
+            valid_to: { type: "string", description: "Valid-time end ISO timestamp" },
+            valid_to_exact: { type: "boolean", description: "Whether valid_to is a known exact historical cessation boundary" },
+            src_ts: { type: "string", description: "Original ISO 8601 timestamp of underlying source document or evidence" },
+            due_at: { type: "string", description: "Due date or reminder ISO timestamp" },
+            expires_at: { type: "string", description: "Expiration ISO timestamp" },
+            salience: { type: "number", description: "Initial importance score (0-1)" },
+            test_command: { type: "string", description: "Command to verify this memory" },
+            trust: {
+              type: "string",
+              enum: ["trusted", "candidate", "untrusted"],
+              description: "Provenance trust tier",
+            },
+            mem_path: { type: "string", description: "Semantic dotted-path addressing (e.g. 'auth.session.jwt')" },
+            idempotency_key: { type: "string", description: "Unique idempotency key to prevent duplicate writes during retries" },
+            source_ids: { type: "array", items: { type: "string" }, description: "Referenced citation IDs in sources.json" },
+            linked_memory_ids: { type: "array", items: { type: "string" }, description: "Explicit memory IDs to link to this memory entry" },
+            session_id: { type: "string", description: "Origin session ID for provenance tracking and self-echo suppression" },
+            agent: { type: "string", description: "Origin agent name or identifier" },
           },
           required: ["content"],
         },
@@ -258,11 +337,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         inputSchema: {
           type: "object",
           properties: {
-            text: { type: "string" },
-            project: { type: "string" },
-            confirmed: { type: "boolean" },
+            text: { type: "string", description: "Raw text or conversation block to harvest memories from" },
+            project: { type: "string", description: "Project name (default: 'default')" },
+            confirmed: { type: "boolean", description: "Whether to mark harvested entries as confirmed" },
+            all: { type: "boolean", description: "Harvest all detected agent transcripts across workspace" },
+            auto: { type: "boolean", description: "Auto-detect and harvest recent transcripts across workspace" },
           },
-          required: ["text", "project"],
         },
       },
       {
@@ -287,6 +367,35 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             new_id: { type: "string", description: "Alias for with" },
           },
           required: ["id"],
+        },
+      },
+      {
+        name: "memory_lifecycle",
+        description: "T-084: Five-verb canonical memory lifecycle mutation (change, end, correct, revert, forget)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            verb: {
+              type: "string",
+              enum: ["change", "end", "correct", "revert", "forget"],
+              description: "Lifecycle action to perform",
+            },
+            id: { type: "string", description: "Target memory ID" },
+            replacement: {
+              type: "object",
+              description: "New memory draft or parameters when verb='change'",
+            },
+            new_id: { type: "string", description: "Existing memory ID to supersede with when verb='change'" },
+            correction: {
+              type: "string",
+              description: "Corrected content or correction payload when verb='correct'",
+            },
+            reason: { type: "string", description: "Audit rationale for this lifecycle transition" },
+            valid_to: { type: "string", description: "Explicit historical cessation timestamp when verb='end' or 'change'" },
+            valid_to_exact: { type: "boolean", description: "Whether the cessation timestamp is an exact historical boundary" },
+            hard: { type: "boolean", description: "Whether to execute a hard erasure when verb='forget' (default: false)" },
+          },
+          required: ["verb", "id"],
         },
       },
       {
@@ -326,12 +435,28 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_delete",
-        description: "Permanently delete a memory entry by ID and record audit event",
+        description: "Soft-delete a memory entry by single point ID (tombstone, reversible via memory_restore). Dry-run by default unless confirm: true or dry_run: false.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Exact single memory ID (point ID only, no wildcards)" },
+            reason: { type: "string", description: "Audit reason for tombstoning" },
+            dry_run: { type: "boolean", description: "Simulate tombstoning without mutating (default: true)" },
+            confirm: { type: "boolean", description: "Set to true to apply deletion" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_restore",
+        description:
+          "Restore a tombstoned memory entry by ID. Fails on an unknown or never-deleted entry. Set replay=true to rebuild the content from the audit ledger when the row is gone, and apply=true to write it back",
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string" },
-            reason: { type: "string" },
+            replay: { type: "boolean" },
+            apply: { type: "boolean" },
           },
           required: ["id"],
         },
@@ -557,6 +682,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           properties: {
             min_count: { type: "number", description: "Minimum cluster size to emit a skill (default 3)" },
             dry_run: { type: "boolean", description: "If true, reports clusters without writing skill folders" },
+          },
+        },
+      },
+      {
+        name: "memory_distill_route",
+        description: "Multi-channel knowledge distillation router: triages memories across system (rules/fixes), content (architecture concepts), and health (contradictions/staleness) lanes with deduplication",
+        inputSchema: {
+          type: "object",
+          properties: {
+            force: { type: "boolean", description: "Bypass state deduplication and route all candidate memories" },
+            dry_run: { type: "boolean", description: "If true, simulates routing without persisting state or writing drafts" },
           },
         },
       },
@@ -1147,14 +1283,47 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_promote",
-        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging",
+        description: "Execute promotion of a memory entry (LOCAL -> PROJECT or PROJECT -> GLOBAL) with generalization and audit logging. Can optionally stage in pending tier for session-end flush.",
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "ID of the memory entry to promote" },
             force_manual: { type: "boolean", description: "Manual promotion override bypassing automatic 5x threshold" },
+            stage_pending: { type: "boolean", description: "Stage promotion in pending tier instead of promoting immediately (T-107 two-tier promotion)" },
+            session_id: { type: "string", description: "Optional session ID for scoped pending promotions" },
             generalized_content: { type: "string", description: "Optional custom generalized principle text" },
             agent: { type: "string", description: "Optional agent or actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "memory_flush_pending",
+        description: "Two-tier promotion protocol (T-107): Flushes staged pending promotions at session close or manual trigger, executing promotion for qualifying entries.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: { type: "string", description: "Optional session ID filter" },
+            dry_run: { type: "boolean", description: "Simulate flush without applying promotions" },
+            actor: { type: "string", description: "Optional actor name" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_curate",
+        description: "Curator protocol (T-106): appends empirical evidence or application outcomes to an existing memory. Deterministic promotion rules evaluate eligibility and trigger promotion when criteria are satisfied.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID of the memory entry to curate" },
+            type: { type: "string", enum: ["raw", "fetch", "search", "infer", "code", "test", "git", "doc", "human", "code_intelligence", "observed", "reproducible"], description: "Type of empirical evidence" },
+            source: { type: "string", description: "Source of the evidence (e.g. test runner, git log, developer)" },
+            excerpt: { type: "string", description: "Supporting text excerpt or error log" },
+            outcome: { type: "string", enum: ["success", "failure", "regression", "neutral"], description: "Application outcome" },
+            confidence: { type: "number", description: "Confidence score 0.0-1.0" },
+            auto_evaluate: { type: "boolean", description: "Whether to evaluate and execute promotion if criteria are met (default true)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
           required: ["id"],
@@ -1229,6 +1398,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             symbol_name: { type: "string", description: "Optional symbol name (function, class, interface, method)" },
             qualified_name: { type: "string", description: "Optional qualified symbol name (e.g. Service.method)" },
             provider_metadata: { type: "object", description: "Optional provider external IDs (e.g. CodeGraph node ID)" },
+            base_path: { type: "string", description: "Optional base directory for anchor resolution (defaults to workspace root)" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
           required: ["memory_id", "file_path"],
@@ -1278,6 +1448,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               type: "boolean",
               description: "Include memories whose code anchors have drifted (default false: they are withheld by the freshness gate and reported instead)",
             },
+            session_id: { type: "string", description: "Optional session ID for 6-turn re-injection suppression and LRU tracking" },
+            turn: { type: "number", description: "Optional 1-indexed turn number within the session" },
+            suppress_reinjected: { type: "boolean", description: "Whether to suppress re-injecting recently seen memories (default: true if session_id provided)" },
+            suppress_self_echo: { type: "boolean", description: "Whether to suppress self-echoes created by active session/agent within echo horizon (default: true)" },
+            echo_horizon_ms: { type: "number", description: "Self-echo horizon in ms (default: 600000 / 10 minutes)" },
+            agent: { type: "string", description: "Caller agent name for provenance self-echo matching" },
+            suppress_seen_chunks: { type: "boolean", description: "Whether to suppress memories already served within their TTL window" },
+            seen_chunk_ttl_ms: { type: "number", description: "Seen-chunk TTL in ms (default: 300000 / 5 minutes)" },
+            check_topic_overlap: { type: "boolean", description: "Whether to skip prefetch and reuse cached context when topic overlap > 0.6" },
+            topic_overlap_threshold: { type: "number", description: "Custom topic overlap threshold (default: 0.6)" },
+            enable_trivial_gate: { type: "boolean", description: "Whether to bypass memory recall for trivial greetings or pleasantries (default: true)" },
           },
         },
       },
@@ -1561,13 +1742,30 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
     ];
 
-    return { tools: filterToolsForProfile(allTools, activeProfile) };
+    const filteredByProfile = filterToolsForProfile(allTools, activeProfile);
+    // T-394: Enforce mcp.enabledTools from settings
+    const settings = getSettings(memoryDir);
+    const enabledTools = settings.mcp?.enabledTools;
+    const finalTools =
+      enabledTools && enabledTools.length > 0
+        ? filteredByProfile.filter((t) => enabledTools.includes(t.name))
+        : filteredByProfile;
+
+    return { tools: finalTools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
     const { activeStore, activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+
+    // T-394: Reject disabled tools per mcp.enabledTools
+    const settings = getSettings(activeMemoryDir);
+    if (settings.mcp?.enabledTools && settings.mcp.enabledTools.length > 0) {
+      if (!settings.mcp.enabledTools.includes(name)) {
+        return toolError(`Tool '${name}' is disabled by mcp.enabledTools settings configuration`);
+      }
+    }
 
     try {
       switch (name) {
@@ -1578,20 +1776,24 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "get_context": {
           const queryStr = String(a.query ?? "");
+          // T-301: every write side-effect is deferred to the async write queue so the
+          // response is served from a consistent, unmutated snapshot.
+          const deferredWrites: Array<() => void> = [];
           if (queryStr && activeMemoryDir) {
-            try {
+            deferredWrites.push(() => {
               updateSessionHandoff(activeMemoryDir, {
                 status: "IN-PROGRESS",
                 lastQuery: queryStr,
                 agent: a.agent ? String(a.agent) : process.env.AGENT_NAME || "AI Assistant",
                 task: a.task ? String(a.task) : queryStr,
               });
-            } catch {}
+            });
           }
           const tierOpt = typeof a.tier === "number" ? (a.tier as RetrievalTier) : undefined;
+          const contextLimit = clampLimit(a.limit, 5, 50, 1);
           const formatted = tierOpt !== undefined
             ? queryTieredContext(activeStore, activeMemoryDir, queryStr, {
-                limit: typeof a.limit === "number" ? a.limit : 5,
+                limit: contextLimit,
                 tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
                 project: a.project ? String(a.project) : undefined,
                 includeSuperseded: false,
@@ -1599,9 +1801,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 status: a.status ? String(a.status) : undefined,
                 verified: a.verified === true,
                 tier: tierOpt,
+                minVeracity: a.min_veracity as any,
               })
             : formatPromptContext(activeStore, activeMemoryDir, queryStr, {
-                limit: typeof a.limit === "number" ? a.limit : 5,
+                limit: contextLimit,
                 tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
                 project: a.project ? String(a.project) : undefined,
                 includeSuperseded: false,
@@ -1609,21 +1812,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 status: a.status ? String(a.status) : undefined,
                 verified: a.verified === true,
                 depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
+                as_of: a.as_of ? String(a.as_of) : undefined,
+                minVeracity: a.min_veracity as any,
               });
 
           // Record Hebbian co-activation on retrieved memory units (SOW-204)
           if (formatted.entries.length >= 2 && activeMemoryDir) {
             try {
               const { recordCoActivation } = await import("./plasticity.ts");
-              recordCoActivation(formatted.entries.map((e) => e.entry.id), activeMemoryDir);
+              const ids = formatted.entries.map((e) => e.entry.id);
+              deferredWrites.push(() => recordCoActivation(ids, activeMemoryDir));
             } catch {}
           }
 
-          // Auto-harvest recent agent transcripts in background (non-blocking)
+          // T-028: Record retrievals to update utility stats and salience
+          if (formatted.entries.length > 0) {
+            const ids = formatted.entries.map((e) => e.entry.id);
+            deferredWrites.push(() => recordRetrievals(activeStore, ids));
+          }
+
+          // Auto-harvest recent agent transcripts (deferred: transcript crawl -> import -> propose -> save)
           if (activeMemoryDir) {
             try {
               const { harvestAllAgentTranscripts } = await import("./harvester.ts");
-              harvestAllAgentTranscripts(activeStore, { memoryDir: activeMemoryDir, maxFiles: 3 });
+              deferredWrites.push(() => {
+                harvestAllAgentTranscripts(activeStore, { memoryDir: activeMemoryDir, maxFiles: 3 });
+              });
             } catch {}
           }
 
@@ -1633,12 +1847,20 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             finalMarkdown = compressPromptContext(finalMarkdown).compressed;
           }
 
+          enqueueWrites(deferredWrites);
+
           return toolResult({
             markdown: finalMarkdown,
             entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
             total_tokens_used: formatted.totalTokensUsed,
             constraints: formatted.constraints,
             user_profile: formatted.userProfile,
+            stale: formatted.stale ?? false,
+            from_cache: formatted.fromCache ?? false,
+            mode: formatted.mode,
+            no_confident_match: formatted.no_confident_match,
+            as_of: formatted.as_of,
+            undetermined: formatted.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
           });
         }
         case "memory_checkpoint": {
@@ -1671,22 +1893,65 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         }
         case "memory_recall":
         case "search": {
+          if (a.at_time) {
+            const res = RetrievalEngine.searchTemporal(activeStore, activeMemoryDir, String(a.query), String(a.at_time), {
+              project: a.project ? String(a.project) : undefined,
+              limit: clampLimit(a.limit, 10, 100, 1),
+              tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
+              includeSuperseded: a.include_superseded === true,
+              type: a.type ? String(a.type) : undefined,
+              status: a.status ? String(a.status) : undefined,
+              verified: a.verified === true,
+              minVeracity: a.min_veracity as any,
+            });
+            if (res.results.length > 0) {
+              const ids = res.results.map((r) => r.entry.id);
+              enqueueWrites([() => recordRetrievals(activeStore, ids)]);
+            }
+            return toolResult({
+              results: res.results.map((r) => ({ ...r.entry, score: r.score })),
+              source: res.mode,
+              stale: res.stale ?? false,
+              from_cache: res.fromCache ?? false,
+              total_tokens_used: res.totalTokensUsed,
+              explanation: res.explanation,
+              mode: res.confidence_mode ?? (res.no_confident_match ? "no_confident_match" : "confident_match"),
+              no_confident_match: res.no_confident_match ?? false,
+              as_of: res.as_of,
+              undetermined: res.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
+            });
+          }
           const mode = a.hybrid === true ? "hybrid" : a.tree === true ? "tree" : "auto";
           const res = RetrievalEngine.search(activeStore, activeMemoryDir, String(a.query), {
             mode,
-            limit: typeof a.limit === "number" ? a.limit : 10,
+            project: a.project ? String(a.project) : undefined,
+            limit: clampLimit(a.limit, 10, 100, 1),
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             includeSuperseded: a.include_superseded === true,
             type: a.type ? String(a.type) : undefined,
             status: a.status ? String(a.status) : undefined,
             verified: a.verified === true,
+            as_of: a.as_of ? String(a.as_of) : undefined,
+            minVeracity: a.min_veracity as any,
           });
+          // T-028: Record retrievals to update utility stats and salience
+          if (res.results.length > 0) {
+            const ids = res.results.map((r) => r.entry.id);
+            enqueueWrites([() => recordRetrievals(activeStore, ids)]);
+          }
+
           return toolResult({
             results: res.results.map((r) => ({ ...r.entry, score: r.score })),
             source: res.mode,
-            stale: false,
+            stale: res.stale ?? false,
+            from_cache: res.fromCache ?? false,
             total_tokens_used: res.totalTokensUsed,
             explanation: res.explanation,
+            mode: res.confidence_mode ?? (res.no_confident_match ? "no_confident_match" : "confident_match"),
+            no_confident_match: res.no_confident_match ?? false,
+            as_of: res.as_of,
+            undetermined: res.undetermined?.map((r) => ({ ...r.entry, score: r.score })),
+            withheld: res.withheld,
           });
         }
         case "propose":
@@ -1700,6 +1965,24 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               tags: Array.isArray(a.tags) ? a.tags.map(String) : undefined,
               type: a.type ? (String(a.type) as MemoryType) : undefined,
               confirmed: a.confirmed === true,
+              source: a.source ? String(a.source) : undefined,
+              evidence: Array.isArray(a.evidence) ? (a.evidence as any) : undefined,
+              verification: typeof a.verification === "object" && a.verification !== null ? (a.verification as any) : undefined,
+              dedup: a.dedup === true,
+              valid_from: a.valid_from ? String(a.valid_from) : (a.validFrom ? String(a.validFrom) : undefined),
+              valid_to: a.valid_to ? String(a.valid_to) : (a.validTo ? String(a.validTo) : undefined),
+              valid_to_exact: typeof a.valid_to_exact === "boolean" ? a.valid_to_exact : (typeof a.validToExact === "boolean" ? a.validToExact : undefined),
+              src_ts: a.src_ts ? String(a.src_ts) : (a.srcTs ? String(a.srcTs) : undefined),
+              due_at: a.due_at ? String(a.due_at) : (a.dueAt ? String(a.dueAt) : undefined),
+              expires_at: a.expires_at ? String(a.expires_at) : (a.expiresAt ? String(a.expiresAt) : undefined),
+              salience: typeof a.salience === "number" ? a.salience : undefined,
+              test_command: a.test_command ? String(a.test_command) : undefined,
+              trust: a.trust ? (String(a.trust) as TrustTier) : undefined,
+              mem_path: a.mem_path ? String(a.mem_path) : undefined,
+              idempotency_key: a.idempotency_key ? String(a.idempotency_key) : undefined,
+              source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
+              linked_memory_ids: Array.isArray(a.linked_memory_ids) ? a.linked_memory_ids.map(String) : (Array.isArray(a.linkedMemoryIds) ? a.linkedMemoryIds.map(String) : undefined),
+              session_id: a.session_id ? String(a.session_id) : undefined,
             });
             if (a.type === "constraint") {
               try {
@@ -1719,7 +2002,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           }
         }
       case "memory_harvest": {
-        if (a.all === true || a.auto === true || !a.text) {
+        const isAll = a.all === true;
+        const isAuto = a.auto === true;
+
+        if (isAll || isAuto) {
           const { harvestAllAgentTranscripts } = await import("./harvester.ts");
           const harvestRes = harvestAllAgentTranscripts(activeStore, {
             memoryDir: activeMemoryDir,
@@ -1728,6 +2014,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           });
           return toolResult(harvestRes);
         }
+
+        if (a.text === undefined || a.text === null || typeof a.text !== "string" || !a.text.trim()) {
+          return toolError("memory_harvest requires 'text' parameter (or 'all'/'auto' flag to harvest agent transcripts)");
+        }
+
         const created = harvestMemories(activeStore, {
           text: String(a.text),
           project: String(a.project || "default"),
@@ -1755,6 +2046,58 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         if (!entry) return toolError(`could not supersede ${oldId} with ${newId} (missing entry or target not confirmed)`);
         return toolResult(entry);
       }
+      case "memory_lifecycle": {
+        const verb = String(a.verb).toLowerCase();
+        const id = String(a.id);
+        switch (verb) {
+          case "change": {
+            const replacement = a.replacement ?? a.new_id ?? a.with;
+            if (!replacement) return toolError("memory_lifecycle verb='change' requires 'replacement' or 'new_id'");
+            const changed = change(activeStore, id, replacement as any, {
+              reason: a.reason ? String(a.reason) : undefined,
+              valid_from: a.valid_to ? String(a.valid_to) : undefined,
+              valid_to_exact: typeof a.valid_to_exact === "boolean" ? a.valid_to_exact : undefined,
+            });
+            if (!changed) return toolError(`Failed to change memory ${id}: not found or invalid replacement`);
+            return toolResult({ success: true, verb: "change", old: changed.old, next: changed.next });
+          }
+          case "end": {
+            const ended = end(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+              valid_to: a.valid_to ? String(a.valid_to) : undefined,
+              valid_to_exact: typeof a.valid_to_exact === "boolean" ? a.valid_to_exact : undefined,
+            });
+            if (!ended) return toolError(`Failed to end memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "end", entry: ended });
+          }
+          case "correct": {
+            const correction = a.correction ?? a.content;
+            if (!correction) return toolError("memory_lifecycle verb='correct' requires 'correction' content or payload");
+            const corrected = correct(activeStore, id, correction as any, {
+              reason: a.reason ? String(a.reason) : undefined,
+            });
+            if (!corrected) return toolError(`Failed to correct memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "correct", entry: corrected });
+          }
+          case "revert": {
+            const reverted = revert(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+            });
+            if (!reverted) return toolError(`Failed to revert memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "revert", entry: reverted });
+          }
+          case "forget": {
+            const ok = forget(activeStore, id, {
+              reason: a.reason ? String(a.reason) : undefined,
+              hard: a.hard === true,
+            });
+            if (!ok) return toolError(`Failed to forget memory ${id}: entry not found`);
+            return toolResult({ success: true, verb: "forget", id, hard: a.hard === true });
+          }
+          default:
+            return toolError(`Unknown lifecycle verb '${verb}'. Supported verbs: change, end, correct, revert, forget`);
+        }
+      }
       case "memory_link": {
         const related = Array.isArray(a.related) ? a.related.map(String) : [];
         const entry = link(activeStore, String(a.id), related);
@@ -1772,17 +2115,62 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(entry);
       }
       case "memory_delete": {
-        const id = String(a.id);
+        const id = String(a.id ?? "").trim();
+        if (!id) return toolError("memory_delete requires 'id' parameter");
+        if (id.includes("*") || id.includes("%") || id.includes("?") || id.includes(",") || id.toLowerCase() === "all") {
+          return toolError("memory_delete requires a single point ID; bulk or wildcard patterns are forbidden");
+        }
+        const entry = get(activeStore, id);
+        if (!entry) return toolError(`no entry found with id ${id}`);
+
+        const isDryRun = a.dry_run !== false && a.confirm !== true && a.apply !== true && a.force !== true;
+        if (isDryRun) {
+          return toolResult({
+            dry_run: true,
+            deleted: false,
+            id,
+            title: entry.title,
+            project: entry.project,
+            message: `[dry-run] Would tombstone memory '${id}' (${entry.title || entry.project}). Pass confirm: true or dry_run: false to apply.`,
+          });
+        }
+
         const reason = a.reason ? String(a.reason) : undefined;
         const ok = deleteEntry(activeStore, id, reason, "mcp_agent");
-        if (!ok) return toolError(`no entry found with id ${id}`);
-        return toolResult({ success: true, deleted_id: id });
+        if (!ok) return toolError(`failed to tombstone entry ${id}`);
+        return toolResult({ success: true, deleted_id: id, tombstoned: true, dry_run: false });
+      }
+      case "memory_restore": {
+        const id = String(a.id);
+        if (a.replay === true) {
+          const report = replayFromAudit(activeStore, id, { apply: a.apply === true });
+          if (!report.ok || !report.entry) {
+            return toolError(`cannot replay ${id}: ${report.reason ?? "unknown reason"}`);
+          }
+          return toolResult({
+            success: true,
+            restored_id: id,
+            applied: a.apply === true,
+            reconstructed: report.reconstructed,
+            not_reconstructable: report.missing,
+            entry: report.entry,
+          });
+        }
+        const out = restoreEntry(activeStore, id, "mcp_agent");
+        if (!out.ok) {
+          return toolError(
+            out.reason === "not_found"
+              ? `no entry found with id ${id} (retry with replay=true to rebuild from the audit ledger)`
+              : `cannot restore ${id}: ${out.reason}`,
+          );
+        }
+        return toolResult({ success: true, restored_id: id, entry: out.entry });
       }
       case "memory_audit": {
         const trail = getAuditTrail(activeMemoryDir, {
           operation: a.operation ? String(a.operation) : undefined,
           entryId: a.entry_id ? String(a.entry_id) : undefined,
-          limit: typeof a.limit === "number" ? a.limit : 50,
+          limit: clampLimit(a.limit, 50, 500, 1),
         });
         return toolResult({ total: trail.length, entries: trail });
       }
@@ -1860,6 +2248,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             dryRun: a.dry_run === true,
           });
           return toolResult(report);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_distill_route": {
+        try {
+          const res = runDistillRouter(activeStore, {
+            workspaceRoot: activeRoot,
+            force: a.force === true,
+            dryRun: a.dry_run === true,
+          });
+          return toolResult(res);
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }
@@ -2252,7 +2652,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           tokenBudget: a.token_budget ? Number(a.token_budget) : undefined,
           activeFilePath: a.active_file_path ? String(a.active_file_path) : undefined,
           targetSymbol: a.target_symbol ? String(a.target_symbol) : undefined,
-          limit: a.limit ? Number(a.limit) : 10,
+          limit: clampLimit(a.limit, 10, 100, 1),
         });
         return toolResult({
           query: a.query,
@@ -2318,12 +2718,55 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(evaluation);
       }
       case "memory_promote": {
+        if (Boolean(a.stage_pending)) {
+          try {
+            const pending = stagePendingPromotion(activeStore, String(a.id), {
+              forceManual: Boolean(a.force_manual),
+              generalizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
+              actor: a.agent ? String(a.agent) : undefined,
+              sessionId: a.session_id ? String(a.session_id) : undefined,
+            });
+            return toolResult({ staged: true, pending });
+          } catch (err: any) {
+            return toolError(err.message || String(err));
+          }
+        }
         const result = promoteMemory(activeStore, String(a.id), {
           forceManual: Boolean(a.force_manual),
           customGeneralizedContent: a.generalized_content ? String(a.generalized_content) : undefined,
           actor: a.agent ? String(a.agent) : undefined,
         });
         return toolResult(result);
+      }
+      case "memory_flush_pending": {
+        const result = flushPendingPromotions(activeStore, {
+          sessionId: a.session_id ? String(a.session_id) : undefined,
+          dryRun: Boolean(a.dry_run),
+          actor: a.actor ? String(a.actor) : undefined,
+        });
+        return toolResult(result);
+      }
+      case "memory_curate": {
+        try {
+          const result = appendEvidence(
+            activeStore,
+            String(a.id),
+            {
+              type: a.type as any,
+              source: a.source ? String(a.source) : undefined,
+              excerpt: a.excerpt ? String(a.excerpt) : undefined,
+              confidence: typeof a.confidence === "number" ? a.confidence : undefined,
+            },
+            {
+              actor: a.source ? String(a.source) : "agent",
+              applicationOutcome: a.outcome as any,
+              autoEvaluate: a.auto_evaluate !== false,
+            },
+          );
+          return toolResult(result);
+        } catch (err: any) {
+          return toolError(err.message || String(err));
+        }
       }
       case "memory_generalize": {
         const result = generalizeContent(String(a.content), {
@@ -2364,6 +2807,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const anchor = createCodeAnchor(activeRoot, {
           kind,
           filePath: String(a.file_path),
+          basePath: a.base_path ? String(a.base_path) : undefined,
           symbolName: a.symbol_name ? String(a.symbol_name) : undefined,
           qualifiedName: a.qualified_name ? String(a.qualified_name) : undefined,
           providerMetadata: (a.provider_metadata && typeof a.provider_metadata === "object") ? a.provider_metadata as Record<string, any> : undefined,
@@ -2409,6 +2853,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: a.project ? String(a.project) : undefined,
           dir: a.dir ? String(a.dir) : undefined,
           include_drifted: a.include_drifted === true,
+          session_id: a.session_id ? String(a.session_id) : undefined,
+          turn: typeof a.turn === "number" ? a.turn : undefined,
+          suppress_reinjected: a.suppress_reinjected !== undefined ? Boolean(a.suppress_reinjected) : undefined,
+          agent: a.agent ? String(a.agent) : undefined,
+          suppress_self_echo: a.suppress_self_echo !== undefined ? Boolean(a.suppress_self_echo) : undefined,
+          echo_horizon_ms: typeof a.echo_horizon_ms === "number" ? a.echo_horizon_ms : undefined,
+          suppress_seen_chunks: a.suppress_seen_chunks !== undefined ? Boolean(a.suppress_seen_chunks) : undefined,
+          seen_chunk_ttl_ms: typeof a.seen_chunk_ttl_ms === "number" ? a.seen_chunk_ttl_ms : undefined,
+          check_topic_overlap: a.check_topic_overlap !== undefined ? Boolean(a.check_topic_overlap) : undefined,
+          topic_overlap_threshold: typeof a.topic_overlap_threshold === "number" ? a.topic_overlap_threshold : undefined,
+          enable_trivial_gate: a.enable_trivial_gate !== undefined ? Boolean(a.enable_trivial_gate) : undefined,
         });
         return toolResult(result);
       }
@@ -2496,7 +2951,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const packet = broadcastKnowledge(activeStore, activeRoot, {
           agentId: a.agent_id as string | undefined,
           project: a.project as string | undefined,
-          limit: typeof a.limit === "number" ? a.limit : undefined,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 50, 500, 1) : undefined,
         });
         return toolResult(packet);
       }
@@ -2531,7 +2986,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           query: a.query as string | undefined,
           targetProjects: Array.isArray(a.projects) ? (a.projects as string[]) : undefined,
           types: Array.isArray(a.types) ? (a.types as MemoryType[]) : undefined,
-          limit: typeof a.limit === "number" ? a.limit : undefined,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 50, 500, 1) : undefined,
         });
         return toolResult({ total_found: results.length, results });
       }
@@ -2605,6 +3060,303 @@ export async function runMcpServer(): Promise<void> {
     process.stdin.on("end", () => resolve());
     process.stdin.on("close", () => resolve());
   });
+}
+
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ["2024-11-05", "2025-06-18"];
+
+export interface HttpMcpServerOptions {
+  port?: number;
+  host?: string;
+  endpoint?: string;
+  stateless?: boolean;
+  enableJsonResponse?: boolean;
+  /** T-151: Allowed Origin headers for CSRF protection. */
+  allowedOrigins?: string[];
+  /** T-151: Allowed Host headers for DNS rebinding protection. */
+  allowedHosts?: string[];
+  /** T-151: Enable strict DNS rebinding validation against allowedHosts. */
+  enableDnsRebindingProtection?: boolean;
+  /** T-386: Single bearer token or require auth flag. */
+  bearerToken?: string;
+  /** T-386: Map of token -> peer ID or peer ID -> token, or array of valid tokens. */
+  bearerTokens?: string[] | Record<string, string>;
+  /** T-386: Allowlist of authorized peer identifiers. */
+  allowedPeers?: string[];
+  /** T-386: Require authentication even if tokens are passed via env or settings. */
+  requireAuth?: boolean;
+}
+
+export interface HttpAuthResult {
+  authenticated: boolean;
+  peerId?: string;
+  status?: number;
+  errorMessage?: string;
+}
+
+/**
+ * T-386: Validate Bearer token authentication and per-peer allowlists on HTTP MCP requests.
+ */
+export function validateHttpAuth(
+  req: IncomingMessage,
+  options: HttpMcpServerOptions,
+): HttpAuthResult {
+  const tokenToPeer = new Map<string, string>();
+  const validTokens = new Set<string>();
+
+  if (options.bearerToken) {
+    validTokens.add(options.bearerToken);
+    tokenToPeer.set(options.bearerToken, "default");
+  }
+
+  if (Array.isArray(options.bearerTokens)) {
+    for (const t of options.bearerTokens) {
+      if (t.includes(":")) {
+        const [peer, tok] = t.split(":");
+        validTokens.add(tok.trim());
+        tokenToPeer.set(tok.trim(), peer.trim());
+      } else {
+        validTokens.add(t.trim());
+      }
+    }
+  } else if (options.bearerTokens && typeof options.bearerTokens === "object") {
+    for (const [k, v] of Object.entries(options.bearerTokens)) {
+      validTokens.add(v);
+      tokenToPeer.set(v, k);
+      validTokens.add(k);
+      tokenToPeer.set(k, v);
+    }
+  }
+
+  if (validTokens.size === 0) {
+    const envToken = process.env.MUSE_BEARER_TOKEN;
+    if (envToken) {
+      validTokens.add(envToken.trim());
+      tokenToPeer.set(envToken.trim(), "default");
+    }
+    const envTokens = process.env.MUSE_AUTH_TOKENS;
+    if (envTokens) {
+      for (const item of envTokens.split(",")) {
+        const trimmed = item.trim();
+        if (trimmed.includes(":")) {
+          const [peer, tok] = trimmed.split(":");
+          validTokens.add(tok.trim());
+          tokenToPeer.set(tok.trim(), peer.trim());
+        } else if (trimmed) {
+          validTokens.add(trimmed);
+        }
+      }
+    }
+  }
+
+  const isAuthRequired = options.requireAuth || validTokens.size > 0;
+  if (!isAuthRequired) {
+    return { authenticated: true };
+  }
+
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return {
+      authenticated: false,
+      status: 401,
+      errorMessage: "Unauthorized: Missing Bearer token in Authorization header",
+    };
+  }
+
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return {
+      authenticated: false,
+      status: 401,
+      errorMessage: "Unauthorized: Invalid Authorization header format. Expected 'Bearer <token>'",
+    };
+  }
+
+  const token = match[1].trim();
+  if (!validTokens.has(token)) {
+    return {
+      authenticated: false,
+      status: 403,
+      errorMessage: "Forbidden: Invalid Bearer token",
+    };
+  }
+
+  const mappedPeer = tokenToPeer.get(token);
+  const headerPeer = (req.headers["mcp-peer-id"] || req.headers["x-peer-id"]) as string | undefined;
+  const peerId = headerPeer || mappedPeer || "default";
+
+  if (options.allowedPeers && options.allowedPeers.length > 0) {
+    const isPeerAllowed =
+      options.allowedPeers.includes(peerId) ||
+      (mappedPeer ? options.allowedPeers.includes(mappedPeer) : false);
+
+    if (!isPeerAllowed) {
+      return {
+        authenticated: false,
+        status: 403,
+        errorMessage: `Forbidden: Peer '${peerId}' is not authorized`,
+      };
+    }
+  }
+
+  return { authenticated: true, peerId };
+}
+
+export interface HttpMcpServerHandle {
+  server: HttpServer;
+  port: number;
+  host: string;
+  url: string;
+  endpoint: string;
+  close: () => Promise<void>;
+}
+
+/**
+ * T-150, T-151 & T-386: Start MCP Streamable HTTP transport server (2025-06-18 spec).
+ * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming,
+ * with strict Bearer token authentication, per-peer allowlists, Origin validation,
+ * DNS rebinding protection, and protocol version headers.
+ */
+export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Promise<HttpMcpServerHandle> {
+  const server = createServer();
+  const endpoint = options.endpoint ?? "/mcp";
+  const host = options.host ?? "127.0.0.1";
+  const port = options.port ?? 0;
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: options.stateless ? undefined : () => randomUUID(),
+    enableJsonResponse: options.enableJsonResponse ?? true,
+    allowedOrigins: options.allowedOrigins,
+    allowedHosts: options.allowedHosts,
+    enableDnsRebindingProtection: options.enableDnsRebindingProtection,
+  });
+
+  await server.connect(transport);
+
+  const httpServer = createHttpServer((req, res) => {
+    // Handle CORS OPTIONS pre-flight
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-origin": req.headers["origin"] ?? "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers":
+          "content-type, authorization, accept, mcp-session-id, mcp-protocol-version, mcp-peer-id, x-peer-id",
+        "access-control-max-age": "86400",
+      });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    if (url.pathname === endpoint || (endpoint === "/mcp" && url.pathname === "/")) {
+      // T-386: Bearer token auth + per-peer allowlist
+      const authResult = validateHttpAuth(req, options);
+      if (!authResult.authenticated) {
+        const status = authResult.status ?? 401;
+        const headers: Record<string, string> = { "content-type": "application/json" };
+        if (status === 401) {
+          headers["www-authenticate"] = 'Bearer error="invalid_token"';
+        }
+        res.writeHead(status, headers);
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: status === 401 ? -32002 : -32000,
+              message: authResult.errorMessage,
+            },
+            id: null,
+          }),
+        );
+        return;
+      }
+      // T-151: Protocol version header validation and echo
+      const clientProtoVersion = req.headers["mcp-protocol-version"];
+      if (typeof clientProtoVersion === "string") {
+        if (!SUPPORTED_MCP_PROTOCOL_VERSIONS.includes(clientProtoVersion)) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Unsupported protocol version: ${clientProtoVersion}. Supported: ${SUPPORTED_MCP_PROTOCOL_VERSIONS.join(", ")}`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+        res.setHeader("mcp-protocol-version", clientProtoVersion);
+      } else {
+        res.setHeader("mcp-protocol-version", "2024-11-05");
+      }
+
+      // T-151: Origin validation if allowedOrigins configured
+      const origin = req.headers["origin"];
+      if (options.allowedOrigins && options.allowedOrigins.length > 0 && typeof origin === "string") {
+        if (!options.allowedOrigins.includes(origin)) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Forbidden: Origin '${origin}' is not allowed`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+      }
+
+      // T-151: Allowed hosts check
+      if (options.allowedHosts && options.allowedHosts.length > 0) {
+        const hostHeader = (req.headers["host"] ?? "").split(":")[0];
+        if (!options.allowedHosts.includes(hostHeader)) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: `Forbidden: Host '${hostHeader}' is not allowed`,
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+      }
+
+      transport.handleRequest(req, res);
+      return;
+    }
+    res.writeHead(404, { "content-type": "text/plain" });
+    res.end("Not Found");
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.listen(port, host, () => resolve());
+    httpServer.on("error", reject);
+  });
+
+  const address = httpServer.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
+  const actualUrl = `http://${host}:${actualPort}${endpoint}`;
+
+  return {
+    server: httpServer,
+    port: actualPort,
+    host,
+    url: actualUrl,
+    endpoint,
+    close: async () => {
+      await transport.close();
+      await server.close();
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    },
+  };
 }
 
 function toolResult(content: unknown) {

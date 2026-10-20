@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import type { Store } from "./store.ts";
 import { propose, save, list } from "./store.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
+import { stripInjectedContextBlocks } from "./security/strip.ts";
+
+export { stripInjectedContextBlocks };
 
 export interface HarvestedUnit {
   title: string;
@@ -20,7 +23,9 @@ export interface HarvestedUnit {
  */
 export function extractHarvestUnits(text: string): HarvestedUnit[] {
   if (!text || typeof text !== "string") return [];
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const sanitized = stripInjectedContextBlocks(text);
+  if (!sanitized) return [];
+  const lines = sanitized.replace(/\r\n/g, "\n").split("\n");
   const units: HarvestedUnit[] = [];
 
   let currentType: MemoryType | null = null;

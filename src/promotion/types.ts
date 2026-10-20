@@ -11,6 +11,8 @@ export interface PromotionEvaluation {
   conflicts: number;
   has_sufficient_evidence: boolean;
   is_generalizable: boolean;
+  is_corroborated?: boolean;
+  has_valid_syntax?: boolean;
   generalized_content?: string;
   reasons: string[];
 }
@@ -25,6 +27,20 @@ export interface PromotionResult {
   target_entry_id?: string;
   target_memory_dir?: string;
   message: string;
+}
+
+export interface AppendEvidenceOptions {
+  actor?: string;
+  applicationOutcome?: "success" | "failure" | "regression" | "neutral";
+  autoEvaluate?: boolean;
+}
+
+export interface CurateResult {
+  memory_id: string;
+  evidence_added: import("../types.ts").EvidenceItem;
+  utility: import("../types.ts").MemoryUtility;
+  promotion_evaluation: PromotionEvaluation;
+  promotion_result?: PromotionResult;
 }
 
 export interface ArchivalEvaluation {
@@ -61,4 +77,48 @@ export interface LifecycleStats {
   by_scope: Record<MemoryScope | string, number>;
   promotion_candidates: number;
   archival_candidates: number;
+}
+
+export interface PendingPromotionEntry {
+  id: string;
+  memory_id: string;
+  target_scope: MemoryScope;
+  current_scope: MemoryScope;
+  staged_at: string;
+  session_id?: string;
+  actor?: string;
+  reason?: string;
+  generalized_content?: string;
+  force_manual?: boolean;
+  status: "pending" | "flushed" | "cancelled" | "rejected";
+  evaluation?: PromotionEvaluation;
+  flushed_at?: string;
+}
+
+export interface StagePendingOptions {
+  targetScope?: MemoryScope;
+  actor?: string;
+  reason?: string;
+  generalizedContent?: string;
+  forceManual?: boolean;
+  sessionId?: string;
+}
+
+export interface FlushPendingOptions {
+  sessionId?: string;
+  dryRun?: boolean;
+  actor?: string;
+}
+
+export interface FlushPendingResult {
+  total_staged: number;
+  promoted_count: number;
+  rejected_count: number;
+  results: Array<{
+    memory_id: string;
+    pending_id: string;
+    target_scope: MemoryScope;
+    promoted: boolean;
+    message: string;
+  }>;
 }

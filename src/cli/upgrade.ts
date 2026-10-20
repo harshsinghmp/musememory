@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -7,6 +7,7 @@ import { initUserProfile, userFilePath } from "../user.ts";
 import { connectAgent } from "../connect.ts";
 import { indexGraph } from "../graph.ts";
 import { installGitHook } from "../hook.ts";
+import { scanSecrets } from "../secrets.ts";
 import { type ParsedArgs, usageError } from "./shared.ts";
 
 export interface UpgradeMilestone {
@@ -26,6 +27,7 @@ export interface RepairOptions {
   memoryDir?: string;
   global?: boolean;
   skipAgentConnect?: boolean;
+  dryRun?: boolean;
 }
 
 export interface RepairResult {
@@ -33,6 +35,7 @@ export interface RepairResult {
   actionsTaken: string[];
   agentsConnected: number;
   memoryDir: string;
+  errors?: string[];
 }
 
 export interface PandaProgressOptions {
@@ -54,6 +57,11 @@ export interface PandaLoaderOptions {
   trailChar?: string;
   trackChar?: string;
   tickIntervalMs?: number;
+}
+
+export interface PandaLoaderResult {
+  success: boolean;
+  failedSteps: Array<{ step: UpgradeStep; error: any }>;
 }
 
 export const DEFAULT_PANDA_FRAMES = [
@@ -144,10 +152,16 @@ export function detectPackageManager(): "bun" | "npm" | "pnpm" | "yarn" {
   return "npm";
 }
 
+const SAFE_NPM_NAME_REGEX = /^(?:@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
+
 /**
  * Fetches the latest published release version from npm registry.
  */
 export async function getLatestNpmVersion(packageName: string = "musememory"): Promise<string | null> {
+  if (!packageName || typeof packageName !== "string" || !SAFE_NPM_NAME_REGEX.test(packageName)) {
+    return null;
+  }
+
   try {
     const res = await fetch(`https://registry.npmjs.org/${packageName}/latest`, {
       headers: { Accept: "application/json" },
@@ -161,9 +175,9 @@ export async function getLatestNpmVersion(packageName: string = "musememory"): P
     }
   } catch {}
 
-  // Fallback to npm view
+  // Fallback to npm view via execFileSync (no shell interpolation)
   try {
-    const out = execSync(`npm show ${packageName} version`, {
+    const out = execFileSync("npm", ["show", packageName, "version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -212,7 +226,7 @@ export function getUpgradeMilestones(): UpgradeMilestone[] {
 export async function playPandaLoader(
   steps: UpgradeStep[],
   options: PandaLoaderOptions = {},
-): Promise<void> {
+): Promise<PandaLoaderResult> {
   const stream = options.stream ?? process.stdout;
   const isTTY = options.isTTY ?? (typeof (stream as any).isTTY === "boolean" ? (stream as any).isTTY : process.stdout.isTTY ?? false);
   const width = options.width ?? 20;
@@ -227,6 +241,7 @@ export async function playPandaLoader(
 
   let frameIndex = 0;
   let currentPercent = 0;
+  const failedSteps: Array<{ step: UpgradeStep; error: any }> = [];
 
   for (let i = 0; i < total; i++) {
     const step = steps[i];
@@ -235,6 +250,7 @@ export async function playPandaLoader(
     currentPercent = stepStartPercent;
 
     let timer: ReturnType<typeof setInterval> | null = null;
+    let stepFailed = false;
 
     if (isTTY) {
       // Dynamic single-line ticking while action is in-flight
@@ -276,6 +292,8 @@ export async function playPandaLoader(
     try {
       await step.action();
     } catch (err: any) {
+      stepFailed = true;
+      failedSteps.push({ step, error: err });
       if (timer) clearInterval(timer);
       if (isTTY) {
         stream.write(`\n  [!] Warning during step "${step.title}": ${err.message || err}\n`);
@@ -296,9 +314,24 @@ export async function playPandaLoader(
         trailChar: options.trailChar,
         trackChar: options.trackChar,
       });
-      stream.write(`\r\x1b[K  ${bar} ✓ [${i + 1}/${total}] ${step.title} [OK]`);
+      if (stepFailed) {
+        stream.write(`\r\x1b[K  ${bar} ✗ [${i + 1}/${total}] ${step.title} [FAILED]\n`);
+      } else {
+        stream.write(`\r\x1b[K  ${bar} ✓ [${i + 1}/${total}] ${step.title} [OK]`);
+      }
       // Micro-pause for dynamic feel
       await new Promise((r) => setTimeout(r, 40));
+    } else {
+      if (stepFailed) {
+        const bar = formatPandaProgressBar(targetPercent, width, {
+          panda,
+          frame: i,
+          target,
+          trailChar: options.trailChar,
+          trackChar: options.trackChar,
+        });
+        stream.write(`  ${bar} ✗ [${i + 1}/${total}] ${step.title} [FAILED]\n`);
+      }
     }
   }
 
@@ -310,11 +343,26 @@ export async function playPandaLoader(
     trackChar: options.trackChar,
   });
 
-  if (isTTY) {
-    stream.write(`\r\x1b[K  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+  if (failedSteps.length > 0) {
+    const msg = `  ${finalBar} ⚠️ [${total - failedSteps.length}/${total}] Completed with ${failedSteps.length} error(s).\n\n`;
+    if (isTTY) {
+      stream.write(`\r\x1b[K${msg}`);
+    } else {
+      stream.write(msg);
+    }
   } else {
-    stream.write(`  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`);
+    const msg = `  ${finalBar} ✨ [${total}/${total}] Complete!\n\n`;
+    if (isTTY) {
+      stream.write(`\r\x1b[K${msg}`);
+    } else {
+      stream.write(msg);
+    }
   }
+
+  return {
+    success: failedSteps.length === 0,
+    failedSteps,
+  };
 }
 
 /**
@@ -328,105 +376,212 @@ export const playGamifiedLoader = playPandaLoader;
 export async function repairInstallation(options: RepairOptions = {}): Promise<RepairResult> {
   const root = options.workspaceRoot || process.cwd();
   const isGlobal = options.global === true;
+  const isDryRun = options.dryRun === true;
   const memoryDir = options.memoryDir || (isGlobal ? getGlobalMemoryDir() : resolveMemoryDir({ root }));
   const actionsTaken: string[] = [];
+  const errors: string[] = [];
 
   // 1. Ensure .memory directory and memories folder exist
   const memoriesDir = join(memoryDir, "memories");
   if (!existsSync(memoriesDir)) {
-    mkdirSync(memoriesDir, { recursive: true });
-    actionsTaken.push(`Created missing memories directory: ${memoriesDir}`);
+    if (!isDryRun) {
+      try {
+        mkdirSync(memoriesDir, { recursive: true });
+      } catch (err: unknown) {
+        errors.push(`Failed creating memories directory: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would create missing memories directory: ${memoriesDir}` : `Created missing memories directory: ${memoriesDir}`);
   }
 
   // 2. Ensure CURRENT.md exists
   const currentPath = join(memoryDir, "CURRENT.md");
   if (!existsSync(currentPath)) {
-    writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
-    actionsTaken.push(`Recovered missing CURRENT.md at ${currentPath}`);
+    if (!isDryRun) {
+      try {
+        writeFileSync(currentPath, "# Active Project Constraints\n\n- [ ] Initial session constraints initialized.\n", "utf8");
+      } catch (err: unknown) {
+        errors.push(`Failed creating CURRENT.md: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would recover missing CURRENT.md at ${currentPath}` : `Recovered missing CURRENT.md at ${currentPath}`);
   }
 
   // 3. Ensure USER.md exists
   const uPath = userFilePath(memoryDir);
   if (!existsSync(uPath)) {
-    initUserProfile(memoryDir, "developer", false, !isGlobal);
-    actionsTaken.push(`Recovered missing USER.md profile at ${uPath}`);
+    if (!isDryRun) {
+      try {
+        initUserProfile(memoryDir, "developer", false, !isGlobal);
+      } catch (err: unknown) {
+        errors.push(`Failed initializing USER.md: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    actionsTaken.push(isDryRun ? `[dry-run] Would recover missing USER.md profile at ${uPath}` : `Recovered missing USER.md profile at ${uPath}`);
   }
 
   // 4. Re-wire agents if not skipped
   let agentsConnected = 0;
   if (!options.skipAgentConnect) {
     try {
-      const reports = connectAgent("all", undefined, { dryRun: false, force: false });
+      const reports = connectAgent("all", undefined, { dryRun: isDryRun, force: false });
       agentsConnected = reports.filter((r) => r.updated || r.installed).length;
       if (agentsConnected > 0) {
-        actionsTaken.push(`Auto-wired ${agentsConnected} detected agent platform(s)`);
+        actionsTaken.push(isDryRun ? `[dry-run] Would auto-wire ${agentsConnected} detected agent platform(s)` : `Auto-wired ${agentsConnected} detected agent platform(s)`);
       }
-    } catch {}
+    } catch (err: unknown) {
+      errors.push(`Failed auto-wiring agents: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // 5. Re-index AST symbols if provider exists
   if (!isGlobal && existsSync(root)) {
-    try {
-      const index = indexGraph(root, memoryDir);
-      if (index.symbolCount > 0) {
-        actionsTaken.push(`Indexed ${index.symbolCount} AST symbols from ${index.provider}`);
+    if (!isDryRun) {
+      try {
+        const index = indexGraph(root, memoryDir);
+        if (index.symbolCount > 0) {
+          actionsTaken.push(`Indexed ${index.symbolCount} AST symbols from ${index.provider}`);
+        }
+      } catch (err: unknown) {
+        errors.push(`Failed indexing AST symbols: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch {}
+    } else {
+      actionsTaken.push(`[dry-run] Would re-index AST symbols from active provider`);
+    }
 
     // Check git pre-commit hook
     if (existsSync(join(root, ".git"))) {
-      try {
-        const hookRes = installGitHook(root);
-        if (hookRes.installed) {
-          actionsTaken.push(`Installed Git pre-commit transcript harvester hook`);
+      if (!isDryRun) {
+        try {
+          const hookRes = installGitHook(root);
+          if (hookRes.installed) {
+            actionsTaken.push(`Installed Git pre-commit transcript harvester hook`);
+          }
+        } catch (err: unknown) {
+          errors.push(`Failed installing Git pre-commit hook: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } catch {}
+      } else {
+        actionsTaken.push(`[dry-run] Would install Git pre-commit transcript harvester hook`);
+      }
     }
   }
 
   return {
-    repaired: true,
+    repaired: errors.length === 0,
     actionsTaken,
     agentsConnected,
     memoryDir,
+    errors: errors.length > 0 ? errors : undefined,
   };
+}
+
+export interface HealBunOptions {
+  enabled?: boolean;
+  backup?: boolean;
+  packagePath?: string;
+}
+
+export interface HealBunResult {
+  healed: boolean;
+  backupCreated: boolean;
+  skipped: boolean;
+  reason?: string;
+  error?: string;
 }
 
 /**
  * Sanitizes ~/.bun/install/global/package.json from empty/corrupted dependency keys.
+ * Gated behind explicit opt-in (enabled: true or MUSE_HEAL_BUN_CONFIG=true).
+ * Creates a .bak backup before writing changes and surfaces errors cleanly.
  */
-export function healBunGlobalConfig(): void {
+export function healBunGlobalConfig(options: HealBunOptions = {}): HealBunResult {
+  const isOptedIn =
+    options.enabled === true ||
+    process.env.MUSE_HEAL_BUN_CONFIG === "1" ||
+    process.env.MUSE_HEAL_BUN_CONFIG === "true";
+
+  if (!isOptedIn) {
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: true,
+      reason: "Opt-in required via enabled: true or MUSE_HEAL_BUN_CONFIG=true",
+    };
+  }
+
+  const globalPkgPath =
+    options.packagePath ||
+    (() => {
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      return home ? join(home, ".bun", "install", "global", "package.json") : "";
+    })();
+
+  if (!globalPkgPath || !existsSync(globalPkgPath)) {
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: true,
+      reason: `Global bun package.json not found at ${globalPkgPath || "unknown"}`,
+    };
+  }
+
   try {
-    const home = process.env.HOME || process.env.USERPROFILE || "";
-    if (!home) return;
-    const globalPkgPath = join(home, ".bun", "install", "global", "package.json");
-    if (existsSync(globalPkgPath)) {
-      const raw = readFileSync(globalPkgPath, "utf-8");
-      const pkg = JSON.parse(raw);
-      let changed = false;
-      if (pkg.dependencies && typeof pkg.dependencies === "object") {
-        for (const key of Object.keys(pkg.dependencies)) {
-          if (!key || key.trim() === "") {
-            delete pkg.dependencies[key];
-            changed = true;
-          }
+    const raw = readFileSync(globalPkgPath, "utf-8");
+    const pkg = JSON.parse(raw);
+    let changed = false;
+
+    if (pkg.dependencies && typeof pkg.dependencies === "object") {
+      for (const key of Object.keys(pkg.dependencies)) {
+        if (!key || key.trim() === "") {
+          delete pkg.dependencies[key];
+          changed = true;
         }
       }
-      if (changed) {
-        writeFileSync(globalPkgPath, JSON.stringify(pkg, null, 2), "utf-8");
-      }
     }
-  } catch {}
+
+    if (changed) {
+      if (options.backup !== false) {
+        writeFileSync(`${globalPkgPath}.bak`, raw, "utf-8");
+      }
+      writeFileSync(globalPkgPath, JSON.stringify(pkg, null, 2), "utf-8");
+      return {
+        healed: true,
+        backupCreated: options.backup !== false,
+        skipped: false,
+      };
+    }
+
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: false,
+      reason: "No corrupt empty keys found in package.json",
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return {
+      healed: false,
+      backupCreated: false,
+      skipped: false,
+      error: `Failed to heal bun global package.json: ${errorMsg}`,
+    };
+  }
 }
 
 /**
  * Executes a package manager update command.
  */
-export function executePackageUpgrade(pm: "bun" | "npm" | "pnpm" | "yarn", dryRun: boolean = false): string {
+export function executePackageUpgrade(
+  pm: "bun" | "npm" | "pnpm" | "yarn",
+  dryRun: boolean = false,
+  options: { healBunConfig?: boolean } = {},
+): string {
   let cmd = "";
   switch (pm) {
     case "bun":
-      healBunGlobalConfig();
+      if (options.healBunConfig) {
+        healBunGlobalConfig({ enabled: true });
+      }
       cmd = "bun add -g musememory@latest";
       break;
     case "pnpm":
@@ -472,31 +627,38 @@ export function getCurrentVersion(): string {
  * Main CLI handler for `memory upgrade` and `memory update`.
  */
 export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<number> {
-  const isGlobal = flags["global"] === "true" || flags["g"] === "true";
-  const dryRun = flags["dry-run"] === "true";
-  const force = flags["force"] === "true";
-  const checkOnly = flags["check"] === "true";
+  try {
+    const isGlobal = flags["global"] === "true" || flags["g"] === "true";
+    const dryRun = flags["dry-run"] === "true";
+    const force = flags["force"] === "true";
+    const checkOnly = flags["check"] === "true";
+    const failOnUpdate = flags["fail-on-update"] === "true" || flags["strict"] === "true";
 
-  const pm = detectPackageManager();
-  const currentVersion = getCurrentVersion();
+    const pm = detectPackageManager();
+    const currentVersion = getCurrentVersion();
 
-  console.log(`[Upgrade] Checking for updates (detected package manager: ${pm})...`);
-  const latestVersion = await getLatestNpmVersion();
+    console.log(`[Upgrade] Checking for updates (detected package manager: ${pm})...`);
+    const latestVersion = await getLatestNpmVersion();
 
-  if (latestVersion) {
-    console.log(`  * Installed version: v${currentVersion}`);
-    console.log(`  * Latest release:    v${latestVersion}`);
-  }
-
-  if (checkOnly) {
-    if (latestVersion && latestVersion !== currentVersion) {
-      console.log(`\n💡 Update available: v${currentVersion} ➔ v${latestVersion}`);
-      console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
-    } else {
-      console.log(`\n✓ Muse Memory is up to date (v${currentVersion}).`);
+    if (latestVersion) {
+      console.log(`  * Installed version: v${currentVersion}`);
+      console.log(`  * Latest release:    v${latestVersion}`);
     }
-    return 0;
-  }
+
+    if (checkOnly) {
+      if (!latestVersion) {
+        console.error(`\n❌ Failed to check for updates: Could not reach registry or resolve latest version.`);
+        return 1;
+      }
+      if (latestVersion !== currentVersion) {
+        console.log(`\n💡 Update available: v${currentVersion} ➔ v${latestVersion}`);
+        console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
+        return failOnUpdate ? 1 : 0;
+      } else {
+        console.log(`\n✓ Muse Memory is up to date (v${currentVersion}).`);
+        return 0;
+      }
+    }
 
   let repairInfo: RepairResult | undefined;
 
@@ -505,7 +667,21 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       level: 1,
       title: "Vibeguard Security & Credential Audit",
       action: async () => {
-        // Verify no secrets or corrupt files
+        const memDir = isGlobal ? getGlobalMemoryDir() : resolveMemoryDir();
+        const currentPath = join(memDir, "CURRENT.md");
+        const uPath = userFilePath(memDir);
+        const leaked: string[] = [];
+        if (existsSync(currentPath)) {
+          const secrets = scanSecrets(readFileSync(currentPath, "utf-8"));
+          if (secrets.length > 0) leaked.push(`CURRENT.md (${secrets.length} secret[s])`);
+        }
+        if (existsSync(uPath)) {
+          const secrets = scanSecrets(readFileSync(uPath, "utf-8"));
+          if (secrets.length > 0) leaked.push(`USER.md (${secrets.length} secret[s])`);
+        }
+        if (leaked.length > 0) {
+          throw new Error(`Vibeguard audit detected unmasked secrets: ${leaked.join(", ")}`);
+        }
       },
     },
     {
@@ -521,30 +697,72 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       level: 3,
       title: "Synaptic Storage & Schema Alignment",
       action: async () => {
-        repairInfo = await repairInstallation({ global: isGlobal });
+        repairInfo = await repairInstallation({ global: isGlobal, dryRun, skipAgentConnect: true });
+        if (repairInfo.errors && repairInfo.errors.length > 0) {
+          throw new Error(`Storage alignment failed: ${repairInfo.errors.join("; ")}`);
+        }
       },
     },
     {
       level: 4,
       title: "80+ Agent Platforms & Skills Auto-Wiring",
       action: async () => {
-        // Agent auto-wiring ran in repairInstallation
+        try {
+          const reports = connectAgent("all", undefined, { dryRun, force: false });
+          const connected = reports.filter((r) => r.updated || r.installed).length;
+          if (repairInfo) {
+            repairInfo.agentsConnected = connected;
+            if (connected > 0) {
+              repairInfo.actionsTaken.push(
+                dryRun
+                  ? `[dry-run] Would auto-wire ${connected} detected agent platform(s)`
+                  : `Auto-wired ${connected} detected agent platform(s)`
+              );
+            }
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (repairInfo) {
+            if (!repairInfo.errors) repairInfo.errors = [];
+            repairInfo.errors.push(`Failed auto-wiring agents: ${msg}`);
+          }
+          throw new Error(`Agent platform wiring failed: ${msg}`);
+        }
       },
     },
     {
       level: 5,
       title: "Cognitive Ascendance Complete",
-      action: async () => {},
+      action: async () => {
+        const memDir = repairInfo?.memoryDir || (isGlobal ? getGlobalMemoryDir() : resolveMemoryDir());
+        if (!existsSync(memDir)) {
+          throw new Error(`Verification failed: Memory directory missing at ${memDir}`);
+        }
+      },
     },
   ];
 
-  await playGamifiedLoader(steps, { title: "SYSTEM LEVEL-UP & UPGRADE MATRIX" });
+  const loaderResult = await playGamifiedLoader(steps, { title: "SYSTEM LEVEL-UP & UPGRADE MATRIX" });
+
+  if (!loaderResult.success) {
+    console.error(`\n❌ [UPGRADE FAILED] One or more upgrade steps failed:`);
+    for (const f of loaderResult.failedSteps) {
+      console.error(`  ✗ ${f.step.title}: ${f.error?.message || f.error}`);
+    }
+    return 1;
+  }
 
   console.log(`🏆 [LEVEL-UP COMPLETE] Muse Memory is now fully armed and up to date!`);
   if (repairInfo && repairInfo.actionsTaken.length > 0) {
     console.log(`\n🔧 Self-Healing Actions Applied:`);
     for (const act of repairInfo.actionsTaken) {
       console.log(`  ✓ ${act}`);
+    }
+  }
+  if (repairInfo && repairInfo.errors && repairInfo.errors.length > 0) {
+    console.warn(`\n⚠️ Self-Healing Warnings:`);
+    for (const err of repairInfo.errors) {
+      console.warn(`  ! ${err}`);
     }
   }
 
@@ -554,5 +772,10 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
   console.log(`  • NPX:   npx musememory@latest`);
   console.log(`  • Auto:  memory upgrade\n`);
 
-  return 0;
+    return 0;
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`\n❌ [UPGRADE FAILED] ${errorMsg}`);
+    return 1;
+  }
 }

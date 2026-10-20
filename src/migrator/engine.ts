@@ -1,6 +1,7 @@
+import { existsSync, statSync, readdirSync } from "node:fs";
 import type { Store } from "../store.ts";
 import { propose, list, markStale, markSuperseded, addConstraint } from "../store.ts";
-import { detectProviders } from "./detect.ts";
+import { detectProviders, expandPath } from "./detect.ts";
 import { AgentMemoryAdapter } from "./adapters/agentmemory.ts";
 import { BeadsAdapter } from "./adapters/beads.ts";
 import { LettaAdapter } from "./adapters/letta.ts";
@@ -10,6 +11,7 @@ import { getCurrent, setCurrent } from "../current.ts";
 import { workspaceRootFor } from "../root.ts";
 import { recordAuditEvent } from "../audit.ts";
 import type { MigrationOptions, MigrationReport, MigrationProviderReport, ProviderAdapter, MigratedRecord } from "./types.ts";
+import { validateMigratedRecord } from "./types.ts";
 
 const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   agentmemory: AgentMemoryAdapter,
@@ -44,6 +46,7 @@ export async function runMigration(
     totalSuperseded: 0,
     totalConstraints: 0,
     totalSecretsRedacted: 0,
+    totalDeduplicated: 0,
     dryRun: Boolean(options.dryRun),
     providers: [],
     errors: [],
@@ -53,7 +56,19 @@ export async function runMigration(
   const existingTitles = new Set(existingMemories.map((m) => m.title.trim().toLowerCase()));
 
   for (const provider of targetProviders) {
-    const pathsToProcess = provider.resolvedPaths.length > 0 ? provider.resolvedPaths : provider.paths;
+    const pathsToProcess = provider.resolvedPaths.length > 0
+      ? provider.resolvedPaths
+      : provider.paths
+          .map((p) => expandPath(p, workspaceRoot))
+          .filter((p) => {
+            try {
+              if (!existsSync(p)) return false;
+              const s = statSync(p);
+              return s.isDirectory() ? readdirSync(p).length > 0 : s.size > 0;
+            } catch {
+              return false;
+            }
+          });
     const adapter = getAdapter(provider.id);
 
     const providerReport: MigrationProviderReport = {
@@ -64,6 +79,7 @@ export async function runMigration(
       supersededCount: 0,
       constraintsCount: 0,
       secretsRedacted: 0,
+      deduplicatedCount: 0,
       status: "success",
     };
 
@@ -88,8 +104,9 @@ export async function runMigration(
         }
       }
 
-      for (const record of records) {
-        if (!record.content || !record.content.trim()) continue;
+      for (const rawRecord of records) {
+        const record = validateMigratedRecord(rawRecord);
+        if (!record || !record.content || !record.content.trim()) continue;
 
         // Vibeguard zero-leakage check
         let finalContent = record.content;
@@ -103,8 +120,12 @@ export async function runMigration(
         // Deduplication check
         const normalizedTitle = record.title.trim().toLowerCase();
         if (!options.overwrite && existingTitles.has(normalizedTitle)) {
+          providerReport.deduplicatedCount++;
+          report.totalDeduplicated++;
           continue;
         }
+
+        existingTitles.add(normalizedTitle);
 
         if (record.isConstraint) {
           // Append active working constraint / persona to CURRENT.md (audited via addConstraint)
@@ -141,8 +162,6 @@ export async function runMigration(
               providerReport.supersededCount++;
               report.totalSuperseded++;
             }
-
-            existingTitles.add(normalizedTitle);
           } else {
             if (record.status === "superseded" || record.status === "stale") {
               providerReport.supersededCount++;

@@ -3,6 +3,8 @@ import { propose } from "../store.ts";
 import type { HarvestedMemory } from "./types.ts";
 import { recordNegativeLesson } from "../learning/negative.ts";
 import { scanSecrets } from "../secrets.ts";
+import { isFactDigestRecorded, recordFactDigest } from "./dedup.ts";
+import { stripInjectedContextBlocks } from "../security/strip.ts";
 
 export interface HarvestOptions {
   project: string;
@@ -22,15 +24,19 @@ export function harvestSessionMemories(
 ): HarvestedMemory[] {
   if (!conversationText || !conversationText.trim()) return [];
 
+  const cleanText = stripInjectedContextBlocks(conversationText);
+  if (!cleanText || !cleanText.trim()) return [];
+
   // Protect against secrets
-  const secrets = scanSecrets(conversationText);
+  const secrets = scanSecrets(cleanText);
   if (secrets.length > 0) {
     // If text contains credentials, abort extraction to prevent leaks
     return [];
   }
 
+  const memoryDir = store.memoryDir || store.dir;
   const harvested: HarvestedMemory[] = [];
-  const lines = conversationText.split("\n");
+  const lines = cleanText.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -45,6 +51,8 @@ export function harvestSessionMemories(
       lower.startsWith("anti-pattern:") ||
       lower.includes("failed approach:")
     ) {
+      if (isFactDigestRecorded(memoryDir, line)) continue;
+
       const title = line.slice(0, 100);
       const contextLines = lines.slice(i, i + 4).join("\n");
       const negEntry = recordNegativeLesson(store, {
@@ -56,6 +64,8 @@ export function harvestSessionMemories(
         source: options.actor ?? "session_harvester",
         confirmed: true,
       });
+
+      recordFactDigest(memoryDir, line, negEntry.id, "negative");
 
       harvested.push({
         id: negEntry.id,
@@ -74,6 +84,8 @@ export function harvestSessionMemories(
       lower.startsWith("decided to") ||
       lower.includes("chose ") && lower.includes(" over ")
     ) {
+      if (isFactDigestRecorded(memoryDir, line)) continue;
+
       const title = line.replace(/^(decision:|architecture decision:)/i, "").trim().slice(0, 100);
       const contextLines = lines.slice(i, i + 3).join("\n");
       const entry = propose(store, {
@@ -85,6 +97,8 @@ export function harvestSessionMemories(
         confirmed: true,
         tags: ["architecture", "decision", "auto-harvested"],
       });
+
+      recordFactDigest(memoryDir, line, entry.id, "decision");
 
       harvested.push({
         id: entry.id,
@@ -103,6 +117,8 @@ export function harvestSessionMemories(
       lower.startsWith("must always") ||
       lower.startsWith("never ")
     ) {
+      if (isFactDigestRecorded(memoryDir, line)) continue;
+
       const title = line.replace(/^(invariant:|constraint:)/i, "").trim().slice(0, 100);
       const entry = propose(store, {
         title,
@@ -114,6 +130,8 @@ export function harvestSessionMemories(
         confirmed: true,
         tags: ["constraint", "invariant", "auto-harvested"],
       });
+
+      recordFactDigest(memoryDir, line, entry.id, "constraint");
 
       harvested.push({
         id: entry.id,
@@ -131,6 +149,8 @@ export function harvestSessionMemories(
       lower.startsWith("resolved:") ||
       (lower.includes("fixed") && lower.includes(" by "))
     ) {
+      if (isFactDigestRecorded(memoryDir, line)) continue;
+
       const title = line.replace(/^(fix:|resolved:)/i, "").trim().slice(0, 100);
       const contextLines = lines.slice(i, i + 3).join("\n");
       const entry = propose(store, {
@@ -142,6 +162,8 @@ export function harvestSessionMemories(
         confirmed: true,
         tags: ["bugfix", "fix", "auto-harvested"],
       });
+
+      recordFactDigest(memoryDir, line, entry.id, "fix");
 
       harvested.push({
         id: entry.id,

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Store } from "../store.ts";
 import { get, list, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
@@ -101,7 +102,8 @@ export function recordAdr(
   const adrNum = options.adr_number ?? getNextAdrNumber(store);
   const now = new Date().toISOString();
   const status: AdrStatus = options.status || "accepted";
-  const id = `m_${Date.now()}_adr_${adrNum}`;
+  const shortUuid = randomUUID().replace(/-/g, "").slice(0, 8);
+  const id = `m_${Date.now()}_${shortUuid}_adr_${adrNum}`;
 
   // 1. Build native code anchors for affected files and symbols
   const anchors: CodeAnchor[] = [];
@@ -140,12 +142,21 @@ export function recordAdr(
     supersedes: options.supersedes,
   };
 
+  const mappedStatus =
+    status === "accepted"
+      ? "confirmed"
+      : status === "rejected"
+      ? "stale"
+      : status === "superseded"
+      ? "superseded"
+      : "candidate";
+
   const entry: MemoryEntry = {
     id,
     title: `ADR-${adrNum}: ${options.title}`,
     content,
     project: options.project,
-    status: status === "proposed" ? "candidate" : "confirmed",
+    status: mappedStatus,
     type: "adr",
     temporal_mode: "timeless",
     created_at: now,
@@ -157,12 +168,13 @@ export function recordAdr(
     verification: { level: "authoritative" },
   };
 
-  // 3. Handle supersedes link
+  // 1. Save new entry first so new ADR exists before any linkage
+  save(store, entry);
+
+  // 2. Handle supersedes link after save succeeds
   if (options.supersedes) {
     supersedeAdr(store, options.supersedes, id, options.actor);
   }
-
-  save(store, entry);
 
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {

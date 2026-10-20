@@ -101,9 +101,93 @@ describe("Claude Code Hook Pack (GAP-2)", () => {
       expect(existsSync(settingsPath)).toBe(false);
     });
 
-    it("refuses to fabricate ~/.claude when missing (no dry-run)", () => {
+    it("refuses to fabricate a harness directory when missing (no dry-run)", () => {
       const missingHome = join(tmpDir, "no-claude");
-      expect(() => installHookPack(missingHome)).toThrow(/not found/);
+      expect(() => installHookPack(missingHome, { harness: "claude" })).toThrow(/not found/);
+    });
+  });
+
+  describe("harness-independent resolution (T-390)", () => {
+    /** Runs fn with cwd inside a bare temp dir, so no real project `.agents/` is found. */
+    function withCwd<T>(dir: string, fn: () => T): T {
+      const orig = process.cwd();
+      process.chdir(dir);
+      try {
+        return fn();
+      } finally {
+        process.chdir(orig);
+      }
+    }
+
+    it("defaults to the global standard (~/.agents) and never writes ~/.claude", () => {
+      withCwd(tmpDir, () => {
+        const result = installHookPack(tmpDir, { dryRun: true });
+        expect(result.settingsPath).toBe(join(tmpDir, ".agents", "hooks.json"));
+      });
+      expect(existsSync(join(tmpDir, ".claude"))).toBe(false);
+    });
+
+    it("prefers the project <root>/.agents/hooks.json when a project .agents/ exists", () => {
+      const project = join(tmpDir, "proj");
+      mkdirSync(join(project, ".agents"), { recursive: true });
+      mkdirSync(join(project, ".git"), { recursive: true });
+
+      withCwd(project, () => {
+        const result = installHookPack(tmpDir, { dryRun: true });
+        expect(result.settingsPath).toBe(join(project, ".agents", "hooks.json"));
+      });
+    });
+
+    it("pre-existing ~/.claude settings do NOT auto-trigger the claude path", () => {
+      const claudeDir = join(tmpDir, ".claude");
+      mkdirSync(claudeDir, { recursive: true });
+      const claudeSettings = join(claudeDir, "settings.json");
+      writeFileSync(claudeSettings, JSON.stringify({ model: "opus" }), "utf8");
+
+      withCwd(tmpDir, () => {
+        const result = installHookPack(tmpDir);
+        expect(result.settingsPath).toBe(join(tmpDir, ".agents", "hooks.json"));
+      });
+
+      // Harness config untouched, global-standard file created instead.
+      expect(JSON.parse(readFileSync(claudeSettings, "utf8"))).toEqual({ model: "opus" });
+      const agents = JSON.parse(readFileSync(join(tmpDir, ".agents", "hooks.json"), "utf8"));
+      expect(agents.hooks.SessionStart[0].command).toBe("memory hooks session-start");
+    });
+
+    it("--harness claude targets ~/.claude/settings.json", () => {
+      const claudeDir = join(tmpDir, ".claude");
+      mkdirSync(claudeDir, { recursive: true });
+
+      withCwd(tmpDir, () => {
+        const result = installHookPack(tmpDir, { harness: "claude" });
+        expect(result.settingsPath).toBe(join(claudeDir, "settings.json"));
+      });
+
+      const settings = JSON.parse(readFileSync(join(claudeDir, "settings.json"), "utf8"));
+      expect(settings.hooks.Stop[0].command).toBe("memory hooks stop");
+      expect(existsSync(join(tmpDir, ".agents", "hooks.json"))).toBe(false);
+    });
+
+    it("--harness accepts the registry id alias and rejects unknown harnesses", () => {
+      mkdirSync(join(tmpDir, ".claude"), { recursive: true });
+      withCwd(tmpDir, () => {
+        expect(installHookPack(tmpDir, { harness: "claude-code", dryRun: true }).settingsPath).toBe(
+          join(tmpDir, ".claude", "settings.json"),
+        );
+        expect(() => installHookPack(tmpDir, { harness: "nope", dryRun: true })).toThrow(
+          /Unknown harness/,
+        );
+      });
+    });
+
+    it("uninstall follows the same resolution order", () => {
+      withCwd(tmpDir, () => {
+        installHookPack(tmpDir);
+        const result = uninstallHookPack(tmpDir);
+        expect(result.settingsPath).toBe(join(tmpDir, ".agents", "hooks.json"));
+        expect(result.removed).toEqual(["SessionStart", "PostToolUse", "Stop"]);
+      });
     });
   });
 

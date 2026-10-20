@@ -42,7 +42,14 @@ export function addSource(
     retrieved_at?: string;
   },
 ): SourceEntry {
-  const textToScan = `${input.title}\n${input.url}\n${input.excerpt ?? ""}\n${input.author ?? ""}`;
+  const textToScan = [
+    input.title,
+    input.url,
+    input.excerpt ?? "",
+    input.author ?? "",
+    input.id ?? "",
+    input.metadata ? JSON.stringify(input.metadata) : "",
+  ].join("\n");
   const secrets = scanSecrets(textToScan);
   if (secrets.length > 0) {
     throw new Error(`Vibeguard: Detected secret in source data: ${secrets.join(", ")}`);

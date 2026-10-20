@@ -44,12 +44,29 @@ memory optimize                # prune noise + VACUUM (auto-cadence)`,
     ],
   },
   {
-    id: "hooks",
-    title: "Hands-free hooks (Claude Code)",
+    id: "learning",
+    title: "Failure attribution & negative mining (v3.0.0)",
     body: [
-      "memory connect --with-hooks wires the lifecycle pack: SessionStart injects constraints and top memories before your agent's first turn, PostToolUse captures tool results as observations, Stop distills the session into candidate memories. Every hook is fail-open — memory problems never block coding.",
+      "Scoped failure attribution: when a test or command fails, Muse verifies relevance against code anchors, affected paths, and reproduction commands before penalizing retrieved notes. Bystander memories are untouched, per-session retry spikes are deduplicated to 1 strike, and active strikes decay after 2 clean runs or 30 days.",
+      "Constitutional immunity: entries typed as constraint, timeless, or foundational (salience >= 0.95) are protected from automated dispute.",
+      "Fix-pair trajectory mining: automatically detects Error ➔ Remediation ➔ Success sequences in your session logs and distills actionable 'AVOID' negative memories with dynamic line number normalization and Vibeguard secret scrubbing.",
+      "HOT.md working set compounding: candidate memories from your active working set receive memoized sub-millisecond retrieval boosts with origin channel attribution (source:hot, source:fts).",
+      "LangMem frequency ranking: sub-linear logarithmic utility curves weight verified applications 2x over passive reads with fresh 7-day recency bonuses.",
     ],
-    code: `# .claude/settings.json (managed by: memory hooks install)
+    code: `# Capture negative memory manually or let the harvester mine it
+memory capture --negative "AVOID: jwt.sign without explicit algorithm"
+
+# Query audit trail for strike and dispute operations
+memory audit --operation regression_strike
+memory audit --operation dispute_triggered`,
+  },
+  {
+    id: "hooks",
+    title: "Hands-free lifecycle hooks",
+    body: [
+      "memory connect --with-hooks wires the lifecycle pack into .agents/hooks.json: SessionStart injects constraints and top memories before your agent's first turn, PostToolUse captures tool results as observations, Stop distills the session into candidate memories. Every hook is fail-open — memory problems never block coding.",
+    ],
+    code: `# .agents/hooks.json (managed by: memory hooks install)
 { "hooks": {
     "SessionStart": [{ "type": "command", "command": "memory hooks session-start" }],
     "PostToolUse":   [{ "type": "command", "command": "memory hooks post-tool-use" }],

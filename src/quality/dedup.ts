@@ -25,6 +25,22 @@ export function computeFingerprint(title: string, content: string): string {
 }
 
 /**
+ * T-040: Normalizes content with case and whitespace folding.
+ * Preserves code, punctuation, and markdown semantics while treating differing indentation/casing identically.
+ */
+export function normalizeContent(content: string): string {
+  return (content || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/**
+ * T-040: Computes deterministic SHA-256 hash of whitespace- and case-folded content.
+ */
+export function computeContentHash(content: string): string {
+  const normalized = normalizeContent(content);
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+/**
  * Computes word-level Jaccard similarity between two texts (0.0 to 1.0).
  */
 export function computeJaccardSimilarity(textA: string, textB: string): number {

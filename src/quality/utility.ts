@@ -16,7 +16,16 @@ export function ensureUtility(entry: MemoryEntry): MemoryUtility {
       regressions: 0,
       contradictions: 0,
       reuse_success_rate: 1.0,
+      regression_strikes: 0,
+      clean_runs_since_regression: 0,
     };
+  } else {
+    if (entry.utility.regression_strikes === undefined) {
+      entry.utility.regression_strikes = 0;
+    }
+    if (entry.utility.clean_runs_since_regression === undefined) {
+      entry.utility.clean_runs_since_regression = 0;
+    }
   }
   return entry.utility;
 }
@@ -25,7 +34,8 @@ export function ensureUtility(entry: MemoryEntry): MemoryUtility {
  * Records that one or more memories were retrieved for an agent prompt context.
  */
 export function recordRetrievals(store: Store, memoryIds: string[]): void {
-  for (const id of memoryIds) {
+  const uniqueIds = Array.from(new Set(memoryIds));
+  for (const id of uniqueIds) {
     const entry = get(store, id);
     if (!entry) continue;
 
@@ -42,6 +52,8 @@ export interface ApplicationOutcomeOptions {
   regression?: boolean;
   notes?: string;
   actor?: string;
+  sessionId?: string;
+  now?: number;
 }
 
 /**
@@ -58,12 +70,56 @@ export function recordApplicationOutcome(
   }
 
   const utility = ensureUtility(entry);
+  const now = options.now ?? Date.now();
+  const nowIso = new Date(now).toISOString();
+
   utility.application_count++;
-  utility.last_applied_at = new Date().toISOString();
+  utility.last_applied_at = nowIso;
 
   if (options.success) {
     utility.successful_applications++;
     entry.reinforcement = (entry.reinforcement ?? 0) + 1;
+
+    // T-313: Decay strikes via 2 clean runs
+    utility.clean_runs_since_regression = (utility.clean_runs_since_regression ?? 0) + 1;
+    if (utility.clean_runs_since_regression >= 2 && (utility.regression_strikes ?? 0) > 0) {
+      utility.regression_strikes = Math.max(0, (utility.regression_strikes ?? 0) - 1);
+      utility.clean_runs_since_regression = 0;
+      if (store.memoryDir) {
+        recordAuditEvent(store.memoryDir, {
+          operation: "strike_decay",
+          entry_id: entry.id,
+          project: entry.project,
+          actor: options.actor ?? "agent",
+          details: {
+            reason: "clean_runs",
+            remaining_strikes: utility.regression_strikes,
+          },
+        });
+      }
+    }
+
+    // T-313: Decay strikes via 30 days elapsed without recurring failure
+    if (utility.last_regression_at && (utility.regression_strikes ?? 0) > 0) {
+      const daysSinceRegression = (now - Date.parse(utility.last_regression_at)) / 86_400_000;
+      if (daysSinceRegression >= 30) {
+        utility.regression_strikes = Math.max(0, (utility.regression_strikes ?? 0) - 1);
+        utility.last_regression_at = nowIso;
+        if (store.memoryDir) {
+          recordAuditEvent(store.memoryDir, {
+            operation: "strike_decay",
+            entry_id: entry.id,
+            project: entry.project,
+            actor: options.actor ?? "agent",
+            details: {
+              reason: "time_elapsed",
+              days: daysSinceRegression,
+              remaining_strikes: utility.regression_strikes,
+            },
+          });
+        }
+      }
+    }
   } else {
     utility.failed_applications++;
     entry.reinforcement = Math.max(-5, (entry.reinforcement ?? 0) - 1);
@@ -72,9 +128,55 @@ export function recordApplicationOutcome(
   if (options.regression) {
     utility.regressions++;
     entry.reinforcement = Math.max(-10, (entry.reinforcement ?? 0) - 2);
-    // If multiple regressions occur, automatically flag as disputed
-    if (utility.regressions >= 3 && entry.status === "confirmed") {
+
+    // T-313: Session deduplication: at most 1 strike per session
+    const isNewSession = !options.sessionId || utility.last_regression_session !== options.sessionId;
+    if (isNewSession) {
+      utility.regression_strikes = (utility.regression_strikes ?? 0) + 1;
+      utility.last_regression_session = options.sessionId;
+      utility.last_regression_at = nowIso;
+      utility.clean_runs_since_regression = 0;
+
+      if (store.memoryDir) {
+        recordAuditEvent(store.memoryDir, {
+          operation: "regression_strike",
+          entry_id: entry.id,
+          project: entry.project,
+          actor: options.actor ?? "agent",
+          details: {
+            strikes: utility.regression_strikes,
+            sessionId: options.sessionId,
+            notes: options.notes,
+          },
+        });
+      }
+    }
+
+    // T-313: Demotion check: 3 corroborated strikes required + constitutional immunity
+    const isImmune =
+      entry.type === "constraint" ||
+      entry.temporal_mode === "timeless" ||
+      (entry.salience ?? 0) >= 0.95;
+
+    if ((utility.regression_strikes ?? 0) >= 3 && !isImmune && entry.status === "confirmed") {
       entry.status = "disputed";
+      const disputer = options.actor ?? "automated_regression_sentry";
+      entry.disputed_by = Array.isArray(entry.disputed_by)
+        ? [...new Set([...entry.disputed_by, disputer])]
+        : [disputer];
+      if (store.memoryDir) {
+        recordAuditEvent(store.memoryDir, {
+          operation: "dispute_triggered",
+          entry_id: entry.id,
+          project: entry.project,
+          actor: options.actor ?? "automated_regression_sentry",
+          details: {
+            strikes: utility.regression_strikes,
+            regressions: utility.regressions,
+            notes: options.notes,
+          },
+        });
+      }
     }
   }
 

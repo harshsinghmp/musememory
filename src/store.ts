@@ -2,25 +2,36 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, Verification, GraphMetadata } from "./types.ts";
-import { scanSecrets } from "./secrets.ts";
-import { recordAuditEvent } from "./audit.ts";
+import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor } from "./types.ts";
+import { scanSecrets, redactSecrets } from "./secrets.ts";
+import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
+import { stripInjectedContextBlocks } from "./security/strip.ts";
 import { autoStampGraphMetadata } from "./graph.ts";
 import { workspaceRootFor } from "./root.ts";
+import { loadSources } from "./provenance.ts";
 import {
   openDatabase,
   insertOrReplaceMemory,
   getMemoryById,
+  getMemoryByIdempotencyKey,
+  getMemoryByContentHash,
   listMemories,
-  deleteMemoryById,
+  searchMemoriesFts,
+  insertFactProvenance,
+  getFactProvenanceRow,
+  listFactProvenanceRows,
   type SqliteDatabase,
+  type FtsSearchHits,
 } from "./sqlite.ts";
+import { runMigrations } from "./migrate.ts";
 import { getOrCreateStoreCache, type MemoryStoreCache } from "./cache.ts";
+import { initEmbedTables } from "./retrieval/embedders.ts";
 import {
   computeFingerprint,
+  computeContentHash,
   inferTemporalMode,
   determineQuality,
   ensureUtility,
@@ -28,8 +39,122 @@ import {
   consolidateIntoCanonical,
   detectConflict,
   flagConflict,
+  resolveConflict,
+  calculateRetentionScore,
+  listConflicts,
+  getConflict,
+  recordConflict,
+  type ConflictRecord,
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  normalizeTerm,
+  canonicalizeRelation,
+  canonicalizeScope,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
 } from "./quality/index.ts";
+import {
+  isDraftMemory,
+  ensureDraftTitle,
+  stripDraftTitle,
+  promoteDraft,
+} from "./drafts.ts";
+export {
+  isDraftMemory,
+  ensureDraftTitle,
+  stripDraftTitle,
+  promoteDraft,
+};
+export {
+  detectConflict,
+  flagConflict,
+  resolveConflict,
+  listConflicts,
+  getConflict,
+  recordConflict,
+  type ConflictRecord,
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+};
+import {
+  initiateFederationHandshake,
+  processFederationHandshake,
+  getConflictDedupKey,
+  computeConflictsChecksum,
+  type FederationHandshakePacket,
+  type FederationHandshakeResult,
+} from "./sync/index.ts";
+export {
+  initiateFederationHandshake,
+  processFederationHandshake,
+  getConflictDedupKey,
+  computeConflictsChecksum,
+  type FederationHandshakePacket,
+  type FederationHandshakeResult,
+};
+import { recoverStaleLocks } from "./outbox.ts";
+export * from "./outbox.ts";
+import { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError } from "./lock.ts";
+export { withStoreLock, acquireStoreLock, releaseStoreLock, StoreLockError };
+import { getStoreCircuitBreaker, CircuitBreaker } from "./circuit.ts";
+export { getStoreCircuitBreaker, CircuitBreaker };
+import {
+  computeDecayScore,
+  computeDefaultExpiresAt,
+  loadExpiryPolicyYaml,
+  evaluateExpiryPolicy,
+  applyExpiryPolicy,
+  parseExpiryPolicyYaml,
+} from "./retention.ts";
+export {
+  loadExpiryPolicyYaml,
+  parseExpiryPolicyYaml,
+  evaluateExpiryPolicy,
+  applyExpiryPolicy,
+};
+import { registerWriteWorker, drainWriteWorkers } from "./async_workers.ts";
+export { registerWriteWorker, drainWriteWorkers };
+import { touchActivity } from "./optimize.ts";
 import type { TemporalMode, MemoryQuality, MemoryUtility, EvidenceItem } from "./types.ts";
+
+export interface StorageLayoutOptions {
+  /** T-153: Optional tenant / member ID for per-tenant SQLite DB files (e.g. 'alice' -> 'tenant_alice.db') */
+  tenantId?: string;
+  /** T-153: Direct database filename or path override (e.g. 'custom.db') */
+  dbName?: string;
+  /** T-153: Designate as shared team store (uses 'team.db') */
+  isTeam?: boolean;
+}
+
+/**
+ * T-153: Map tenant options to target database filename.
+ * Defaults to 'memory.db', team mode to 'team.db', and tenants to 'tenant_<id>.db'.
+ */
+export function resolveDbFilename(options?: StorageLayoutOptions): string {
+  if (options?.dbName) {
+    const raw = options.dbName.trim();
+    return raw.endsWith(".db") ? raw : `${raw}.db`;
+  }
+  if (options?.isTeam) {
+    return "team.db";
+  }
+  if (options?.tenantId) {
+    const raw = options.tenantId.trim();
+    if (raw === "team") return "team.db";
+    return raw.startsWith("tenant_") ? (raw.endsWith(".db") ? raw : `${raw}.db`) : `tenant_${raw}.db`;
+  }
+  const envTenant = process.env.MUSE_TENANT_ID || process.env.MUSE_TENANT;
+  if (envTenant) {
+    const raw = envTenant.trim();
+    if (raw === "team") return "team.db";
+    return raw.startsWith("tenant_") ? (raw.endsWith(".db") ? raw : `${raw}.db`) : `tenant_${raw}.db`;
+  }
+  return "memory.db";
+}
 
 export interface StorageLayout {
   root: string;
@@ -39,18 +164,36 @@ export interface StorageLayout {
   currentMd: string;
   userMd: string;
   auditJsonl: string;
+  /** T-153: Active tenant or team identifier if operating in multi-DB mode. */
+  tenantId?: string;
 }
 
-export function getStorageLayout(memoryDir: string): StorageLayout {
+export function getStorageLayout(memoryDir: string, options?: StorageLayoutOptions): StorageLayout {
+  const dbFile = resolveDbFilename(options);
+  const tenantId = options?.tenantId ?? (options?.isTeam ? "team" : undefined);
+  const tenantSuffix = tenantId && tenantId !== "team" ? `_${tenantId.replace(/^tenant_/, "")}` : "";
+  const memoriesDir =
+    tenantId && tenantId !== "team"
+      ? join(memoryDir, `memories${tenantSuffix}`)
+      : join(memoryDir, "memories");
+
   return {
     root: workspaceRootFor(memoryDir),
     memoryDir,
-    memoriesDir: join(memoryDir, "memories"),
-    dbPath: join(memoryDir, "memory.db"),
+    memoriesDir,
+    dbPath: join(memoryDir, dbFile),
     currentMd: join(memoryDir, "CURRENT.md"),
     userMd: join(memoryDir, "USER.md"),
-    auditJsonl: join(memoryDir, "audit.jsonl"),
+    auditJsonl: join(memoryDir, tenantId ? `audit${tenantSuffix}.jsonl` : "audit.jsonl"),
+    tenantId,
   };
+}
+
+export interface StoreOptions extends StorageLayoutOptions {
+  /** T-023: Skip syncing working constraints on open (e.g. read-only operations). */
+  skipSyncConstraints?: boolean;
+  /** T-023: Skip automatic wiki re-compilation on open. */
+  skipAutoWiki?: boolean;
 }
 
 export interface Store {
@@ -59,23 +202,205 @@ export interface Store {
   layout?: StorageLayout;
   db?: SqliteDatabase;
   cache?: MemoryStoreCache;
+  circuit?: CircuitBreaker;
+  tenantId?: string;
 }
 
-/** Open the memories directory & SQLite primary database for a memory dir, creating it if missing. */
-export function openStore(memoryDir: string): Store {
-  const layout = getStorageLayout(memoryDir);
+export class IdempotencyConflictError extends Error {
+  constructor(
+    public readonly idempotencyKey: string,
+    public readonly existingEntryId: string,
+    message?: string,
+  ) {
+    super(
+      message ||
+        `Idempotency conflict: key '${idempotencyKey}' already used with divergent content for memory '${existingEntryId}'`,
+    );
+    this.name = "IdempotencyConflictError";
+  }
+}
+
+// --- T-030: tombstone marker ------------------------------------------------------
+// Shape: two nullable columns on `memories`, `deleted_at` / `deleted_by` (migration v2).
+// NULL = live. Set = soft-deleted: the row, its YAML mirror and its audit event all survive,
+// and only the read paths stop surfacing it. Deliberately NOT an entry field, so a tombstoned
+// row cannot leak the marker into schema.json validation or the YAML/JSON export shape.
+
+/** Ids carrying a tombstone marker. Empty without a SQLite primary (nothing can be tombstoned). */
+function tombstonedIds(store: Store): Set<string> {
+  if (!store.db) return new Set();
+  try {
+    return new Set(
+      store.db
+        .query<{ id: string }>(`SELECT id FROM memories WHERE deleted_at IS NOT NULL`)
+        .all()
+        .map((r) => r.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function isTombstoned(store: Store, id: string): boolean {
+  if (!store.db) return false;
+  try {
+    const row = store.db
+      .query<{ c: number }>(`SELECT count(*) AS c FROM memories WHERE id = ? AND deleted_at IS NOT NULL`)
+      .get([id]);
+    return (row?.c ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Write or clear the marker. Must run AFTER `save()` in the same transaction: INSERT OR
+ * REPLACE rewrites the row and drops any column the writer does not know about.
+ */
+function setTombstone(store: Store, id: string, marker: { at: string; by: string } | null): void {
+  if (!store.db) return;
+  store.db.run(
+    marker
+      ? `UPDATE memories SET deleted_at = ?, deleted_by = ? WHERE id = ?`
+      : `UPDATE memories SET deleted_at = NULL, deleted_by = NULL WHERE id = ?`,
+    marker ? [marker.at, marker.by, id] : [id],
+  );
+}
+
+const openWriteTx = new WeakSet<SqliteDatabase>();
+
+/**
+ * T-025: run a multi-statement write path as one SQLite commit instead of one commit
+ * per statement. Re-entrant per connection — a nested call (get() inside list()) or a
+ * caller-owned transaction (optimizeStore, health/reconcile) is joined, not restarted.
+ */
+function withTransaction<T>(db: SqliteDatabase | undefined, fn: () => T): T {
+  if (!db || openWriteTx.has(db)) return fn();
+  let began = false;
+  openWriteTx.add(db);
+  try {
+    try {
+      db.exec("BEGIN IMMEDIATE");
+      began = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/within a transaction/i.test(msg)) throw err;
+      began = false; // a transaction is already open on this connection — join it
+    }
+    const out = fn();
+    if (began) db.exec("COMMIT");
+    return out;
+  } catch (err) {
+    if (began) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {}
+    }
+    throw err;
+  } finally {
+    openWriteTx.delete(db);
+  }
+}
+
+/**
+ * T-020: SQLite's total change counter moves on every committed write, including
+ * writes that never touch the memories directory. Used as the query-cache write
+ * generation so a cached result is never served after a write.
+ */
+function dbWriteGeneration(db: SqliteDatabase | undefined): number | undefined {
+  if (!db) return undefined;
+  try {
+    return db.query<{ t: number }>(`SELECT total_changes() AS t`).get()?.t;
+  } catch {
+    return undefined;
+  }
+}
+
+function getStoreMemoriesFingerprint(store: Store): string {
+  if (store.db) {
+    try {
+      const row = store.db.query<{ count: number; max_up: string }>(
+        `SELECT count(*) AS count, coalesce(max(updated_at), '') AS max_up FROM memories`
+      ).get();
+      if (row) return `${row.count}:${row.max_up}`;
+    } catch {}
+  }
+  if (existsSync(store.dir)) {
+    try {
+      return `dir:${statSync(store.dir).mtimeMs}`;
+    } catch {}
+  }
+  return "none";
+}
+
+interface StoreDirtyState {
+  lastWikiFingerprint?: string;
+  lastConstraintsFingerprint?: string;
+  lastConstraintsMtimeMs?: number;
+}
+
+const storeDirtyStateRegistry = new Map<string, StoreDirtyState>();
+
+/**
+ * Resets the in-process dirty gate state for a memory directory (or all directories).
+ * Useful for test isolation or forced recompilation.
+ */
+export function resetStoreDirtyState(memoryDir?: string): void {
+  if (memoryDir) {
+    for (const key of storeDirtyStateRegistry.keys()) {
+      if (key === memoryDir || key.startsWith(memoryDir)) {
+        storeDirtyStateRegistry.delete(key);
+      }
+    }
+  } else {
+    storeDirtyStateRegistry.clear();
+  }
+}
+
+/**
+ * Open the memories directory & SQLite primary database for a memory dir, creating it if missing.
+ * T-153: Supports multi-DB topologies (e.g. options.tenantId, options.isTeam, options.dbName).
+ */
+export function openStore(memoryDir: string, options?: StoreOptions): Store {
+  const layout = getStorageLayout(memoryDir, options);
   mkdirSync(layout.memoriesDir, { recursive: true });
   mkdirSync(memoryDir, { recursive: true });
 
   let db: SqliteDatabase | undefined;
   try {
-    db = openDatabase(layout.dbPath);
+    const opened = openDatabase(layout.dbPath);
+    // T-368: additive ALTERs for stores created by an older build. No rollback code —
+    // the YAML mirror (which openStore rehydrates into SQLite below) is the rollback.
+    runMigrations(opened);
+    // T-042: Stale-lock recovery sweep on store open (300s expiration)
+    try {
+      recoverStaleLocks(opened, 300);
+    } catch {}
+    db = opened;
   } catch (err) {
     // If SQLite initialization fails on unusual environment, fallback gracefully
   }
 
-  const cache = getOrCreateStoreCache(memoryDir);
-  const store: Store = { dir: layout.memoriesDir, memoryDir, layout, db, cache };
+  // T-153: Key cache and circuit breaker by dbPath to isolate per-tenant and team databases
+  const cacheKey = layout.dbPath;
+  const cache = getOrCreateStoreCache(cacheKey);
+  const circuit = getStoreCircuitBreaker(cacheKey);
+  const store: Store = {
+    dir: layout.memoriesDir,
+    memoryDir,
+    layout,
+    db,
+    cache,
+    circuit,
+    tenantId: layout.tenantId,
+  };
+
+  // R21: ensure the embedding vector + pipeline-fingerprint tables exist.
+  if (db) {
+    try {
+      initEmbedTables(db);
+    } catch {}
+  }
 
   // Fast startup sync: only sync YAML files into SQLite database if DB is empty or missing entries
   if (db && existsSync(layout.memoriesDir)) {
@@ -84,24 +409,61 @@ export function openStore(memoryDir: string): Store {
       const memCount = memCountRow?.count ?? 0;
       if (memCount === 0) {
         const yamlFiles = readdirSync(layout.memoriesDir).filter((f) => f.endsWith(".yaml"));
-        for (const f of yamlFiles) {
-          const yId = f.slice(0, -5);
-          const entry = getFromYaml(store, yId);
-          if (entry) {
-            insertOrReplaceMemory(db, entry);
-            cache.setEntry(entry);
+        // T-025: one commit for the whole rehydrate, not three per entry.
+        withTransaction(db, () => {
+          for (const f of yamlFiles) {
+            const yId = f.slice(0, -5);
+            const entry = getFromYaml(store, yId);
+            if (entry) {
+              insertOrReplaceMemory(db!, entry);
+              cache.setEntry(entry);
+            }
           }
-        }
+        });
       }
     } catch {}
   }
 
-  try {
-    syncConstraints(memoryDir, store);
-  } catch {}
-  try {
-    autoCompileWiki(store, memoryDir);
-  } catch {}
+  // T-023: Dirty-gated constraint synchronization and wiki compilation
+  const dirtyKey = layout.dbPath || memoryDir;
+  let dirtyState = storeDirtyStateRegistry.get(dirtyKey);
+  if (!dirtyState) {
+    dirtyState = {};
+    storeDirtyStateRegistry.set(dirtyKey, dirtyState);
+  }
+
+  const currentFingerprint = getStoreMemoriesFingerprint(store);
+
+  if (!options?.skipSyncConstraints) {
+    const currentMdPath = join(memoryDir, "CURRENT.md");
+    const currentMtime = existsSync(currentMdPath) ? statSync(currentMdPath).mtimeMs : 0;
+    const isConstraintsClean =
+      dirtyState.lastConstraintsFingerprint !== undefined &&
+      dirtyState.lastConstraintsFingerprint === currentFingerprint &&
+      dirtyState.lastConstraintsMtimeMs === currentMtime;
+
+    if (!isConstraintsClean) {
+      try {
+        syncConstraints(memoryDir, store);
+        dirtyState.lastConstraintsFingerprint = getStoreMemoriesFingerprint(store);
+        dirtyState.lastConstraintsMtimeMs = existsSync(currentMdPath) ? statSync(currentMdPath).mtimeMs : 0;
+      } catch {}
+    }
+  }
+
+  if (!options?.skipAutoWiki) {
+    const isWikiClean =
+      dirtyState.lastWikiFingerprint !== undefined &&
+      dirtyState.lastWikiFingerprint === currentFingerprint;
+
+    if (!isWikiClean) {
+      try {
+        autoCompileWiki(store, memoryDir);
+        dirtyState.lastWikiFingerprint = getStoreMemoriesFingerprint(store);
+      } catch {}
+    }
+  }
+
   return store;
 }
 
@@ -167,7 +529,44 @@ function getFromYaml(store: Store, id: string): MemoryEntry | null {
   }
 }
 
+/** R23: Track access timestamp and count on retrieval (used by retention scoring). */
+export function recordAccess(store: Store, entry: MemoryEntry): MemoryEntry {
+  const now = nowIso();
+  const currentCount = entry.access_count ?? 0;
+  entry.last_accessed_at = now;
+  entry.access_count = currentCount + 1;
+  if (store.db) {
+    try {
+      store.db.run(
+        `UPDATE memories SET last_accessed_at = ?, access_count = ?, updated_at = ? WHERE id = ?`,
+        [now, entry.access_count, entry.updated_at, entry.id],
+      );
+    } catch {}
+  }
+  return entry;
+}
+
 export function get(store: Store, id: string): MemoryEntry | null {
+  if (store.circuit?.isDegraded()) {
+    return store.cache?.getEntry(id) ?? null;
+  }
+  // T-030: a tombstoned entry is invisible to reads even though its row and YAML survive.
+  if (isTombstoned(store, id)) return null;
+  try {
+    const entry = readEntry(store, id);
+    if (entry) store.circuit?.recordSuccess();
+    return entry ? recordAccess(store, entry) : null;
+  } catch (err) {
+    store.circuit?.recordFailure(err);
+    if (store.circuit?.isDegraded()) {
+      return store.cache?.getEntry(id) ?? null;
+    }
+    throw err;
+  }
+}
+
+/** `get()` minus the tombstone gate and the access bookkeeping: the raw stored entry. */
+function readEntry(store: Store, id: string): MemoryEntry | null {
   const file = fileForId(store, id);
   let fileMtime: number | undefined;
 
@@ -191,8 +590,9 @@ export function get(store: Store, id: string): MemoryEntry | null {
     }
 
     if (store.db) {
+      // T-025: row + FTS sync in one commit.
       try {
-        insertOrReplaceMemory(store.db, fromYaml);
+        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, fromYaml));
       } catch {}
     }
     if (store.cache) {
@@ -232,9 +632,16 @@ export function list(
     } catch {}
   }
 
-  // 1. Check L0 query cache
+  // T-055: If circuit breaker is open (degraded mode), return cache without crashing
+  if (store.circuit?.isDegraded()) {
+    const cached = store.cache?.getQuery(cacheKey, dirMtime);
+    return cached ?? [];
+  }
+
+  // 1. Check L0 query cache. T-020: the write generation guards against writes the
+  // dir mtime cannot see (coarse mtimes, SQLite-only writes).
   if (store.cache) {
-    const cached = store.cache.getQuery(cacheKey, dirMtime);
+    const cached = store.cache.getQuery(cacheKey, dirMtime, dbWriteGeneration(store.db));
     if (cached) return cached;
   }
 
@@ -246,24 +653,27 @@ export function list(
     if (existsSync(store.dir)) {
       const dbIds = new Set(entries.map((e) => e.id));
       const diskFiles = readdirSync(store.dir);
-      for (const f of diskFiles) {
-        if (f.endsWith(".yaml")) {
-          const diskId = f.slice(0, -5);
-          if (!dbIds.has(diskId)) {
-            const externalEntry = get(store, diskId);
-            if (externalEntry) {
-              try {
-                insertOrReplaceMemory(store.db, externalEntry);
-              } catch {}
-              let matches = true;
-              if (filters?.project && externalEntry.project !== filters.project) matches = false;
-              if (filters?.type && externalEntry.type !== filters.type) matches = false;
-              if (filters?.status && externalEntry.status !== filters.status) matches = false;
-              if (matches) entries.push(externalEntry);
+      // T-025: reconcile the whole batch as one commit instead of three per file.
+      withTransaction(store.db, () => {
+        for (const f of diskFiles) {
+          if (f.endsWith(".yaml")) {
+            const diskId = f.slice(0, -5);
+            if (!dbIds.has(diskId)) {
+              const externalEntry = get(store, diskId);
+              if (externalEntry) {
+                try {
+                  insertOrReplaceMemory(store.db!, externalEntry);
+                } catch {}
+                let matches = true;
+                if (filters?.project && externalEntry.project !== filters.project) matches = false;
+                if (filters?.type && externalEntry.type !== filters.type) matches = false;
+                if (filters?.status && externalEntry.status !== filters.status) matches = false;
+                if (matches) entries.push(externalEntry);
+              }
             }
           }
         }
-      }
+      });
     }
   } else {
     // Fallback: file scan if SQLite is unavailable
@@ -277,14 +687,43 @@ export function list(
     if (filters?.status) entries = entries.filter((e) => e.status === filters.status);
   }
 
+  // T-030: tombstoned rows stay queryable for audit and replay but never surface here, which
+  // is also what keeps recall (queryContext), rankAndRetrieveMemories and hybridSearch out.
+  const tombstones = tombstonedIds(store);
+  if (tombstones.size > 0) entries = entries.filter((e) => !tombstones.has(e.id));
+
   if (store.cache) {
-    store.cache.setQuery(cacheKey, entries, undefined, dirMtime);
     for (const e of entries) {
       store.cache.setEntry(e);
     }
+    // Cache the query result last: setEntry() invalidates the query cache, so
+    // caching it first would self-destruct. Stamped with the post-write generation
+    // so results computed before a reconciliation write are never served (T-020).
+    store.cache.setQuery(cacheKey, entries, undefined, dirMtime, dbWriteGeneration(store.db));
   }
 
   return entries;
+}
+
+/**
+ * T-037: Fast integer count of stored memories without loading, parsing, or allocating all entries.
+ */
+export function countMemories(store: Store): number {
+  if (store.circuit?.isDegraded() && store.cache) {
+    return store.cache.size();
+  }
+  if (store.db) {
+    try {
+      const row = store.db.query<{ count: number }>(
+        `SELECT COUNT(*) as count FROM memories WHERE (deleted_at IS NULL OR deleted_at = '')`,
+      ).get();
+      if (row && typeof row.count === "number") return row.count;
+    } catch {}
+  }
+  if (store.cache && store.cache.size() > 0) {
+    return store.cache.size();
+  }
+  return list(store).length;
 }
 
 /** Helper to extract all scannable text from a memory entry. */
@@ -303,37 +742,73 @@ export function extractEntryText(entry: Partial<MemoryEntry>): string {
 }
 
 /** Atomic write: SQLite primary database + dual YAML file sync. Validates secrets before writing. */
-export function save(store: Store, entry: MemoryEntry, options: { skipSecretCheck?: boolean } = {}): void {
-  if (!options.skipSecretCheck) {
-    const textToScan = extractEntryText(entry);
-    const secrets = scanSecrets(textToScan);
-    if (secrets.length > 0) {
-      throw new Error(`Secret detected during save: ${secrets.join(", ")}`);
+export function save(store: Store, entry: MemoryEntry, options: { skipSecretCheck?: boolean; lock?: boolean } = {}): void {
+  const doSave = () => {
+    if (!options.skipSecretCheck) {
+      const textToScan = extractEntryText(entry);
+      const secrets = scanSecrets(textToScan);
+      if (secrets.length > 0) {
+        throw new Error(`Secret detected during save: ${secrets.join(", ")}`);
+      }
     }
-  }
 
-  // 1. Primary write to SQLite database
-  if (store.db) {
-    insertOrReplaceMemory(store.db, entry);
-  }
+    // T-074: Ensure decay_score is calculated via importance-gated half-life
+    if (entry.decay_score === undefined) {
+      entry.decay_score = computeDecayScore(entry);
+    }
 
-  // 2. Dual write to YAML file for exportability
-  let mtimeMs: number | undefined;
-  try {
-    const file = fileForId(store, entry.id);
-    const tmp = `${file}.tmp`;
-    writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
-    renameSync(tmp, file);
+    // 1. Primary write to SQLite database
+    if (store.db) {
+      try {
+        // T-025: memories row + FTS delete/insert as a single commit.
+        withTransaction(store.db, () => {
+          insertOrReplaceMemory(store.db!, entry);
+          recordFactProvenance(store, entry);
+        });
+        store.circuit?.recordSuccess();
+      } catch (err) {
+        store.circuit?.recordFailure(err);
+        throw err;
+      }
+    }
+
+    // 2. Dual write to YAML file for exportability
+    let mtimeMs: number | undefined;
     try {
-      mtimeMs = statSync(file).mtimeMs;
-    } catch {}
-  } catch (err: unknown) {
-    console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+      const file = fileForId(store, entry.id);
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
+      renameSync(tmp, file);
+      try {
+        mtimeMs = statSync(file).mtimeMs;
+      } catch {}
+    } catch (err: unknown) {
+      console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+    }
+
+    // 3. L0 Cache update with mtime
+    if (store.cache) {
+      store.cache.setEntry(entry, undefined, mtimeMs);
+    }
+
+    // T-304: Incrementally upsert into vector index.json if present
+    if (store.memoryDir) {
+      try {
+        const { upsertIndexEntry } = require("./vector.ts");
+        upsertIndexEntry(entry, store.memoryDir);
+      } catch {}
+    }
+  };
+
+  if (options.lock && store.memoryDir) {
+    withStoreLock(store.memoryDir, doSave);
+  } else {
+    doSave();
   }
 
-  // 3. L0 Cache update with mtime
-  if (store.cache) {
-    store.cache.setEntry(entry, undefined, mtimeMs);
+  // T-029: Touch optimization activity on store writes
+  if (store.memoryDir) {
+    touchActivity(store.memoryDir);
   }
 }
 
@@ -363,10 +838,34 @@ function normalizeIdArray(val: string | string[] | null | undefined): string[] {
   return val;
 }
 
-/** Bi-temporal close-out: stamp valid_to once and decrement reinforcement. */
-function closeOutValidity(entry: MemoryEntry): void {
-  if (!entry.valid_to) entry.valid_to = nowIso();
+/** Bi-temporal close-out: stamp valid_to once and decrement reinforcement. (T-082) */
+export function closeOutValidity(entry: MemoryEntry, options?: { valid_to_exact?: boolean; valid_to?: string }): void {
+  if (!entry.valid_to) entry.valid_to = options?.valid_to ?? nowIso();
+  if (options?.valid_to_exact !== undefined) {
+    entry.valid_to_exact = options.valid_to_exact;
+  } else if (entry.valid_to_exact === undefined) {
+    entry.valid_to_exact = false;
+  }
   entry.reinforcement = (entry.reinforcement ?? 0) - 1;
+}
+
+/**
+ * T-075: Derives provenance trust tier from source or explicit parameter.
+ * - trusted: user, human, manual, direct, owner, admin, principal
+ * - untrusted: web, external, third-party, unknown, scrape, url, crawler
+ * - candidate: agent, transcript, inference, distillation, session, assistant
+ */
+export function deriveTrustTier(source?: string, explicitTrust?: TrustTier): TrustTier {
+  if (explicitTrust) return explicitTrust;
+  if (!source) return "candidate";
+  const s = source.toLowerCase().trim();
+  if (["t1", "trusted", "user", "human", "manual", "direct", "owner", "admin", "principal"].includes(s)) {
+    return "trusted";
+  }
+  if (["t4", "untrusted", "web", "external", "third-party", "unknown", "scrape", "url", "crawler"].includes(s)) {
+    return "untrusted";
+  }
+  return "candidate";
 }
 
 /** Create a new entry. Defaults: status candidate, type discovery, verification unverified. */
@@ -386,22 +885,66 @@ export function propose(
     salience?: number;
     validFrom?: string;
     validTo?: string;
-    dueAt?: string;
-    expiresAt?: string;
+    validToExact?: boolean;
     valid_from?: string;
     valid_to?: string;
+    valid_to_exact?: boolean;
+    /** T-090: Original timestamp of underlying evidence or source document. */
+    src_ts?: string;
+    srcTs?: string;
+    dueAt?: string;
+    expiresAt?: string | null;
     due_at?: string;
-    expires_at?: string;
+    expires_at?: string | null;
+    createdAt?: string;
+    created_at?: string;
+    updatedAt?: string;
+    updated_at?: string;
+    /** T-078 & T-080: Pin status exempting memory from expiration policies. */
+    pinned?: boolean;
+    /** T-078: Enable automatic per-type default expiration calculation even when type is default. */
+    autoExpire?: boolean;
     test_command?: string;
     graph?: GraphMetadata;
     fingerprint?: string;
     temporal_mode?: TemporalMode;
     quality?: MemoryQuality;
     utility?: MemoryUtility;
+    reinforcement?: number;
     evidence?: EvidenceItem[];
     conflict_ids?: string[];
     dedup?: boolean;
     checkConflict?: boolean;
+    /** R23: Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry"). */
+    mem_path?: string;
+    /** T-038: Unique idempotency key to prevent duplicate writes during retries. */
+    idempotency_key?: string;
+    /** T-040: Normalized content hash for fast SQLite deduplication. */
+    content_hash?: string;
+    /** T-075: Provenance trust tier override. */
+    trust?: TrustTier;
+    /** T-104: Skip retention gate for internal migrations or tests. */
+    skipRetentionGate?: boolean;
+    /** T-391: Citation source IDs referencing sources in sources.json. */
+    source_ids?: string[];
+    /** T-095: Explicit write-time linked memory IDs. */
+    linked_memory_ids?: string[];
+    linkedMemoryIds?: string[];
+    /** T-095: Whether to auto-seed write-time linked memory IDs if omitted (default: true). */
+    autoLink?: boolean;
+    session_id?: string;
+    /** T-096: Prior memory ID(s) superseded by this proposal (supersede-not-delete). */
+    supersedes?: string | string[];
+    /** T-100: Lineage foreign key for superseded memory ID. */
+    supersedes_id?: string | null;
+    /** T-100: Lineage foreign key for conflicting memory ID. */
+    conflicts_with_id?: string | null;
+    /** T-087 & T-099: Semantic fact triples for scoped invalidation and fact_provenance. */
+    triples?: SemanticFactTriple[];
+    /** T-128: Draft flag marking preliminary memory, kept isolated from confident answers. */
+    draft?: boolean;
+    /** First-class code anchors linking memory to files and symbols. */
+    anchors?: CodeAnchor[];
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -411,11 +954,66 @@ export function propose(
     throw new Error("Cannot propose memory entry with empty project");
   }
 
-  const title = (opts.title ?? opts.content.slice(0, 120)).slice(0, 120);
+  // T-110: Strip <memory-context> and injected context blocks before capture
+  const cleanContent = stripInjectedContextBlocks(opts.content);
+  if (!cleanContent || !cleanContent.trim()) {
+    throw new Error("Cannot propose memory entry consisting entirely of injected context blocks or empty content");
+  }
 
-  // Deduplication check: consolidate into canonical memory if exact duplicate exists
+  // T-038 & T-039: Idempotency key handling (retry -> 0 writes; divergent retry -> named conflict)
+  if (opts.idempotency_key && store.db) {
+    const existing = getMemoryByIdempotencyKey(store.db, opts.idempotency_key);
+    if (existing) {
+      const incomingHash = opts.content_hash ?? computeContentHash(cleanContent);
+      const existingHash = existing.content_hash || computeContentHash(existing.content);
+      if (existingHash === incomingHash) {
+        return existing;
+      } else {
+        throw new IdempotencyConflictError(opts.idempotency_key, existing.id);
+      }
+    }
+  }
+
+  const isDraft = Boolean(opts.draft || (opts.title && opts.title.startsWith("[DRAFT]")));
+  const rawTitle = opts.title ?? cleanContent.slice(0, 120);
+  const title = isDraft ? ensureDraftTitle(rawTitle).slice(0, 140) : rawTitle.slice(0, 120);
+  const content_hash = opts.content_hash ?? computeContentHash(cleanContent);
+
+  // T-104: Retention admission gate
+  const retention = calculateRetentionScore(cleanContent, {
+    title,
+    tags: opts.tags,
+    salience: opts.salience,
+    type: opts.type,
+    confirmed: opts.confirmed,
+  });
+  if (!opts.skipRetentionGate && !retention.passed) {
+    throw new Error(`Retention gate rejected write (score ${retention.score.toFixed(2)} < 0.30): ${retention.reason}`);
+  }
+
+  // T-391: Citation grounding validation against live registry
+  if (opts.source_ids && opts.source_ids.length > 0) {
+    const existingSources = store.memoryDir ? loadSources(store.memoryDir) : [];
+    const existingIds = new Set(existingSources.map((s) => s.id));
+    for (const srcId of opts.source_ids) {
+      if (!existingIds.has(srcId)) {
+        throw new Error(`Grounding failure: unknown source_id "${srcId}" in memory citation`);
+      }
+    }
+  }
+
+  // Deduplication check: consolidate into canonical memory if exact duplicate exists (T-040)
   if (opts.dedup) {
-    const dupes = findDuplicates(store, { title, content: opts.content, project: opts.project });
+    if (store.db) {
+      const dupe = getMemoryByContentHash(store.db, content_hash, opts.project);
+      if (dupe) {
+        return consolidateIntoCanonical(store, dupe.id, {
+          source: opts.source,
+          evidence: opts.evidence?.[0],
+        });
+      }
+    }
+    const dupes = findDuplicates(store, { title, content: cleanContent, project: opts.project });
     if (dupes.exact) {
       return consolidateIntoCanonical(store, dupes.exact.id, {
         source: opts.source,
@@ -427,7 +1025,7 @@ export function propose(
   const secrets = scanSecrets(
     extractEntryText({
       title,
-      content: opts.content,
+      content: cleanContent,
       tags: opts.tags,
       verification: opts.verification,
     }),
@@ -437,25 +1035,136 @@ export function propose(
   }
 
   const now = nowIso();
-  const fingerprint = opts.fingerprint ?? computeFingerprint(title, opts.content);
-  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, opts.content, opts.type);
+  const createdAt = opts.createdAt ?? opts.created_at ?? now;
+  const updatedAt = opts.updatedAt ?? opts.updated_at ?? now;
+  const fingerprint = opts.fingerprint ?? computeFingerprint(title, cleanContent);
+  const temporal_mode = opts.temporal_mode ?? inferTemporalMode(title, cleanContent, opts.type);
+  const trust = deriveTrustTier(opts.source, opts.trust);
+
+  // T-090: src_ts evidence-age stamping (derive from explicit option or evidence items)
+  let src_ts = opts.src_ts ?? opts.srcTs;
+  if (!src_ts && opts.evidence && opts.evidence.length > 0) {
+    for (const ev of opts.evidence) {
+      const evTs = (ev as any).timestamp || (ev as any).ts || (ev as any).created_at || (ev as any).date;
+      if (evTs) {
+        src_ts = evTs;
+        break;
+      }
+    }
+  }
+
+  // T-078 & T-080: Expiry & Pinning Policy evaluation (first-match-wins)
+  // Explicit overrides (string) win; explicit null opts out; pinned/timeless exempt.
+  let pinned = opts.pinned;
+  let expires_at: string | undefined;
+
+  if (opts.expiresAt !== undefined || opts.expires_at !== undefined) {
+    const rawExpiry = opts.expiresAt ?? opts.expires_at;
+    expires_at = rawExpiry === null ? undefined : rawExpiry;
+  } else {
+    // T-080: Check for declarative expiry.yaml in store.memoryDir
+    if (!pinned && store.memoryDir) {
+      const customPolicy = loadExpiryPolicyYaml(store.memoryDir);
+      if (customPolicy) {
+        const candidateEntry: any = {
+          title,
+          content: cleanContent,
+          project: opts.project,
+          type: opts.type ?? "discovery",
+          tags: opts.tags ?? [],
+          trust,
+          temporal_mode,
+          created_at: createdAt,
+          pinned,
+        };
+        const match = evaluateExpiryPolicy(candidateEntry, customPolicy, Date.now());
+        if (match) {
+          if (match.pinned) pinned = true;
+          if (match.expires_at) expires_at = match.expires_at;
+        }
+      }
+    }
+
+    if (!pinned && temporal_mode !== "timeless" && expires_at === undefined && (opts.type !== undefined || opts.autoExpire === true)) {
+      expires_at = computeDefaultExpiresAt(opts.type ?? "discovery", createdAt);
+    }
+  }
+
+  // T-095: linked_memory_ids write-time edges seeded during capture (mem0 pattern)
+  let linked_memory_ids: string[] = [];
+  if (Array.isArray(opts.linked_memory_ids) || Array.isArray(opts.linkedMemoryIds)) {
+    const rawIds = (opts.linked_memory_ids ?? opts.linkedMemoryIds ?? []).map(String).filter(Boolean);
+    linked_memory_ids = Array.from(new Set(rawIds)).slice(0, 10);
+  } else if (opts.autoLink !== false) {
+    if (store.db) {
+      try {
+        const recentRows = store.db.query<{ id: string; title: string; tags: string; session_id: string | null }>(`
+          SELECT id, title, COALESCE(json_extract(data, '$.tags'), '') as tags, session_id
+          FROM memories
+          WHERE project = ? AND status NOT IN ('superseded', 'expired', 'rejected') AND (deleted_at IS NULL)
+          ORDER BY updated_at DESC
+          LIMIT 10
+        `).all([opts.project]);
+
+        const scoredCandidates: { id: string; score: number }[] = [];
+        const incomingTags = new Set((opts.tags ?? []).map((t) => t.toLowerCase()));
+        const incomingTitleWords = new Set(
+          (title + " " + cleanContent).toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3)
+        );
+
+        for (const row of recentRows) {
+          if (opts.id && row.id === opts.id) continue;
+          let score = 0.5; // base temporal recency score
+          if (opts.session_id && row.session_id === opts.session_id) {
+            score += 1.0; // strong boost for same session
+          }
+          try {
+            const rowTags: string[] = JSON.parse(row.tags || "[]");
+            for (const rt of rowTags) {
+              if (incomingTags.has(rt.toLowerCase())) score += 0.8;
+            }
+          } catch {}
+          const rowTitleWords = row.title.toLowerCase().split(/[^a-z0-9_-]+/).filter((w) => w.length >= 3);
+          for (const rw of rowTitleWords) {
+            if (incomingTitleWords.has(rw)) score += 0.3;
+          }
+          scoredCandidates.push({ id: row.id, score });
+        }
+
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        linked_memory_ids = scoredCandidates.slice(0, 5).map((c) => c.id);
+      } catch {}
+    }
+  }
 
   const entry: MemoryEntry = {
-    id: opts.id ?? makeId(opts.title ?? opts.content.slice(0, 60)),
+    id: opts.id ?? makeId(opts.title ?? cleanContent.slice(0, 60)),
     title,
-    content: opts.content,
+    content: cleanContent,
     project: opts.project,
     status: opts.confirmed ? "confirmed" : "candidate",
     type: opts.type ?? "discovery",
-    created_at: now,
-    updated_at: now,
+    ...(isDraft ? { draft: true } : {}),
+    created_at: createdAt,
+    updated_at: updatedAt,
     source: opts.source ?? "manual",
     tags: opts.tags?.slice(0, 8) ?? [],
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom ?? opts.valid_from,
     valid_to: opts.validTo ?? opts.valid_to,
+    valid_to_exact:
+      opts.validToExact !== undefined
+        ? opts.validToExact
+        : opts.valid_to_exact !== undefined
+        ? opts.valid_to_exact
+        : opts.validTo || opts.valid_to
+        ? true
+        : undefined,
+    src_ts,
+    linked_memory_ids: linked_memory_ids.length > 0 ? linked_memory_ids : undefined,
     due_at: opts.dueAt ?? opts.due_at,
-    expires_at: opts.expiresAt ?? opts.expires_at,
+    expires_at,
+    pinned,
     test_command: opts.test_command,
     verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
     graph: opts.graph ?? (store.memoryDir ? autoStampGraphMetadata(`${opts.title ?? ""} ${opts.content}`, store.memoryDir) : undefined),
@@ -463,13 +1172,87 @@ export function propose(
     temporal_mode,
     evidence: opts.evidence,
     conflict_ids: opts.conflict_ids,
+    supersedes_id:
+      opts.supersedes_id ??
+      (typeof opts.supersedes === "string" ? opts.supersedes : Array.isArray(opts.supersedes) ? (opts.supersedes[0] ?? null) : null),
+    conflicts_with_id:
+      opts.conflicts_with_id ??
+      (Array.isArray(opts.conflict_ids) ? (opts.conflict_ids[0] ?? null) : null),
+    triples: opts.triples,
+    session_id: opts.session_id,
+    mem_path: opts.mem_path,
+    idempotency_key: opts.idempotency_key,
+    content_hash,
+    trust,
+    score_retain: retention.score,
+    source_ids: opts.source_ids,
+    anchors: opts.anchors,
+    reinforcement: typeof opts.reinforcement === "number" ? opts.reinforcement : undefined,
+    utility: opts.utility,
+    decay_score:
+      typeof (opts as any).decay_score === "number"
+        ? (opts as any).decay_score
+        : computeDecayScore({
+            type: opts.type ?? "discovery",
+            created_at: now,
+            updated_at: now,
+            valid_from: opts.validFrom ?? opts.valid_from,
+            src_ts,
+            verification: opts.verification ?? (opts.confirmed ? { level: "user-confirmed", verified_at: now } : { level: "unverified" }),
+            reinforcement: opts.confirmed ? 1 : 0,
+            access_count: 0,
+            salience: typeof opts.salience === "number" ? opts.salience : undefined,
+            temporal_mode,
+          }),
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);
   entry.utility = opts.utility ?? ensureUtility(entry);
 
+  // Resurrection guard: an explicit id colliding with a tombstoned row must go
+  // through memory_restore, not silently clear the marker via INSERT OR REPLACE.
+  if (opts.id && isTombstoned(store, entry.id)) {
+    throw new Error(`Entry ${entry.id} is deleted — use memory_restore to bring it back, not propose`);
+  }
+
   if (opts.confirmed) entry.last_confirmed_at = now;
   save(store, entry);
+
+  // T-096: supersede-not-delete handling during proposal
+  if (opts.supersedes) {
+    const rawSuperseded = Array.isArray(opts.supersedes) ? opts.supersedes : [opts.supersedes];
+    const validSupersededIds: string[] = [];
+    for (const oldId of rawSuperseded) {
+      if (!oldId || oldId === entry.id) continue;
+      const oldEntry = get(store, oldId);
+      if (oldEntry) {
+        validSupersededIds.push(oldId);
+        // Mark status, update cessation bounds, and save (NEVER delete)
+        oldEntry.status = "superseded";
+        oldEntry.valid_to = nowIso();
+        oldEntry.valid_to_exact = true;
+        const prevSup = normalizeIdArray(oldEntry.superseded_by);
+        if (!prevSup.includes(entry.id)) {
+          oldEntry.superseded_by = [...prevSup, entry.id];
+        }
+        oldEntry.updated_at = nowIso();
+        save(store, oldEntry);
+        if (store.memoryDir) {
+          recordAuditEvent(store.memoryDir, {
+            operation: "supersede",
+            entry_id: oldEntry.id,
+            project: oldEntry.project,
+            details: { superseded_by: entry.id },
+          });
+        }
+      }
+    }
+    if (validSupersededIds.length > 0) {
+      entry.supersedes = Array.isArray(opts.supersedes) ? validSupersededIds : validSupersededIds[0];
+      entry.supersedes_id = validSupersededIds[0];
+      save(store, entry);
+    }
+  }
 
   // Optional automated contradiction detection
   if (opts.checkConflict) {
@@ -516,6 +1299,10 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   const now = nowIso();
   entry.status = "confirmed";
   entry.disputed_by = undefined;
+  if (entry.draft || (entry.title && entry.title.startsWith("[DRAFT]"))) {
+    entry.draft = false;
+    entry.title = stripDraftTitle(entry.title);
+  }
   entry.last_confirmed_at = now;
   entry.reinforcement = (entry.reinforcement ?? 0) + 1;
   entry.verification = { level: "user-confirmed", verified_at: now };
@@ -538,8 +1325,13 @@ export function confirm(store: Store, id: string): MemoryEntry | null {
   return entry;
 }
 
-/** Mark old superseded (sets superseded_by), sets new's supersedes. Requires new to be confirmed. */
-export function supersede(store: Store, oldId: string, newId: string): MemoryEntry | null {
+/** Mark old superseded (sets superseded_by), sets new's supersedes. Requires new to be confirmed. (T-082) */
+export function supersede(
+  store: Store,
+  oldId: string,
+  newId: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const old = get(store, oldId);
   const next = get(store, newId);
   if (!old || !next) return null;
@@ -547,7 +1339,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (next.status !== "confirmed") return null;
 
   old.status = "superseded";
-  closeOutValidity(old);
+  closeOutValidity(old, options);
   old.quality = determineQuality(old);
   const prevOld = normalizeIdArray(old.superseded_by);
   if (!prevOld.includes(newId)) {
@@ -559,6 +1351,7 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   if (!prevNext.includes(oldId)) {
     next.supersedes = [...prevNext, oldId];
   }
+  next.supersedes_id = oldId;
   next.quality = determineQuality(next);
   next.updated_at = nowIso();
 
@@ -580,13 +1373,207 @@ export function supersede(store: Store, oldId: string, newId: string): MemoryEnt
   return old;
 }
 
-/** Mark an entry stale; reason appended to content. */
-export function markStale(store: Store, id: string, reason?: string): MemoryEntry | null {
+/** T-096: Returns true if memory is in superseded status */
+export function isSuperseded(entry: MemoryEntry): boolean {
+  return entry.status === "superseded";
+}
+
+export interface LineageWalkOptions {
+  /** Traversal direction: ancestors (supersedes), descendants (superseded_by), or both. Default: 'both' */
+  direction?: "ancestors" | "descendants" | "both";
+  /** Maximum traversal depth from root. Default: 5 */
+  maxDepth?: number;
+  /** Maximum number of unique entries to collect. Default: 50 */
+  limit?: number;
+  /** Whether to traverse lateral conflicts (conflicts_with_id / conflict_ids). Default: false */
+  includeConflicts?: boolean;
+  /** Whether to traverse associative write-time links (linked_memory_ids / related_memory_ids). Default: false */
+  includeLinked?: boolean;
+  /** Filter collected entries by memory status (root is always included). */
+  filterStatus?: MemoryStatus[];
+}
+
+export interface LineageEdge {
+  from: string;
+  to: string;
+  relation: "supersedes" | "superseded_by" | "conflicts_with" | "linked";
+}
+
+export interface LineageWalkResult {
+  rootId: string;
+  entries: MemoryEntry[];
+  depths: Record<string, number>;
+  edges: LineageEdge[];
+}
+
+/**
+ * T-101: Lineage BFS walker traversing provenance DAG edges with cycle prevention and depth bounds.
+ */
+export function walkLineageBfs(
+  store: Store,
+  startId: string,
+  options: LineageWalkOptions = {},
+): LineageWalkResult {
+  const rootEntry = get(store, startId);
+  if (!rootEntry) {
+    return { rootId: startId, entries: [], depths: {}, edges: [] };
+  }
+
+  const direction = options.direction ?? "both";
+  const maxDepth = typeof options.maxDepth === "number" && options.maxDepth >= 0 ? options.maxDepth : 5;
+  const limit = typeof options.limit === "number" && options.limit > 0 ? options.limit : 50;
+  const includeConflicts = Boolean(options.includeConflicts);
+  const includeLinked = Boolean(options.includeLinked);
+  const allowedStatuses = options.filterStatus ? new Set(options.filterStatus) : null;
+
+  const entries: MemoryEntry[] = [rootEntry];
+  const depths: Record<string, number> = { [startId]: 0 };
+  const edges: LineageEdge[] = [];
+  const edgeSet = new Set<string>();
+
+  const visited = new Set<string>([startId]);
+  const queue: { id: string; depth: number }[] = [{ id: startId, depth: 0 }];
+
+  const addEdge = (from: string, to: string, relation: LineageEdge["relation"]) => {
+    const key = `${from}->${to}:${relation}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      edges.push({ from, to, relation });
+    }
+  };
+
+  while (queue.length > 0 && entries.length < limit) {
+    const current = queue.shift()!;
+    if (current.depth >= maxDepth) continue;
+
+    const currentEntry = get(store, current.id);
+    if (!currentEntry) continue;
+
+    const neighborCandidates: { id: string; relation: LineageEdge["relation"] }[] = [];
+
+    // 1. Ancestors (what currentEntry supersedes / replaced)
+    if (direction === "ancestors" || direction === "both") {
+      const ancIds = new Set<string>();
+      if (currentEntry.supersedes_id) ancIds.add(currentEntry.supersedes_id);
+      for (const sid of normalizeIdArray(currentEntry.supersedes)) {
+        ancIds.add(sid);
+      }
+      for (const ancId of ancIds) {
+        if (ancId && ancId !== current.id) {
+          neighborCandidates.push({ id: ancId, relation: "supersedes" });
+        }
+      }
+    }
+
+    // 2. Descendants (what superseded currentEntry / replaced it)
+    if (direction === "descendants" || direction === "both") {
+      const descIds = new Set<string>();
+      for (const sby of normalizeIdArray(currentEntry.superseded_by)) {
+        descIds.add(sby);
+      }
+      // Fast SQLite query via idx_memories_supersedes_id
+      if (store.db) {
+        try {
+          const rows = store.db.query<{ id: string }>(
+            "SELECT id FROM memories WHERE supersedes_id = ?"
+          ).all([current.id]);
+          for (const r of rows) {
+            descIds.add(r.id);
+          }
+        } catch {}
+      }
+      for (const descId of descIds) {
+        if (descId && descId !== current.id) {
+          neighborCandidates.push({ id: descId, relation: "superseded_by" });
+        }
+      }
+    }
+
+    // 3. Lateral Conflicts (conflicting memories)
+    if (includeConflicts) {
+      const cflIds = new Set<string>();
+      if (currentEntry.conflicts_with_id) cflIds.add(currentEntry.conflicts_with_id);
+      for (const cid of currentEntry.conflict_ids || []) {
+        cflIds.add(cid);
+      }
+      // Fast SQLite query via idx_memories_conflicts_with_id
+      if (store.db) {
+        try {
+          const rows = store.db.query<{ id: string }>(
+            "SELECT id FROM memories WHERE conflicts_with_id = ?"
+          ).all([current.id]);
+          for (const r of rows) {
+            cflIds.add(r.id);
+          }
+        } catch {}
+      }
+      for (const cflId of cflIds) {
+        if (cflId && cflId !== current.id) {
+          neighborCandidates.push({ id: cflId, relation: "conflicts_with" });
+        }
+      }
+    }
+
+    // 4. Linked & Related edges
+    if (includeLinked) {
+      const linkIds = new Set<string>();
+      for (const lid of currentEntry.linked_memory_ids || []) {
+        linkIds.add(lid);
+      }
+      for (const rid of currentEntry.related_memory_ids || []) {
+        linkIds.add(rid);
+      }
+      for (const linkId of linkIds) {
+        if (linkId && linkId !== current.id) {
+          neighborCandidates.push({ id: linkId, relation: "linked" });
+        }
+      }
+    }
+
+    for (const candidate of neighborCandidates) {
+      addEdge(current.id, candidate.id, candidate.relation);
+
+      if (!visited.has(candidate.id)) {
+        visited.add(candidate.id);
+        const neighborEntry = get(store, candidate.id);
+        if (neighborEntry) {
+          const nextDepth = current.depth + 1;
+          depths[candidate.id] = nextDepth;
+
+          if (!allowedStatuses || allowedStatuses.has(neighborEntry.status)) {
+            entries.push(neighborEntry);
+          }
+
+          if (entries.length >= limit) {
+            break;
+          }
+
+          queue.push({ id: candidate.id, depth: nextDepth });
+        }
+      }
+    }
+  }
+
+  return {
+    rootId: startId,
+    entries,
+    depths,
+    edges,
+  };
+}
+
+/** Mark an entry stale; reason appended to content. (T-082) */
+export function markStale(
+  store: Store,
+  id: string,
+  reason?: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "stale";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   if (reason) entry.content = `${entry.content}\n\nStale: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -609,14 +1596,19 @@ export function markStale(store: Store, id: string, reason?: string): MemoryEntr
 /**
  * Migration archive transition: candidate -> superseded for imported records whose
  * source state was archived/superseded and which have no replacement pair in this
- * store (pair-based supersessions must use supersede(oldId, newId)). Logs audit.
+ * store (pair-based supersessions must use supersede(oldId, newId)). Logs audit. (T-082)
  */
-export function markSuperseded(store: Store, id: string, reason?: string): MemoryEntry | null {
+export function markSuperseded(
+  store: Store,
+  id: string,
+  reason?: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "superseded";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   if (reason) entry.content = `${entry.content}\n\nSuperseded: ${reason}`;
   entry.updated_at = nowIso();
   save(store, entry);
@@ -635,6 +1627,112 @@ export function markSuperseded(store: Store, id: string, reason?: string): Memor
     });
   }
   return entry;
+}
+
+/**
+ * T-079: Transition a memory entry to expired status, stamping expired_at and expired_by rule name.
+ * Respects pin exemptions (pinned: true entries cannot be expired unless forced).
+ */
+export function expireEntry(
+  store: Store,
+  id: string,
+  options?: {
+    rule?: string;
+    expired_at?: string;
+    reason?: string;
+    force?: boolean;
+    valid_to_exact?: boolean;
+    valid_to?: string;
+  },
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  // Pin-capable exemption: pinned entries never expire unless explicitly forced
+  if (entry.pinned && !options?.force) {
+    return entry;
+  }
+
+  const now = options?.expired_at ?? nowIso();
+  const ruleName = options?.rule ?? "rule:default_expiry";
+
+  entry.status = "expired";
+  entry.expired_at = now;
+  entry.expired_by = ruleName;
+  entry.quality = determineQuality(entry);
+  closeOutValidity(entry, {
+    valid_to: options?.valid_to ?? now,
+    valid_to_exact: options?.valid_to_exact,
+  });
+
+  if (options?.reason) {
+    entry.content = `${entry.content}\n\nExpired: [${ruleName}] ${options.reason}`;
+  }
+  entry.updated_at = now;
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "expire",
+      entry_id: entry.id,
+      project: entry.project,
+      reason: options?.reason,
+      details: {
+        expired_at: now,
+        expired_by: ruleName,
+      },
+    });
+  }
+
+  return entry;
+}
+
+/** T-079: Alias for expireEntry */
+export const markExpired = expireEntry;
+
+/**
+ * T-079: Sweep and expire all entries in the store whose expires_at is past now.
+ */
+export function sweepExpiredEntries(
+  store: Store,
+  options?: {
+    now?: number;
+    rule?: string;
+    project?: string;
+  },
+): { expired: MemoryEntry[]; skippedPinned: number } {
+  const nowMs = options?.now ?? Date.now();
+  const entries = list(store, { project: options?.project });
+  const expired: MemoryEntry[] = [];
+  let skippedPinned = 0;
+
+  for (const entry of entries) {
+    if (entry.status === "expired" || entry.status === "archived" || entry.status === "superseded") {
+      continue;
+    }
+    if (entry.pinned) {
+      skippedPinned++;
+      continue;
+    }
+    if (entry.expires_at) {
+      const expiresMs = Date.parse(entry.expires_at);
+      if (!Number.isNaN(expiresMs) && expiresMs <= nowMs) {
+        const res = expireEntry(store, entry.id, {
+          rule: options?.rule ?? `ttl_${entry.type ?? "discovery"}`,
+          expired_at: new Date(nowMs).toISOString(),
+        });
+        if (res) expired.push(res);
+      }
+    }
+  }
+
+  return { expired, skippedPinned };
 }
 
 /** Two-way link: union related_memory_ids on both sides, no dupes. */
@@ -671,13 +1769,17 @@ export function link(store: Store, id: string, relatedIds: string[]): MemoryEntr
   return primary;
 }
 
-/** Reject an entry. */
-export function reject(store: Store, id: string): MemoryEntry | null {
+/** Reject an entry. (T-082) */
+export function reject(
+  store: Store,
+  id: string,
+  options?: { valid_to_exact?: boolean; valid_to?: string }
+): MemoryEntry | null {
   const entry = get(store, id);
   if (!entry) return null;
   entry.status = "rejected";
   entry.quality = determineQuality(entry);
-  closeOutValidity(entry);
+  closeOutValidity(entry, options);
   entry.updated_at = nowIso();
   save(store, entry);
   if (entry.type === "constraint" && store.memoryDir) {
@@ -695,25 +1797,44 @@ export function reject(store: Store, id: string): MemoryEntry | null {
   return entry;
 }
 
-/** Delete an entry permanently from store and record audit event. */
+/**
+ * T-030: soft delete. The row, its YAML mirror and its audit event all survive; only the
+ * marker and the FTS text are removed, so no read path can surface it again.
+ * `restoreEntry` reverses this. Without a SQLite primary there is nowhere to persist the
+ * marker, so the degraded path still unlinks — shortcut: openStore always provides a db.
+ */
 export function deleteEntry(store: Store, id: string, reason?: string, actor?: string): boolean {
   const entry = get(store, id);
   if (!entry) return false;
+  const who = actor ?? "agent";
+
+  if (!store.db) {
+    const file = fileForId(store, id);
+    if (existsSync(file)) unlinkSync(file);
+    if (store.cache) store.cache.deleteEntry(id);
+    return true;
+  }
+
+  // T-025: row + marker + FTS eviction as one commit. save() first so a YAML-only entry
+  // gets a row to tombstone; the marker must follow save() because INSERT OR REPLACE
+  // rewrites the row and drops columns its writer does not know about.
+  withTransaction(store.db, () => {
+    save(store, entry);
+    setTombstone(store, id, { at: nowIso(), by: who });
+    store.db!.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
+  });
 
   // 1. Evict from L0 Cache
   if (store.cache) {
     store.cache.deleteEntry(id);
   }
 
-  let deleted = false;
-  if (store.db) {
-    deleted = deleteMemoryById(store.db, id) || deleted;
-  }
-
-  const file = fileForId(store, id);
-  if (existsSync(file)) {
-    unlinkSync(file);
-    deleted = true;
+  // T-304: Remove from vector index.json if present
+  if (store.memoryDir) {
+    try {
+      const { removeIndexEntry } = require("./vector.ts");
+      removeIndexEntry(id, store.memoryDir);
+    } catch {}
   }
 
   if (store.memoryDir && entry) {
@@ -721,8 +1842,18 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
       operation: "delete",
       entry_id: id,
       project: entry.project,
-      actor: actor ?? "agent",
+      actor: who,
       reason,
+      // T-032: snapshot of what was tombstoned, so replayFromAudit can rebuild the content
+      // if the row and the YAML mirror are later lost. Reported as reconstruction gaps otherwise.
+      details: {
+        tombstone: true,
+        title: entry.title,
+        type: entry.type,
+        status: entry.status,
+        tags: entry.tags,
+        content: entry.content,
+      },
     });
     if (entry.type === "constraint") {
       try {
@@ -730,7 +1861,128 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
       } catch {}
     }
   }
-  return deleted;
+  return true;
+}
+
+export type RestoreFailure = "not_found" | "not_deleted" | "no_store";
+export type RestoreOutcome = { ok: true; entry: MemoryEntry } | { ok: false; reason: RestoreFailure };
+
+/**
+ * T-031: clear a tombstone so the entry returns to every read path. Fails cleanly on an
+ * unknown id or an entry that was never deleted. The content is reused as-is; use
+ * `replayFromAudit` when the stored copy is gone.
+ */
+export function restoreEntry(store: Store, id: string, actor = "agent"): RestoreOutcome {
+  if (!store.db) return { ok: false, reason: "no_store" };
+  // Read the row, not the YAML mirror: readEntry() re-syncs rows with INSERT OR REPLACE, which
+  // drops the marker columns and would clear the tombstone we are about to test for.
+  const entry = getMemoryById(store.db, id);
+  if (!entry) return { ok: false, reason: "not_found" };
+  if (!isTombstoned(store, id)) return { ok: false, reason: "not_deleted" };
+
+  // Same ordering rule as deleteEntry: save() re-adds the FTS row, then the marker clears.
+  withTransaction(store.db, () => {
+    save(store, entry);
+    setTombstone(store, id, null);
+  });
+  if (store.cache) store.cache.deleteEntry(id);
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "restore",
+      entry_id: id,
+      project: entry.project,
+      actor,
+      details: { tombstone_restore: true, title: entry.title },
+    });
+    if (entry.type === "constraint") {
+      try {
+        syncConstraints(store.memoryDir, store);
+      } catch {}
+    }
+  }
+  return { ok: true, entry };
+}
+
+export interface ReplayReport {
+  ok: boolean;
+  entry: MemoryEntry | null;
+  /** Fields rebuilt from the audit ledger. */
+  reconstructed: string[];
+  /** Fields the ledger does not carry, left at defaults rather than invented. */
+  missing: string[];
+  reason?: string;
+}
+
+/**
+ * Fields the audit ledger never records, so a replay can always be expected to report them.
+ * `rehydrate`/`delete`/`supersede` events carry identifiers and lifecycle state, not payloads.
+ */
+const REPLAY_UNRECONSTRUCTABLE = [
+  "verification",
+  "fingerprint",
+  "quality",
+  "utility",
+  "evidence",
+  "graph",
+  "related_memory_ids",
+  "supersedes",
+] as const;
+
+/**
+ * T-032: best-effort rebuild of an entry from audit.jsonl. Needed when the tombstoned row and
+ * its YAML mirror are gone (purged, or written by a build that hard-deleted). Dry run by
+ * default: `apply: true` writes the rebuilt entry and clears the tombstone.
+ */
+export function replayFromAudit(store: Store, id: string, options: { apply?: boolean } = {}): ReplayReport {
+  const fail = (reason: string): ReplayReport => ({ ok: false, entry: null, reconstructed: [], missing: [], reason });
+  if (!store.memoryDir) return fail("store has no memory directory, so no audit ledger");
+
+  const trail = getAuditTrail(store.memoryDir, { entryId: id });
+  if (trail.length === 0) return fail(`no audit history for ${id}`);
+
+  // getAuditTrail is newest-first: the most recent snapshot wins, older events only fill gaps.
+  const snap = trail.find((e) => typeof e.details?.content === "string" && e.details.content)?.details;
+  if (!snap?.content) return fail(`audit history for ${id} carries no content snapshot`);
+
+  const oldest = trail[trail.length - 1];
+  const entry: MemoryEntry = {
+    id,
+    title: String(snap.title ?? `Reconstructed ${id}`),
+    content: String(snap.content),
+    project: String(snap.project ?? oldest.project ?? "unknown"),
+    status: (snap.status ?? "candidate") as MemoryEntry["status"],
+    type: (snap.type ?? "discovery") as MemoryEntry["type"],
+    created_at: oldest.timestamp,
+    updated_at: nowIso(),
+    source: "audit_replay",
+    tags: Array.isArray(snap.tags) ? snap.tags.map(String) : [],
+    verification: { level: "unverified", method: "audit_replay" },
+  };
+
+  const reconstructed = ["id", "content", "created_at", "updated_at", "status", "type", "source", "verification"];
+  if (snap.title) reconstructed.push("title");
+  if (snap.tags) reconstructed.push("tags");
+  const missing: string[] = [...REPLAY_UNRECONSTRUCTABLE];
+  if (!snap.title) missing.push("title");
+  if (!snap.tags) missing.push("tags");
+
+  if (options.apply) {
+    withTransaction(store.db, () => {
+      save(store, entry);
+      setTombstone(store, id, null);
+    });
+    if (store.memoryDir) {
+      recordAuditEvent(store.memoryDir, {
+        operation: "restore",
+        entry_id: id,
+        project: entry.project,
+        actor: "audit_replay",
+        details: { replay_restore: true, missing },
+      });
+    }
+  }
+  return { ok: true, entry, reconstructed, missing };
 }
 
 /**
@@ -762,4 +2014,603 @@ export function harvestMemories(
   }
   return created;
 }
+
+// --- T-024: bounded FTS preflight -------------------------------------------------
+
+/** Max whitespace-separated terms accepted before an FTS query is rejected. */
+export const FTS_MAX_QUERY_TERMS = 32;
+/** Max raw query length accepted before an FTS query is rejected. */
+export const FTS_MAX_QUERY_CHARS = 512;
+
+export interface FtsPreflight {
+  ok: boolean;
+  terms: number;
+  reason?: string;
+}
+
+/**
+ * T-024: bound the work FTS5 can be asked to do. Each term becomes one OR branch of
+ * the MATCH expression, so an unbounded term list turns a lookup into a table scan
+ * per term. Returns a verdict instead of throwing so callers can degrade or report.
+ */
+export function preflightFtsQuery(query: string): FtsPreflight {
+  const raw = query ?? "";
+  const clean = raw.trim().replace(/['"*]/g, "");
+  if (!clean) return { ok: false, terms: 0, reason: "empty query" };
+  if (raw.length > FTS_MAX_QUERY_CHARS) {
+    return {
+      ok: false,
+      terms: 0,
+      reason: `query is ${raw.length} characters, limit is ${FTS_MAX_QUERY_CHARS}`,
+    };
+  }
+  const terms = clean.split(/\s+/).filter(Boolean);
+  if (terms.length > FTS_MAX_QUERY_TERMS) {
+    return {
+      ok: false,
+      terms: terms.length,
+      reason: `query has ${terms.length} terms, limit is ${FTS_MAX_QUERY_TERMS}`,
+    };
+  }
+  return { ok: true, terms: terms.length };
+}
+
+/** Store-level FTS read path: preflight the query, then BM25 search. */
+export function searchMemories(
+  store: Store,
+  query: string,
+  filters?: { project?: string; type?: string; status?: string; limit?: number },
+): FtsSearchHits {
+  const preflight = preflightFtsQuery(query);
+  if (!preflight.ok) throw new Error(`FTS query rejected: ${preflight.reason}`);
+  if (!store.db) {
+    const empty: FtsSearchHits = [];
+    empty.degraded = false;
+    return empty;
+  }
+  const hits = searchMemoriesFts(store.db, query, filters);
+  // T-030: the delete path already evicts the FTS row; this holds the read path closed even if
+  // a row carries a marker without that eviction having run.
+  const tombstones = tombstonedIds(store);
+  if (tombstones.size === 0) return hits;
+  const filtered = hits.filter((h) => !tombstones.has(h.entry.id)) as FtsSearchHits;
+  filtered.degraded = hits.degraded;
+  filtered.error = hits.error;
+  return filtered;
+}
+
+// --- T-026: FTS <-> row parity ----------------------------------------------------
+
+/** Cap on ids reported per desync class so a broken index cannot flood a caller. */
+const FTS_PARITY_SAMPLE = 50;
+
+export interface FtsParityReport {
+  ok: boolean;
+  rowCount: number;
+  indexedCount: number;
+  /** Memory rows with no FTS index row. */
+  missingCount: number;
+  /** FTS index rows with no memory row. */
+  orphanedCount: number;
+  /** Sample of memory rows with no FTS index row. */
+  missing: string[];
+  /** Sample of FTS index rows with no memory row. */
+  orphaned: string[];
+  /** Set by repairFtsIndex() to record that a rebuild was performed. */
+  repaired?: boolean;
+}
+
+/** Compare the FTS index against the memories table without mutating anything. */
+export function checkFtsParity(store: Store): FtsParityReport {
+  const db = store.db;
+  if (!db) {
+    return { ok: true, rowCount: 0, indexedCount: 0, missingCount: 0, orphanedCount: 0, missing: [], orphaned: [] };
+  }
+  const count = (sql: string): number => {
+    try {
+      return db.query<{ c: number }>(sql).get()?.c ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const ids = (sql: string): string[] =>
+    db
+      .query<{ id: string }>(sql)
+      .all([FTS_PARITY_SAMPLE])
+      .map((r) => r.id);
+
+  // T-030: a tombstoned row is intentionally absent from FTS, so it is not a desync.
+  const missingCount = count(
+    `SELECT count(*) AS c FROM memories WHERE deleted_at IS NULL AND id NOT IN (SELECT id FROM memories_fts)`,
+  );
+  const orphanedCount = count(`SELECT count(*) AS c FROM memories_fts WHERE id NOT IN (SELECT id FROM memories)`);
+  return {
+    ok: missingCount === 0 && orphanedCount === 0,
+    rowCount: count(`SELECT count(*) AS c FROM memories`),
+    indexedCount: count(`SELECT count(DISTINCT id) AS c FROM memories_fts`),
+    missingCount,
+    orphanedCount,
+    missing: missingCount > 0 ? ids(`SELECT id FROM memories WHERE deleted_at IS NULL AND id NOT IN (SELECT id FROM memories_fts) ORDER BY updated_at DESC LIMIT ?`) : [],
+    orphaned: orphanedCount > 0 ? ids(`SELECT id FROM memories_fts WHERE id NOT IN (SELECT id FROM memories) LIMIT ?`) : [],
+  };
+}
+
+/**
+ * T-026: rebuild the FTS index from the memories table in one commit (drops orphaned
+ * and duplicate index rows, re-adds missing ones), then re-report. Tombstoned rows are
+ * left unindexed (T-030) — re-adding them would make deleted text searchable again.
+ */
+export function repairFtsIndex(store: Store): FtsParityReport {
+  const db = store.db;
+  if (!db) return checkFtsParity(store);
+  withTransaction(db, () => {
+    db!.run(`DELETE FROM memories_fts`);
+    const rows = db!.query<{ id: string; title: string; content: string; tags: string }>(
+      `SELECT id, title, content, COALESCE(json_extract(data, '$.tags'), '') as tags FROM memories WHERE deleted_at IS NULL`,
+    ).all();
+    for (const r of rows) {
+      db!.run(
+        `INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`,
+        [r.id, redactSecrets(r.title), redactSecrets(r.content), r.tags],
+      );
+    }
+  });
+  return { ...checkFtsParity(store), repaired: true };
+}
+
+/**
+ * T-084: Five-Verb Lifecycle Interfaces & Engine
+ */
+export interface ChangeOptions {
+  valid_from?: string;
+  valid_to_exact?: boolean;
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `change`.
+ * Represents a historical state transition where a fact ceases to be valid going forward
+ * and is replaced by a new fact. The old fact is superseded and closed out bi-temporally.
+ */
+export function change(
+  store: Store,
+  oldId: string,
+  newDraftOrId: string | Parameters<typeof propose>[1],
+  options?: ChangeOptions,
+): { old: MemoryEntry; next: MemoryEntry } | null {
+  const old = get(store, oldId);
+  if (!old) return null;
+
+  let next: MemoryEntry | null = null;
+  const now = options?.valid_from ?? nowIso();
+
+  if (typeof newDraftOrId === "string") {
+    next = get(store, newDraftOrId);
+    if (!next) return null;
+    if (next.status !== "confirmed") {
+      confirm(store, next.id);
+      next = get(store, next.id)!;
+    }
+  } else {
+    next = propose(store, {
+      ...newDraftOrId,
+      project: newDraftOrId.project ?? old.project,
+      confirmed: newDraftOrId.confirmed ?? true,
+      valid_from: newDraftOrId.valid_from ?? now,
+    });
+  }
+
+  const superseded = supersede(store, old.id, next.id, {
+    valid_to: now,
+    valid_to_exact: options?.valid_to_exact ?? true,
+  });
+  if (!superseded) return null;
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_change",
+      entry_id: old.id,
+      project: old.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { new_id: next.id, verb: "change", valid_to: now },
+    });
+  }
+
+  return { old: get(store, old.id)!, next: get(store, next.id)! };
+}
+
+export interface EndOptions {
+  reason?: string;
+  valid_to?: string;
+  valid_to_exact?: boolean;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `end`.
+ * Concludes a fact's validity when it ceases to be true without a replacement fact.
+ * Closes out valid_to bi-temporally and transitions status to stale.
+ */
+export function end(
+  store: Store,
+  id: string,
+  options?: EndOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const validTo = options?.valid_to ?? nowIso();
+  const validToExact = options?.valid_to_exact ?? true;
+
+  entry.status = "stale";
+  entry.ended_at = validTo;
+  closeOutValidity(entry, { valid_to: validTo, valid_to_exact: validToExact });
+  if (options?.reason) {
+    entry.content = `${entry.content}\n\nEnded: ${options.reason}`;
+  }
+  entry.updated_at = nowIso();
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_end",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "end", valid_to: validTo, valid_to_exact: validToExact },
+    });
+  }
+
+  return entry;
+}
+
+export interface CorrectOptions {
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `correct`.
+ * Retroactively fixes an erroneous fact recorded by mistake.
+ * Unlike `change`, this does NOT imply historical continuity: the prior recording was wrong.
+ * Amends the entry directly with an audit trail note.
+ */
+export function correct(
+  store: Store,
+  id: string,
+  correction: string | Partial<MemoryEntry>,
+  options?: CorrectOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const prevContent = entry.content;
+  if (typeof correction === "string") {
+    entry.content = correction;
+  } else {
+    if (correction.content) entry.content = correction.content;
+    if (correction.title) entry.title = correction.title;
+    if (correction.tags) entry.tags = correction.tags;
+    if (correction.type) entry.type = correction.type;
+    if (correction.salience !== undefined) entry.salience = correction.salience;
+    if (correction.verification) entry.verification = correction.verification;
+  }
+
+  const now = nowIso();
+  entry.updated_at = now;
+  entry.corrected_at = now;
+  if (options?.reason) {
+    entry.correction_reason = options.reason;
+  }
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_correct",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "correct", previous_content: prevContent },
+    });
+  }
+
+  return entry;
+}
+
+export interface RevertOptions {
+  reason?: string;
+  actor?: string;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `revert`.
+ * Restores a previously superseded, ended, or stale fact back into active confirmed knowledge.
+ * Clears valid_to and bi-temporal closeout, resets status to confirmed, and unlinks supersessions.
+ */
+export function revert(
+  store: Store,
+  id: string,
+  options?: RevertOptions,
+): MemoryEntry | null {
+  const entry = get(store, id);
+  if (!entry) return null;
+
+  const prevStatus = entry.status;
+  const now = nowIso();
+  entry.status = "confirmed";
+  delete entry.valid_to;
+  delete entry.valid_to_exact;
+  delete entry.expired_at;
+  delete entry.expired_by;
+  delete entry.ended_at;
+  entry.reverted_at = now;
+  entry.reinforcement = (entry.reinforcement ?? 0) + 1;
+  entry.last_confirmed_at = now;
+  entry.updated_at = now;
+
+  // Unlink incoming supersession references from replacing memories
+  const supersededBy = normalizeIdArray(entry.superseded_by);
+  for (const sId of supersededBy) {
+    const sEntry = get(store, sId);
+    if (sEntry) {
+      const sSupersedes = normalizeIdArray(sEntry.supersedes).filter((x) => x !== id);
+      sEntry.supersedes = sSupersedes.length > 0 ? sSupersedes : null;
+      sEntry.updated_at = now;
+      save(store, sEntry);
+    }
+  }
+  entry.superseded_by = null;
+  entry.quality = determineQuality(entry);
+  save(store, entry);
+
+  if (entry.type === "constraint" && store.memoryDir) {
+    try {
+      syncConstraints(store.memoryDir, store);
+    } catch {}
+  }
+
+  if (store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_revert",
+      entry_id: entry.id,
+      project: entry.project,
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "revert", previous_status: prevStatus },
+    });
+  }
+
+  return entry;
+}
+
+export interface ForgetOptions {
+  reason?: string;
+  actor?: string;
+  hard?: boolean;
+}
+
+/**
+ * T-084: Five-verb lifecycle — `forget`.
+ * Right-to-be-forgotten / complete soft tombstone or hard erasure.
+ * Excludes the memory from all active recall, FTS, and indexing.
+ */
+export function forget(
+  store: Store,
+  id: string,
+  options?: ForgetOptions,
+): boolean {
+  if (options?.hard) {
+    const entry = get(store, id);
+    if (!entry) return false;
+    const file = fileForId(store, id);
+    if (existsSync(file)) unlinkSync(file);
+    if (store.db) {
+      store.db.run(`DELETE FROM memories WHERE id = ?`, [id]);
+      store.db.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
+    }
+    if (store.cache) store.cache.deleteEntry(id);
+    if (store.memoryDir) {
+      try {
+        const { removeIndexEntry } = require("./vector.ts");
+        removeIndexEntry(id, store.memoryDir);
+      } catch {}
+      recordAuditEvent(store.memoryDir, {
+        operation: "lifecycle_forget",
+        entry_id: id,
+        project: entry.project,
+        actor: options?.actor ?? "agent",
+        reason: options?.reason,
+        details: { verb: "forget", hard: true },
+      });
+    }
+    return true;
+  }
+
+  const ok = deleteEntry(store, id, options?.reason, options?.actor);
+  if (ok && store.memoryDir) {
+    recordAuditEvent(store.memoryDir, {
+      operation: "lifecycle_forget",
+      entry_id: id,
+      project: get(store, id)?.project ?? "default",
+      actor: options?.actor ?? "agent",
+      reason: options?.reason,
+      details: { verb: "forget", hard: false },
+    });
+  }
+  return ok;
+}
+
+/**
+ * T-056 & T-055: Gracefully closes store, awaiting all in-flight async write workers
+ * within a bounded join and running WAL checkpoint optimization to keep disk compact.
+ */
+/**
+ * T-099: Records append-only fact provenance assertions for all explicit or heuristically
+ * extracted semantic fact triples from a memory entry.
+ * Uses INSERT OR IGNORE via idx_fact_provenance_triple to preserve original provenance.
+ */
+export function recordFactProvenance(
+  store: Store,
+  entry: MemoryEntry | { id: string; title: string; content: string; triples?: SemanticFactTriple[]; source?: string; session_id?: string; tags?: string[]; mem_path?: string },
+): FactProvenanceRecord[] {
+  if (!store.db) return [];
+  const triples = extractFactTriples(entry);
+  if (!triples || triples.length === 0) return [];
+
+  const records: FactProvenanceRecord[] = [];
+  for (const t of triples) {
+    const recordId = `fp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const now = nowIso();
+    const rec: FactProvenanceRecord = {
+      id: recordId,
+      memory_id: entry.id,
+      entity: t.entity,
+      relation: t.relation,
+      target: t.target,
+      scope: t.scope ?? "global",
+      source: (entry as any).source ?? (entry as any).provenance?.source ?? undefined,
+      session_id: (entry as any).session_id ?? undefined,
+      confidence: 1.0,
+      created_at: now,
+    };
+    insertFactProvenance(store.db, rec);
+    records.push(rec);
+  }
+  return records;
+}
+
+/**
+ * T-099: Retrieve fact provenance record for a specific canonical triple.
+ */
+export function getFactProvenance(
+  store: Store,
+  entity: string,
+  relation: string,
+  target: string,
+): FactProvenanceRecord | null {
+  if (!store.db) return null;
+  const normEntity = normalizeTerm(entity);
+  const normRelation = canonicalizeRelation(relation);
+  const normTarget = normalizeTerm(target);
+  const row = getFactProvenanceRow(store.db, normEntity, normRelation, normTarget);
+  if (!row) return null;
+  return {
+    id: row.id,
+    memory_id: row.memory_id,
+    entity: row.entity,
+    relation: row.relation,
+    target: row.target,
+    scope: row.scope,
+    source: row.source ?? undefined,
+    session_id: row.session_id ?? undefined,
+    confidence: row.confidence ?? 1.0,
+    data: row.data ?? undefined,
+    created_at: row.created_at,
+  };
+}
+
+/**
+ * T-099: List append-only fact provenance records matching optional filters.
+ */
+export function listFactProvenance(
+  store: Store,
+  filters: { memory_id?: string; entity?: string; relation?: string; target?: string; scope?: string } = {},
+): FactProvenanceRecord[] {
+  if (!store.db) return [];
+  const normalizedFilters = {
+    ...filters,
+    entity: filters.entity ? normalizeTerm(filters.entity) : undefined,
+    relation: filters.relation ? canonicalizeRelation(filters.relation) : undefined,
+    target: filters.target ? normalizeTerm(filters.target) : undefined,
+    scope: filters.scope ? canonicalizeScope(filters.scope) : undefined,
+  };
+  const rows = listFactProvenanceRows(store.db, normalizedFilters);
+  return rows.map((r) => ({
+    id: r.id,
+    memory_id: r.memory_id,
+    entity: r.entity,
+    relation: r.relation,
+    target: r.target,
+    scope: r.scope,
+    source: r.source ?? undefined,
+    session_id: r.session_id ?? undefined,
+    confidence: r.confidence ?? 1.0,
+    data: r.data ?? undefined,
+    created_at: r.created_at,
+  }));
+}
+
+export async function closeStore(store: Store): Promise<void> {
+  try {
+    await drainWriteWorkers(5000);
+  } catch {}
+
+  if (store.db) {
+    try {
+      store.db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+    } catch {}
+    try {
+      store.db.close();
+    } catch {}
+  }
+}
+
+export {
+  resolveVeracityClass,
+  getVeracityWeight,
+  VERACITY_RANK_WEIGHTS,
+  type VeracityClass,
+} from "./retrieval.ts";
+
+export type { FactProvenanceRecord };
+
+export {
+  type L1Abstract,
+  type AbstractSidecar,
+  type StaleSidecarCandidate,
+  type SidecarStalenessReport,
+  type SidecarRefreshOptions,
+  type SidecarRefreshResult,
+  generateL0Abstract,
+  generateL1Abstract,
+  buildAbstractSidecar,
+  saveAbstractSidecar,
+  loadAbstractSidecar,
+  listAbstractSidecars,
+  saveAbstractSidecarToDb,
+  loadAbstractSidecarFromDb,
+  ensureAbstractSidecar,
+  getSidecarStaleness,
+  refreshSidecarsRatioBatched,
+} from "./store/sidecars.ts";
+
+export {
+  type RecallUsageStatus,
+  type RecallUsageJoinRecord,
+  type RecallUsageTelemetryReport,
+  calculateUsageRate,
+  calculateRoiScore,
+  computeRecallUsageRecord,
+  joinRecallUsageTelemetry,
+  computeRoiScoreMultiplier,
+} from "./quality/telemetry.ts";
+
 

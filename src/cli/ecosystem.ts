@@ -383,6 +383,30 @@ export async function handleAgentsCommand(): Promise<number> {
 }
 
 export async function handleConnectCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  // T-387: Output client configuration recipes for remote/team MCP HTTP server
+  if (flags["recipe"] || flags["remote"]) {
+    const endpoint = flags["endpoint"] || "http://127.0.0.1:31338/mcp";
+    const token = flags["token"] || process.env.MUSE_BEARER_TOKEN || "<YOUR_BEARER_TOKEN>";
+    const peerId = flags["peer"] || flags["peer-id"];
+    const { generateClientConfigRecipe } = await import("../connect.ts");
+    const recipes = generateClientConfigRecipe(endpoint, token, peerId);
+
+    console.log(`\n=== Muse Memory Team Server Client Configuration Recipes (T-387) ===`);
+    console.log(`Endpoint:  ${recipes.endpoint}`);
+    console.log(`Transport: MCP Streamable HTTP (2025-06-18 spec)`);
+    console.log(`Auth:      Authorization: Bearer <token>\n`);
+
+    console.log(`1. Cursor (~/.cursor/mcp.json or .cursor/mcp.json):`);
+    console.log(JSON.stringify(recipes.cursor, null, 2));
+
+    console.log(`\n2. Opencode (~/.config/opencode/opencode.json):`);
+    console.log(JSON.stringify(recipes.opencode, null, 2));
+
+    console.log(`\n3. Claude Code / Antigravity / Windsurf (mcp_config.json):`);
+    console.log(JSON.stringify(recipes.claude, null, 2));
+    return 0;
+  }
+
   let agent = positional[0];
   const { connectAgent } = await import("../connect.ts");
   const { detectAgents } = await import("../agents/detect.ts");
@@ -418,17 +442,17 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
   if (withHooks && !dryRun) {
     try {
       const { installHookPack } = await import("../hooks/pack.ts");
-      const hookResult = installHookPack();
+      const hookResult = installHookPack(undefined, { harness: flags["harness"] });
       for (const r of hookResult.installed) console.log(`  [HOOKS] ${r.message}`);
     } catch (err: any) {
       console.log(`  [HOOKS] Skipped: ${err.message}`);
     }
   } else if (withHooks && dryRun) {
-    console.log(`  [HOOKS] [DRY RUN] Would wire SessionStart/PostToolUse/Stop hooks into ~/.claude/settings.json`);
+    console.log(`  [HOOKS] [DRY RUN] Would wire SessionStart/PostToolUse/Stop hooks into the resolved settings path`);
   }
 
   try {
-    const reports = connectAgent(agent, undefined, { dryRun, force });
+    const reports = connectAgent(agent, undefined, { dryRun, force, harness: flags["harness"] });
     if (reports.length === 0) {
       console.log(`[INFO] No coding agents were detected on this machine.`);
       console.log(`Use 'memory connect <agent> --force' to configure a specific agent, or 'memory agents' to list all supported platforms.`);
@@ -454,15 +478,29 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
 export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const port = flags["port"] ? parseInt(flags["port"], 10) : 2222;
+  let port: number | undefined = undefined;
+  if (flags["port"]) {
+    const parsed = parseInt(flags["port"], 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      console.error(`Error: Invalid port "${flags["port"]}". Port must be an integer between 1 and 65535.`);
+      return 1;
+    }
+    port = parsed;
+  }
   const sync = flags["sync"] === "true";
 
   const { startUiServer } = await import("../ui.ts");
-  const srv = await startUiServer({
-    port,
-    memoryDir: ctx.memoryDir,
-    store: ctx.store,
-  });
+  let srv: { port: number; close: () => void };
+  try {
+    srv = await startUiServer({
+      port,
+      memoryDir: ctx.memoryDir,
+      store: ctx.store,
+    });
+  } catch (err: any) {
+    console.error(`Error starting Web Observability Studio: ${err.message || err}`);
+    return 1;
+  }
   console.log(`\x1b[36m[Studio] Muse Memory Web Observability Studio running at: http://localhost:${srv.port}\x1b[0m`);
   console.log(`Press Ctrl+C to stop.`);
 
@@ -479,8 +517,19 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
     }, 100);
   }
 
-  await new Promise<void>(() => {});
-  return 0;
+  return new Promise<number>((resolve) => {
+    const shutdown = () => {
+      process.off("SIGINT", shutdown);
+      process.off("SIGTERM", shutdown);
+      console.log("\nStopping Web Observability Studio...");
+      try {
+        srv.close();
+      } catch {}
+      resolve(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  });
 }
 
 export async function handleGraphCommand({ positional, flags }: ParsedArgs): Promise<number> {
@@ -505,7 +554,52 @@ export async function handleGraphCommand({ positional, flags }: ParsedArgs): Pro
   return usageError("graph requires 'status' or 'index'");
 }
 
-export async function handleMcpCommand(): Promise<number> {
+export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
+  const flags = args?.flags ?? {};
+  if (flags["http"] || flags["port"] || flags["serve"]) {
+    const port = flags["port"] ? parseInt(flags["port"], 10) : 31338;
+    const host = flags["host"] || "127.0.0.1";
+    const bearerToken = flags["token"] || process.env.MUSE_BEARER_TOKEN;
+    const rawTokens = flags["tokens"] || process.env.MUSE_AUTH_TOKENS;
+    const bearerTokens = rawTokens ? rawTokens.split(",").map((t: string) => t.trim()) : undefined;
+    const allowedPeers = flags["allowed-peers"]
+      ? flags["allowed-peers"].split(",").map((p: string) => p.trim())
+      : undefined;
+    const allowedOrigins = flags["allowed-origins"]
+      ? flags["allowed-origins"].split(",").map((o: string) => o.trim())
+      : undefined;
+    const allowedHosts = flags["allowed-hosts"]
+      ? flags["allowed-hosts"].split(",").map((h: string) => h.trim())
+      : undefined;
+
+    const { startHttpMcpServer } = await import("../mcp.ts");
+    const handle = await startHttpMcpServer({
+      port,
+      host,
+      bearerToken,
+      bearerTokens,
+      allowedPeers,
+      allowedOrigins,
+      allowedHosts,
+    });
+    console.log(`Muse Memory MCP Streamable HTTP Server listening at ${handle.url}`);
+    if (bearerToken || bearerTokens) {
+      console.log(`[Auth] Bearer authentication active (${allowedPeers ? `${allowedPeers.length} allowed peers` : "allowlist open"})`);
+    }
+    return new Promise<number>((resolve) => {
+      const shutdown = async () => {
+        process.off("SIGINT", shutdown);
+        process.off("SIGTERM", shutdown);
+        console.log("\nStopping MCP HTTP server...");
+        try {
+          await handle.close();
+        } catch {}
+        resolve(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+    });
+  }
   const { runMcpServer } = await import("../mcp.ts");
   await runMcpServer();
   return 0;
@@ -514,12 +608,37 @@ export async function handleMcpCommand(): Promise<number> {
 export async function handleDaemonCommand({ flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const port = flags["port"] ? parseInt(flags["port"], 10) : 7878;
+  let port: number = 7878;
+  if (flags["port"]) {
+    const parsed = parseInt(flags["port"], 10);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+      console.error(`Error: Invalid port "${flags["port"]}". Port must be an integer between 0 and 65535.`);
+      return 1;
+    }
+    port = parsed;
+  }
   const { startHub } = await import("../daemon.ts");
-  const hub = await startHub(port, ctx.memoryDir);
+  let hub;
+  try {
+    hub = await startHub(port, ctx.memoryDir);
+  } catch (err: any) {
+    console.error(`Error starting agency hub on port ${port}: ${err.message || err}`);
+    return 1;
+  }
   console.log(`Agency hub listening on ${hub.url}`);
-  return new Promise<number>(() => {
-    // Run until terminated; SIGINT/SIGTERM default handling tears down the server.
+  console.log(`Press Ctrl+C to stop.`);
+  return new Promise<number>((resolve) => {
+    const shutdown = async () => {
+      process.off("SIGINT", shutdown);
+      process.off("SIGTERM", shutdown);
+      console.log("\nShutting down agency hub...");
+      try {
+        await hub.close();
+      } catch {}
+      resolve(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
   });
 }
 

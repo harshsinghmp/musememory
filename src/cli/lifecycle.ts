@@ -1,5 +1,6 @@
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import {
+  get,
   list,
   propose,
   confirm,
@@ -8,6 +9,8 @@ import {
   markStale,
   reject,
   deleteEntry,
+  restoreEntry,
+  replayFromAudit,
 } from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { consolidateScenes } from "../consolidate.ts";
@@ -17,6 +20,7 @@ import { collectLoops, renderLoops } from "../loops.ts";
 import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
 import { loadRoutines, runRoutine, crontabLine, type Routine } from "../routines.ts";
 import { distillSkills } from "../distill.ts";
+import { runDistillRouter } from "../cognition/distill_router.ts";
 import { verifyEntry, verifyStrictIntegrity } from "../verify.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
@@ -127,13 +131,75 @@ export async function handleRejectCommand({ positional, flags }: ParsedArgs): Pr
 export async function handleDeleteCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const id = positional[0];
+  const id = positional[0]?.trim();
   if (!id) return usageError("delete requires <id>");
-  const ok = deleteEntry(ctx.store, id, flags["reason"], "cli_user");
-  if (!ok) {
+  if (id.includes("*") || id.includes("%") || id.includes("?") || id.includes(",") || id.toLowerCase() === "all") {
+    return fail("delete requires a single point ID; bulk or wildcard patterns are forbidden");
+  }
+  const entry = get(ctx.store, id);
+  if (!entry) {
     return fail(`no entry found with id ${id}`);
   }
+
+  const hasConfirmFlag =
+    flags["yes"] === "true" ||
+    flags["y"] === "true" ||
+    flags["apply"] === "true" ||
+    flags["force"] === "true" ||
+    flags["dry-run"] === "false" ||
+    flags["dryRun"] === "false";
+
+  if (!hasConfirmFlag) {
+    console.log(`[dry-run] Would tombstone entry '${id}' (${entry.title || entry.project}). Pass --apply or --yes to execute.`);
+    return 0;
+  }
+
+  const ok = deleteEntry(ctx.store, id, flags["reason"], "cli_user");
+  if (!ok) {
+    return fail(`failed to delete entry ${id}`);
+  }
   console.log(`deleted entry ${id}`);
+  return 0;
+}
+
+/**
+ * T-031/T-032: restore a tombstoned entry. `--replay` rebuilds the content from audit.jsonl,
+ * for entries whose row and YAML mirror are gone instead of merely tombstoned.
+ */
+export async function handleRestoreCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const id = positional[0];
+  if (!id) return usageError("restore requires <id>");
+  const replay = flags["replay"] !== undefined;
+
+  if (!replay) {
+    const out = restoreEntry(ctx.store, id, "cli_user");
+    if (out.ok) {
+      console.log(`restored entry ${id}`);
+      printEntry(out.entry);
+      return 0;
+    }
+    if (out.reason !== "not_found") return fail(`cannot restore ${id}: ${out.reason}`);
+    return fail(`no entry found with id ${id} (tombstone gone too — retry with --replay to rebuild from audit)`);
+  }
+
+  const dryRun = flags["apply"] !== "true";
+  const report = replayFromAudit(ctx.store, id, { apply: !dryRun });
+  if (!report.ok || !report.entry) {
+    return fail(`cannot replay ${id}: ${report.reason ?? "unknown reason"}`);
+  }
+  console.log(
+    `${dryRun ? "would replay" : "replayed"} ${id} from audit history (reconstructed: ${report.reconstructed.join(", ")})`,
+  );
+  console.log(`not reconstructable from audit: ${report.missing.join(", ")}`);
+  if (dryRun) {
+    printEntry(report.entry);
+    console.log("dry run — pass --apply to write this entry back");
+    return 0;
+  }
+  console.log(`restored entry ${id} from audit history`);
+  printEntry(report.entry);
   return 0;
 }
 
@@ -501,6 +567,39 @@ export async function handleDistillCommand({ flags }: ParsedArgs): Promise<numbe
     if (report.created.length === 0 && report.skippedExisting.length === 0) {
       console.log("No recurring fix patterns found.");
     }
+    return 0;
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleDistillRouteCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const force = flags["force"] === "true" || flags["force"] === "1";
+  const dryRun = flags["dry-run"] === "true" || flags["dry-run"] === "1";
+
+  try {
+    const result = runDistillRouter(ctx.store, {
+      workspaceRoot: ctx.root,
+      force,
+      dryRun,
+    });
+
+    console.log(`\n🧠 Knowledge Distillation Routing:`);
+    console.log(`- System Lane (Fixes/Rules): ${result.routed.system.length}`);
+    for (const item of result.routed.system) {
+      console.log(`  • [${item.id}] ${item.title}`);
+    }
+    console.log(`- Content Lane (Architecture/Concepts): ${result.routed.content.length}`);
+    for (const item of result.routed.content) {
+      console.log(`  • [${item.id}] ${item.title}${item.path ? ` -> ${item.path}` : ""}`);
+    }
+    console.log(`- Health Lane (Contradictions): ${result.routed.health.length}`);
+    for (const item of result.routed.health) {
+      console.log(`  • [${item.id}] ${item.title}`);
+    }
+    console.log(`\nSummary: ${result.total_routed} routed, ${result.skipped_surfaced} skipped (previously surfaced)\n`);
     return 0;
   } catch (err: unknown) {
     return fail(err instanceof Error ? err.message : String(err));

@@ -1,30 +1,112 @@
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
-import { STATUS_PENALTY } from "../types.ts";
-import { tokenize, daysSince } from "../retrieval.ts";
+import {
+  tokenize,
+  computeFactors,
+  evaluateQueryRelevance,
+  deriveWhyRetrieved,
+  isLowDiscrimination,
+  conditionalRerank,
+  clampLimit,
+  matchesWordBoundary,
+  evaluateAbstentionGate,
+  type AbstentionDecision,
+  type ScoreFactors,
+  type VeracityClass,
+  VERACITY_RANK_WEIGHTS,
+  resolveVeracityClass,
+  getVeracityWeight,
+  type TaskIntent,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+  type RrfConfig,
+  type RrfVariant,
+  type RrfWeights,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
+  type CandidateKeepReason,
+  type CandidateDropReason,
+  type CandidateEvaluation,
+  type RetrievalSourceChannel,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
+} from "../retrieval.ts";
 import { searchMemoriesFts } from "../sqlite.ts";
 import { defaultRegistry } from "../intelligence/registry.ts";
+import { getHotCandidateIds } from "../compounding/temporal.ts";
+import {
+  defaultReinjectionTracker,
+  filterSelfEchoes,
+  defaultSeenChunkTracker,
+} from "./suppression.ts";
 
-export interface ScoreFactors {
-  exactSymbolMatch: number;
-  pathMatch: number;
-  bm25Match: number;
-  graphOverlap: number;
-  blastRadius: number;
-  recencyDecay: number;
-  utilityBonus: number;
-  negativeWarningBonus: number;
-  timelessBoost: number;
-  statusPenalty: number;
-  baseApplicability: number;
-  totalScore: number;
+export type {
+  ScoreFactors,
+  AbstentionDecision,
+  VeracityClass,
+  TaskIntent,
+  RrfConfig,
+  RrfVariant,
+  RrfWeights,
+  CandidateKeepReason,
+  CandidateDropReason,
+  CandidateEvaluation,
+  RetrievalSourceChannel,
+};
+export {
+  isLowDiscrimination,
+  conditionalRerank,
+  deriveWhyRetrieved,
+  matchesWordBoundary,
+  evaluateAbstentionGate,
+  VERACITY_RANK_WEIGHTS,
+  resolveVeracityClass,
+  getVeracityWeight,
+  INTENT_BIAS_TABLE,
+  detectQueryIntent,
+  computeIntentMultiplier,
+  computeReinforcementMultiplier,
+  computeEffectiveScore,
+  RRF_PRESETS,
+  calculateRrfItemScore,
+  resolveRrfConfig,
+  reciprocalRankFusion,
+  deriveCandidateKeepReasons,
+  deriveCandidateDropReason,
+  evaluateCandidateDecisions,
+};
+
+/**
+ * T-114: Soft-OR evidence fusion formula: P = 1 - (1 - pv) * (1 - pl).
+ * Combines independent vector semantic probability (pv) and lexical/BM25 probability (pl)
+ * without artificial linear dilution.
+ */
+export function softOrFusion(pv: number, pl: number): number {
+  const clampedV = Math.max(0, Math.min(1, pv));
+  const clampedL = Math.max(0, Math.min(1, pl));
+  return 1 - (1 - clampedV) * (1 - clampedL);
 }
 
 export interface MultiFactorScoreResult {
   entry: MemoryEntry;
   score: number;
+  /** T-119: Multiplicative composite score: base × reinforcement × decay. */
+  effectiveScore?: number;
+  /** T-120: Reciprocal Rank Fusion score across multi-signal rankings. */
+  rrfScore?: number;
   factors: ScoreFactors;
+  why_retrieved?: string[];
+  /** T-121: Typed keep reasons explaining why this memory was preserved. */
+  keep_reasons?: CandidateKeepReason[];
+  /** T-121: Typed drop reasons if candidate was rejected. */
+  drop_reasons?: CandidateDropReason[];
 }
 
 export interface MultiFactorRankingOptions {
@@ -34,196 +116,55 @@ export interface MultiFactorRankingOptions {
   targetSymbol?: string;
   ftsMatchIds?: Set<string>;
   blastRadiusFiles?: Set<string>;
+  /** R21: precomputed semantic cosine scores by entry id. */
+  semanticScores?: Map<string, number>;
+  /** T-118: Caller or detected task intent for query-intent bias. */
+  taskIntent?: TaskIntent;
+  inferIntent?: boolean;
+  /** T-119: Use multiplicative effective_score (base × reinforcement × decay) for score. */
+  useEffectiveScore?: boolean;
+  /** T-314: Source channels from which candidate memories were surfaced. */
+  sourceChannels?: Map<string, Set<RetrievalSourceChannel>>;
 }
 
 /**
- * Multi-Factor Ranking Engine for MuseMemory (R5):
- * - Exact symbol match: +1.0
- * - Path / directory match: +0.4
- * - Lexical BM25 match (SQLite FTS5): +0.3
- * - Graph / call-graph overlap: +0.3 (if provider available)
- * - Blast-radius relevance: +0.25 (if provider available)
- * - Recency decay: -0.05 per 30 days untouched (0 for timeless)
- * - Utility / success-rate bonus: +0.25 for high reuse success
- * - Negative lesson warning bonus: +0.3 for anti-patterns matching query/files
- * - Invariant / timeless boost: +0.2 for constraint/timeless entries
- * - Status penalties: -0.8 conflicted, -0.5 stale/superseded
+ * muse_context's entry point into the one shared scorer (T-308): the same factor set
+ * scoreEntry uses, plus the code-context signals only muse_context can supply
+ * (active file, target symbol, FTS hits, blast radius).
  */
 export function calculateMultiFactorScore(
   entry: MemoryEntry,
   queryTokens: string[],
   options: MultiFactorRankingOptions = {},
 ): MultiFactorScoreResult {
-  const now = options.now ?? Date.now();
-  const lowerQueryTokens = queryTokens.map((t) => t.toLowerCase());
-  const entryText = `${entry.title} ${entry.content}`.toLowerCase();
+  const factors = computeFactors(entry, queryTokens, {
+    now: options.now ?? Date.now(),
+    workspaceRoot: options.workspaceRoot,
+    semanticScore: options.semanticScores?.get(entry.id) ?? 0,
+    activeFilePath: options.activeFilePath,
+    targetSymbol: options.targetSymbol,
+    ftsMatchIds: options.ftsMatchIds,
+    blastRadiusFiles: options.blastRadiusFiles,
+    taskIntent: options.taskIntent,
+    inferIntent: options.inferIntent,
+    sourceChannels: options.sourceChannels,
+  });
 
-  // 1. Base applicability
-  let matchedTokens = 0;
-  for (const token of lowerQueryTokens) {
-    if (entryText.includes(token)) matchedTokens++;
-  }
-  const baseApplicability = queryTokens.length > 0 ? (matchedTokens / queryTokens.length) * 0.5 : 0;
-
-  // 2. Exact Symbol Match (+1.0)
-  let exactSymbolMatch = 0;
-  const entrySymbols = new Set<string>();
-  if (entry.graph?.symbol_names) {
-    for (const s of entry.graph.symbol_names) entrySymbols.add(s.toLowerCase());
-  }
-  for (const tag of entry.tags ?? []) {
-    if (tag.length > 3 && !tag.includes("-") && !tag.includes(" ")) {
-      entrySymbols.add(tag.toLowerCase());
-    }
-  }
-  // Backtick symbol extractor from markdown
-  const backtickMatches = entryText.match(/`([a-zA-Z0-9_$]+)`/g);
-  if (backtickMatches) {
-    for (const m of backtickMatches) {
-      entrySymbols.add(m.replace(/`/g, "").toLowerCase());
-    }
-  }
-
-  if (options.targetSymbol && entrySymbols.has(options.targetSymbol.toLowerCase())) {
-    exactSymbolMatch = 1.0;
-  } else {
-    for (const token of lowerQueryTokens) {
-      if (entrySymbols.has(token)) {
-        exactSymbolMatch = 1.0;
-        break;
-      }
-    }
-  }
-
-  // 3. Path / Directory Match (+0.4)
-  let pathMatch = 0;
-  const pathsInEntry = new Set<string>();
-  if (entry.graph?.affected_paths) {
-    for (const p of entry.graph.affected_paths) pathsInEntry.add(p.toLowerCase());
-  }
-  for (const ev of entry.evidence ?? []) {
-    if (ev.source) pathsInEntry.add(ev.source.toLowerCase());
-  }
-
-  if (options.activeFilePath) {
-    const lowerActive = options.activeFilePath.toLowerCase();
-    for (const p of pathsInEntry) {
-      if (lowerActive.includes(p) || p.includes(lowerActive)) {
-        pathMatch = 0.4;
-        break;
-      }
-    }
-  }
-  if (pathMatch === 0) {
-    for (const token of lowerQueryTokens) {
-      if (token.includes("/") || token.endsWith(".ts") || token.endsWith(".js") || token.endsWith(".py")) {
-        for (const p of pathsInEntry) {
-          if (p.includes(token)) {
-            pathMatch = 0.4;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // 4. Lexical BM25 match (+0.3)
-  const bm25Match = options.ftsMatchIds && options.ftsMatchIds.has(entry.id) ? 0.3 : 0;
-
-  // 5. Graph / Call-Graph overlap (+0.3)
-  let graphOverlap = 0;
-  if (entry.graph?.symbol_names && entry.graph.symbol_names.length > 0 && queryTokens.length > 0) {
-    const symMatches = queryTokens.filter((t) => entrySymbols.has(t.toLowerCase())).length;
-    if (symMatches > 0) graphOverlap = 0.3;
-  }
-
-  // 6. Blast-Radius relevance (+0.25)
-  let blastRadius = 0;
-  if (options.blastRadiusFiles && options.blastRadiusFiles.size > 0) {
-    for (const p of pathsInEntry) {
-      if (options.blastRadiusFiles.has(p)) {
-        blastRadius = 0.25;
-        break;
-      }
-    }
-  }
-
-  // 7. Recency decay (-0.05 per 30 days untouched, 0 if timeless)
-  let recencyDecay = 0;
-  if (entry.temporal_mode !== "timeless" && entry.type !== "constraint") {
-    const decayBase = entry.valid_from ?? entry.updated_at;
-    const days = daysSince(decayBase, now);
-    const monthsUntouched = Math.floor(days / 30);
-    recencyDecay = -0.05 * Math.min(monthsUntouched, 6); // Cap decay at -0.30
-  }
-
-  // 8. Utility / success-rate bonus (+0.25)
-  let utilityBonus = 0;
-  if (entry.utility && entry.utility.application_count >= 1) {
-    const successRate = entry.utility.reuse_success_rate ?? 1.0;
-    if (successRate >= 0.75) {
-      utilityBonus = 0.25;
-    } else if (successRate < 0.4) {
-      utilityBonus = -0.25;
-    }
-  }
-
-  // 9. Negative lesson warning bonus (+0.3)
-  let negativeWarningBonus = 0;
-  if (entry.type === "negative" || entry.tags?.includes("anti-pattern") || entry.negative) {
-    // If the negative lesson matches the query or path context, boost so agents are warned
-    if (baseApplicability > 0 || exactSymbolMatch > 0 || pathMatch > 0) {
-      negativeWarningBonus = 0.3;
-    }
-  }
-
-  // 10. Invariant / Timeless Boost (+0.2)
-  let timelessBoost = 0;
-  if (entry.temporal_mode === "timeless" || entry.type === "constraint") {
-    timelessBoost = 0.2;
-  }
-
-  // 11. Status Penalty (-0.8 conflicted, -0.5 stale/superseded)
-  const statusPenalty = STATUS_PENALTY[entry.status] ?? 0;
-
-  const totalScore =
-    baseApplicability +
-    exactSymbolMatch +
-    pathMatch +
-    bm25Match +
-    graphOverlap +
-    blastRadius +
-    recencyDecay +
-    utilityBonus +
-    negativeWarningBonus +
-    timelessBoost +
-    statusPenalty;
-
-  const factors: ScoreFactors = {
-    baseApplicability,
-    exactSymbolMatch,
-    pathMatch,
-    bm25Match,
-    graphOverlap,
-    blastRadius,
-    recencyDecay,
-    utilityBonus,
-    negativeWarningBonus,
-    timelessBoost,
-    statusPenalty,
-    totalScore,
-  };
+  const score = options.useEffectiveScore ? (factors.effectiveScore ?? factors.totalScore) : factors.totalScore;
 
   return {
     entry,
-    score: totalScore,
+    score,
+    effectiveScore: factors.effectiveScore,
     factors,
+    why_retrieved: deriveWhyRetrieved(factors, entry),
+    keep_reasons: deriveCandidateKeepReasons(entry, factors),
   };
 }
 
 /**
  * Multi-Factor Ranked Context Retriever (R5).
- * Ranks candidates across all 11 factors and packs results within token budgets.
+ * Ranks candidates with the shared scorer (T-308) and packs results within token budgets.
  */
 export async function rankAndRetrieveMemories(
   store: Store,
@@ -236,19 +177,77 @@ export async function rankAndRetrieveMemories(
     targetSymbol?: string;
     includeSuperseded?: boolean;
     now?: number;
+    /** R21: precomputed semantic cosine scores by entry id. */
+    semanticScores?: Map<string, number>;
+    /** T-108: Session ID for turn-level re-injection suppression. */
+    sessionId?: string;
+    /** T-108: Session turn number. */
+    sessionTurn?: number;
+    /** T-108: Suppress memories injected in previous turns (default true if sessionId present). */
+    suppressReinjection?: boolean;
+    /** T-108: Turn window for suppression (default 6). */
+    reinjectionWindow?: number;
+    /** T-109: Suppress memories created by caller session/agent within echo horizon (default true). */
+    suppressSelfEcho?: boolean;
+    /** T-109: Self-echo horizon in milliseconds (default 10 minutes). */
+    echoHorizonMs?: number;
+    /** T-109: Caller agent name/identifier for provenance checking. */
+    agent?: string;
+    /** T-111: Suppress chunks/memories already seen within TTL window. */
+    suppressSeenChunks?: boolean;
+    /** T-111: Seen-chunk TTL in milliseconds (default: 5 minutes / 300,000ms). */
+    seenChunkTtlMs?: number;
+    /** T-111: Whether to record returned entries into seen-chunk tracker. */
+    recordSeenChunks?: boolean;
+    /** T-118: Caller or detected task intent for query-intent bias. */
+    taskIntent?: TaskIntent;
+    inferIntent?: boolean;
+    /** T-119: Rank candidates by multiplicative effective_score (base × reinforcement × decay) instead of additive totalScore. */
+    useEffectiveScore?: boolean;
+    /** T-120: Rank candidates using Reciprocal Rank Fusion (RRF). */
+    useRrf?: boolean;
+    /** T-120: RRF configuration when useRrf is enabled. */
+    rrfConfig?: RrfConfig;
+    /** T-120: A/B testing variant for RRF presets ('A'/'control' vs 'B'/'treatment'). */
+    rrfVariant?: RrfVariant;
   } = {},
 ): Promise<MultiFactorScoreResult[]> {
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
   const workspaceRoot = store.dir;
+  const effectiveTaskIntent =
+    options.taskIntent ??
+    (options.inferIntent !== false && query.trim().length > 0 ? detectQueryIntent(query) : undefined);
 
-  // 1. Optional FTS5 BM25 match pre-flight
+  // 1. T-070 & T-072: FTS5-tokenizer-matched abstention gate before FTS5 search
   const ftsMatchIds = new Set<string>();
-  if (store.db && query.trim()) {
+  const abstention = evaluateAbstentionGate(query);
+  if (store.db && query.trim() && !abstention.abstain) {
     try {
       const ftsResults = searchMemoriesFts(store.db, query);
-      for (const res of ftsResults.slice(0, 15)) {
-        ftsMatchIds.add(res.entry.id);
+      if (ftsResults.degraded) {
+        console.warn(`[FTS5_DEGRADED] Lexical FTS signal unavailable for ranking query "${query}": ${ftsResults.error}`);
+      } else {
+        for (const res of ftsResults.slice(0, 15)) {
+          ftsMatchIds.add(res.entry.id);
+        }
+      }
+    } catch (err) {
+      console.warn(`[FTS5_DEGRADED] FTS exception during ranking: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // 1.5. T-307: Hebbian associative candidate expansion from top matches
+  if (store.memoryDir && ftsMatchIds.size > 0) {
+    try {
+      const { getAssociatedMemories } = await import("../plasticity.ts");
+      for (const id of Array.from(ftsMatchIds).slice(0, 3)) {
+        const associated = getAssociatedMemories(id, store.memoryDir);
+        for (const assoc of associated.slice(0, 5)) {
+          if (assoc.weight >= 0.2) {
+            ftsMatchIds.add(assoc.targetId);
+          }
+        }
       }
     } catch {}
   }
@@ -273,8 +272,66 @@ export async function rankAndRetrieveMemories(
   if (!options.includeSuperseded) {
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
   }
+  // T-108: Re-injection suppression per session
+  if (options.sessionId && options.suppressReinjection !== false) {
+    const filtered = defaultReinjectionTracker.filterSuppressed(options.sessionId, entries, {
+      turn: options.sessionTurn,
+      window: options.reinjectionWindow,
+    });
+    entries = filtered.allowed;
+  }
+  // T-109: Self-echo suppression via capture-side provenance
+  if (options.suppressSelfEcho !== false && (options.sessionId || options.agent)) {
+    const echoFiltered = filterSelfEchoes(entries, {
+      sessionId: options.sessionId,
+      agent: options.agent,
+      now,
+      echoHorizonMs: options.echoHorizonMs,
+    });
+    entries = echoFiltered.allowed;
+  }
+  // T-111: Seen-chunk TTL suppression
+  if (options.sessionId && (options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+    const seenFiltered = defaultSeenChunkTracker.filterSeen(options.sessionId, entries, {
+      now,
+      ttlMs: options.seenChunkTtlMs,
+    });
+    entries = seenFiltered.allowed;
+  }
 
-  // 4. Score candidates
+  // T-137: Vector-upgrade degradation path — resolve semantic scores if embedder configured
+  let semanticScores = options.semanticScores;
+  if (!semanticScores && store.db && query.trim()) {
+    try {
+      const { semanticScoresFor } = await import("./embed-store.ts");
+      semanticScores = (await semanticScoresFor(store, query)) ?? undefined;
+    } catch {
+      // Cleanly degrade to FTS5 floor without throwing
+      semanticScores = undefined;
+    }
+  }
+
+  // 4. T-314: Ingest hot candidate IDs and build candidate origin sources
+  const candidateSources = new Map<string, Set<RetrievalSourceChannel>>();
+  const hotIds = getHotCandidateIds(store, store.memoryDir || store.dir);
+  for (const id of hotIds) {
+    if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+    candidateSources.get(id)!.add("hot");
+  }
+  for (const id of ftsMatchIds) {
+    if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+    candidateSources.get(id)!.add("fts");
+  }
+  if (semanticScores) {
+    for (const [id, score] of semanticScores) {
+      if (score >= 0.30) {
+        if (!candidateSources.has(id)) candidateSources.set(id, new Set());
+        candidateSources.get(id)!.add("vector");
+      }
+    }
+  }
+
+  // Score candidates
   const scored = entries.map((entry) =>
     calculateMultiFactorScore(entry, queryTokens, {
       now,
@@ -283,30 +340,86 @@ export async function rankAndRetrieveMemories(
       targetSymbol: options.targetSymbol,
       ftsMatchIds,
       blastRadiusFiles,
+      semanticScores,
+      taskIntent: effectiveTaskIntent,
+      useEffectiveScore: options.useEffectiveScore,
+      sourceChannels: candidateSources,
     }),
   );
 
-  // 5. Sort descending by totalScore
+  // 4.5. T-120: Optional Reciprocal Rank Fusion (RRF) across multi-signals
+  if (options.useRrf || options.rrfVariant !== undefined || options.rrfConfig !== undefined) {
+    const { k, weights, variant } = resolveRrfConfig(
+      options.rrfConfig ?? (options.rrfVariant ? { variant: options.rrfVariant } : {}),
+    );
+
+    // Compute ranks across 4 key signals: lexical, semantic, graph, recency
+    const lexicalRanked = [...scored].sort((a, b) => (b.factors.baseApplicability + b.factors.bm25Match) - (a.factors.baseApplicability + a.factors.bm25Match));
+    const semanticRanked = [...scored].sort((a, b) => (b.factors.semanticMatch ?? 0) - (a.factors.semanticMatch ?? 0));
+    const graphRanked = [...scored].sort((a, b) => (b.factors.exactSymbolMatch + b.factors.graphOverlap + b.factors.blastRadius) - (a.factors.exactSymbolMatch + a.factors.graphOverlap + a.factors.blastRadius));
+    const recencyRanked = [...scored].sort((a, b) => {
+      const bU = Date.parse(b.entry.updated_at);
+      const aU = Date.parse(a.entry.updated_at);
+      return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
+    });
+
+    const lexRanks = new Map<string, number>();
+    lexicalRanked.forEach((s, idx) => lexRanks.set(s.entry.id, idx + 1));
+    const semRanks = new Map<string, number>();
+    semanticRanked.forEach((s, idx) => semRanks.set(s.entry.id, idx + 1));
+    const graphRanks = new Map<string, number>();
+    graphRanked.forEach((s, idx) => graphRanks.set(s.entry.id, idx + 1));
+    const recencyRanks = new Map<string, number>();
+    recencyRanked.forEach((s, idx) => recencyRanks.set(s.entry.id, idx + 1));
+
+    for (const item of scored) {
+      const rrf = calculateRrfItemScore([
+        { rank: lexRanks.get(item.entry.id) ?? 999, weight: weights.lexical ?? 1.0, signal: "lexical" },
+        { rank: semRanks.get(item.entry.id) ?? 999, weight: weights.semantic ?? 1.0, signal: "semantic" },
+        { rank: graphRanks.get(item.entry.id) ?? 999, weight: weights.graph ?? 0.8, signal: "graph" },
+        { rank: recencyRanks.get(item.entry.id) ?? 999, weight: weights.recency ?? 0.5, signal: "recency" },
+      ], k);
+      item.rrfScore = rrf;
+      item.score = rrf;
+      item.why_retrieved = item.why_retrieved ?? [];
+      item.why_retrieved.push("rrf_fused");
+      if (variant) {
+        item.why_retrieved.push(`rrf_variant:${variant}`);
+      }
+    }
+  }
+
+  // 5. Sort descending by score (or effectiveScore if useEffectiveScore is true) and apply conditional rerank (T-115)
   scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+    const valA = options.useEffectiveScore ? (a.effectiveScore ?? a.score) : a.score;
+    const valB = options.useEffectiveScore ? (b.effectiveScore ?? b.score) : b.score;
+    if (valB !== valA) return valB - valA;
     const bU = Date.parse(b.entry.updated_at);
     const aU = Date.parse(a.entry.updated_at);
     return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
   });
+  const ranked = conditionalRerank(scored);
 
-  const limit = options.limit ?? 10;
+  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 200, 1) : 10;
 
   // 6. Token Budget Knapsack Packing: Critical constraints fit first
   if (options.tokenBudget && options.tokenBudget > 0) {
     const packed: MultiFactorScoreResult[] = [];
     let tokensUsed = 0;
 
-    // First pass: pack high-scoring critical constraints / timeless rules
-    const criticalConstraints = scored.filter(
-      (s) => (s.entry.type === "constraint" || s.entry.temporal_mode === "timeless") && s.score > 0.5,
+    // First pass: pack high-scoring critical constraints / timeless rules / negative lessons
+    const isPriorityGuardrail = (e: MemoryEntry) =>
+      e.type === "constraint" ||
+      e.temporal_mode === "timeless" ||
+      e.type === "negative" ||
+      e.tags?.includes("anti-pattern") ||
+      e.negative;
+
+    const priorityGuardrails = ranked.filter(
+      (s) => isPriorityGuardrail(s.entry) && s.score > 0.4,
     );
 
-    for (const item of criticalConstraints) {
+    for (const item of priorityGuardrails) {
       if (packed.length >= limit) break;
       const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
       if (tokensUsed + tokens <= options.tokenBudget) {
@@ -317,7 +430,7 @@ export async function rankAndRetrieveMemories(
 
     // Second pass: pack remaining highest-scoring entries
     const packedIds = new Set(packed.map((p) => p.entry.id));
-    for (const item of scored) {
+    for (const item of ranked) {
       if (packed.length >= limit) break;
       if (packedIds.has(item.entry.id)) continue;
       const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
@@ -327,8 +440,24 @@ export async function rankAndRetrieveMemories(
       }
     }
 
-    return packed;
+    const results = packed;
+    if (options.sessionId && (options.recordSeenChunks || options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+      defaultSeenChunkTracker.recordSeen(
+        options.sessionId,
+        results.map((r) => r.entry),
+        { now, ttlMs: options.seenChunkTtlMs }
+      );
+    }
+    return results;
   }
 
-  return scored.slice(0, limit);
+  const results = ranked.slice(0, limit);
+  if (options.sessionId && (options.recordSeenChunks || options.suppressSeenChunks || options.seenChunkTtlMs !== undefined)) {
+    defaultSeenChunkTracker.recordSeen(
+      options.sessionId,
+      results.map((r) => r.entry),
+      { now, ttlMs: options.seenChunkTtlMs }
+    );
+  }
+  return results;
 }

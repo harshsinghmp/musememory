@@ -170,6 +170,17 @@ export function handleRequest(raw: string) {
       expect(symbols.length).toBeGreaterThan(0);
       expect(symbols[0].name).toBe("bootstrapApp");
     });
+
+    it("T-013: keeps LspProvider dormant in chain without crashing or activating", async () => {
+      const lsp = new LspProvider(true);
+      expect(lsp.name).toBe("lsp");
+      expect(lsp.isAvailable(testDir)).toBe(false);
+
+      const registry = new ProviderRegistry([lsp, new HeuristicFallbackProvider()]);
+      const available = await registry.getAvailableProviders(testDir);
+      expect(available.some((p) => p.name === "lsp")).toBe(false);
+      expect(available.some((p) => p.name === "heuristic")).toBe(true);
+    });
   });
 
   describe("Memory Enrichment Integration", () => {

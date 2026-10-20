@@ -106,7 +106,7 @@ describe("universal memory migrator & auto-detection", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  test("LettaAdapter routes core memory (human/persona) to constraints", () => {
+  test("LettaAdapter routes core memory (human/persona) to standard memories without constraint injection", () => {
     const root = temp();
     const lettaPath = join(root, "letta_agent.json");
     writeFileSync(
@@ -126,12 +126,21 @@ describe("universal memory migrator & auto-detection", () => {
     const recs = LettaAdapter.extract(lettaPath);
     expect(recs.length).toBe(3);
 
+    // T-339 / F-05: Ensure core memories are NOT flagged as constraints
     const constraints = recs.filter((r) => r.isConstraint);
-    expect(constraints.length).toBe(2);
-    expect(constraints.some((c) => c.title.includes("Human"))).toBe(true);
-    expect(constraints.some((c) => c.title.includes("Persona"))).toBe(true);
+    expect(constraints.length).toBe(0);
 
-    const archival = recs.find((r) => !r.isConstraint);
+    const human = recs.find((r) => r.title.includes("Human"));
+    expect(human).toBeDefined();
+    expect(human?.type).toBe("preference");
+    expect(human?.isConstraint).toBe(false);
+
+    const persona = recs.find((r) => r.title.includes("Persona"));
+    expect(persona).toBeDefined();
+    expect(persona?.type).toBe("architecture");
+    expect(persona?.isConstraint).toBe(false);
+
+    const archival = recs.find((r) => r.title.includes("Archival"));
     expect(archival?.status).toBe("confirmed");
 
     rmSync(root, { recursive: true, force: true });

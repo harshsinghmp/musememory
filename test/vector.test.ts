@@ -118,4 +118,30 @@ describe("hybrid fusion search", () => {
     expect(results.every((r) => r.entry.id !== "m_9999999999_ghost")).toBe(true);
     cleanup(root);
   });
+
+  test("T-304: save() incrementally updates index.json and deleteEntry() removes it", () => {
+    const { root, memoryDir, store } = setup();
+    const e1 = propose(store, { title: "First memory", content: "first content", project: "aria", confirmed: true });
+
+    // 1. Build initial index
+    const index = rebuildIndex(store);
+    saveIndex(index, memoryDir);
+    expect(Object.keys(loadIndex(memoryDir)!.entries).length).toBe(1);
+
+    // 2. Save a second memory: verify index.json now has 2 entries without manual rebuild
+    const e2 = propose(store, { title: "Second memory", content: "second content", project: "aria", confirmed: true });
+    const updatedIndex = loadIndex(memoryDir)!;
+    expect(Object.keys(updatedIndex.entries).length).toBe(2);
+    expect(updatedIndex.entries[e2.id]).toBeDefined();
+
+    // 3. Delete e1: verify e1 is removed from index.json
+    const { deleteEntry } = require("../src/store.ts");
+    deleteEntry(store, e1.id);
+    const postDeleteIndex = loadIndex(memoryDir)!;
+    expect(Object.keys(postDeleteIndex.entries).length).toBe(1);
+    expect(postDeleteIndex.entries[e1.id]).toBeUndefined();
+    expect(postDeleteIndex.entries[e2.id]).toBeDefined();
+
+    cleanup(root);
+  });
 });

@@ -67,7 +67,8 @@ export type MemoryStatus =
   | "conflicted"
   | "cold"
   | "dormant"
-  | "archived";
+  | "archived"
+  | "expired";
 
 export type MemoryScope = "local" | "project" | "global";
 
@@ -101,6 +102,7 @@ export interface CodeAnchor {
   id: string;
   kind: CodeAnchorKind;
   file_path: string;
+  base_path?: string;
   symbol_name?: string;
   qualified_name?: string;
   structural_hash?: string;
@@ -115,9 +117,33 @@ export type TemporalMode = "current" | "historical" | "timeless";
 
 export type MemoryQuality = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED" | "CONFLICTED" | "STALE";
 
+export interface SemanticFactTriple {
+  entity: string;
+  relation: string;
+  target: string;
+  scope?: string;
+}
+
+/**
+ * T-099: Append-only fact provenance record tracking triple origin and evidence.
+ */
+export interface FactProvenanceRecord {
+  id: string;
+  memory_id: string;
+  entity: string;
+  relation: string;
+  target: string;
+  scope?: string;
+  source?: string;
+  session_id?: string;
+  confidence?: number;
+  data?: string;
+  created_at: string;
+}
+
 export interface EvidenceItem {
   id: string;
-  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence";
+  type: "raw" | "fetch" | "search" | "infer" | "code" | "test" | "git" | "doc" | "human" | "code_intelligence" | "observed" | "reproducible";
   source?: string;
   timestamp: string;
   excerpt?: string;
@@ -133,6 +159,18 @@ export interface MemoryUtility {
   contradictions: number;
   last_applied_at?: string;
   reuse_success_rate?: number;
+  /** T-127: Ratio of applications to retrievals (usage_rate = application_count / retrieval_count). */
+  usage_rate?: number;
+  /** T-127: Return-on-investment score reflecting value delivered per retrieval turn. */
+  roi_score?: number;
+  /** T-313: Active un-decayed corroborated strikes (0-3). */
+  regression_strikes?: number;
+  /** T-313: ISO timestamp of latest attributed failure. */
+  last_regression_at?: string;
+  /** T-313: Session ID of latest regression to deduplicate retry loops. */
+  last_regression_session?: string;
+  /** T-313: Count of clean runs since last strike. */
+  clean_runs_since_regression?: number;
 }
 
 export type VerificationLevel =
@@ -170,10 +208,21 @@ export interface MemoryEntry {
   status: MemoryStatus;
   created_at: string;
   updated_at: string;
+  /** T-128: Draft flag marking preliminary memory, kept isolated from confident answers. */
+  draft?: boolean;
   /** Valid-time (event time) start; decay uses this when set (bi-temporal). */
   valid_from?: string;
   /** Valid-time end, set when an entry leaves active knowledge (stale/rejected/superseded). */
   valid_to?: string;
+  /** T-082: Explicit flag indicating whether valid_to is a known exact historical cessation boundary. */
+  valid_to_exact?: boolean;
+  /** T-090: Original ISO 8601 timestamp of underlying source document or evidence. Memory freshness cannot exceed this timestamp. */
+  src_ts?: string;
+  /** T-084: Five-verb lifecycle audit stamps */
+  corrected_at?: string;
+  correction_reason?: string;
+  ended_at?: string;
+  reverted_at?: string;
   /** Reinforcement counter: +1 on confirm, -1 on stale/reject/supersede. */
   reinforcement?: number;
   source?: string;
@@ -182,10 +231,16 @@ export interface MemoryEntry {
   salience?: number;
   supersedes?: string | string[] | null;
   superseded_by?: string | string[] | null;
+  /** T-100: First-class lineage foreign key pointing to superseded memory ID. */
+  supersedes_id?: string | null;
+  /** T-100: First-class lineage foreign key pointing to conflicting memory ID. */
+  conflicts_with_id?: string | null;
   disputed_by?: string[];
   verification?: Verification;
   last_confirmed_at?: string | null;
   related_memory_ids?: string[];
+  /** T-095: Write-time graph edges seeded during capture linking to recent or related memories. */
+  linked_memory_ids?: string[];
   session_id?: string;
   /** Executable verification command for the Verification Oracle (memory verify). */
   test_command?: string;
@@ -222,6 +277,58 @@ export interface MemoryEntry {
   anchors?: CodeAnchor[];
   /** First-class Architecture Decision Record (ADR) metadata. */
   adr?: AdrDetails;
+  /** Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry") alongside UUID id. */
+  mem_path?: string;
+  /** ISO timestamp of the most recent recall via queryContext / get_context. */
+  last_accessed_at?: string | null;
+  /** Number of times this memory was accessed via recall / get_context. */
+  access_count?: number;
+  /** T-038: Unique idempotency key to prevent duplicate writes during retries. */
+  idempotency_key?: string;
+  /** T-040: Normalized (whitespace/case folded) content hash for fast SQLite deduplication. */
+  content_hash?: string;
+  /** T-075: Ingest provenance trust tier (trusted = user/direct, candidate = agent/inference, untrusted = web/external). */
+  trust?: TrustTier;
+  /** T-087: Semantic (entity, relation, target, scope) fact triples for scoped invalidation. */
+  triples?: SemanticFactTriple[];
+  /** T-104: Retention score computed at admission (must be >= 0.30 to pass write gate). */
+  score_retain?: number;
+  /** T-391: Validated citation source IDs referencing live sources in sources.json. */
+  source_ids?: string[];
+  /** T-139: True if entry failed or was missed during embedding reindex/build. */
+  stale_embedder?: boolean;
+  /** T-074: Materialized decay retention score (1.0 = fully fresh, 0.0 = fully decayed) based on importance-gated half-life. */
+  decay_score?: number;
+  /** T-076: Bayesian confidence score computed from independent corroboration C(n) = 1 - 0.7^n. */
+  confidence?: number;
+  /** T-078 & T-080: Pin status exempting memory from expiration policies. */
+  pinned?: boolean;
+  /** T-079: Timestamp when the memory was expired. */
+  expired_at?: string;
+  /** T-079: Rule name that caused the memory expiration (e.g. 'ttl_fix_90d', 'governor_sweep'). */
+  expired_by?: string;
+  /** T-081: Optional decay model override ('exponential' or 'weibull'). */
+  decay_model?: "exponential" | "weibull";
+}
+
+export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";
+
+export type OutboxStatus = "pending" | "processing" | "sent" | "held" | "failed";
+
+export interface OutboxEntry {
+  id: string;
+  entry_id: string;
+  operation: string;
+  payload: string;
+  status: OutboxStatus;
+  idempotency_key?: string | null;
+  auto_replay: boolean;
+  attempts: number;
+  last_attempt_at?: string | null;
+  locked_at?: string | null;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export const STATUS_PENALTY: Record<MemoryStatus, number> = {
@@ -236,6 +343,7 @@ export const STATUS_PENALTY: Record<MemoryStatus, number> = {
   cold: -0.2,
   dormant: -0.5,
   archived: -0.9,
+  expired: -1.0,
 };
 
 export const VERIFICATION_BONUS: Record<VerificationLevel, number> = {
@@ -252,6 +360,11 @@ export const DEFAULT_CONTEXT_LIMIT = 5;
 export const MAX_TITLE_LENGTH = 120;
 export const MAX_TAGS = 8;
 
+// Decay/staleness policy intentionally lives in ./retention.ts, which is the single
+// source of truth for half-life curves, verification multipliers, and thresholds.
+// Do not redeclare a StalenessPolicy type or policy table here — importing from
+// retention.ts into types.ts would invert the dependency direction.
+
 export type AuditOperation =
   | "propose"
   | "confirm"
@@ -263,6 +376,8 @@ export type AuditOperation =
   | "import"
   | "transcript_import"
   | "verify"
+  | "verify_refused"
+  | "restore"
   | "conflict_detected"
   | "conflict_resolved"
   | "application_outcome"
@@ -278,7 +393,23 @@ export type AuditOperation =
   | "adr_recorded"
   | "adr_superseded"
   | "drift_detected"
-  | "optimize";
+  | "optimize"
+  | "memory_branch"
+  | "memory_checkout"
+  | "memory_blame"
+  | "expire"
+  | "lifecycle_change"
+  | "lifecycle_end"
+  | "lifecycle_correct"
+  | "lifecycle_revert"
+  | "lifecycle_forget"
+  | "merkle_checkpoint"
+  | "stage_pending_promotion"
+  | "cancel_pending_promotion"
+  | "flush_pending_promotions"
+  | "regression_strike"
+  | "strike_decay"
+  | "dispute_triggered";
 
 export interface AuditEntry {
   timestamp: string;
@@ -288,6 +419,31 @@ export interface AuditEntry {
   actor?: string;
   reason?: string;
   details?: Record<string, any>;
+  /** T-102: SHA-256 hash of the immediately preceding audit entry in the chain. */
+  prev_hash?: string;
+  /** T-102: Cryptographic SHA-256 hash of this entry with per-day salt. */
+  hash?: string;
+  /** T-102: Date partition for the per-day salt (YYYY-MM-DD). */
+  salt_date?: string;
+}
+
+/** T-102: Session-scoped Merkle tree checkpoint. */
+export interface MerkleCheckpoint {
+  checkpoint_id: string;
+  session_id: string;
+  timestamp: string;
+  merkle_root: string;
+  leaf_count: number;
+  leaves: string[];
+  daily_salt: string;
+}
+
+/** T-102: Merkle inclusion proof for verifiable audit logs. */
+export interface MerkleProof {
+  leaf: string;
+  index: number;
+  siblings: string[];
+  root: string;
 }
 
 export interface SearchOptions {
@@ -304,7 +460,15 @@ export interface SearchOptions {
   tokenBudget?: number;
   includeArchived?: boolean;
   autoRehydrate?: boolean;
+  /** T-075: Include memories with untrusted provenance (filtered by default). */
+  includeUntrusted?: boolean;
+  /** T-021: Optional workspace root for memoized runtime file verification. */
+  workspaceRoot?: string;
+  /** T-089: Minimum provenance veracity class or weight threshold (user: 1.0, agent: 0.7, external: 0.5, system: 0.3). */
+  minVeracity?: VeracityClass | number;
 }
+
+export type VeracityClass = "user" | "agent" | "external" | "system";
 
 export type SourceType = "primary" | "secondary" | "documentation" | "rfc" | "repo" | "article" | string;
 

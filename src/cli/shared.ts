@@ -8,23 +8,32 @@ export interface ParsedArgs {
   flags: Record<string, string>;
 }
 
+function isFlagToken(arg: string): boolean {
+  return arg.startsWith("-") && !/^-\d+(\.\d+)?$/.test(arg) && arg !== "--";
+}
+
 export function parseFlags(args: string[]): ParsedArgs {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a.startsWith("--")) {
-      const [key, val] = a.slice(2).split("=");
-      if (val !== undefined) {
+    if (a === "--") {
+      positional.push(...args.slice(i + 1));
+      break;
+    } else if (a.startsWith("--")) {
+      const eqIdx = a.indexOf("=");
+      if (eqIdx !== -1) {
+        const key = a.slice(2, eqIdx);
+        const val = a.slice(eqIdx + 1);
         flags[key] = val;
-      } else if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
-        flags[key] = args[++i];
+      } else if (i + 1 < args.length && !isFlagToken(args[i + 1])) {
+        flags[a.slice(2)] = args[++i];
       } else {
-        flags[key] = "true";
+        flags[a.slice(2)] = "true";
       }
-    } else if (a.startsWith("-")) {
+    } else if (a.startsWith("-") && !/^-\d+(\.\d+)?$/.test(a)) {
       const key = a.slice(1);
-      if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+      if (i + 1 < args.length && !isFlagToken(args[i + 1])) {
         flags[key] = args[++i];
       } else {
         flags[key] = "true";

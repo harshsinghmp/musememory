@@ -1,8 +1,31 @@
+import { randomUUID } from "node:crypto";
 import type { Store } from "../store.ts";
 import { get, list, save, supersede, reject } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
 import { computeJaccardSimilarity, normalizeText } from "./dedup.ts";
+import {
+  type ConflictRecord,
+  insertOrUpdateConflict,
+  getConflictById,
+  findConflictBetween,
+  listConflictsFromDb,
+} from "../sqlite.ts";
+import {
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+} from "./invalidation.ts";
+export {
+  evaluateScopedInvalidation,
+  extractFactTriples,
+  evaluateScopedAlignment,
+  type SemanticFactTriple,
+  type ScopedInvalidationResult,
+};
+export type { ConflictRecord };
 
 export interface ConflictDetection {
   conflicted: boolean;
@@ -24,10 +47,20 @@ const CONTRADICTORY_PAIRS: [RegExp, RegExp, string][] = [
 
 /**
  * Detects if a candidate memory contradicts an existing active or confirmed memory.
+ * Evaluates semantic (entity, relation, target) alignment to avoid false positive
+ * contradictions when facts apply to different scopes (e.g. dev vs prod, mobile vs desktop).
  */
 export function detectConflict(
   store: Store,
-  candidate: { title: string; content: string; project?: string; type?: MemoryType; id?: string },
+  candidate: {
+    title: string;
+    content: string;
+    project?: string;
+    type?: MemoryType;
+    id?: string;
+    triples?: SemanticFactTriple[];
+    tags?: string[];
+  },
 ): ConflictDetection {
   const candidateText = `${candidate.title} ${candidate.content}`.toLowerCase();
   const entries = list(store, candidate.project ? { project: candidate.project } : undefined);
@@ -37,6 +70,34 @@ export function detectConflict(
     if (candidate.id && entry.id === candidate.id) continue;
     // Only check active or confirmed memories
     if (entry.status !== "active" && entry.status !== "confirmed" && entry.status !== "conflicted") {
+      continue;
+    }
+
+    // T-087: Scoped invalidation requiring (entity, relation, target) alignment
+    const scopedCheck = evaluateScopedInvalidation(entry, candidate);
+    if (scopedCheck.shouldInvalidate) {
+      const entryText = `${entry.title} ${entry.content}`.toLowerCase();
+      let pairReason = "";
+      for (const [patternA, patternB, reason] of CONTRADICTORY_PAIRS) {
+        if ((patternA.test(candidateText) && patternB.test(entryText)) || (patternB.test(candidateText) && patternA.test(entryText))) {
+          pairReason = `${reason} between candidate and "${entry.title}" (${entry.id})`;
+          break;
+        }
+      }
+      const combinedReason = pairReason
+        ? `${pairReason}: ${scopedCheck.reason}`
+        : scopedCheck.reason || `Scoped contradiction detected with "${entry.title}" (${entry.id})`;
+
+      return {
+        conflicted: true,
+        conflictingEntry: entry,
+        confidence: scopedCheck.confidence,
+        reason: combinedReason,
+      };
+    }
+
+    // If scoped check explicitly detected an entity or scope differentiation (e.g. dev vs prod, macos vs mobile), skip polarity contradiction
+    if (scopedCheck.reason && !scopedCheck.aligned && !scopedCheck.shouldInvalidate) {
       continue;
     }
 
@@ -81,13 +142,21 @@ export function detectConflict(
 
 /**
  * Flags both memories into CONFLICTED state with mutual cross-references.
+ * Preserves BOTH memories in the store and records the conflict into the
+ * persistent SQLite conflicts table (keep-both, never delete).
  */
 export function flagConflict(
   store: Store,
   existingId: string,
   newId: string,
   reason: string,
-): { existing: MemoryEntry; incoming: MemoryEntry } {
+  options?: {
+    conflict_type?: string;
+    confidence?: number;
+    data?: Record<string, any>;
+    conflictId?: string;
+  },
+): { existing: MemoryEntry; incoming: MemoryEntry; conflict?: ConflictRecord } {
   const existing = get(store, existingId);
   const incoming = get(store, newId);
 
@@ -99,6 +168,9 @@ export function flagConflict(
   const existingConflicts = new Set(existing.conflict_ids || []);
   existingConflicts.add(newId);
   existing.conflict_ids = [...existingConflicts];
+  if (!existing.conflicts_with_id) {
+    existing.conflicts_with_id = newId;
+  }
   existing.status = "conflicted";
   existing.quality = "CONFLICTED";
   existing.updated_at = new Date().toISOString();
@@ -108,10 +180,42 @@ export function flagConflict(
   const incomingConflicts = new Set(incoming.conflict_ids || []);
   incomingConflicts.add(existingId);
   incoming.conflict_ids = [...incomingConflicts];
+  incoming.conflicts_with_id = existingId;
   incoming.status = "conflicted";
   incoming.quality = "CONFLICTED";
   incoming.updated_at = new Date().toISOString();
   save(store, incoming);
+
+  // Record into persistent conflicts table (keep-both, never delete)
+  let conflictRecord: ConflictRecord | undefined;
+  if (store.db) {
+    const existingCfl = findConflictBetween(store.db, existingId, newId);
+    const now = new Date().toISOString();
+    if (existingCfl) {
+      conflictRecord = {
+        ...existingCfl,
+        status: "open",
+        reason: reason || existingCfl.reason,
+        updated_at: now,
+      };
+      insertOrUpdateConflict(store.db, conflictRecord);
+    } else {
+      conflictRecord = {
+        id: options?.conflictId || `cfl_${randomUUID().slice(0, 8)}`,
+        memory_a_id: existingId,
+        memory_b_id: newId,
+        status: "open",
+        conflict_type: options?.conflict_type ?? "opposing_polarity",
+        confidence: options?.confidence ?? 0.85,
+        reason,
+        detected_at: now,
+        data: options?.data,
+        created_at: now,
+        updated_at: now,
+      };
+      insertOrUpdateConflict(store.db, conflictRecord);
+    }
+  }
 
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
@@ -121,11 +225,12 @@ export function flagConflict(
       details: {
         conflicted_with: existingId,
         reason,
+        conflict_id: conflictRecord?.id,
       },
     });
   }
 
-  return { existing, incoming };
+  return { existing, incoming, conflict: conflictRecord };
 }
 
 export interface ConflictResolutionOptions {
@@ -134,12 +239,14 @@ export interface ConflictResolutionOptions {
   reason: string;
   strategy: "supersede" | "historical" | "reject" | "keep_both";
   actor?: string;
+  conflictId?: string;
 }
 
 export interface ConflictResolutionResult {
   success: boolean;
   winning: MemoryEntry;
   losing?: MemoryEntry;
+  conflict?: ConflictRecord;
   message: string;
 }
 
@@ -149,6 +256,9 @@ export interface ConflictResolutionResult {
  * - 'historical': Losing memory preserved as historical context ("used to..."), winning marked current.
  * - 'reject': Losing memory rejected as invalid/false assertion.
  * - 'keep_both': Both un-conflicted with resolved contextual notes.
+ *
+ * Crucially: Neither memory nor the conflict row is ever deleted. The conflict row
+ * is updated to status: 'resolved' with full resolution strategy attribution.
  */
 export function resolveConflict(
   store: Store,
@@ -194,6 +304,42 @@ export function resolveConflict(
     message = `Retained both memories ${options.winningId} and ${options.losingId} as distinct contextual truths: ${options.reason}`;
   }
 
+  // Update conflicts table in SQLite (never delete!)
+  let resolvedConflict: ConflictRecord | undefined;
+  if (store.db) {
+    let conflictRecord = options.conflictId ? getConflictById(store.db, options.conflictId) : null;
+    if (!conflictRecord) {
+      conflictRecord = findConflictBetween(store.db, options.winningId, options.losingId);
+    }
+    const now = new Date().toISOString();
+    if (conflictRecord) {
+      conflictRecord.status = "resolved";
+      conflictRecord.resolved_at = now;
+      conflictRecord.resolution_strategy = options.strategy;
+      conflictRecord.resolved_by = options.actor ?? "system";
+      conflictRecord.updated_at = now;
+      insertOrUpdateConflict(store.db, conflictRecord);
+      resolvedConflict = conflictRecord;
+    } else {
+      resolvedConflict = {
+        id: options.conflictId ?? `cfl_${randomUUID().slice(0, 8)}`,
+        memory_a_id: options.winningId,
+        memory_b_id: options.losingId,
+        status: "resolved",
+        conflict_type: "manual_resolution",
+        confidence: 1.0,
+        reason: options.reason,
+        detected_at: now,
+        resolved_at: now,
+        resolution_strategy: options.strategy,
+        resolved_by: options.actor ?? "system",
+        created_at: now,
+        updated_at: now,
+      };
+      insertOrUpdateConflict(store.db, resolvedConflict);
+    }
+  }
+
   if (store.memoryDir) {
     recordAuditEvent(store.memoryDir, {
       operation: "conflict_resolved",
@@ -205,6 +351,7 @@ export function resolveConflict(
         winning_id: options.winningId,
         losing_id: options.losingId,
         reason: options.reason,
+        conflict_id: resolvedConflict?.id,
       },
     });
   }
@@ -213,6 +360,56 @@ export function resolveConflict(
     success: true,
     winning,
     losing: get(store, options.losingId) ?? undefined,
+    conflict: resolvedConflict,
     message,
   };
+}
+
+/**
+ * Lists conflicts from the persistent SQLite conflicts table.
+ */
+export function listConflicts(
+  store: Store,
+  options?: { status?: string; memoryId?: string; limit?: number },
+): ConflictRecord[] {
+  if (!store.db) return [];
+  return listConflictsFromDb(store.db, options);
+}
+
+/**
+ * Retrieves a conflict record by ID from SQLite.
+ */
+export function getConflict(store: Store, id: string): ConflictRecord | null {
+  if (!store.db) return null;
+  return getConflictById(store.db, id);
+}
+
+/**
+ * Records a conflict directly into the SQLite conflicts table without deleting any memories.
+ */
+export function recordConflict(
+  store: Store,
+  conflict: Partial<ConflictRecord> & { memory_a_id: string; memory_b_id: string },
+): ConflictRecord {
+  const now = new Date().toISOString();
+  const record: ConflictRecord = {
+    id: conflict.id || `cfl_${randomUUID().slice(0, 8)}`,
+    memory_a_id: conflict.memory_a_id,
+    memory_b_id: conflict.memory_b_id,
+    status: conflict.status ?? "open",
+    conflict_type: conflict.conflict_type ?? "opposing_assertion",
+    confidence: conflict.confidence ?? 1.0,
+    reason: conflict.reason,
+    detected_at: conflict.detected_at ?? now,
+    resolved_at: conflict.resolved_at,
+    resolution_strategy: conflict.resolution_strategy,
+    resolved_by: conflict.resolved_by,
+    data: conflict.data,
+    created_at: conflict.created_at ?? now,
+    updated_at: now,
+  };
+  if (store.db) {
+    insertOrUpdateConflict(store.db, record);
+  }
+  return record;
 }

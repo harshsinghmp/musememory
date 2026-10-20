@@ -29,7 +29,7 @@ Load these relative modules on-demand when relevant to your active task:
 - ⚙️ [Execution & Cognitive Kernel](./.agents/standards/execution-kernel.md) — 6 Judgment laws, Fowler Refactoring, McConnell Code Complete, and byte-capping.
 - 🛡️ [Security & Vibeguard Protocol](./.agents/standards/security-vibeguard.md) — Secret isolation, Destructive Command Gate, Untrusted Tool Output defense.
 - 📐 [System, Domain & Resilience Design](./.agents/standards/system-design.md) — Evans DDD, Nygard Release It! stability, migration rehearsal, and schemas.
-- 🔄 [Development Workflows & Gates](./.agents/standards/workflows.md) — Scaled tiers (tiny-fix, quick-win, feature, architecture-change) & 5-phase pipeline.
+- 🔄 [Development Workflows & Gates](./.agents/standards/workflows.md) — Scaled tiers, 5-phase pipeline & the mandatory PR-per-feature + post-merge docs/agents/git pipeline.
 - 📜 [Git Branching, Commits & SemVer](./.agents/standards/git-workflow.md) — Branch lifecycle (`master`/`dev`/`feature`/`release`/`hotfix`), commit standards, and SemVer.
 - 📑 [DOX Hierarchy & Subtree Contracts](./.agents/standards/dox-hierarchy.md) — Reading order, child doc shape, closeout checklist, and pruning loop.
 - 🎭 [Council Roles & Routing](./.agents/standards/council-roles.md) — Division responsibilities (Muse, Sol, Jasper, Crew, Nexus) and subagent dispatch policies.
@@ -45,6 +45,6 @@ Load these relative modules on-demand when relevant to your active task:
 - 📖 [Durable Context Map](./.agents/context/index.md) — Central navigation index for Muse Memory durable truth.
 - 📦 [Product Scope & Capabilities](./.agents/context/product.md) — CLI commands, binary aliases, and MCP tool matrix.
 - 🏗️ [Architecture & Storage Layout](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, and repo layout.
-- 📍 [Current Shipped State](./.agents/context/current.md) — v2.0.0 status, active test suites, and system invariants.
+- 📍 [Current Shipped State](./.agents/context/current.md) — v3.0.0 status, active test suites, and system invariants.
 - 🏛️ [Locked Architectural Decisions](./.agents/context/decisions.md) — ADRs (zero-daemon, dual persistence, MCP stdio).
 - 🗺️ [Roadmap & Backlog](./.agents/context/roadmap.md) — Active roadmap and planned milestones.

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { list, slugifyId as slugify, type Store } from "../store.ts";
+import { resolveWithin } from "../paths.ts";
 import { clusterByTokenOverlap, dominantTopicTokens, entryTokens, tokenBag, cosineSimilarity } from "../compounding/cluster.ts";
 import { extractEntitiesFromText } from "../entities/extractor.ts";
 import { tokenize } from "../retrieval.ts";
@@ -318,6 +319,14 @@ function buildLogPage(logEntries: LogEntry[]): LogPage {
   };
 }
 
+/**
+ * Every wiki page read/write goes through here, so a hostile name can never
+ * escape its section dir even if slugifyId is ever loosened.
+ */
+function pagePath(dir: string, slug: string): string {
+  return resolveWithin(dir, `${slug}.md`);
+}
+
 function stripFrontmatter(content: string): string {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   if (!match) return content;
@@ -331,7 +340,7 @@ function loadExistingConcepts(dir: string): Map<string, ConceptPage> {
     if (!file.endsWith(".md")) continue;
     const slug = file.slice(0, -3);
     try {
-      const content = readFileSync(join(dir, file), "utf8");
+      const content = readFileSync(pagePath(dir, slug), "utf8");
       const frontmatter = parseFrontmatter(content);
       map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as ConceptPage);
     } catch {}
@@ -346,7 +355,7 @@ function loadExistingEntities(dir: string): Map<string, EntityPage> {
     if (!file.endsWith(".md")) continue;
     const slug = file.slice(0, -3);
     try {
-      const content = readFileSync(join(dir, file), "utf8");
+      const content = readFileSync(pagePath(dir, slug), "utf8");
       const frontmatter = parseFrontmatter(content);
       map.set(slug, { ...frontmatter, slug, content: stripFrontmatter(content) } as EntityPage);
     } catch {}
@@ -391,14 +400,14 @@ function parseFrontmatter(content: string): any {
 function writeConceptPages(map: Map<string, ConceptPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderConceptPage(page);
-    writeFileSync(join(dir, slug + ".md"), content, "utf8");
+    writeFileSync(pagePath(dir, slug), content, "utf8");
   }
 }
 
 function writeEntityPages(map: Map<string, EntityPage>, dir: string): void {
   for (const [slug, page] of map) {
     const content = renderEntityPage(page);
-    writeFileSync(join(dir, slug + ".md"), content, "utf8");
+    writeFileSync(pagePath(dir, slug), content, "utf8");
   }
 }
 
@@ -501,7 +510,7 @@ export function getWikiPage(
   }
 
   if (!type || type === "concept") {
-    const p = join(wikiDir, "concepts", `${slug}.md`);
+    const p = resolveWithin(wikiDir, "concepts", `${slug}.md`);
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);
@@ -510,7 +519,7 @@ export function getWikiPage(
   }
 
   if (!type || type === "entity") {
-    const p = join(wikiDir, "entities", `${slug}.md`);
+    const p = resolveWithin(wikiDir, "entities", `${slug}.md`);
     if (existsSync(p)) {
       const raw = readFileSync(p, "utf8");
       const fm = parseFrontmatter(raw);

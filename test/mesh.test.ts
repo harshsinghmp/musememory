@@ -15,7 +15,27 @@ import {
 import { createServer } from "../src/mcp.ts";
 import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { handleMeshCommand } from "../src/cli/mesh.ts";
+import { attachAnchorToMemory } from "../src/anchors/index.ts";
+import type { Store } from "../src/store.ts";
 import type { ParsedArgs } from "../src/cli/shared.ts";
+
+let anchorSeq = 0;
+/** Attaches a raw, unverified code anchor — the shape a memory-supplied anchor has on disk. */
+function attachRawAnchor(store: Store, filePath: string, symbolName?: string): void {
+  const entry = propose(store, {
+    title: `anchor probe ${++anchorSeq}`,
+    content: "Memory-supplied anchor path probe.",
+    project: "@mesh/app",
+    confirmed: true,
+  });
+  attachAnchorToMemory(
+    store,
+    entry.id,
+    { id: `anc_probe_${anchorSeq}`, kind: "file", file_path: filePath, symbol_name: symbolName },
+    "test",
+    { verify: false },
+  );
+}
 
 function setupMonorepoFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "muse-mesh-monorepo-"));
@@ -154,6 +174,38 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
     }
   });
 
+  test("addMeshLink normalizes external paths and rejects NUL bytes", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      // External target is an explicit feature: relative and dot-segments normalize.
+      addMeshLink(fixture.appMemoryDir, path.join(fixture.extDir, "..", path.basename(fixture.extDir)));
+      expect(listMeshLinks(fixture.appMemoryDir)).toContain(path.resolve(fixture.extDir));
+
+      expect(() => addMeshLink(fixture.appMemoryDir, `${fixture.extDir}\u0000evil`)).toThrow();
+      expect(listMeshLinks(fixture.appMemoryDir)).not.toContain(`${path.resolve(fixture.extDir)}\u0000evil`);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
+  test("removeMeshLink normalizes like addMeshLink and rejects NUL bytes", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      addMeshLink(fixture.appMemoryDir, fixture.extDir);
+
+      // Unlinking with dot-segments resolves to the same entry addMeshLink stored.
+      removeMeshLink(fixture.appMemoryDir, path.join(fixture.extDir, "..", path.basename(fixture.extDir)));
+      expect(listMeshLinks(fixture.appMemoryDir)).toEqual([]);
+
+      expect(() => removeMeshLink(fixture.appMemoryDir, `${fixture.extDir}\u0000evil`)).toThrow();
+      expect(listMeshLinks(fixture.appMemoryDir)).toEqual([]);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
   test("resolveMeshMemories executes cross-project queries across monorepo packages", () => {
     const fixture = setupMonorepoFixture();
     try {
@@ -182,6 +234,32 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
         types: ["architecture"],
       });
       expect(archResults.every((r) => r.memory.type === "architecture")).toBe(true);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
+  test("T-310: resolveMeshMemories does not false-match substring words (race⊂trace)", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      // Add entry with "trace" to coreStore
+      propose(fixture.coreStore, {
+        title: "Stack trace logging format",
+        content: "Ensure forensic stack traces are emitted on internal uncaught rejections.",
+        project: "@mesh/core",
+        type: "decision",
+        confirmed: true,
+        tags: ["logging", "trace"],
+      });
+
+      const topology = discoverWorkspaceMesh(fixture.appDir, fixture.appMemoryDir);
+
+      // Query for "race" should NOT match "Stack trace logging format"
+      const raceResults = resolveMeshMemories(fixture.appStore, topology, {
+        query: "race",
+      });
+      expect(raceResults.some((r) => r.memory.title === "Stack trace logging format")).toBe(false);
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });
       fs.rmSync(fixture.extDir, { recursive: true, force: true });
@@ -342,6 +420,42 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
       const linkData = JSON.parse(linkRes.content[0].text);
       expect(linkData.success).toBe(true);
       expect(linkData.action).toBe("linked");
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.extDir, { recursive: true, force: true });
+    }
+  });
+
+  test("auditMeshContracts reads legitimate anchors and rejects hostile paths (F-21)", () => {
+    const fixture = setupMonorepoFixture();
+    try {
+      const topology = discoverWorkspaceMesh(fixture.appDir, fixture.appMemoryDir);
+
+      // Legitimate in-workspace anchor still audits clean.
+      attachRawAnchor(fixture.appStore, "packages/core/index.ts", "connectDb");
+      const okAudit = auditMeshContracts(topology, fixture.appStore);
+      expect(okAudit.items.some((i) => i.symbol === "packages/core/index.ts" && i.status === "valid")).toBe(true);
+
+      // NUL byte in a memory-supplied path must not reach the filesystem.
+      attachRawAnchor(fixture.appStore, "packages/core/index.ts\u0000evil");
+      expect(() => auditMeshContracts(topology, fixture.appStore)).toThrow();
+
+      // Symlinked anchors are refused (fail closed) rather than followed.
+      fs.symlinkSync(
+        path.join(fixture.extDir, "package.json"),
+        path.join(fixture.coreDir, "linked.ts"),
+      );
+      attachRawAnchor(fixture.appStore, "packages/core/linked.ts");
+      expect(() => auditMeshContracts(topology, fixture.appStore)).toThrow();
+
+      // Oversized files are refused so an anchor can't exfiltrate a giant file.
+      fs.writeFileSync(path.join(fixture.coreDir, "huge.ts"), Buffer.alloc(1024 * 1024 + 1, 0x61));
+      attachRawAnchor(fixture.appStore, "packages/core/huge.ts");
+      expect(() => auditMeshContracts(topology, fixture.appStore)).toThrow();
+
+      // A directory is not a readable anchor target either.
+      attachRawAnchor(fixture.appStore, "packages/core");
+      expect(() => auditMeshContracts(topology, fixture.appStore)).toThrow();
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });
       fs.rmSync(fixture.extDir, { recursive: true, force: true });

@@ -3,7 +3,9 @@ import { openStore, propose, confirm, supersede, get } from "../src/store.ts";
 import { queryContext } from "../src/retrieval.ts";
 import { validateStore } from "../src/schema.ts";
 import { getGraphStatus } from "../src/graph.ts";
-import { setupFixtureRoot, cleanup } from "./helpers.ts";
+import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 describe("mcp tool handlers logic", () => {
   test("get_context and search with filters", () => {
@@ -167,6 +169,97 @@ describe("mcp tool handlers logic", () => {
     cleanup(root);
   });
 
+  test("get_context read purity: zero synchronous writes, deferred to the write queue (T-301)", async () => {
+    const { existsSync, readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { list } = await import("../src/store.ts");
+    const { createServer, flushPendingWrites } = await import("../src/mcp.ts");
+
+    // Snapshot of the store write path the handler owns: memories/, harvest ledger, audit log.
+    // (memory.db, wiki/ and CURRENT.md mtimes are churned by openStore/syncConstraints, not by the handler.)
+    const snapshot = (): Record<string, string> => {
+      const out: Record<string, string> = {};
+      const walk = (dir: string) => {
+        for (const name of readdirSync(dir)) {
+          const p = join(dir, name);
+          const st = statSync(p);
+          if (st.isDirectory()) walk(p);
+          else out[p.slice(memoryDir.length)] = `${st.size}:${st.mtimeMs}`;
+        }
+      };
+      walk(join(memoryDir, "memories"));
+      const ledger = join(memoryDir, "harvested-transcripts.json");
+      if (existsSync(ledger)) out["/harvested-transcripts.json"] = statSync(ledger).size.toString();
+      return out;
+    };
+
+    try {
+      const before = snapshot();
+      const entriesBefore = list(store).length;
+      const currentPath = join(memoryDir, "CURRENT.md");
+      const currentBefore = existsSync(currentPath) ? readFileSync(currentPath, "utf8") : "";
+
+      const server = createServer(root);
+      const callTool = (server as any)._requestHandlers.get("tools/call");
+      const res = await callTool({
+        method: "tools/call",
+        params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+      });
+      expect(res.isError).toBeFalsy();
+
+      // A read tool must never mutate the store: no transcript import, no propose/save, no CURRENT.md rewrite.
+      expect(snapshot()).toEqual(before);
+      expect(list(store).length).toBe(entriesBefore);
+      expect(existsSync(join(memoryDir, "harvested-transcripts.json"))).toBe(false);
+      expect(existsSync(currentPath) ? readFileSync(currentPath, "utf8") : "").toBe(currentBefore);
+
+      // Deferred writes still land — after the response, on flush.
+      flushPendingWrites();
+      expect(snapshot()).not.toEqual(before);
+      expect(existsSync(join(memoryDir, "harvested-transcripts.json"))).toBe(true);
+      expect(readFileSync(currentPath, "utf8")).toContain("deploy");
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  test("search forwards the request project into the hybrid path (T-303 follow-up)", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const { rebuildIndex, saveIndex } = await import("../src/vector.ts");
+    const { createServer } = await import("../src/mcp.ts");
+
+    propose(store, {
+      title: "Session rotation policy",
+      content: "quantum ledger rotation policy runs nightly",
+      project: "alpha",
+      confirmed: true,
+    });
+    propose(store, {
+      title: "Session rotation policy borealis",
+      content: "quantum ledger rotation policy runs nightly",
+      project: "borealis",
+      confirmed: true,
+    });
+    saveIndex(rebuildIndex(store), memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+    const res = await callTool({
+      method: "tools/call",
+      params: { name: "search", arguments: { query: "quantum ledger rotation", hybrid: true, project: "alpha", dir: root } },
+    });
+    const payload = JSON.parse(res.content[0].text);
+
+    expect(payload.source).toBe("hybrid");
+    expect(payload.results.length).toBeGreaterThan(0);
+    expect(payload.results.map((r: any) => r.project)).toEqual(["alpha"]);
+
+    cleanup(root);
+  });
+
   test("ensureProjectAgentInstructions writes and updates AGENTS.md with Muse Memory directive", async () => {
     const { ensureProjectAgentInstructions, MUSE_MEMORY_DIRECTIVE } = await import("../src/cli/ecosystem.ts");
     const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import("node:fs");
@@ -195,4 +288,267 @@ describe("mcp tool handlers logic", () => {
 
     rmSync(testDir, { recursive: true, force: true });
   });
+
+  test("T-028: recordRetrievals increments utility.retrieval_count on recall and get_context", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer, flushPendingWrites } = await import("../src/mcp.ts");
+    const { get, openStore } = await import("../src/store.ts");
+    const store = openStore(memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Call memory_recall
+    const recallRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_recall", arguments: { query: "deploy", dir: root } },
+    });
+    const recallPayload = JSON.parse(recallRes.content[0].text);
+    expect(recallPayload.results.length).toBeGreaterThan(0);
+    const retrievedId = recallPayload.results[0].id;
+
+    // Before flush, utility count is not yet committed
+    // Flush pending writes
+    flushPendingWrites();
+
+    const entryAfterRecall = get(store, retrievedId);
+    expect(entryAfterRecall?.utility?.retrieval_count).toBe(1);
+
+    // 2. Call get_context
+    await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+    });
+
+    flushPendingWrites();
+
+    const entryAfterContext = get(store, retrievedId);
+    expect(entryAfterContext?.utility?.retrieval_count).toBe(2);
+
+    cleanup(root);
+  });
+
+  test("T-063: memory_delete enforces point-ID-only validation and dry-run by default", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const { get, list, openStore } = await import("../src/store.ts");
+    const store = openStore(memoryDir);
+
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Wildcard/bulk point-ID rejection
+    const wildcardRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: "*", dir: root } },
+    });
+    expect(wildcardRes.isError).toBe(true);
+    expect(wildcardRes.content[0].text).toContain("bulk or wildcard patterns are forbidden");
+
+    const multiRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: "m_1,m_2", dir: root } },
+    });
+    expect(multiRes.isError).toBe(true);
+    expect(multiRes.content[0].text).toContain("bulk or wildcard patterns are forbidden");
+
+    // 2. Dry run by default: does NOT delete the entry
+    const entryId = list(store)[0].id;
+    const existing = get(store, entryId);
+    expect(existing).toBeDefined();
+
+    const dryRunRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: entryId, dir: root } },
+    });
+    expect(dryRunRes.isError).toBeFalsy();
+    const dryRunPayload = JSON.parse(dryRunRes.content[0].text);
+    expect(dryRunPayload.dry_run).toBe(true);
+    expect(dryRunPayload.deleted).toBe(false);
+
+    // Verify entry still exists
+    expect(get(store, entryId)).toBeDefined();
+
+    // 3. Explicit confirm: true executes deletion
+    const applyRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_delete", arguments: { id: entryId, confirm: true, dir: root } },
+    });
+    expect(applyRes.isError).toBeFalsy();
+    const applyPayload = JSON.parse(applyRes.content[0].text);
+    expect(applyPayload.success).toBe(true);
+    expect(applyPayload.tombstoned).toBe(true);
+    expect(applyPayload.dry_run).toBe(false);
+
+    // Verify entry is now tombstoned (get() filters out tombstoned entries)
+    expect(get(store, entryId)).toBeNull();
+
+    cleanup(root);
+  });
+
+  test("T-064: MCP get_context and memory_recall surface stale and from_cache provenance tags", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. get_context call returns stale and from_cache
+    const ctxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "deploy", dir: root } },
+    });
+    expect(ctxRes.isError).toBeFalsy();
+    const ctxPayload = JSON.parse(ctxRes.content[0].text);
+    expect(typeof ctxPayload.stale).toBe("boolean");
+    expect(ctxPayload.stale).toBe(false);
+    expect(typeof ctxPayload.from_cache).toBe("boolean");
+    expect(ctxPayload.from_cache).toBe(false);
+
+    // 2. memory_recall returns stale and from_cache
+    const recallRes = await callTool({
+      method: "tools/call",
+      params: { name: "memory_recall", arguments: { query: "deploy", dir: root } },
+    });
+    expect(recallRes.isError).toBeFalsy();
+    const recallPayload = JSON.parse(recallRes.content[0].text);
+    expect(typeof recallPayload.stale).toBe("boolean");
+    expect(recallPayload.stale).toBe(false);
+    expect(typeof recallPayload.from_cache).toBe("boolean");
+    expect(recallPayload.from_cache).toBe(false);
+
+    cleanup(root);
+  });
+
+  test("T-302: memory_capture passes through full propose options (evidence, verification, trust, valid_from, expires_at, idempotency_key)", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    const captureRes = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          content: "Always rotate database service account keys every 90 days",
+          title: "Database Key Rotation Policy",
+          type: "decision",
+          tags: ["security", "database", "rotation"],
+          source: "security-audit-2026.md",
+          trust: "trusted",
+          salience: 0.95,
+          valid_from: "2026-01-01T00:00:00.000Z",
+          expires_at: "2027-01-01T00:00:00.000Z",
+          mem_path: "sec.db.key-rotation",
+          idempotency_key: "audit-2026-key-rotation-001",
+          evidence: [
+            {
+              id: "ev-001",
+              type: "doc",
+              source: "compliance.pdf",
+              timestamp: "2026-01-01T00:00:00.000Z",
+              excerpt: "SOC2 rule 4.1",
+            },
+          ],
+          verification: {
+            level: "authoritative",
+            verified_by: "SecurityLead",
+            verified_at: "2026-01-02T00:00:00.000Z",
+          },
+          dir: root,
+        },
+      },
+    });
+
+    expect(captureRes.isError).toBeFalsy();
+    const entry = JSON.parse(captureRes.content[0].text);
+    expect(entry.id).toBeDefined();
+    expect(entry.title).toBe("Database Key Rotation Policy");
+    expect(entry.source).toBe("security-audit-2026.md");
+    expect(entry.trust).toBe("trusted");
+    expect(entry.salience).toBe(0.95);
+    expect(entry.valid_from).toBe("2026-01-01T00:00:00.000Z");
+    expect(entry.expires_at).toBe("2027-01-01T00:00:00.000Z");
+    expect(entry.mem_path).toBe("sec.db.key-rotation");
+    expect(entry.idempotency_key).toBe("audit-2026-key-rotation-001");
+    expect(entry.evidence?.length).toBe(1);
+    expect(entry.evidence[0].excerpt).toBe("SOC2 rule 4.1");
+    expect(entry.verification?.level).toBe("authoritative");
+
+    // Test idempotency replay
+    const replayRes = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          content: "Always rotate database service account keys every 90 days",
+          idempotency_key: "audit-2026-key-rotation-001",
+          dir: root,
+        },
+      },
+    });
+    expect(replayRes.isError).toBeFalsy();
+    const replayEntry = JSON.parse(replayRes.content[0].text);
+    expect(replayEntry.id).toBe(entry.id);
+
+    cleanup(root);
+  });
+
+  test("T-073: MCP get_context and search return mode and no_confident_match", async () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    mkdirSync(join(memoryDir, "memories"), { recursive: true });
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // 1. Initial query with no memories returns no_confident_match
+    const emptyCtxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "authentication tokens", dir: root } },
+    });
+    expect(emptyCtxRes.isError).toBeFalsy();
+    const emptyCtx = JSON.parse(emptyCtxRes.content[0].text);
+    expect(emptyCtx.mode).toBe("no_confident_match");
+    expect(emptyCtx.no_confident_match).toBe(true);
+    expect(emptyCtx.markdown).toContain("_No confident prior memories matched this query._");
+
+    // 2. Capture a memory
+    await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          title: "Authentication Token Lifecycle",
+          content: "Always use ed25519 asymmetric keys for token verification and refresh tokens.",
+          dir: root,
+        },
+      },
+    });
+
+    // 3. get_context query matching memory returns confident_match
+    const matchCtxRes = await callTool({
+      method: "tools/call",
+      params: { name: "get_context", arguments: { query: "Authentication Token Lifecycle ed25519", dir: root } },
+    });
+    expect(matchCtxRes.isError).toBeFalsy();
+    const matchCtx = JSON.parse(matchCtxRes.content[0].text);
+    expect(matchCtx.mode).toBe("confident_match");
+    expect(matchCtx.no_confident_match).toBe(false);
+    expect(matchCtx.entries.length).toBeGreaterThan(0);
+
+    // 4. search returns mode and no_confident_match
+    const searchRes = await callTool({
+      method: "tools/call",
+      params: { name: "search", arguments: { query: "Authentication Token", dir: root } },
+    });
+    expect(searchRes.isError).toBeFalsy();
+    const searchPayload = JSON.parse(searchRes.content[0].text);
+    expect(searchPayload.mode).toBe("confident_match");
+    expect(searchPayload.no_confident_match).toBe(false);
+
+    cleanup(root);
+  });
 });
+
+

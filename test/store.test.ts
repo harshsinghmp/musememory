@@ -1,5 +1,27 @@
 import { describe, test, expect } from "bun:test";
-import { openStore, propose, confirm, supersede, markStale, reject, get, list, save, makeId, slugifyId, link, addConstraint, deleteEntry } from "../src/store.ts";
+import { writeFileSync, statSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import yaml from "js-yaml";
+import {
+  openStore,
+  propose,
+  confirm,
+  supersede,
+  markStale,
+  reject,
+  get,
+  list,
+  save,
+  makeId,
+  slugifyId,
+  link,
+  addConstraint,
+  deleteEntry,
+  checkFtsParity,
+  repairFtsIndex,
+  resetStoreDirtyState,
+} from "../src/store.ts";
+import { searchMemoriesFts } from "../src/sqlite.ts";
 import { getCurrent } from "../src/current.ts";
 import { getAuditTrail } from "../src/audit.ts";
 import { queryContext, formatPromptContext } from "../src/retrieval.ts";
@@ -214,5 +236,117 @@ describe("store graph", () => {
     expect(get(store, entry.id)).toBeNull();
 
     cleanup(root);
+  });
+
+  // T-025: a multi-statement write path must cost one commit, not one per statement.
+  test("reconciles a batch of disk drops in a single transaction", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+
+    const now = new Date().toISOString();
+    const dropped: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const id = makeId(`txdrop${i}`);
+      dropped.push(id);
+      writeFileSync(
+        join(store.dir, `${id}.yaml`),
+        yaml.dump(
+          { id, title: `Drop ${i}`, content: `dropped body ${i}`, project: "aria", status: "candidate", type: "discovery", created_at: now, updated_at: now },
+          { lineWidth: 120 },
+        ),
+        "utf8",
+      );
+    }
+
+    store.cache?.invalidateQueries(); // force the reconcile path
+
+    const execs: string[] = [];
+    const realExec = store.db!.exec.bind(store.db!);
+    store.db!.exec = (sql: string) => {
+      execs.push(sql);
+      return realExec(sql);
+    };
+
+    const rows = list(store);
+    expect(dropped.every((id) => rows.some((r) => r.id === id))).toBe(true);
+    expect(execs.filter((s) => /^BEGIN/i.test(s)).length).toBe(1);
+    expect(execs.filter((s) => /^COMMIT/i.test(s)).length).toBe(1);
+    expect(execs.some((s) => /^ROLLBACK/i.test(s))).toBe(false);
+
+    cleanup(root);
+  });
+
+  // T-026: the FTS index is derived data and must be verifiable + repairable.
+  test("checks and repairs FTS/row parity on a desynced index", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const e = propose(store, {
+      title: "Parity Probe",
+      content: "quokka parity marker body",
+      project: "aria",
+      confirmed: true,
+    });
+
+    expect(checkFtsParity(store).ok).toBe(true);
+    expect(searchMemoriesFts(store.db!, "quokka").length).toBe(1);
+
+    // Desync: index row removed while the memory row stays.
+    store.db!.run(`DELETE FROM memories_fts WHERE id = ?`, [e.id]);
+    const broken = checkFtsParity(store);
+    expect(broken.ok).toBe(false);
+    expect(broken.missingCount).toBe(1);
+    expect(broken.missing).toContain(e.id);
+    expect(searchMemoriesFts(store.db!, "quokka").length).toBe(0);
+
+    const repaired = repairFtsIndex(store);
+    expect(repaired.repaired).toBe(true);
+    expect(repaired.ok).toBe(true);
+    expect(repaired.missingCount).toBe(0);
+    expect(searchMemoriesFts(store.db!, "quokka").length).toBe(1);
+
+    // Orphaned index rows are dropped as well.
+    store.db!.run(`INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`, [
+      "m_orphan_row",
+      "orphan",
+      "orphan body",
+      "",
+    ]);
+    expect(checkFtsParity(store).orphanedCount).toBe(1);
+    expect(repairFtsIndex(store).ok).toBe(true);
+    expect(checkFtsParity(store).orphanedCount).toBe(0);
+
+    cleanup(root);
+  });
+
+  test("T-023: openStore dirty-gate skips redundant syncConstraints and autoCompileWiki", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    resetStoreDirtyState();
+
+    // 1. Initial open runs sync and wiki compilation
+    const store1 = openStore(memoryDir);
+    const currentMdPath = join(memoryDir, "CURRENT.md");
+    expect(existsSync(currentMdPath)).toBe(true);
+    const mtime1 = statSync(currentMdPath).mtimeMs;
+
+    // Small delay to ensure any potential mtime change would be detectable
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 2. Second open with clean store skips re-writing CURRENT.md
+    const store2 = openStore(memoryDir);
+    const mtime2 = statSync(currentMdPath).mtimeMs;
+    expect(mtime2).toBe(mtime1);
+
+    // 3. openStore with skipSyncConstraints and skipAutoWiki options
+    const { root: root2, memoryDir: memDir2 } = setupFixtureRoot();
+    resetStoreDirtyState(memDir2);
+    const storeOpt = openStore(memDir2, {
+      skipSyncConstraints: true,
+      skipAutoWiki: true,
+    });
+    // With skipSyncConstraints on fresh dir, CURRENT.md should not be written
+    expect(existsSync(join(memDir2, "CURRENT.md"))).toBe(false);
+
+    cleanup(root);
+    cleanup(root2);
   });
 });

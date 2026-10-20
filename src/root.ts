@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { initUserProfile, userFilePath } from "./user.ts";
@@ -145,3 +145,35 @@ function ancestorChain(startDir: string): string[] {
 export function resolveMemoryDir(options: { global?: boolean; root?: string } = {}): string {
   return findOrCreateProjectRoot(options.root || process.cwd(), options).memoryDir;
 }
+
+/**
+ * T-153: Resolve SQLite database path for a given tenant or team in a memory directory.
+ * Maps 'team' to 'team.db', custom tenants to 'tenant_<id>.db', and default to 'memory.db'.
+ */
+export function resolveTenantDbPath(memoryDir: string, tenantId?: string): string {
+  if (!tenantId || tenantId === "default") return join(memoryDir, "memory.db");
+  if (tenantId === "team") return join(memoryDir, "team.db");
+  const normalized = tenantId.startsWith("tenant_") ? tenantId : `tenant_${tenantId}`;
+  return join(memoryDir, normalized.endsWith(".db") ? normalized : `${normalized}.db`);
+}
+
+/**
+ * T-153: Returns true if filename is a recognized database file (memory.db, team.db, or tenant_*.db).
+ */
+export function isTenantDb(filename: string): boolean {
+  return filename === "memory.db" || filename === "team.db" || /^tenant_[a-zA-Z0-9_-]+\.db$/.test(filename);
+}
+
+/**
+ * T-153: List all tenant and team databases present in a memory directory.
+ */
+export function listTenantDatabases(memoryDir: string): string[] {
+  if (!existsSync(memoryDir)) return [];
+  try {
+    const files = readdirSync(memoryDir);
+    return files.filter(isTenantDb);
+  } catch {
+    return [];
+  }
+}
+

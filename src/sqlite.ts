@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { MemoryEntry, MemoryType, MemoryStatus } from "./types.ts";
+import { redactSecrets } from "./secrets.ts";
 
 export interface SqliteDatabase {
   exec(sql: string): void;
@@ -148,11 +149,21 @@ function initSchema(db: SqliteDatabase): void {
       expires_at TEXT,
       valid_from TEXT,
       valid_to TEXT,
+      valid_to_exact INTEGER DEFAULT 0,
+      src_ts TEXT,
+      linked_memory_ids TEXT,
+      supersedes_id TEXT,
+      conflicts_with_id TEXT,
+      mem_path TEXT,
+      last_accessed_at TEXT,
+      access_count INTEGER,
+      decay_score REAL DEFAULT 1.0,
       data TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
 
+    -- R23: access-weighted retention indexes (A15/A18)
     CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project);
     CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
     CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
@@ -162,7 +173,34 @@ function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_memories_proj_stat_updated ON memories(project, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_memories_salience ON memories(salience);
     CREATE INDEX IF NOT EXISTS idx_memories_reinforcement ON memories(reinforcement);
+  `);
 
+  // Guard post-v0 column indexes against missing columns on legacy databases prior to migration
+  const memCols = db
+    .query<{ name: string }>(`PRAGMA table_info(memories)`)
+    .all()
+    .map((c) => c.name);
+
+  if (memCols.includes("decay_score")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_decay_score ON memories(decay_score)`);
+  }
+  if (memCols.includes("valid_to_exact")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_valid_to_exact ON memories(valid_to_exact)`);
+  }
+  if (memCols.includes("src_ts")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_src_ts ON memories(src_ts)`);
+  }
+  if (memCols.includes("linked_memory_ids")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_linked_ids ON memories(linked_memory_ids)`);
+  }
+  if (memCols.includes("supersedes_id")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_supersedes_id ON memories(supersedes_id)`);
+  }
+  if (memCols.includes("conflicts_with_id")) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_memories_conflicts_with_id ON memories(conflicts_with_id)`);
+  }
+
+  db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       id UNINDEXED,
       title,
@@ -170,7 +208,60 @@ function initSchema(db: SqliteDatabase): void {
       tags,
       tokenize = 'unicode61'
     );
+
+    -- T-086: keep-both conflicts table (never delete)
+    CREATE TABLE IF NOT EXISTS conflicts (
+      id TEXT PRIMARY KEY,
+      memory_a_id TEXT NOT NULL,
+      memory_b_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      conflict_type TEXT NOT NULL,
+      confidence REAL DEFAULT 1.0,
+      reason TEXT,
+      detected_at TEXT NOT NULL,
+      resolved_at TEXT,
+      resolution_strategy TEXT,
+      resolved_by TEXT,
+      data TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_mem_a ON conflicts(memory_a_id);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_mem_b ON conflicts(memory_b_id);
+    CREATE INDEX IF NOT EXISTS idx_conflicts_pair ON conflicts(memory_a_id, memory_b_id);
+
+    -- T-099: fact_provenance append-only table with triple-unique index
+    CREATE TABLE IF NOT EXISTS fact_provenance (
+      id TEXT PRIMARY KEY,
+      memory_id TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      relation TEXT NOT NULL,
+      target TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT 'global',
+      source TEXT,
+      session_id TEXT,
+      confidence REAL DEFAULT 1.0,
+      data TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_fact_provenance_triple ON fact_provenance(entity, relation, target);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_mem_id ON fact_provenance(memory_id);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_entity ON fact_provenance(entity);
+    CREATE INDEX IF NOT EXISTS idx_fact_provenance_created ON fact_provenance(created_at);
   `);
+
+  // T-402: Only create indexes on post-v0 columns if those columns actually exist (or have been migrated)
+  try {
+    const cols = db.query<{ name: string }>(`PRAGMA table_info(memories)`).all().map((c) => c.name);
+    if (cols.includes("mem_path")) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path);
+        CREATE INDEX IF NOT EXISTS idx_memories_last_accessed_at ON memories(last_accessed_at);
+        CREATE INDEX IF NOT EXISTS idx_memories_access_count ON memories(access_count);
+      `);
+    }
+  } catch {}
 
   // Backfill FTS index if memories table has records but FTS table is empty
   try {
@@ -199,6 +290,17 @@ export interface DbMemoryRow {
   expires_at: string | null;
   valid_from: string | null;
   valid_to: string | null;
+  valid_to_exact?: number | null;
+  src_ts?: string | null;
+  linked_memory_ids?: string | null;
+  supersedes_id?: string | null;
+  conflicts_with_id?: string | null;
+  mem_path: string | null;
+  last_accessed_at: string | null;
+  access_count: number | null;
+  decay_score?: number | null;
+  idempotency_key?: string | null;
+  content_hash?: string | null;
   data: string;
   created_at: string;
   updated_at: string;
@@ -209,6 +311,17 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
   try {
     parsedData = JSON.parse(row.data);
   } catch {}
+
+  let linked_memory_ids = parsedData.linked_memory_ids;
+  if (row.linked_memory_ids !== undefined && row.linked_memory_ids !== null) {
+    if (typeof row.linked_memory_ids === "string") {
+      try {
+        linked_memory_ids = JSON.parse(row.linked_memory_ids);
+      } catch {}
+    } else if (Array.isArray(row.linked_memory_ids)) {
+      linked_memory_ids = row.linked_memory_ids;
+    }
+  }
 
   return {
     ...parsedData,
@@ -225,49 +338,136 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
     expires_at: row.expires_at !== null ? row.expires_at : parsedData.expires_at,
     valid_from: row.valid_from !== null ? row.valid_from : parsedData.valid_from,
     valid_to: row.valid_to !== null ? row.valid_to : parsedData.valid_to,
+    valid_to_exact:
+      row.valid_to_exact !== undefined && row.valid_to_exact !== null
+        ? Boolean(row.valid_to_exact)
+        : parsedData.valid_to_exact !== undefined
+        ? Boolean(parsedData.valid_to_exact)
+        : undefined,
+    src_ts: row.src_ts !== null && row.src_ts !== undefined ? row.src_ts : parsedData.src_ts,
+    linked_memory_ids,
+    supersedes_id: row.supersedes_id !== undefined && row.supersedes_id !== null ? row.supersedes_id : parsedData.supersedes_id,
+    conflicts_with_id:
+      row.conflicts_with_id !== undefined && row.conflicts_with_id !== null
+        ? row.conflicts_with_id
+        : parsedData.conflicts_with_id,
+    mem_path: row.mem_path !== null ? row.mem_path : parsedData.mem_path,
+    last_accessed_at: row.last_accessed_at !== null ? row.last_accessed_at : parsedData.last_accessed_at,
+    access_count: row.access_count !== null ? row.access_count : parsedData.access_count,
+    decay_score:
+      typeof row.decay_score === "number"
+        ? row.decay_score
+        : typeof parsedData.decay_score === "number"
+        ? parsedData.decay_score
+        : 1.0,
+    idempotency_key: row.idempotency_key !== undefined && row.idempotency_key !== null ? row.idempotency_key : parsedData.idempotency_key,
+    content_hash: row.content_hash !== undefined && row.content_hash !== null ? row.content_hash : parsedData.content_hash,
     created_at: row.created_at || parsedData.created_at || new Date().toISOString(),
     updated_at: row.updated_at || parsedData.updated_at || new Date().toISOString(),
   };
 }
 
 export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): void {
-  const sql = `
-    INSERT OR REPLACE INTO memories (
-      id, title, content, project, type, status, salience, reinforcement,
-      session_id, due_at, expires_at, valid_from, valid_to, data,
-      created_at, updated_at
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?,
-      ?, ?
-    )
-  `;
+  try {
+    const sql = `
+      INSERT OR REPLACE INTO memories (
+        id, title, content, project, type, status, salience, reinforcement,
+        session_id, due_at, expires_at, valid_from, valid_to, valid_to_exact, src_ts, linked_memory_ids,
+        supersedes_id, conflicts_with_id,
+        mem_path, last_accessed_at, access_count, decay_score, idempotency_key, content_hash, data,
+        created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?,
+        ?, ?, ?, ?, ?, ?, ?,
+        ?, ?
+      )
+    `;
 
-  db.run(sql, [
-    entry.id,
-    entry.title,
-    entry.content,
-    entry.project,
-    entry.type || "discovery",
-    entry.status,
-    typeof entry.salience === "number" ? entry.salience : null,
-    typeof entry.reinforcement === "number" ? entry.reinforcement : null,
-    entry.session_id ?? null,
-    entry.due_at ?? null,
-    entry.expires_at ?? null,
-    entry.valid_from ?? null,
-    entry.valid_to ?? null,
-    JSON.stringify(entry),
-    entry.created_at,
-    entry.updated_at,
-  ]);
+    const supersedesId =
+      entry.supersedes_id ??
+      (typeof entry.supersedes === "string" ? entry.supersedes : Array.isArray(entry.supersedes) ? (entry.supersedes[0] ?? null) : null);
+    const conflictsWithId =
+      entry.conflicts_with_id ??
+      (Array.isArray(entry.conflict_ids) ? (entry.conflict_ids[0] ?? null) : null);
 
-  // Synchronize FTS5 virtual table
+    db.run(sql, [
+      entry.id,
+      entry.title,
+      entry.content,
+      entry.project,
+      entry.type || "discovery",
+      entry.status,
+      typeof entry.salience === "number" ? entry.salience : null,
+      typeof entry.reinforcement === "number" ? entry.reinforcement : null,
+      entry.session_id ?? null,
+      entry.due_at ?? null,
+      entry.expires_at ?? null,
+      entry.valid_from ?? null,
+      entry.valid_to ?? null,
+      entry.valid_to_exact ? 1 : 0,
+      entry.src_ts ?? null,
+      entry.linked_memory_ids ? JSON.stringify(entry.linked_memory_ids) : null,
+      supersedesId,
+      conflictsWithId,
+      entry.mem_path ?? null,
+      entry.last_accessed_at ?? null,
+      typeof entry.access_count === "number" ? entry.access_count : null,
+      typeof entry.decay_score === "number" ? entry.decay_score : 1.0,
+      entry.idempotency_key ?? null,
+      entry.content_hash ?? null,
+      JSON.stringify(entry),
+      entry.created_at,
+      entry.updated_at,
+    ]);
+  } catch (err: any) {
+    if (err && String(err.message || err).includes("no column named")) {
+      const legacySql = `
+        INSERT OR REPLACE INTO memories (
+          id, title, content, project, type, status, salience, reinforcement,
+          session_id, due_at, expires_at, valid_from, valid_to,
+          mem_path, last_accessed_at, access_count, data,
+          created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
+      `;
+      db.run(legacySql, [
+        entry.id,
+        entry.title,
+        entry.content,
+        entry.project,
+        entry.type || "discovery",
+        entry.status,
+        typeof entry.salience === "number" ? entry.salience : null,
+        typeof entry.reinforcement === "number" ? entry.reinforcement : null,
+        entry.session_id ?? null,
+        entry.due_at ?? null,
+        entry.expires_at ?? null,
+        entry.valid_from ?? null,
+        entry.valid_to ?? null,
+        entry.mem_path ?? null,
+        entry.last_accessed_at ?? null,
+        typeof entry.access_count === "number" ? entry.access_count : null,
+        JSON.stringify(entry),
+        entry.created_at,
+        entry.updated_at,
+      ]);
+    } else {
+      throw err;
+    }
+  }
+
+  // Synchronize FTS5 virtual table with index-time credential redaction (T-103)
   try {
     db.run(`DELETE FROM memories_fts WHERE id = ?`, [entry.id]);
     db.run(
       `INSERT INTO memories_fts (id, title, content, tags) VALUES (?, ?, ?, ?)`,
-      [entry.id, entry.title, entry.content, (entry.tags ?? []).join(" ")],
+      [entry.id, redactSecrets(entry.title), redactSecrets(entry.content), (entry.tags ?? []).join(" ")],
     );
   } catch {}
 }
@@ -276,6 +476,33 @@ export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | nul
   const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE id = ? LIMIT 1`).get([id]);
   if (!row) return null;
   return rowToMemoryEntry(row);
+}
+
+export function getMemoryByIdempotencyKey(db: SqliteDatabase, key: string): MemoryEntry | null {
+  try {
+    const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE idempotency_key = ? AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1`).get([key]);
+    if (!row) return null;
+    return rowToMemoryEntry(row);
+  } catch {
+    return null;
+  }
+}
+
+export function getMemoryByContentHash(db: SqliteDatabase, hash: string, project?: string): MemoryEntry | null {
+  try {
+    let sql = `SELECT * FROM memories WHERE content_hash = ? AND (deleted_at IS NULL OR deleted_at = '')`;
+    const params: unknown[] = [hash];
+    if (project) {
+      sql += ` AND project = ?`;
+      params.push(project);
+    }
+    sql += ` LIMIT 1`;
+    const row = db.query<DbMemoryRow>(sql).get(params);
+    if (!row) return null;
+    return rowToMemoryEntry(row);
+  } catch {
+    return null;
+  }
 }
 
 export function listMemories(
@@ -319,18 +546,82 @@ export function deleteMemoryById(db: SqliteDatabase, id: string): boolean {
 }
 
 /**
+ * T-060: Safely escapes and quotes an individual FTS5 token.
+ * Internal double quotes are escaped as `""`, and the token is enclosed in double quotes with prefix match `*`.
+ */
+export function escapeFtsToken(token: string): string {
+  if (!token || typeof token !== "string") return "";
+  const clean = token.replace(/[\x00-\x1F\x7F]/g, "").trim();
+  if (!clean) return "";
+  const escaped = clean.replace(/"/g, '""');
+  return `"${escaped}"*`;
+}
+
+/**
+ * T-060: Builds a syntax-safe FTS5 query string from user/agent input.
+ * Strips hostile operators and constructs quoted phrase/prefix terms combined with OR.
+ */
+export function buildSafeFtsQuery(rawQuery: string): string {
+  if (!rawQuery || typeof rawQuery !== "string") return "";
+
+  const rawTokens = rawQuery
+    .replace(/[(){}[\]:^~*+]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => {
+      if (!t) return false;
+      const lower = t.toLowerCase();
+      if (lower === "and" || lower === "or" || lower === "not" || lower.startsWith("near/")) {
+        return false;
+      }
+      return true;
+    });
+
+  if (rawTokens.length === 0) return "";
+
+  const terms = rawTokens
+    .map(escapeFtsToken)
+    .filter((t) => t.length > 0);
+
+  return terms.join(" OR ");
+}
+
+export interface FtsSearchHit {
+  entry: MemoryEntry;
+  rank: number;
+}
+
+export type FtsSearchHits = FtsSearchHit[] & {
+  degraded?: boolean;
+  error?: string;
+  hidden_count?: number;
+};
+
+/**
  * High-speed BM25 full-text search directly inside SQLite using FTS5.
+ * Sanitizes and safely escapes all query tokens (T-060) and surfaces degraded status (T-312).
+ * Implements hidden-count-aware over-fetch (T-096) so superseded/inactive memories do not starve limit.
  */
 export function searchMemoriesFts(
   db: SqliteDatabase,
   query: string,
-  filters?: { project?: string; type?: string; status?: string; limit?: number },
-): { entry: MemoryEntry; rank: number }[] {
-  const cleanQuery = query.trim().replace(/['"*]/g, "");
-  if (!cleanQuery) return [];
+  filters?: {
+    project?: string;
+    type?: string;
+    status?: string;
+    limit?: number;
+    includeSuperseded?: boolean;
+    overfetch?: boolean;
+  },
+): FtsSearchHits {
+  const terms = buildSafeFtsQuery(query);
+  if (!terms) {
+    const empty: FtsSearchHits = [];
+    empty.degraded = false;
+    empty.hidden_count = 0;
+    return empty;
+  }
 
-  // Match tokens with prefix search
-  const terms = cleanQuery.split(/\s+/).filter(Boolean).map((t) => `"${t}"*`).join(" OR ");
   let sql = `
     SELECT m.*, bm25(memories_fts) as rank
     FROM memories_fts f
@@ -339,6 +630,14 @@ export function searchMemoriesFts(
   `;
   const conditions: string[] = [];
   const params: unknown[] = [terms];
+
+  // Exclude tombstoned rows if column exists
+  try {
+    const cols = db.query<{ name: string }>(`PRAGMA table_info(memories)`).all().map((c) => c.name);
+    if (cols.includes("deleted_at")) {
+      conditions.push(`(m.deleted_at IS NULL OR m.deleted_at = '')`);
+    }
+  } catch {}
 
   if (filters?.project) {
     conditions.push(`m.project = ?`);
@@ -358,17 +657,339 @@ export function searchMemoriesFts(
   }
   sql += ` ORDER BY rank ASC`;
 
-  if (filters?.limit) {
+  // Hidden-count-aware over-fetch: if limit is requested and superseded rows should be filtered out,
+  // query an over-fetch buffer so active results fill the requested limit.
+  const targetLimit = filters?.limit;
+  if (targetLimit) {
+    const shouldOverfetch = filters?.overfetch !== false && !filters?.includeSuperseded && !filters?.status;
+    const fetchLimit = shouldOverfetch ? Math.min(500, Math.max(targetLimit * 2, targetLimit + 10)) : targetLimit;
     sql += ` LIMIT ?`;
-    params.push(filters.limit);
+    params.push(fetchLimit);
   }
 
   try {
     const rows = db.query<DbMemoryRow & { rank: number }>(sql).all(params);
-    return rows.map((r) => ({
-      entry: rowToMemoryEntry(r),
-      rank: r.rank,
-    }));
+    let hidden_count = 0;
+    const activeHits: FtsSearchHit[] = [];
+
+    for (const r of rows) {
+      const entry = rowToMemoryEntry(r);
+      if (!filters?.includeSuperseded && !filters?.status && (entry.status === "superseded" || entry.status === "rejected")) {
+        hidden_count++;
+        continue;
+      }
+      activeHits.push({ entry, rank: r.rank });
+    }
+
+    const finalHits = targetLimit ? activeHits.slice(0, targetLimit) : activeHits;
+    const results: FtsSearchHits = finalHits as FtsSearchHits;
+    results.degraded = false;
+    results.hidden_count = hidden_count;
+    return results;
+  } catch (err) {
+    // T-312: Surface FTS failure with loud log and degraded: true signal instead of silent swallow
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[FTS5_DEGRADED] FTS query execution failed for "${query}": ${errorMsg}`);
+    const empty: FtsSearchHits = [];
+    empty.degraded = true;
+    empty.error = errorMsg;
+    empty.hidden_count = 0;
+    return empty;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// T-086: keep-both conflicts table (never delete)
+// ---------------------------------------------------------------------------
+
+export interface DbConflictRow {
+  id: string;
+  memory_a_id: string;
+  memory_b_id: string;
+  status: string;
+  conflict_type: string;
+  confidence: number;
+  reason: string | null;
+  detected_at: string;
+  resolved_at: string | null;
+  resolution_strategy: string | null;
+  resolved_by: string | null;
+  data: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConflictRecord {
+  id: string;
+  memory_a_id: string;
+  memory_b_id: string;
+  status: "open" | "resolved" | "acknowledged";
+  conflict_type: string;
+  confidence: number;
+  reason?: string;
+  detected_at: string;
+  resolved_at?: string;
+  resolution_strategy?: string;
+  resolved_by?: string;
+  data?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToConflictRecord(row: DbConflictRow): ConflictRecord {
+  let parsedData: Record<string, any> | undefined;
+  if (row.data) {
+    try {
+      parsedData = JSON.parse(row.data);
+    } catch {}
+  }
+  return {
+    id: row.id,
+    memory_a_id: row.memory_a_id,
+    memory_b_id: row.memory_b_id,
+    status: row.status as "open" | "resolved" | "acknowledged",
+    conflict_type: row.conflict_type,
+    confidence: row.confidence,
+    reason: row.reason ?? undefined,
+    detected_at: row.detected_at,
+    resolved_at: row.resolved_at ?? undefined,
+    resolution_strategy: row.resolution_strategy ?? undefined,
+    resolved_by: row.resolved_by ?? undefined,
+    data: parsedData,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function insertOrUpdateConflict(db: SqliteDatabase, conflict: ConflictRecord): void {
+  const existing = getConflictById(db, conflict.id);
+  const now = new Date().toISOString();
+  if (existing) {
+    db.run(
+      `UPDATE conflicts SET
+        status = ?,
+        conflict_type = ?,
+        confidence = ?,
+        reason = ?,
+        resolved_at = ?,
+        resolution_strategy = ?,
+        resolved_by = ?,
+        data = ?,
+        updated_at = ?
+       WHERE id = ?`,
+      [
+        conflict.status,
+        conflict.conflict_type,
+        conflict.confidence,
+        conflict.reason ?? null,
+        conflict.resolved_at ?? null,
+        conflict.resolution_strategy ?? null,
+        conflict.resolved_by ?? null,
+        conflict.data ? JSON.stringify(conflict.data) : null,
+        conflict.updated_at || now,
+        conflict.id,
+      ]
+    );
+  } else {
+    db.run(
+      `INSERT INTO conflicts (
+        id, memory_a_id, memory_b_id, status, conflict_type, confidence,
+        reason, detected_at, resolved_at, resolution_strategy, resolved_by,
+        data, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        conflict.id,
+        conflict.memory_a_id,
+        conflict.memory_b_id,
+        conflict.status,
+        conflict.conflict_type,
+        conflict.confidence,
+        conflict.reason ?? null,
+        conflict.detected_at,
+        conflict.resolved_at ?? null,
+        conflict.resolution_strategy ?? null,
+        conflict.resolved_by ?? null,
+        conflict.data ? JSON.stringify(conflict.data) : null,
+        conflict.created_at || now,
+        conflict.updated_at || now,
+      ]
+    );
+  }
+}
+
+export function getConflictById(db: SqliteDatabase, id: string): ConflictRecord | null {
+  const row = db.query<DbConflictRow>(`SELECT * FROM conflicts WHERE id = ?`).get([id]);
+  if (!row) return null;
+  return rowToConflictRecord(row);
+}
+
+export function findConflictBetween(
+  db: SqliteDatabase,
+  memoryA: string,
+  memoryB: string,
+): ConflictRecord | null {
+  const row = db
+    .query<DbConflictRow>(
+      `SELECT * FROM conflicts
+       WHERE (memory_a_id = ? AND memory_b_id = ?)
+          OR (memory_a_id = ? AND memory_b_id = ?)
+       ORDER BY detected_at DESC
+       LIMIT 1`,
+    )
+    .get([memoryA, memoryB, memoryB, memoryA]);
+  if (!row) return null;
+  return rowToConflictRecord(row);
+}
+
+export function listConflictsFromDb(
+  db: SqliteDatabase,
+  options?: { status?: string; memoryId?: string; limit?: number },
+): ConflictRecord[] {
+  let sql = `SELECT * FROM conflicts`;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (options?.status) {
+    conditions.push(`status = ?`);
+    params.push(options.status);
+  }
+  if (options?.memoryId) {
+    conditions.push(`(memory_a_id = ? OR memory_b_id = ?)`);
+    params.push(options.memoryId, options.memoryId);
+  }
+  if (conditions.length > 0) {
+    sql += ` WHERE ` + conditions.join(" AND ");
+  }
+  sql += ` ORDER BY detected_at DESC`;
+  if (options?.limit && options.limit > 0) {
+    sql += ` LIMIT ?`;
+    params.push(options.limit);
+  }
+
+  const rows = db.query<DbConflictRow>(sql).all(params);
+  return rows.map(rowToConflictRecord);
+}
+
+/**
+ * T-099: Raw database row representing an append-only fact provenance assertion.
+ */
+export interface FactProvenanceRow {
+  id: string;
+  memory_id: string;
+  entity: string;
+  relation: string;
+  target: string;
+  scope: string;
+  source: string | null;
+  session_id: string | null;
+  confidence: number | null;
+  data: string | null;
+  created_at: string;
+}
+
+/**
+ * T-099: Appends a fact provenance record to SQLite using INSERT OR IGNORE
+ * to enforce the triple-unique index idx_fact_provenance_triple(entity, relation, target).
+ */
+export function insertFactProvenance(
+  db: SqliteDatabase,
+  record: {
+    id: string;
+    memory_id: string;
+    entity: string;
+    relation: string;
+    target: string;
+    scope?: string;
+    source?: string;
+    session_id?: string;
+    confidence?: number;
+    data?: string;
+    created_at?: string;
+  },
+): boolean {
+  try {
+    const scope = record.scope ?? "global";
+    const confidence = record.confidence ?? 1.0;
+    const createdAt = record.created_at ?? new Date().toISOString();
+    db.run(
+      `INSERT OR IGNORE INTO fact_provenance (id, memory_id, entity, relation, target, scope, source, session_id, confidence, data, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        record.id,
+        record.memory_id,
+        record.entity,
+        record.relation,
+        record.target,
+        scope,
+        record.source ?? null,
+        record.session_id ?? null,
+        confidence,
+        record.data ?? null,
+        createdAt,
+      ],
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * T-099: Look up a fact provenance assertion by its exact canonical triple (entity, relation, target).
+ */
+export function getFactProvenanceRow(
+  db: SqliteDatabase,
+  entity: string,
+  relation: string,
+  target: string,
+): FactProvenanceRow | null {
+  try {
+    const row = db
+      .query<FactProvenanceRow>(
+        `SELECT * FROM fact_provenance WHERE entity = ? AND relation = ? AND target = ? LIMIT 1`,
+      )
+      .get([entity, relation, target]);
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * T-099: List append-only fact provenance assertions matching optional filters.
+ */
+export function listFactProvenanceRows(
+  db: SqliteDatabase,
+  filters: { memory_id?: string; entity?: string; relation?: string; target?: string; scope?: string } = {},
+): FactProvenanceRow[] {
+  try {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filters.memory_id) {
+      conditions.push("memory_id = ?");
+      params.push(filters.memory_id);
+    }
+    if (filters.entity) {
+      conditions.push("entity = ?");
+      params.push(filters.entity);
+    }
+    if (filters.relation) {
+      conditions.push("relation = ?");
+      params.push(filters.relation);
+    }
+    if (filters.target) {
+      conditions.push("target = ?");
+      params.push(filters.target);
+    }
+    if (filters.scope) {
+      conditions.push("scope = ?");
+      params.push(filters.scope);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const sql = `SELECT * FROM fact_provenance ${where} ORDER BY created_at ASC`;
+    return db.query<FactProvenanceRow>(sql).all(params);
   } catch {
     return [];
   }

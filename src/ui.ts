@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
+import type { MemoryEntry } from "./types.ts";
 import { list, get, confirm, markStale, supersede, deleteEntry, propose } from "./store.ts";
 import { getCurrent, setCurrent, parseCurrentFile, writeCurrentFile, updateSessionHandoff, getSessionHandoff, WorkspaceGovernor } from "./governor.ts";
 import { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
@@ -32,14 +34,87 @@ export interface UiServerOptions {
   port?: number;
   memoryDir: string;
   store: Store;
+  token?: string;
+}
+
+/** Explicit projection contract for UI read routes (T-400). */
+export interface ProjectedUiMemory {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  status: string;
+  project?: string;
+  tags: string[];
+  salience?: number;
+  verification?: {
+    level?: string;
+    method?: string;
+    verified_at?: string;
+  };
+  related_memory_ids?: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Project raw MemoryEntry into safe UI allowlist schema (T-400). */
+export function projectMemoryForUi(entry: MemoryEntry): ProjectedUiMemory {
+  return {
+    id: entry.id,
+    title: entry.title,
+    content: entry.content,
+    type: entry.type || "discovery",
+    status: entry.status,
+    project: entry.project,
+    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+    salience: typeof entry.salience === "number" ? entry.salience : 0.5,
+    verification: entry.verification
+      ? {
+          level: entry.verification.level,
+          method: entry.verification.method,
+          verified_at: entry.verification.verified_at,
+        }
+      : undefined,
+    related_memory_ids: Array.isArray(entry.related_memory_ids) ? [...entry.related_memory_ids] : [],
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
+  };
+}
+
+/** Pure HTML escaping helper for strings without external DOM dependencies. */
+export function escapeHtml(str: string): string {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function startUiServer(opts: UiServerOptions): Promise<{ port: number; close: () => void }> {
   return new Promise((resolve, reject) => {
-    let currentPort = opts.port ?? 2222;
+    const rawPort = opts.port !== undefined ? Number(opts.port) : undefined;
+    if (rawPort !== undefined && (!Number.isInteger(rawPort) || rawPort < 0 || rawPort > 65535)) {
+      return reject(new Error(`Invalid port: ${opts.port}. Port must be an integer between 0 and 65535.`));
+    }
+    const activeSockets = new Set<Socket>();
+    let currentPort = rawPort ?? 2222;
 
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-      const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+      if (req.socket && !activeSockets.has(req.socket as Socket)) {
+        const sock = req.socket as Socket;
+        activeSockets.add(sock);
+        sock.once("close", () => activeSockets.delete(sock));
+      }
+      let url: URL;
+      try {
+        url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+      } catch {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "text/plain");
+        res.end("Bad Request: Invalid URL or Host header");
+        return;
+      }
       const pathname = url.pathname;
 
       // Security Headers
@@ -53,7 +128,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       // CORS & CSRF Defense: allow localhost / 127.0.0.1 origins
       const origin = req.headers.origin;
-      const isLocalOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) || origin === "null";
+      const isLocalOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
       if (origin && isLocalOrigin) {
         res.setHeader("Access-Control-Allow-Origin", origin);
@@ -80,8 +155,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // API Routes
       if (pathname === "/api/memories" && req.method === "GET") {
         const memories = list(opts.store);
+        const projected = memories.map(projectMemoryForUi);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(memories));
+        res.end(JSON.stringify(projected));
         return;
       }
 
@@ -117,8 +193,12 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       if (pathname === "/api/snapshot" && req.method === "GET") {
         const snapshot = exportSnapshot(opts.store);
+        const projectedSnapshot = {
+          ...snapshot,
+          entries: snapshot.entries.map(projectMemoryForUi),
+        };
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(snapshot));
+        res.end(JSON.stringify(projectedSnapshot));
         return;
       }
 
@@ -206,7 +286,8 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
 
       if (pathname === "/api/audit" && req.method === "GET") {
-        const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+        const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(1000, rawLimit) : 50;
         const trail = getAuditTrail(opts.memoryDir, { limit });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ trail }));
@@ -217,12 +298,16 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         try {
           const body = await parseJsonBody(req);
           const query = String(body.query || "");
-          const tokenBudget = typeof body.tokenBudget === "number" ? body.tokenBudget : undefined;
+          const tokenBudget = typeof body.tokenBudget === "number" && Number.isFinite(body.tokenBudget) && body.tokenBudget > 0
+            ? Math.min(100000, Math.floor(body.tokenBudget))
+            : undefined;
+          const rawLimit = typeof body.limit === "number" ? body.limit : 10;
+          const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(500, rawLimit) : 10;
           const mode = body.mode as any || "auto";
           const resSearch = RetrievalEngine.search(opts.store, opts.memoryDir, query, {
             mode,
             tokenBudget,
-            limit: typeof body.limit === "number" ? body.limit : 10,
+            limit,
             type: body.type ? String(body.type) : undefined,
             status: body.status ? String(body.status) : undefined,
           });
@@ -361,12 +446,35 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       if (pathname === "/api/optimize" && req.method === "POST") {
         try {
-          const { optimizeStore } = await import("./optimize.ts");
           const body = await parseJsonBody(req);
+          const dryRun = body.dryRun !== false; // Default to dryRun: true (T-004)
+
+          // Localhost / Token Gate (T-004)
+          const expectedToken = opts.token || process.env.MUSE_UI_TOKEN;
+          const remoteIp = req.socket?.remoteAddress;
+          const isLoopback = remoteIp === "127.0.0.1" || remoteIp === "::1" || remoteIp === "::ffff:127.0.0.1";
+          const headerToken = req.headers["x-muse-token"];
+          const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
+          const bearerToken = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader;
+          const providedToken = (typeof headerToken === "string" ? headerToken : undefined) || bearerToken;
+
+          if (expectedToken) {
+            if (providedToken !== expectedToken) {
+              res.writeHead(403, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Forbidden: Invalid or missing authentication token" }));
+              return;
+            }
+          } else if (!isLoopback && !dryRun) {
+            res.writeHead(403, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Forbidden: Non-dryRun optimization requires localhost origin or configured token" }));
+            return;
+          }
+
+          const { optimizeStore } = await import("./optimize.ts");
           const report = optimizeStore(opts.store, {
             memoryDir: opts.memoryDir,
             project: body.project ? String(body.project) : undefined,
-            dryRun: body.dryRun === true,
+            dryRun,
             force: body.force !== false,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -610,7 +718,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     });
 
     server.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE" && !opts.port) {
+      if (err.code === "EADDRINUSE" && opts.port === undefined) {
         currentPort++;
         server.listen(currentPort, "127.0.0.1");
       } else {
@@ -618,12 +726,23 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
     });
 
+    server.on("connection", (socket: Socket) => {
+      activeSockets.add(socket);
+      socket.on("close", () => activeSockets.delete(socket));
+    });
+
     server.listen(currentPort, "127.0.0.1", () => {
       const addr = server.address();
       const actualPort = typeof addr === "object" && addr ? addr.port : currentPort;
       resolve({
         port: actualPort,
-        close: () => server.close(),
+        close: () => {
+          for (const s of activeSockets) {
+            s.destroy();
+          }
+          activeSockets.clear();
+          server.close();
+        },
       });
     });
   });
@@ -1477,7 +1596,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           let progHtml = '';
           if (h.progress && h.progress.length > 0) {
             progHtml += '<div style="font-weight:700; font-size:11px; color:var(--text-dim); margin-bottom:4px;">PROGRESS CHECKPOINTS:</div>';
-            h.progress.forEach(p => { progHtml += '<div style="font-size:12px; color:var(--text); margin-bottom:2px;">• ' + p + '</div>'; });
+            h.progress.forEach(p => { progHtml += '<div style="font-size:12px; color:var(--text); margin-bottom:2px;">• ' + escapeHtml(p) + '</div>'; });
           }
           document.getElementById('handoffProgressBox').innerHTML = progHtml;
         }
@@ -1507,7 +1626,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           const card = document.createElement('div');
           card.className = 'archetype-card';
           card.style.textAlign = 'left';
-          card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + p.title + '</div><div style="font-size:11px; color:var(--text-dim);">' + p.slug + '</div>';
+          card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + escapeHtml(p.title) + '</div><div style="font-size:11px; color:var(--text-dim);">' + escapeHtml(p.slug) + '</div>';
           card.onclick = async () => {
             const pageRes = await fetch('/api/wiki?page=' + encodeURIComponent(p.slug));
             const pageData = await pageRes.json();
@@ -1550,11 +1669,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
           const tr = document.createElement('tr');
           const opColor = r.operation === 'confirm' ? 'var(--green)' : r.operation === 'delete' ? 'var(--red)' : 'var(--accent)';
           tr.innerHTML = \`
-            <td class="mono" style="font-size:11px;">\${new Date(r.timestamp).toLocaleTimeString()}</td>
-            <td><span class="op-badge" style="background:rgba(255,255,255,0.06); color:\${opColor};">\${r.operation}</span></td>
-            <td class="mono">\${r.entry_id}</td>
-            <td>\${r.actor || 'system'}</td>
-            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${JSON.stringify(r.details || r.reason || '')}</td>
+            <td class="mono" style="font-size:11px;">\${escapeHtml(new Date(r.timestamp).toLocaleTimeString())}</td>
+            <td><span class="op-badge" style="background:rgba(255,255,255,0.06); color:\${escapeHtml(opColor)};">\${escapeHtml(r.operation)}</span></td>
+            <td class="mono">\${escapeHtml(r.entry_id)}</td>
+            <td>\${escapeHtml(r.actor || 'system')}</td>
+            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${escapeHtml(JSON.stringify(r.details || r.reason || ''))}</td>
           \`;
           tbody.appendChild(tr);
         });
@@ -1586,7 +1705,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     }
 
     function escapeHtml(str) {
-      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function renderList() {
@@ -1940,7 +2059,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       const times = allMemories.map(m => Date.parse(m.updated_at || '')).filter(t => !Number.isNaN(t));
       if (times.length === 0) { slider.disabled = true; label.textContent = 'n/a'; return; }
       slider.disabled = false;
-      const min = Math.min(...times), max = Math.max(...times);
+      const min = times.reduce((a, b) => (b < a ? b : a), Infinity), max = times.reduce((a, b) => (b > a ? b : a), -Infinity);
       slider.oninput = () => {
         const t = parseInt(slider.value, 10) / 1000;
         if (t >= 1) { timelineCutoff = null; label.textContent = 'all'; }
@@ -2089,9 +2208,11 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
               <td colspan="2"><strong>\${escapeHtml(item)}</strong></td>
             \`;
           } else {
-            const pillClass = 'priority-' + (item.priority || 'medium').toLowerCase();
+            const rawPriority = String(item.priority || 'medium');
+            const safePriority = escapeHtml(rawPriority);
+            const pillClass = 'priority-' + rawPriority.toLowerCase().replace(/[^a-z0-9_-]/g, '');
             tr.innerHTML = \`
-              <td><span class="priority-badge \${pillClass}">[\${item.priority}]</span></td>
+              <td><span class="priority-badge \${pillClass}">[\${safePriority}]</span></td>
               <td><strong>\${escapeHtml(item.issue)}</strong></td>
               <td>\${escapeHtml(item.action)}</td>
             \`;
@@ -2470,6 +2591,9 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 
 export function exportStandaloneHtml(store: Store): string {
   const memories = list(store);
-  const script = `<script>window.STANDALONE_DATA = ${JSON.stringify(memories)};</script>`;
-  return EMBEDDED_HTML.replace("</head>", `${script}\n</head>`);
+  // Escape every `<` as its JSON unicode form so memory content cannot close the
+  // inline script block; replace() takes a function so `$&` in content stays literal.
+  const data = JSON.stringify(memories).replace(/</g, "\\u003c");
+  const script = `<script>window.STANDALONE_DATA = ${data};</script>`;
+  return EMBEDDED_HTML.replace("</head>", () => `${script}\n</head>`);
 }

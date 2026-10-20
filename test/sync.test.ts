@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, save, get, list } from "../src/store.ts";
@@ -347,6 +347,51 @@ describe("R14: Cross-Agent Knowledge Sync & P2P Gossip Protocol", () => {
       expect(poolRes.isError).toBeFalsy();
       const poolReport = JSON.parse(poolRes.content[0].text);
       expect(poolReport.broadcast_packet_id).toBeDefined();
+    });
+  });
+
+  describe("Pool Directory Path Safety", () => {
+    it("accepts an external absolute pool_dir and normalizes it (explicit feature)", () => {
+      const unnormalized = join(sharedPoolDir, "..", "muse-sync-pool-", "..", sharedPoolDir.split("/").pop()!);
+      const report = syncWithSharedPool(storeA, tmpRootA, unnormalized, "agent_ext_pool");
+      expect(report.pool_dir).toBe(sharedPoolDir);
+      expect(existsSync(sharedPoolDir)).toBe(true);
+    });
+
+    it("rejects a pool_dir containing a NUL byte", () => {
+      expect(() => syncWithSharedPool(storeA, tmpRootA, `${tmpRootA}/po\u0000ol`)).toThrow();
+    });
+
+    it("rejects an empty pool_dir", () => {
+      expect(() => syncWithSharedPool(storeA, tmpRootA, "", "agent_empty_pool")).toThrow();
+    });
+
+    it("refuses a pool_dir resolving inside the server's own memory store (self-ingest loop)", () => {
+      const memoryDir = join(tmpRootA, ".memory");
+      expect(() => syncWithSharedPool(storeA, tmpRootA, memoryDir, "agent_self_pool")).toThrow();
+      // The store's own default pool location is equally off-limits as a custom target.
+      expect(() =>
+        syncWithSharedPool(storeA, tmpRootA, join(memoryDir, "sync", "pool"), "agent_self_pool")
+      ).toThrow();
+    });
+
+    it("refuses an unnormalized pool_dir that normalizes into the memory store", () => {
+      const sneaky = join(tmpRootA, ".memory", "nested", "..", "..", ".memory", "inner");
+      expect(() => syncWithSharedPool(storeA, tmpRootA, sneaky, "agent_self_pool")).toThrow();
+    });
+
+    it("still accepts a shared pool that only shares the tmp root prefix (no false positive)", () => {
+      const sibling = join(tmpRootA, "shared-pool");
+      const report = syncWithSharedPool(storeA, tmpRootA, sibling, "agent_sibling_pool");
+      expect(report.pool_dir).toBe(sibling);
+    });
+
+    it.skipIf(process.platform === "win32")("creates a missing pool dir with owner-only mode 0o700", () => {
+      const freshPool = join(tmpRootA, "fresh-pool", "nested");
+      expect(existsSync(freshPool)).toBe(false);
+      const report = syncWithSharedPool(storeA, tmpRootA, freshPool, "agent_mode_test");
+      expect(report.pool_dir).toBe(freshPool);
+      expect(statSync(freshPool).mode & 0o777).toBe(0o700);
     });
   });
 });
