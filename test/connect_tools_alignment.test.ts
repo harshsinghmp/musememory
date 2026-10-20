@@ -33,8 +33,8 @@ describe("T-011: ALL_MEMORY_TOOLS Alignment with Registered MCP Tools", () => {
     const missingTools = Array.from(registeredToolNames).filter((t) => !allMemoryToolsSet.has(t));
     expect(missingTools).toEqual([]);
 
-    // 3. Exactly 111 registered tools
-    expect(ALL_MEMORY_TOOLS.length).toBe(111);
-    expect(registeredToolNames.size).toBe(111);
+    // 3. Exactly 112 registered tools
+    expect(ALL_MEMORY_TOOLS.length).toBe(112);
+    expect(registeredToolNames.size).toBe(112);
   });
 });

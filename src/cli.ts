@@ -59,6 +59,7 @@ import {
   handleNudgeCommand,
   handleRoutineCommand,
   handleDistillCommand,
+  handleDistillRouteCommand,
   handleVerifyCommand,
   handleSessionCommand,
 } from "./cli/lifecycle.ts";
@@ -320,6 +321,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleRoutineCommand(parsed);
     case "distill":
       return handleDistillCommand(parsed);
+    case "distill-route":
+      return handleDistillRouteCommand(parsed);
     case "verify":
       return handleVerifyCommand(parsed);
     case "session":

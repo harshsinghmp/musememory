@@ -40,6 +40,7 @@ export const ALL_MEMORY_TOOLS = [
   "memory_trace",
   "memory_loops",
   "memory_distill",
+  "memory_distill_route",
   "memory_verify",
   "graph_status",
   "graph_index",

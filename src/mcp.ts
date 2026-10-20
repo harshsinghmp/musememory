@@ -107,6 +107,7 @@ import {
   explainWhyCodeIsTheWayItIs,
   clusterRecurringBugsAndFriction,
   analyzeTechnicalDebt,
+  runDistillRouter,
 } from "./cognition/index.ts";
 import { evaluateProjectHealth, reconcileCodeAnchors } from "./health/index.ts";
 import { analyzeMemoryCodeImpact } from "./intelligence/index.ts";
@@ -681,6 +682,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           properties: {
             min_count: { type: "number", description: "Minimum cluster size to emit a skill (default 3)" },
             dry_run: { type: "boolean", description: "If true, reports clusters without writing skill folders" },
+          },
+        },
+      },
+      {
+        name: "memory_distill_route",
+        description: "Multi-channel knowledge distillation router: triages memories across system (rules/fixes), content (architecture concepts), and health (contradictions/staleness) lanes with deduplication",
+        inputSchema: {
+          type: "object",
+          properties: {
+            force: { type: "boolean", description: "Bypass state deduplication and route all candidate memories" },
+            dry_run: { type: "boolean", description: "If true, simulates routing without persisting state or writing drafts" },
           },
         },
       },
@@ -2236,6 +2248,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             dryRun: a.dry_run === true,
           });
           return toolResult(report);
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+      }
+      case "memory_distill_route": {
+        try {
+          const res = runDistillRouter(activeStore, {
+            workspaceRoot: activeRoot,
+            force: a.force === true,
+            dryRun: a.dry_run === true,
+          });
+          return toolResult(res);
         } catch (err: unknown) {
           return toolError(err instanceof Error ? err.message : String(err));
         }

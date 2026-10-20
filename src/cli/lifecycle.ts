@@ -20,6 +20,7 @@ import { collectLoops, renderLoops } from "../loops.ts";
 import { collectNudges, renderNudges, dueEntries } from "../nudge.ts";
 import { loadRoutines, runRoutine, crontabLine, type Routine } from "../routines.ts";
 import { distillSkills } from "../distill.ts";
+import { runDistillRouter } from "../cognition/distill_router.ts";
 import { verifyEntry, verifyStrictIntegrity } from "../verify.ts";
 import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
@@ -566,6 +567,39 @@ export async function handleDistillCommand({ flags }: ParsedArgs): Promise<numbe
     if (report.created.length === 0 && report.skippedExisting.length === 0) {
       console.log("No recurring fix patterns found.");
     }
+    return 0;
+  } catch (err: unknown) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleDistillRouteCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const force = flags["force"] === "true" || flags["force"] === "1";
+  const dryRun = flags["dry-run"] === "true" || flags["dry-run"] === "1";
+
+  try {
+    const result = runDistillRouter(ctx.store, {
+      workspaceRoot: ctx.root,
+      force,
+      dryRun,
+    });
+
+    console.log(`\n🧠 Knowledge Distillation Routing:`);
+    console.log(`- System Lane (Fixes/Rules): ${result.routed.system.length}`);
+    for (const item of result.routed.system) {
+      console.log(`  • [${item.id}] ${item.title}`);
+    }
+    console.log(`- Content Lane (Architecture/Concepts): ${result.routed.content.length}`);
+    for (const item of result.routed.content) {
+      console.log(`  • [${item.id}] ${item.title}${item.path ? ` -> ${item.path}` : ""}`);
+    }
+    console.log(`- Health Lane (Contradictions): ${result.routed.health.length}`);
+    for (const item of result.routed.health) {
+      console.log(`  • [${item.id}] ${item.title}`);
+    }
+    console.log(`\nSummary: ${result.total_routed} routed, ${result.skipped_surfaced} skipped (previously surfaced)\n`);
     return 0;
   } catch (err: unknown) {
     return fail(err instanceof Error ? err.message : String(err));
