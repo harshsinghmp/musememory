@@ -406,7 +406,10 @@ export type AuditOperation =
   | "merkle_checkpoint"
   | "stage_pending_promotion"
   | "cancel_pending_promotion"
-  | "flush_pending_promotions";
+  | "flush_pending_promotions"
+  | "regression_strike"
+  | "strike_decay"
+  | "dispute_triggered";
 
 export interface AuditEntry {
   timestamp: string;

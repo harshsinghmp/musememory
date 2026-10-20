@@ -30,8 +30,9 @@ describe("T-313: Scoped Failure Attribution", () => {
         status: "confirmed",
         anchors: [
           {
+            id: "anc-1",
             kind: "file",
-            file: "src/auth/jwt.ts",
+            file_path: "src/auth/jwt.ts",
             structural_hash: "hash123",
             status: "valid",
           },
@@ -60,9 +61,10 @@ describe("T-313: Scoped Failure Attribution", () => {
         status: "confirmed",
         anchors: [
           {
+            id: "anc-2",
             kind: "symbol",
-            file: "src/auth/manager.ts",
-            symbol: "SessionTokenManager",
+            file_path: "src/auth/manager.ts",
+            symbol_name: "SessionTokenManager",
             structural_hash: "hash456",
             status: "valid",
           },
@@ -91,9 +93,10 @@ describe("T-313: Scoped Failure Attribution", () => {
         status: "confirmed",
         anchors: [
           {
+            id: "anc-3",
             kind: "symbol",
-            file: "src/utils/id.ts",
-            symbol: "id",
+            file_path: "src/utils/id.ts",
+            symbol_name: "id",
             structural_hash: "hash789",
             status: "valid",
           },
@@ -123,8 +126,9 @@ describe("T-313: Scoped Failure Attribution", () => {
         status: "confirmed",
         anchors: [
           {
+            id: "anc-4",
             kind: "file",
-            file: "src/components/Button.tsx",
+            file_path: "src/components/Button.tsx",
             structural_hash: "hash000",
             status: "valid",
           },
@@ -155,8 +159,9 @@ describe("T-313: Scoped Failure Attribution", () => {
       });
       authEntry.anchors = [
         {
+          id: "anc-auth",
           kind: "file",
-          file: "src/auth/jwt.ts",
+          file_path: "src/auth/jwt.ts",
           structural_hash: "auth123",
           status: "valid",
         },
@@ -175,8 +180,9 @@ describe("T-313: Scoped Failure Attribution", () => {
       });
       uiEntry.anchors = [
         {
+          id: "anc-ui",
           kind: "file",
-          file: "src/components/Button.tsx",
+          file_path: "src/components/Button.tsx",
           structural_hash: "ui123",
           status: "valid",
         },

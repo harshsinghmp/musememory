@@ -160,7 +160,10 @@ export function recordApplicationOutcome(
 
     if ((utility.regression_strikes ?? 0) >= 3 && !isImmune && entry.status === "confirmed") {
       entry.status = "disputed";
-      entry.disputed_by = options.actor ?? "automated_regression_sentry";
+      const disputer = options.actor ?? "automated_regression_sentry";
+      entry.disputed_by = Array.isArray(entry.disputed_by)
+        ? [...new Set([...entry.disputed_by, disputer])]
+        : [disputer];
       if (store.memoryDir) {
         recordAuditEvent(store.memoryDir, {
           operation: "dispute_triggered",

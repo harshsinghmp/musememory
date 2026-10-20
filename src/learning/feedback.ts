@@ -38,18 +38,20 @@ export function isMemoryRelevantToFailure(
   // 1. Anchor matching
   if (entry.anchors && entry.anchors.length > 0) {
     for (const anchor of entry.anchors) {
-      if (anchor.file) {
-        const basename = anchor.file.split(/[/\\]/).pop();
+      const filePath = anchor.file_path || (anchor as any).file;
+      if (filePath) {
+        const basename = filePath.split(/[/\\]/).pop();
         if (basename && matchesWordBoundary(combinedContext, basename)) {
           return true;
         }
-        if (combinedContext.includes(anchor.file)) {
+        if (combinedContext.includes(filePath)) {
           return true;
         }
       }
-      if (anchor.symbol) {
-        const spec = calculateSymbolSpecificity(anchor.symbol);
-        if (spec > 0.3 && matchesWordBoundary(combinedContext, anchor.symbol)) {
+      const symbolName = anchor.symbol_name || (anchor as any).symbol;
+      if (symbolName) {
+        const spec = calculateSymbolSpecificity(symbolName);
+        if (spec > 0.3 && matchesWordBoundary(combinedContext, symbolName)) {
           return true;
         }
       }
@@ -79,6 +81,19 @@ export function isMemoryRelevantToFailure(
     context.command.includes(entry.negative.reproduction_command)
   ) {
     return true;
+  }
+
+  // 4. Distinctive title or content match when anchors are absent
+  if (!entry.anchors || entry.anchors.length === 0) {
+    const textToMatch = `${entry.title} ${entry.content}`.toLowerCase();
+    const contextTokens = combinedContext.toLowerCase().split(/[\s:,\(\)\[\]"']+/);
+    for (const token of contextTokens) {
+      if (token.length >= 4 && calculateSymbolSpecificity(token) > 0.3) {
+        if (matchesWordBoundary(textToMatch, token)) {
+          return true;
+        }
+      }
+    }
   }
 
   return false;
