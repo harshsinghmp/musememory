@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   CompactionInvariants,
@@ -10,6 +10,7 @@ import type {
 import { recordAuditEvent } from "../audit.ts";
 import type { Store } from "../store.ts";
 import { propose } from "../store.ts";
+import { verifyMutationSafety } from "../quality/guards.ts";
 
 export const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
 export const COMPACTION_THRESHOLD_PERCENT = 70;
@@ -235,6 +236,81 @@ export function generateResumptionPrompt(invariants: CompactionInvariants): stri
   return parts.join("\n");
 }
 
+/**
+ * Parses active working constraints from an existing CURRENT.md markdown string.
+ */
+export function parseCurrentConstraints(content: string): string[] {
+  if (!content) return [];
+  const lines = content.split("\n");
+  const constraints: string[] = [];
+  let inConstraintsSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+      if (
+        trimmed.toLowerCase().includes("active working constraints") ||
+        trimmed.toLowerCase().includes("active constraints")
+      ) {
+        inConstraintsSection = true;
+        continue;
+      } else if (inConstraintsSection) {
+        break;
+      }
+    }
+
+    if (inConstraintsSection) {
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        const raw = trimmed.replace(/^[-*]\s+(\[[ xX]\]\s+)?/, "").trim();
+        if (raw && !raw.toLowerCase().startsWith("none recorded")) {
+          constraints.push(raw);
+        }
+      }
+    }
+  }
+
+  return constraints;
+}
+
+/**
+ * Merges proposed constraints with existing constraints, preserving hand-added rules.
+ * Applies in-lock mutation safety validation.
+ */
+export function mergeCurrentConstraints(
+  existingText: string,
+  proposed: string[],
+  options?: { allowDrastic?: boolean },
+): string[] {
+  const existing = parseCurrentConstraints(existingText);
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  // Add existing constraints first
+  for (const c of existing) {
+    const key = c.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(c);
+    }
+  }
+
+  // Count additions from proposed
+  let additionsCount = 0;
+  for (const p of proposed) {
+    const key = p.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(p);
+      additionsCount++;
+    }
+  }
+
+  // Verify mutation safety
+  verifyMutationSafety(existing.length, merged.length, additionsCount, options);
+
+  return merged;
+}
+
 function commitHandoff(
   memoryDir: string,
   invariants: CompactionInvariants,
@@ -245,7 +321,27 @@ function commitHandoff(
   }
 
   const currentMdPath = join(memoryDir, "CURRENT.md");
-  const markdownContent = renderCurrentMdContent(invariants, options);
+  let effectiveConstraints = invariants.activeConstraints ?? [];
+
+  if (existsSync(currentMdPath)) {
+    try {
+      const existingText = readFileSync(currentMdPath, "utf8");
+      effectiveConstraints = mergeCurrentConstraints(
+        existingText,
+        effectiveConstraints,
+        { allowDrastic: (options as any)?.allowDrastic },
+      );
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  const invariantsWithMerged: CompactionInvariants = {
+    ...invariants,
+    activeConstraints: effectiveConstraints,
+  };
+
+  const markdownContent = renderCurrentMdContent(invariantsWithMerged, options);
   writeFileSync(currentMdPath, markdownContent, "utf8");
 
   recordAuditEvent(memoryDir, {
