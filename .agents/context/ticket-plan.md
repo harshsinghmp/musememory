@@ -56,7 +56,7 @@
 - [x] T-047 · landed Wave 4 — never-empty checkpoint contract (raise instead of emit partial) · compaction, orchestrator · branch: feat/wave-4-compaction-distillation · F
 - [ ] T-048 · wake gate: background passes exit unless actionable-keys allowlist matches · optimize, cognition · new · F
 - [x] MERGED→T-048 T-049 · gate exit-0 contract (never blocks a turn) · optimize · new · F
-- [ ] T-050 · overnight loss guard: snapshot entry-head hashes; >25% loss → alert-only · optimize · new · F
+- [x] T-050 · landed Wave 21 — overnight / in-lock mutation safety guards (verifyMutationSafety, ESUSPECT_SHRINK, ESUSPECT_EROSION, allowDrastic) · quality, store · test/mutation_guards.test.ts · F
 - [ ] T-051 · memory_pressure as first-class event (store near ceiling) · store.ts · new · F
 - [x] MERGED→T-051 T-052 · pressure alert in CLI (non-silent refusal) · cli · new · F
 - [x] T-053 · landed Wave 4 — honest dual-measure token accounting (harness + pessimistic model) · compaction · branch: feat/wave-4-compaction-distillation · F
@@ -185,7 +185,7 @@
 - [ ] T-174 · peer/namespace scoping · store · dep: T-153 · new · U
 - [ ] T-175 · reserved slots per peer · orchestrator · new · U
 - [ ] T-176 · memory forking/branching · store · branch: feat (R31) · F
-- [ ] T-177 · safety snapshots before governance passes · store · new · F
+- [x] T-177 · landed Wave 21 — pre-mutation 30-snapshot rolling ring buffer before governance/compaction passes · store, snapshot · test/snapshot_ring.test.ts · F
 - [ ] T-178 · graph retrieval A/B gate behind eval harness · retrieval · branch: recall-eval-harness · U
 - [ ] T-179 · HRR/wikilink expansion — implement only if T-178 shows net gain · retrieval · dep: T-178 · new · U
 - [ ] T-180 · funded/shared memory pools spec (Walrus delegation model) · .agents/research · new · N
@@ -255,7 +255,7 @@ Source: read-only gap audit cross-checking the 168 tickets against the four rese
 - [ ] T-321 · HIGH (B12) · per-project health gate: gate/clustering/tech-debt call `list(store)` unfiltered and label by `entries[0].project` (health/gate.ts:31,220; cognition/clustering.ts:62; tech-debt.ts:102) — one number attributed to whichever memory sorts first · dep: T-153 · U
 - [ ] T-322 · MEDIUM (B13) · per-file read cache: anchor audit reads every source file 3× per health check (health/gate.ts:82,111,176 → anchors/resolver.ts:121) · U
 - [ ] T-323 · MEDIUM (B14) · anchored memories force-injected to front regardless of `anchor.status` + budget ordering (orchestrator/context.ts:104-147) — anchor to a deleted file wins the slot forever · dep: T-134 · U
-- [ ] T-324 · HIGH (B18) · checkpoint merge semantics: `generateSessionHandoff` overwrites CURRENT.md wholesale; omitted constraints default to 2 hardcoded strings → hand-added constraints destroyed (compaction/engine.ts:145,54). Diff-preserving update, never drop unknown constraints · F
+- [x] T-324 · landed Wave 21 · HIGH (B18) · checkpoint merge semantics: parseCurrentConstraints & mergeCurrentConstraints in compaction handoff; diff-preserving update preserves hand-added constraints · compaction · test/current_compaction_guard.test.ts · F
 - [ ] T-325 · MEDIUM (B19) · `rollupTemporal` never filters by its own period — every rollup contains all history (compounding/temporal.ts:120-135) · U
 - [ ] T-326 · MEDIUM (B20) · tier 0/1 run the full ranking path (retrieval/tiered.ts:37) — audit D9 named this line; no ticket makes tier 0 cheap or removes it · U
 - [ ] T-327 · MEDIUM (B21) · paged candidate source: `list()` = full SELECT * + JSON.parse ×44 call sites (store.ts:220-288); getSyncStatus filters whole store to count; collectNudges calls it twice uncapped · U

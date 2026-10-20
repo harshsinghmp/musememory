@@ -5,12 +5,17 @@
 
 ---
 
-## ⏭️ Next Up (Post-Wave 20 Focus)
-- **Wave 21**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. failure attribution, eval harness, dashboard panels, and Hermes provider adapter).
+## ⏭️ Next Up (Post-Wave 21 Focus)
+- **Wave 22**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. failure attribution, eval harness, dashboard panels, and Hermes provider adapter).
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing**:
+  - `T-050`: Overnight & in-lock mutation safety guards (`verifyMutationSafety`, `MutationSafetyError`, `ESUSPECT_SHRINK`, `ESUSPECT_EROSION`, `allowDrastic`) preventing accidental bulk erasure or semantic erosion during compaction/governance (`test/mutation_guards.test.ts`, commit `439e31c`).
+  - `T-177`: Pre-mutation 30-snapshot rolling ring buffer (`captureSnapshotRing`, `listSnapshotRing`, `restoreSnapshotRing`) with zero resident daemons in `.memory/snapshots/` before write transactions and compaction handoffs (`test/snapshot_ring.test.ts`, commit `76c58eb`).
+  - `T-324`: Diff-preserving `CURRENT.md` checkpoint merge semantics (`parseCurrentConstraints`, `mergeCurrentConstraints`), preventing mid-session hand-added constraints from being overwritten (`test/current_compaction_guard.test.ts`, commit `f1a4756`).
+  - Multi-Channel Distillation Router: Distills verified memories across `system` (rules/fixes), `content` (architecture concepts), and `health` (contradictions/staleness) lanes with SHA-256 state deduplication (`.memory/distill_state.json`) and draft generation (`.agents/drafts/`), exposed via `distill-route` CLI and `memory_distill_route` MCP tool (`test/distill_router.test.ts`, `test/mcp_distill_route.test.ts`, commits `c6badf1`, `e634bdb`).
 - [x] **Wave 20: Quality Telemetry, Honesty Gates & Retrieval Fault Signals**:
   - `T-127`: Recall→usage telemetry join (`usage_rate` feeds ROI) (PR #291, Closes #290)
   - `T-128`: `[DRAFT]` marking with separate confident-answer key (PR #293, Closes #292)
