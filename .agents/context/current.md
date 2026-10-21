@@ -6,6 +6,7 @@
 ---
 
 ## ⏭️ Next Up (Post-Wave 22 Focus)
+- **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall) to replace removed legacy demo.
 - **Wave 23**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. Hebbian co-activation retrieval expansion, query-seeded PPR restart set, retrieval weight auto-tuner, and contradiction engine calibration).
 
 ---

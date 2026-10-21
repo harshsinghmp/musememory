@@ -15,6 +15,14 @@
 
 ## 🚀 Active Roadmap & Future Horizons (Agentic Cognitive OS Evolution)
 
+### 0. **DX & Project Showcase Assets (Pending Triage)**
+- **Production-Grade Showcase Demo Video & GIF**:
+  - Re-record high-fidelity terminal demo video (`showreel.mp4`) and GIF (`muse-memory-demo.gif`) reflecting v3.0.0 capabilities.
+  - Showcase real workflows: failure attribution with decaying strikes, negative fix-pair mining, HOT.md candidate compounding, `memory branch` / `checkout`, and MCP context recall.
+  - Replace legacy inaccurate SVG render with an authentic, crisp terminal capture.
+
+---
+
 ### 1. **R17: Tri-Cognitive Memory Architecture (Procedural Playbooks & Episodic Horizons)**
 - **Procedural Playbook Engine (`ProceduralMemory`)**:
   - Capture executable tool-calling workflows, pre-conditions, step trajectories, verification assertions, and rollback recipes distilled from successful agent sessions.

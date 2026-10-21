@@ -29,11 +29,6 @@
 
 [Visit the live site](https://harshsinghmp.github.io/musememory/) · [Docs](https://harshsinghmp.github.io/musememory/docs) · [Comparison](https://harshsinghmp.github.io/musememory/compare) · [Install](#start-with-one-command)
 
-<img src="./assets/muse-memory-demo.gif" alt="Muse Memory in action — memory init, propose, context recall, and R23 version control (branch / blame / checkout) with access-weighted decay" width="100%" />
-
-*→ Prefer the raw clip? [`apps/website/public/showreel.mp4`](./apps/website/public/showreel.mp4) (10s, 1280×720, 240KB) — or watch it embedded on the [live site](https://harshsinghmp.github.io/musememory/#showreel).*
-*Rebuild the GIF with `bun run build:gif` (deterministic — renders from a declarative scene script, not a screen recording).*
-
 </div>
 
 ---
@@ -663,7 +658,6 @@ bun install
 bun test          # 1309 pass, 0 fail, 5872 assertions across 203 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
-bun run build:gif # Regenerate assets/muse-memory-demo.gif (deterministic SVG→GIF render)
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch/PR model, the per-commit gate, and the post-merge sequence.
@@ -689,6 +683,7 @@ Muse Memory features are developed in structured sprints moving across 4 determi
 
 ### 📋 Phase 1: Requested (Backlog)
 *Incoming community proposals, agent adapters, and feature requests pending sprint triage:*
+- [ ] Production-Grade Showcase Demo: Re-record high-fidelity terminal demo video / GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall)
 - [ ] Multi-Agent Consensus Verification Protocol (cross-agent memory agreement)
 - [ ] Continuous Background Memory Compaction & Pruning Cron
 - [ ] Export to Local Vector GGUF Embedding Index
