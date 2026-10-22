@@ -40,43 +40,27 @@ jobs:
       # ── Showreel freshness gate (hash-verified) ──────────────────────────
       # The committed showreel.mp4 is rendered from the composition in
       # apps/website/showreel/ — the render is done locally via
-      # `bun run site:showreel`, never during deploy. The hash of the
-      # composition + build script + fonts is stored beside the video; a
-      # mismatch fails the deploy fast so the video can never drift from
-      # its source. To refresh: run `bun run site:showreel`, commit the new
-      # video + hash, or dispatch this workflow with rebuild-showreel=true.
-      - name: Compute showreel input hash
-        id: reelhash
-        run: |
-          INPUTS=$( (cat \
-            apps/website/showreel/index.html \
-            apps/website/scripts/build-showreel.ts \
-            ; sha256sum apps/website/src/assets/fonts/*.woff2) \
-            | sha256sum | cut -d' ' -f1)
-          STORED=$(cat apps/website/public/brand/.showreel-hash 2>/dev/null || echo "none")
-          echo "hash=$INPUTS" >> "$GITHUB_OUTPUT"
-          echo "stored=$STORED" >> "$GITHUB_OUTPUT"
-          if [ "$INPUTS" != "$STORED" ]; then
-            echo "stale=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "stale=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Fail on stale showreel (source changed, video not rebuilt)
-        if: steps.reelhash.outputs.stale == 'true' && inputs.rebuild-showreel != true
-        run: |
-          echo "::error::showreel.mp4 is stale — the composition changed without a re-render."
-          echo "Refresh locally with: bun run site:showreel"
-          echo "Then commit the new public/showreel.mp4, showreel-poster.png, and public/brand/.showreel-hash."
-          exit 1
+      # `bun run site:showreel`, never during deploy. The hash of every
+      # input to that render is stored beside the video; a mismatch fails
+      # the deploy fast so the video can never drift from its source.
+      #
+      # The hash is computed by a SCRIPT, not by an inline shell command.
+      # It used to be duplicated between the workflow and a maintainer's
+      # shell, and the two disagreed because `sha256sum` embeds the file
+      # name — so the deploy failed on a freshly rendered video. One
+      # implementation, called from both places, removes the whole class.
+      - name: Verify the showreel matches its inputs
+        if: inputs.rebuild-showreel != true
+        run: bun run scripts/showreel-hash.ts --check
 
       - name: Rebuild showreel in CI (dispatched)
         if: inputs.rebuild-showreel == true
         run: |
           cd apps/website
           bun scripts/build-showreel.ts
-          echo "${{ steps.reelhash.outputs.hash }}" > public/brand/.showreel-hash
-          echo "⚠ Commit the regenerated showreel + updated public/brand/.showreel-hash." >> "$GITHUB_STEP_SUMMARY"
+          cd ../..
+          bun run scripts/showreel-hash.ts --write
+          echo "⚠ Commit the regenerated showreel + updated .showreel-hash." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate brand assets (favicon, OG card, banner, icons)
         run: bun run --cwd apps/website brand

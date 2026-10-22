@@ -27,7 +27,9 @@
     "validate": "bun run dist/index.js validate --dry-run",
     "start": "bun run dist/index.js mcp",
     "prepublishOnly": "bun run build && bun test",
-    "site:qa": "bun run --cwd apps/website scripts/qa-gate.ts"
+    "site:qa": "bun run --cwd apps/website scripts/qa-gate.ts",
+    "showreel:hash": "bun scripts/showreel-hash.ts",
+    "showreel:hash:write": "bun scripts/showreel-hash.ts --write"
   },
   "bin": {
     "memory": "dist/index.js",
