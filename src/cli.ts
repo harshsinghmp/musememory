@@ -78,6 +78,7 @@ import {
   handleCodeImpactCommand,
   handlePrContextCommand,
 } from "./cli/health.ts";
+import { handleConflictsCommand } from "./cli/conflicts.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
 import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
@@ -167,7 +168,8 @@ Ecosystem, Migration & Connectivity:
   daemon [--port N]             Real-time agency hub (SSE event stream + publish API, default port 7878)
   sync [status|broadcast|ingest|pool] Cross-agent knowledge sync & P2P gossip mesh
   mesh [query|check|link|unlink|propagate] Multi-repo & monorepo cross-project mesh
-  health                        Run unified 5-pillar architectural health evaluation
+  health [--project P]         Run unified 5-pillar architectural health evaluation; --project scopes it to one memory project
+  conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
@@ -355,6 +357,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleLoopCommand(parsed);
     case "health":
       return handleHealthCommand(parsed);
+    case "conflicts":
+      return handleConflictsCommand(parsed);
     case "reconcile":
       return handleReconcileCommand(parsed);
     case "benchmark":

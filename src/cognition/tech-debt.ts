@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Store } from "../store.ts";
-import { list } from "../store.ts";
+import { listForProject } from "../store.ts";
 import { verifyCodeAnchor } from "../anchors/resolver.ts";
 import type { TechnicalDebtReport, DebtItem } from "./types.ts";
 
@@ -42,7 +42,8 @@ function scanFiles(dir: string, maxFiles: number = 50): string[] {
  */
 export function analyzeTechnicalDebt(
   store: Store,
-  workspaceRoot: string
+  workspaceRoot: string,
+  options?: { project?: string },
 ): TechnicalDebtReport {
   const items: DebtItem[] = [];
   const hotspotMap = new Map<string, number>();
@@ -99,7 +100,7 @@ export function analyzeTechnicalDebt(
   }
 
   // 2. Memory Store Drifted Anchors as Architectural Debt
-  const allEntries = list(store);
+  const allEntries = listForProject(store, options?.project);
   for (const entry of allEntries) {
     if (entry.status === "archived" || entry.status === "superseded") continue;
 

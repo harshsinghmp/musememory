@@ -163,6 +163,7 @@ musememory capture \
 | :--- | :--- | :--- |
 | `musememory why "<symbol/path>"` | `/muse-why` | Explains **why** a function or file was designed this way before you refactor it. Synthesizes past ADRs, bug fixes, and constraints. |
 | `musememory health` | `/muse-health` | Runs the 5-pillar health check (store integrity, code anchors, doc/code alignment, anti-pattern sentry, technical debt) before opening a PR. |
+| `musememory conflicts --dry-run` | — | Previews the memory pairs the contradiction engine *would* flag, without changing anything. Use it before trusting a health-gate conflict count. |
 | `search(as_of="<iso>")` | — | Executes bi-temporal point-in-time recall, returning active memories and undetermined boundary items without date invention. |
 | `memory_lifecycle(verb)` | — | Executes one of the five canonical lifecycle verbs (`change`, `end`, `correct`, `revert`, `forget`) with full audit logging. |
 | `musememory doctor` | — | Validates database WAL files, checks MCP server readiness, and audits token allocations. |

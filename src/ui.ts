@@ -510,7 +510,11 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R15: Project Health Gate Endpoint
       if (pathname === "/api/health" && req.method === "GET") {
         try {
-          const report = evaluateProjectHealth(opts.store, workspaceRoot);
+          // T-321: optional project scope filter.
+          const healthProject = url.searchParams.get("project") || undefined;
+          const report = evaluateProjectHealth(opts.store, workspaceRoot, {
+            project: healthProject,
+          });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(report));
         } catch (err: unknown) {
@@ -536,7 +540,11 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R15: Code ↔ Documentation Drift Endpoint
       if (pathname === "/api/drift" && req.method === "GET") {
         try {
-          const drift = detectDocumentationCodeDrift(opts.store, workspaceRoot);
+          // T-321: optional project scope filter.
+          const driftProject = url.searchParams.get("project") || undefined;
+          const drift = detectDocumentationCodeDrift(opts.store, workspaceRoot, {
+            project: driftProject,
+          });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(drift));
         } catch (err: unknown) {
@@ -568,7 +576,11 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R15: Cognition Recurring Bug Clusters Endpoint
       if (pathname === "/api/cognition/clusters" && req.method === "GET") {
         try {
-          const clusters = clusterRecurringBugsAndFriction(opts.store);
+          // T-321: optional project scope filter.
+          const clustersProject = url.searchParams.get("project") || undefined;
+          const clusters = clusterRecurringBugsAndFriction(opts.store, {
+            project: clustersProject,
+          });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ total_clusters: clusters.length, clusters }));
         } catch (err: unknown) {
@@ -581,7 +593,11 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R15: Cognition Technical Debt Endpoint
       if (pathname === "/api/cognition/debt" && req.method === "GET") {
         try {
-          const debt = analyzeTechnicalDebt(opts.store, workspaceRoot);
+          // T-321: optional project scope filter.
+          const debtProject = url.searchParams.get("project") || undefined;
+          const debt = analyzeTechnicalDebt(opts.store, workspaceRoot, {
+            project: debtProject,
+          });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(debt));
         } catch (err: unknown) {
@@ -837,6 +853,10 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     
     /* Stats & Quick Actions */
     .header-actions { display: flex; align-items: center; gap: 12px; }
+    .scope-filter { display: flex; align-items: center; gap: 8px; }
+    .scope-filter-label { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .scope-filter-input { width: 140px; background: #090d14; border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 6px 10px; color: #fff; font-size: 12px; outline: none; transition: var(--transition); }
+    .scope-filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
     .status-badge { font-size: 12px; font-weight: 600; background: rgba(16,185,129,0.12); color: var(--green); padding: 5px 12px; border-radius: var(--radius-full); border: 1px solid rgba(16,185,129,0.25); display: flex; align-items: center; gap: 6px; }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
     .btn-icon { background: rgba(255,255,255,0.04); border: 1px solid var(--panel-border); color: var(--text-muted); padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; }
@@ -1043,6 +1063,10 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     </div>
     
     <div class="header-actions">
+      <div class="scope-filter">
+        <label class="scope-filter-label" for="projectFilter">Project Scope</label>
+        <input type="text" id="projectFilter" class="scope-filter-input" placeholder="all projects" autocomplete="off" spellcheck="false" title="Leave empty to audit the whole memory store, or enter a project name to scope the health gate, drift, bug cluster and technical debt audits." />
+      </div>
       <button class="btn-icon btn-refresh" id="refreshBtn" onclick="refreshMemories()" title="Refresh and sync active constraints, handoff state, and prior memories">
         <span class="refresh-icon" id="refreshIcon">🔄</span>
         <span id="refreshLabel">Refresh</span>
@@ -1225,6 +1249,10 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
                   <span class="gate-badge gate-pass" id="healthGate">[PASS]</span>
                 </div>
                 <div style="font-size:13px; color:var(--text-muted); margin-top:3px;" id="healthSummary">Comprehensive project cognitive health evaluation.</div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:6px; display:flex; gap:14px; flex-wrap:wrap;">
+                  <span id="healthScopeProject">Project: --</span>
+                  <span id="healthScope">Scope: --</span>
+                </div>
               </div>
             </div>
             <div style="text-align:right;">
@@ -1460,6 +1488,36 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     let currentFilter = 'all';
     let searchQuery = '';
     let currentTab = 'graph';
+
+    // T-321: optional project scope for the studio's audit surfaces.
+    // An empty value means the whole store; a value scopes the health gate,
+    // drift, bug cluster and technical debt audits to that memory project.
+    // The initial value comes from the URL query string so a scoped link
+    // stays shareable and reloadable.
+    let projectScope = (new URLSearchParams(window.location.search).get('project') || '').trim();
+
+    function projectScopeQuery() {
+      return projectScope ? '?project=' + encodeURIComponent(projectScope) : '';
+    }
+
+    function syncProjectScopeUrl() {
+      try {
+        const url = new URL(window.location.href);
+        if (projectScope) url.searchParams.set('project', projectScope);
+        else url.searchParams.delete('project');
+        window.history.replaceState({}, '', url.toString());
+      } catch (err) {
+        console.error('Failed to sync project scope in URL:', err);
+      }
+    }
+
+    function applyProjectScope(value) {
+      projectScope = (value || '').trim();
+      syncProjectScopeUrl();
+      fetchHealth();
+      if (currentTab === 'adrs') fetchDrift();
+      if (currentTab === 'cognition') fetchCognition();
+    }
 
     // ---- Graph state (3D force-directed) ----
     const TYPE_COLORS = {
@@ -2127,12 +2185,23 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     // R15 Studio Loaders
     async function fetchHealth() {
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch('/api/health' + projectScopeQuery());
         const data = await res.json();
         renderHealth(data);
       } catch (err) {
         console.error('Failed to load health report:', err);
       }
+    }
+
+    // T-321: mirrors the CLI scope wording — "N memories across M project(s)".
+    function formatHealthScope(scope) {
+      if (!scope) return 'Scope: --';
+      const count = scope.entry_count || 0;
+      const projectCount = (scope.projects || []).length;
+      const memories = count === 1 ? 'memory' : 'memories';
+      const projects = projectCount === 1 ? 'project' : 'projects';
+      const label = scope.filter ? 'project "' + scope.filter + '"' : 'entire store';
+      return 'Scope: ' + label + ' (' + count + ' ' + memories + ' across ' + projectCount + ' ' + projects + '); code-side metrics cover the ' + (scope.code_scope || 'workspace') + '.';
     }
 
     function renderHealth(data) {
@@ -2141,6 +2210,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
       const scoreEl = document.getElementById('healthScore');
       const gateEl = document.getElementById('healthGate');
       const summaryEl = document.getElementById('healthSummary');
+      const scopeEl = document.getElementById('healthScope');
+      const scopeProjectEl = document.getElementById('healthScopeProject');
       const grade = data.overall_grade || data.grade || '--';
       const score = data.overall_score !== undefined ? data.overall_score : (data.score || 0);
       if (gradeEl) {
@@ -2153,6 +2224,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
         gateEl.className = 'gate-badge gate-' + (data.gate_status || 'WARN').toLowerCase();
       }
       if (summaryEl) summaryEl.textContent = data.summary || '';
+      if (scopeEl) scopeEl.textContent = formatHealthScope(data.scope);
+      if (scopeProjectEl) scopeProjectEl.textContent = 'Project: ' + (data.project || '--');
 
       if (data.pillars) {
         const p1 = data.pillars.store_integrity || data.pillars.memory_integrity;
@@ -2255,7 +2328,7 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 
     async function fetchDrift() {
       try {
-        const res = await fetch('/api/drift');
+        const res = await fetch('/api/drift' + projectScopeQuery());
         const drift = await res.json();
         const tbody = document.getElementById('driftTableBody');
         if (tbody) {
@@ -2313,8 +2386,8 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
     async function fetchCognition() {
       try {
         const [clustRes, debtRes] = await Promise.all([
-          fetch('/api/cognition/clusters'),
-          fetch('/api/cognition/debt')
+          fetch('/api/cognition/clusters' + projectScopeQuery()),
+          fetch('/api/cognition/debt' + projectScopeQuery())
         ]);
         const clustersData = await clustRes.json();
         const debtData = await debtRes.json();
@@ -2550,6 +2623,16 @@ const EMBEDDED_HTML = `<!DOCTYPE html>
 
     setupCanvasInteractions();
     setupTimeline();
+
+    // T-321: project scope control. Seeded from the URL so a scoped link is
+    // reloadable; an empty value means the whole store.
+    const projectFilterInput = document.getElementById('projectFilter');
+    if (projectFilterInput) {
+      projectFilterInput.value = projectScope;
+      projectFilterInput.addEventListener('change', () => {
+        applyProjectScope(projectFilterInput.value);
+      });
+    }
 
     let searchDebounceTimer = null;
     document.getElementById('searchInput').addEventListener('input', (e) => {

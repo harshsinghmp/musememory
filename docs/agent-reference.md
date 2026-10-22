@@ -79,6 +79,7 @@ Full matrix: [`cli-reference.md`](./cli-reference.md).
 | `memory current get` / `memory current set "<text>" --project P` | Read/write active constraints. |
 | `memory link <id> --related <id1,id2>` | Bidirectional relation between entries. |
 | `memory audit [--operation OP] [--entry-id ID]` | Query the append-only audit ledger. |
+| `memory conflicts [--dry-run]` | List recorded contradictions; `--dry-run` previews what would be flagged. |
 | `memory doctor` | Full ecosystem health diagnostic. |
 | `memory harvest "<text>" --project P` | Distil a turn into a fix/decision unit. |
 | `memory verify <id> --strict` | Run an entry's verification command, or the full integrity gate. |
@@ -191,9 +192,22 @@ propose → candidate → confirmed → superseded
 ```bash
 memory doctor            # storage, schemas, secrets, agent wiring
 memory health            # 5-pillar health gate, letter grade
+memory health --project P  # ...scoped to one memory project
 memory stats             # counts by status and type
 memory context --query "how does auth work" --budget 2000
 ```
 
 A healthy install reports: SQLite reachable, schema version current, no
 secrets in the store, and the expected agents wired.
+
+The health report states its own scope in `scope`: `filter` (the requested
+project, or `null` for the whole store), `projects` (every project whose
+memories were considered) and `entry_count`. Read it before comparing two
+numbers — an unscoped report covers every project in the store.
+
+The same `project` filter is available on every audit surface: the
+`muse_health`, `muse_tech_debt`, `muse_bug_clusters`, `memory_anchor_audit` and
+`memory_drift_audit` MCP tools, and the studio's `/api/health`, `/api/drift`,
+`/api/cognition/clusters` and `/api/cognition/debt` endpoints
+(`?project=P`). Code-side metrics stay workspace-wide by design — source code
+is shared between projects — so `scope.code_scope` always reads `workspace`.

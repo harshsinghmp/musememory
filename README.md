@@ -66,48 +66,51 @@ has since changed.
 
 ## What's new
 
-### v3.0.1 — correctness release
+> One flat list of what is current. Historical releases live in the
+> [Changelog](./CHANGELOG.md) and the [GitHub Releases](https://github.com/harshsinghmp/musememory/releases) pages.
 
-Five defects found by a cross-file invariant audit, and a guarantee that the
-numbers on this page are the numbers the code produces.
+**Correctness**
 
-- **Prompt-injection channel closed**: `CURRENT.md` was written with the raw,
-  un-stripped constraint text while the stored memory was sanitised. Because
-  `CURRENT.md` is replayed into every later prompt, one captured constraint
-  could reach every future session. Sanitisation now happens at the sink.
-- **Bi-temporal queries answered from the wrong snapshot**: the context cache
-  key omitted `as_of`, so "what did we believe in Q1?" could return today's
-  answer from a 30-second-old cache entry.
-- **Access counter never accumulated**: every read reset it to its baseline,
-  which silently disarmed the access-frequency ranking axis.
-- **Store could fail its own schema validator**: entries that failed embedding
-  were permanently reported as corrupt.
-- **Tier token budget was declared but never enforced**: 327 tokens against a
-  200-token budget.
-- **Every published number is now generated from the source** and checked by a
-  test, so the site can no longer advertise a figure the code does not produce.
+- **Five defects closed in the engine**: a prompt-injection channel through
+  `CURRENT.md`, a store that could fail its own schema validator, bi-temporal
+  queries answered from a stale cache entry, a tiered-context path that
+  silently dropped `as_of`, and an access counter that never accumulated.
+- **Every published number is generated from the source** and checked by a test,
+  so the site can no longer advertise a figure the code does not produce.
+- **The contradiction engine no longer flags unrelated memories.** It used to
+  compare two memories with bare keyword pairs, so "pooling is enabled" and
+  "pooling is disabled" looked like a conflict. It now compares *claims* about
+  the same subject in the same scope, and a read-only
+  `memory conflicts --dry-run` previews what it would flag.
+- **The health report no longer attributes a store-wide number to one
+  arbitrary project.** It states its own scope — the filter, the projects it
+  covered, the entry count — and `memory health --project P` asks for one
+  project's health directly.
+- **The page no longer reads blank without JavaScript**, and the mobile menu
+  no longer overflows the viewport.
 
-### v3.0.0 — feature release
+**The website**
 
-Closed-loop failure attribution, trajectory fix-pair mining, HOT.md compounding, and LangMem logarithmic frequency ranking.
+- **Rebuilt** on a developer-vertical anatomy — hero, demo, architecture, code
+  grid, proof, quickstart — with a fluid token system, a new twelve-second
+  showreel and a line-icon set. Every figure is bound to the same manifest the
+  code generates, so no number on the page can drift from the code.
+- **The release gate is executable code** (`apps/website/scripts/qa-gate.ts`):
+  critical paths, keyboard-only navigation, 200% zoom reflow, the
+  no-JavaScript first frame, animation performance, the payload budget and a
+  second rendering engine. It exits non-zero on a blocking failure and runs in
+  CI, so a broken page cannot ship.
 
-#### New capabilities
-- Scoped failure attribution matching code anchors with decaying strike counters ([#313](https://github.com/harshsinghmp/musememory/pull/313))
-- Trajectory fix-pair mining discovering negative lessons from agent error sequences ([#144](https://github.com/harshsinghmp/musememory/pull/144))
-- Active working set compounding and candidate scoring directly from HOT.md ([#314](https://github.com/harshsinghmp/musememory/pull/314))
-- Multi-channel knowledge distillation router across system, content, and health ([#324](https://github.com/harshsinghmp/musememory/pull/324))
-- Pre-mutation 30-snapshot rolling ring buffer for zero-daemon recovery ([#177](https://github.com/harshsinghmp/musememory/pull/177))
+**Capabilities**
 
-#### Bug fixes
-- In-lock mutation safety guards preventing bulk deletion and semantic erosion ([#50](https://github.com/harshsinghmp/musememory/pull/50))
-- Strict CodeAnchor field alignment and dispute tracking type safety ([#325](https://github.com/harshsinghmp/musememory/pull/325))
-
-#### Improvements
-- LangMem logarithmic frequency rank curve with 2x application weighting ([#315](https://github.com/harshsinghmp/musememory/pull/315))
-- Diff-preserving CURRENT.md checkpoint merge semantics for agent handoffs ([#324](https://github.com/harshsinghmp/musememory/pull/324))
-- Constitutional immunity defending non-negotiable rules against strike decay ([#313](https://github.com/harshsinghmp/musememory/pull/313))
-
-*For earlier releases, see the [Changelog](./CHANGELOG.md) or [GitHub Releases](https://github.com/harshsinghmp/musememory/releases).*
+- Closed-loop failure attribution matching code anchors with decaying strike
+  counters.
+- Trajectory fix-pair mining that discovers negative lessons from agent error
+  sequences.
+- Active working-set compounding and candidate scoring straight from `HOT.md`.
+- LangMem logarithmic frequency ranking with 2x application weighting.
+- A multi-channel distillation router across system, content and health.
+- A pre-mutation snapshot ring for zero-daemon recovery.
 
 ---
 
@@ -603,7 +606,7 @@ memory current get | set "<text>"         # read/write active constraints
 memory link <id> --related <id1,id2>      # bidirectional relation between entries
 memory audit [--operation OP]             # query the append-only audit ledger
 memory doctor                             # full ecosystem health diagnostic
-memory health                             # 5-pillar health gate with a letter grade
+memory health                             # 5-pillar health gate with a letter grade (--project P to scope it)
 memory verify <id> --strict               # run an entry's verification command
 memory harvest "<text>" --project P       # distil a turn into a fix/decision unit
 memory wiki compile                       # compile memories into an Obsidian wiki

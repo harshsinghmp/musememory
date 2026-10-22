@@ -18,6 +18,7 @@ import {
   type SemanticFactTriple,
   type ScopedInvalidationResult,
 } from "./invalidation.ts";
+import { comparePolarityClaims, extractPolarityClaims } from "./polarity.ts";
 export {
   evaluateScopedInvalidation,
   extractFactTriples,
@@ -32,23 +33,35 @@ export interface ConflictDetection {
   conflictingEntry?: MemoryEntry;
   confidence: number;
   reason?: string;
+  /** T-320: true when the detection was produced in dry-run mode (no mutation applied). */
+  dryRun?: boolean;
 }
 
-// Common competing technology pairs / opposite polarities
-const CONTRADICTORY_PAIRS: [RegExp, RegExp, string][] = [
-  [/\b(enable|enabled|true)\b/i, /\b(disable|disabled|false)\b/i, "Opposing configuration polarity"],
-  [/\b(allow|allowed)\b/i, /\b(deny|denied|disallow|disallowed|forbidden)\b/i, "Opposing permission rule"],
-  [/\b(uses?\s+postgresql|postgres)\b/i, /\b(uses?\s+mysql|uses?\s+sqlite|uses?\s+mongodb)\b/i, "Conflicting primary database choice"],
-  [/\b(port\s+3000)\b/i, /\b(port\s+8080|port\s+5000|port\s+4000)\b/i, "Conflicting port binding"],
-  [/\b(rest\s+api)\b/i, /\b(graphql\s+only|grpc\s+only)\b/i, "Conflicting communication protocol"],
-  [/\b(bun\s+runtime)\b/i, /\b(node\s+runtime\s+only|deno\s+only)\b/i, "Conflicting runtime engine"],
-  [/\b(always)\b/i, /\b(never)\b/i, "Contradictory universal policy"],
-];
+export interface ConflictDetectionOptions {
+  /**
+   * T-320: detect without applying any mutation. Detection itself is pure;
+   * the flag is echoed on the result so callers can prove no state changed.
+   */
+  dryRun?: boolean;
+}
+
+/**
+ * Minimum confidence a detection must reach before it is allowed to poison
+ * both sides of a memory pair. Flagging costs 25 health points per memory and
+ * removes both from every future sync broadcast, so the bar is deliberately
+ * high.
+ */
+export const MIN_CONFLICT_CONFIDENCE = 0.8;
 
 /**
  * Detects if a candidate memory contradicts an existing active or confirmed memory.
- * Evaluates semantic (entity, relation, target) alignment to avoid false positive
- * contradictions when facts apply to different scopes (e.g. dev vs prod, mobile vs desktop).
+ *
+ * T-320: a contradiction now requires a *claim-level* opposition — the same
+ * subject, the same relation, opposite target values, in a compatible scope.
+ * The previous implementation compared two memories by testing seven bare
+ * regex pairs against their concatenated title and content, so any two
+ * memories that happened to contain an "enable"-ish and a "disable"-ish word
+ * were flagged as contradictory regardless of what they were about.
  */
 export function detectConflict(
   store: Store,
@@ -61,8 +74,11 @@ export function detectConflict(
     triples?: SemanticFactTriple[];
     tags?: string[];
   },
+  options?: ConflictDetectionOptions,
 ): ConflictDetection {
-  const candidateText = `${candidate.title} ${candidate.content}`.toLowerCase();
+  const dryRun = options?.dryRun === true;
+  const candidateText = `${candidate.title || ""} ${candidate.content || ""}`;
+  const candidateClaims = extractPolarityClaims(candidateText);
   const entries = list(store, candidate.project ? { project: candidate.project } : undefined);
 
   for (const entry of entries) {
@@ -73,71 +89,135 @@ export function detectConflict(
       continue;
     }
 
-    // T-087: Scoped invalidation requiring (entity, relation, target) alignment
-    const scopedCheck = evaluateScopedInvalidation(entry, candidate);
-    if (scopedCheck.shouldInvalidate) {
-      const entryText = `${entry.title} ${entry.content}`.toLowerCase();
-      let pairReason = "";
-      for (const [patternA, patternB, reason] of CONTRADICTORY_PAIRS) {
-        if ((patternA.test(candidateText) && patternB.test(entryText)) || (patternB.test(candidateText) && patternA.test(entryText))) {
-          pairReason = `${reason} between candidate and "${entry.title}" (${entry.id})`;
-          break;
+    // T-087/T-320: semantic (entity, relation, target) alignment. Only
+    // author-supplied triples take this path: the heuristic fact extractor
+    // binds subjects loosely (a port is always "gateway", a database is
+    // always "database"), which produced false positives between unrelated
+    // memories. Heuristic facts are handled by the claim comparison below,
+    // which binds the subject explicitly.
+    const existingTriples = entry.triples && entry.triples.length > 0 ? extractFactTriples(entry) : [];
+    const candidateTriples =
+      candidate.triples && candidate.triples.length > 0 ? extractFactTriples(candidate) : [];
+    if (existingTriples.length > 0 && candidateTriples.length > 0) {
+      for (const existingTriple of existingTriples) {
+        for (const candidateTriple of candidateTriples) {
+          const alignment = evaluateScopedAlignment(existingTriple, candidateTriple);
+          if (alignment.aligned && alignment.conflicting) {
+            return {
+              conflicted: true,
+              conflictingEntry: entry,
+              confidence: 0.95,
+              reason: alignment.reason,
+              dryRun,
+            };
+          }
         }
       }
-      const combinedReason = pairReason
-        ? `${pairReason}: ${scopedCheck.reason}`
-        : scopedCheck.reason || `Scoped contradiction detected with "${entry.title}" (${entry.id})`;
-
-      return {
-        conflicted: true,
-        conflictingEntry: entry,
-        confidence: scopedCheck.confidence,
-        reason: combinedReason,
-      };
     }
 
-    // If scoped check explicitly detected an entity or scope differentiation (e.g. dev vs prod, macos vs mobile), skip polarity contradiction
-    if (scopedCheck.reason && !scopedCheck.aligned && !scopedCheck.shouldInvalidate) {
-      continue;
-    }
-
-    const entryText = `${entry.title} ${entry.content}`.toLowerCase();
-    const topicSimilarity = computeJaccardSimilarity(candidate.title, entry.title);
-
-    // 1. High title/topic similarity with polarity opposition
-    if (topicSimilarity >= 0.4 || (entry.type && candidate.type && entry.type === candidate.type && topicSimilarity >= 0.3)) {
-      for (const [patternA, patternB, reason] of CONTRADICTORY_PAIRS) {
-        const aInCand = patternA.test(candidateText);
-        const bInCand = patternB.test(candidateText);
-        const aInEntry = patternA.test(entryText);
-        const bInEntry = patternB.test(entryText);
-
-        if ((aInCand && bInEntry) || (bInCand && aInEntry)) {
+    // T-320: subject-bound, scope-aware polarity comparison. Distinct scopes
+    // are distinct contextual truths, not contradictions.
+    const entryText = `${entry.title || ""} ${entry.content || ""}`;
+    const entryClaims = extractPolarityClaims(entryText);
+    for (const candidateClaim of candidateClaims) {
+      for (const entryClaim of entryClaims) {
+        const comparison = comparePolarityClaims(candidateClaim, entryClaim);
+        if (comparison.conflicting) {
           return {
             conflicted: true,
             conflictingEntry: entry,
             confidence: 0.85,
-            reason: `${reason} between candidate and "${entry.title}" (${entry.id})`,
+            reason: comparison.reason,
+            dryRun,
           };
         }
       }
+    }
 
-      // Direct negation: "never X" vs "always X" or "do not X" vs "X"
-      if (
-        (candidateText.includes("do not") && !entryText.includes("do not") && topicSimilarity > 0.6) ||
-        (!candidateText.includes("do not") && entryText.includes("do not") && topicSimilarity > 0.6)
-      ) {
-        return {
-          conflicted: true,
-          conflictingEntry: entry,
-          confidence: 0.8,
-          reason: `Direct negation detected on topic "${entry.title}" (${entry.id})`,
-        };
+    // Direct negation: "never X" vs "X" or "do not X" vs "X" on the same topic.
+    const candidateLower = candidateText.toLowerCase();
+    const entryLower = entryText.toLowerCase();
+    const topicSimilarity = computeJaccardSimilarity(candidate.title || "", entry.title || "");
+    if (
+      topicSimilarity > 0.6 &&
+      ((candidateLower.includes("do not") && !entryLower.includes("do not")) ||
+        (!candidateLower.includes("do not") && entryLower.includes("do not")))
+    ) {
+      return {
+        conflicted: true,
+        conflictingEntry: entry,
+        confidence: 0.8,
+        reason: `Direct negation detected on topic "${entry.title}" (${entry.id})`,
+        dryRun,
+      };
+    }
+  }
+
+  return { conflicted: false, confidence: 0, dryRun };
+}
+
+/**
+ * T-320: Scans a store for memory pairs that the contradiction engine WOULD
+ * flag, without mutating anything.
+ *
+ * This is the dry-run surface: an operator can measure the blast radius of
+ * automatic conflict flagging on a real store before enabling it, instead of
+ * discovering it as a health-gate failure afterwards.
+ */
+export interface PotentialConflict {
+  entry_a_id: string;
+  entry_a_title: string;
+  entry_b_id: string;
+  entry_b_title: string;
+  confidence: number;
+  reason?: string;
+}
+
+export function scanPotentialConflicts(
+  store: Store,
+  options?: { project?: string; limit?: number },
+): PotentialConflict[] {
+  const entries = list(store, options?.project ? { project: options.project } : undefined).filter(
+    (entry) => entry.status === "active" || entry.status === "confirmed",
+  );
+
+  const claimsById = new Map<string, ReturnType<typeof extractPolarityClaims>>();
+  for (const entry of entries) {
+    claimsById.set(entry.id, extractPolarityClaims(`${entry.title || ""} ${entry.content || ""}`));
+  }
+
+  const found: PotentialConflict[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i];
+      const b = entries[j];
+      const aClaims = claimsById.get(a.id) ?? [];
+      const bClaims = claimsById.get(b.id) ?? [];
+      let conflict: { conflicting: boolean; reason?: string } | null = null;
+      for (const aClaim of aClaims) {
+        for (const bClaim of bClaims) {
+          const comparison = comparePolarityClaims(aClaim, bClaim);
+          if (comparison.conflicting) {
+            conflict = comparison;
+            break;
+          }
+        }
+        if (conflict) break;
+      }
+      if (conflict) {
+        found.push({
+          entry_a_id: a.id,
+          entry_a_title: a.title,
+          entry_b_id: b.id,
+          entry_b_title: b.title,
+          confidence: 0.85,
+          reason: conflict.reason,
+        });
       }
     }
   }
 
-  return { conflicted: false, confidence: 0 };
+  return options?.limit !== undefined ? found.slice(0, options.limit) : found;
 }
 
 /**
