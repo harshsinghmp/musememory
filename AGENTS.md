@@ -15,9 +15,10 @@
 4. **Destructive Command Gate**: Prohibit `rm -rf`, `git reset --hard`, force-pushes, or shell piping without stating blast radius, rollback plan, and getting user authorization.
 5. **Universal English Standard**: All agent responses, code, comments, commits, specs, and docs MUST strictly be in English.
 6. **Evidence Before Claims**: Work is complete only after independent oracle verification (`bun test` passes, build succeeds, types check clean).
-7. **Structured Commits**: Commits must follow `<type>(<scope>): <summary>` with Why/What/Verification blocks.
-8. **Agent Containment & Archive**: All agent artifacts live in `./.agents/*`. Retired plans move to `./.agents/archive/[title]-[timestamp].md`.
-9. **Session Memory & Closeout DOX Pass**: Update `./.agents/context/current.md` and this `AGENTS.md` before completing tasks. **Never touch `./.memory/**`** — it is owned by the MuseMemory engine.
+7. **The Landing Gate (a commit is not a delivery)**: Work is **landed** only when it is reachable from the integration branch **on the remote**; until then it is **local**. Run `bun run check:landed` before the close-out DOX pass, before the final report, and before writing any remote-state claim. The words *landed / shipped / merged / released / verified on `dev`* may only be used after that gate exits 0. Never `git add -A` in a checkout another agent may be writing. Full contract: [`.agents/standards/landing-gate.md`](./.agents/standards/landing-gate.md).
+8. **Structured Commits**: Commits must follow `<type>(<scope>): <summary>` with Why/What/Verification blocks.
+9. **Agent Containment & Archive**: All agent artifacts live in `./.agents/*`. Retired plans move to `./.agents/archive/[title]-[timestamp].md`.
+10. **Session Memory & Closeout DOX Pass**: Update `./.agents/context/current.md` and this `AGENTS.md` before completing tasks. **Never touch `./.memory/**`** — it is owned by the MuseMemory engine.
 
 ---
 
@@ -31,6 +32,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 📐 [System, Domain & Resilience Design](./.agents/standards/system-design.md) — Evans DDD, Nygard Release It! stability, migration rehearsal, schemas.
 - 🔄 [Development Workflows & Gates](./.agents/standards/workflows.md) — Scaled tiers, 5-phase pipeline, PR-per-feature + post-merge pipeline.
 - 📜 [Git Branching, Commits & SemVer](./.agents/standards/git-workflow.md) — Branch lifecycle, commit standards, SemVer.
+- 🚚 [The Landing Gate](./.agents/standards/landing-gate.md) — A commit is not a delivery. `bun run check:landed` proves work is on the remote before the words *landed* or *shipped* may be used.
 - 📑 [DOX Hierarchy & Subtree Contracts](./.agents/standards/dox-hierarchy.md) — Reading order, child doc shape, closeout checklist, pruning loop.
 - 🎭 [Council Roles & Routing](./.agents/standards/council-roles.md) — Muse, Sol, Jasper, Crew, Nexus responsibilities and subagent dispatch policy.
 - 🧠 [Context, Memory & Identity](./.agents/standards/memory-context.md) — Context hygiene, `./.memory` store lifecycle, Creed proposals, LifeOS sources.
