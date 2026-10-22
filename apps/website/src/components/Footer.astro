@@ -14,10 +14,10 @@ const columns = [
   {
     title: "Product",
     links: [
-      { href: `${base}/#how-it-works`, label: "How it works" },
-      { href: `${base}/#capabilities`, label: "Capabilities" },
+      { href: `${base}/#problem`, label: "Why agents forget" },
+      { href: `${base}/#demo`, label: "See it work" },
+      { href: `${base}/#architecture`, label: "Architecture" },
       { href: `${base}/#proof`, label: "Benchmarks" },
-      { href: `${base}/compare`, label: "Compare" },
     ],
   },
   {
@@ -44,7 +44,7 @@ const columns = [
       { href: `${base}/llms.txt`, label: "llms.txt" },
       { href: `${base}/llms-full.txt`, label: "llms-full.txt" },
       { href: "https://github.com/harshsinghmp/musememory/blob/main/docs/agent-reference.md", label: "Agent reference", external: true },
-      { href: `${base}/docs#mcp`, label: "Tool matrix" },
+      { href: "https://github.com/harshsinghmp/musememory/blob/main/docs/cli-reference.md", label: "CLI reference", external: true },
     ],
   },
 ];
@@ -60,7 +60,9 @@ const columns = [
         Persistent, local-first memory for AI coding agents. Runs in-process on
         your machine — no account, no API key, no background daemon.
       </p>
-      <p class="footer-meta">MIT licensed · v{claims.version} · <span id="footer-year">{year}</span></p>
+      <p class="footer-meta">
+        MIT licensed · v{claims.version} · {claims.tests.count.toLocaleString("en-US")} tests green
+      </p>
     </div>
 
     {columns.map((col) => (
@@ -81,76 +83,68 @@ const columns = [
 
 <style>
   .footer {
-    border-top: 1px solid var(--line);
-    background: var(--bg-raised);
-    padding: clamp(3rem, 6vw, 4.5rem) 0 1.6rem;
+    border-block-start: 1px solid var(--border-subtle);
+    background: var(--surface-raised);
+    padding-block: var(--space-2xl) var(--space-lg);
   }
   .footer-grid {
     display: grid;
-    grid-template-columns: minmax(240px, 1.6fr) repeat(4, minmax(120px, 1fr));
-    gap: clamp(1.6rem, 4vw, 3rem);
+    grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr));
+    gap: var(--space-xl);
   }
   .footer-logo {
     display: inline-flex;
-    color: var(--text);
+    color: var(--text-primary);
   }
-  .footer-logo:hover {
-    text-decoration: none;
-  }
+  .footer-logo:hover { text-decoration: none; }
   .footer-brand p {
-    color: var(--text-dim);
-    font-size: 0.9rem;
-    margin-top: 0.9rem;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    margin-block-start: var(--space-sm);
     max-width: 34ch;
   }
   .footer-brand .footer-meta {
-    color: var(--text-faint);
-    font-size: 0.82rem;
+    color: var(--text-tertiary);
+    font-size: var(--text-2xs);
     font-family: var(--font-mono);
   }
   .footer-col {
     display: grid;
     align-content: start;
-    gap: 0.5rem;
+    gap: var(--space-xs);
   }
   .footer-col-title {
-    font-size: 0.74rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: var(--text-faint);
-    margin-bottom: 0.2rem;
+    color: var(--text-tertiary);
+    margin-block-end: var(--space-3xs);
   }
   .footer-col a {
-    color: var(--text-dim);
-    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
   }
   .footer-col a:hover {
-    color: var(--text);
+    color: var(--text-primary);
     text-decoration: none;
   }
   .footer-base {
-    margin-top: clamp(2rem, 4vw, 3rem);
-    padding-top: 1.4rem;
-    border-top: 1px solid var(--line);
+    margin-block-start: var(--space-xl);
+    padding-block-start: var(--space-md);
+    border-block-start: 1px solid var(--border-subtle);
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.6rem;
-    color: var(--text-faint);
-    font-size: 0.82rem;
+    gap: var(--space-xs);
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
   }
   @media (max-width: 960px) {
-    .footer-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .footer-brand {
-      grid-column: 1 / -1;
-    }
+    .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .footer-brand { grid-column: 1 / -1; }
   }
   @media (max-width: 520px) {
-    .footer-grid {
-      grid-template-columns: 1fr;
-    }
+    .footer-grid { grid-template-columns: 1fr; }
   }
 </style>

@@ -1,0 +1,429 @@
+---
+/**
+ * System topology: what talks to what, and where it all lives.
+ *
+ * The diagram answers the three questions a sceptical developer asks before
+ * installing anything: what runs, what it depends on, and who owns the data.
+ *
+ *   1. Agents — the editors and CLIs already on the machine.
+ *   2. MCP stdio — one local subprocess, one stdio transport.
+ *   3. The engine — recall, write gates, lifecycle.
+ *   4. The store — a project folder and a global folder of plain files.
+ *
+ * The band around the engine and the store is the point of the whole figure:
+ * everything below the transport runs on the machine you are reading this on.
+ * The daemon count is bound to the generated claims manifest, so it can never
+ * drift away from the code.
+ *
+ * Colour contract: hex values are inlined because an inline SVG cannot read
+ * the page's custom properties. They mirror the site tokens
+ * (`--bg`, `--line`, `--text`, `--cyan`).
+ */
+import claims from "../../../../../claims.json";
+
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+const FONT = "Inter, ui-sans-serif, system-ui, sans-serif";
+const SURFACE_RAISED = "#0c1019";
+const SURFACE_PANEL = "#101624";
+const LINE_STRONG = "rgba(148,163,216,0.3)";
+const TEXT = "#e8ecf8";
+const TEXT_DIM = "#9aa5c3";
+const TEXT_FAINT = "#8791ad";
+const CYAN = "#4fd6e0";
+
+/** Stroke weight shared by every outline in the figure set. */
+const STROKE = 1.5;
+/** Corner radius shared by every rounded box in the figure set. */
+const RADIUS = 8;
+
+/* ── Geometry ──────────────────────────────────────────────────────────── */
+const VIEW = { w: 720, h: 474 };
+
+const AGENT = { y: 66, h: 44, w: 100 };
+const GENERIC = { y: 60, h: 56, w: 146, x: 550 };
+const MCP = { x: 250, y: 140, w: 220, h: 44 };
+const ENGINE = { x: 88, y: 246, w: 544, h: 86 };
+const BLOCK = { y: 276, h: 44, w: 156 };
+const STORE = { y: 358, h: 88, w: 320 };
+const BAND = { x: 24, y: 196, w: 672, h: 262 };
+const PILL = { x: 531, y: 202, w: 145, h: 32 };
+
+interface Line {
+  text: string;
+  size: number;
+  weight: number;
+  /** Baseline offset from the top of the box. */
+  dy: number;
+}
+
+interface Box {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label?: string;
+  note?: string;
+}
+
+/**
+ * Layer 1 — the agents. The last box is the catch-all: it deliberately says
+ * what Muse covers instead of quoting a count, so it is taller and its label
+ * is set on two lines to stay inside the box.
+ */
+const AGENT_LINES: Record<string, Line[]> = {
+  claude: [{ text: "Claude Code", size: 12, weight: 600, dy: 27 }],
+  cursor: [{ text: "Cursor", size: 12, weight: 600, dy: 27 }],
+  codex: [{ text: "Codex", size: 12, weight: 600, dy: 27 }],
+  opencode: [{ text: "OpenCode", size: 12, weight: 600, dy: 27 }],
+  "any-mcp": [
+    { text: "the majority of", size: 12, weight: 600, dy: 18 },
+    { text: "coding agents", size: 12, weight: 600, dy: 32 },
+    { text: "any MCP agent", size: 9.5, weight: 400, dy: 46 },
+  ],
+};
+
+const AGENTS: Box[] = [
+  { id: "claude", x: 24, y: AGENT.y, w: AGENT.w, h: AGENT.h },
+  { id: "cursor", x: 155, y: AGENT.y, w: AGENT.w, h: AGENT.h },
+  { id: "codex", x: 287, y: AGENT.y, w: AGENT.w, h: AGENT.h },
+  { id: "opencode", x: 418, y: AGENT.y, w: AGENT.w, h: AGENT.h },
+  { id: "any-mcp", x: GENERIC.x, y: GENERIC.y, w: GENERIC.w, h: GENERIC.h },
+];
+
+/** Layer 3 — what the engine does. */
+const BLOCKS: Box[] = [
+  { id: "recall", x: 114, y: BLOCK.y, w: BLOCK.w, h: BLOCK.h, label: "Unified recall", note: "one ranked context" },
+  { id: "gates", x: 282, y: BLOCK.y, w: BLOCK.w, h: BLOCK.h, label: "Write gates", note: "secret and citation checks" },
+  { id: "lifecycle", x: 450, y: BLOCK.y, w: BLOCK.w, h: BLOCK.h, label: "Lifecycle", note: "confirm, supersede, restore" },
+];
+
+/** Layer 4 — the two stores, and what is actually in them. */
+const STORES: Box[] = [
+  {
+    id: "project",
+    x: 24,
+    y: STORE.y,
+    w: STORE.w,
+    h: STORE.h,
+    label: ".memory/ (project)",
+  },
+  {
+    id: "global",
+    x: 376,
+    y: STORE.y,
+    w: STORE.w,
+    h: STORE.h,
+    label: "~/.memory/ (global)",
+  },
+];
+
+const STORE_FILES = ["CURRENT.md · USER.md", "memories/ · memory.db", "wiki/ · audit.jsonl"];
+
+/** Where each agent lands on the transport node. */
+const FAN_ENDS = [280, 315, 350, 385, 420];
+
+const agentCenter = (agent: Box): number => agent.x + agent.w / 2;
+const storeCenter = (store: Box): number => store.x + store.w / 2;
+
+const FAN = AGENTS.map((agent, i) => ({
+  fromX: agentCenter(agent),
+  fromY: agent.y + agent.h,
+  toX: FAN_ENDS[i],
+  toY: MCP.y,
+}));
+
+const uid = Math.random().toString(36).slice(2, 8);
+const arrowId = `architecture-arrow-${uid}`;
+const accentArrowId = `architecture-arrow-accent-${uid}`;
+const titleId = `architecture-title-${uid}`;
+const descId = `architecture-desc-${uid}`;
+---
+
+<svg
+  viewBox={`0 0 ${VIEW.w} ${VIEW.h}`}
+  width="100%"
+  style="height:auto;display:block"
+  preserveAspectRatio="xMidYMid meet"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby={`${titleId} ${descId}`}
+  font-family={FONT}
+>
+  <title id={titleId}>How Muse fits together</title>
+  <desc id={descId}>
+    Four layers. Coding agents talk to a local MCP stdio subprocess. That
+    subprocess drives the Muse Memory engine, which unifies recall, applies
+    write gates and runs the memory lifecycle. The engine reads and writes two
+    local folders, .memory in the project and .memory in the home directory.
+    Everything below the transport runs on your own machine: no account, no
+    API key, no network and no background daemon.
+  </desc>
+
+  <defs>
+    <marker
+      id={arrowId}
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+      markerUnits="strokeWidth"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={TEXT_FAINT}></path>
+    </marker>
+    <marker
+      id={accentArrowId}
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+      markerUnits="strokeWidth"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={CYAN}></path>
+    </marker>
+  </defs>
+
+  <text x="24" y="26" fill={TEXT} font-size="15" font-weight="600" letter-spacing="0.2">
+    How Muse fits together
+  </text>
+  <text x="24" y="46" fill={TEXT_DIM} font-size="10">
+    The whole path, from the editor you already use to the file that holds the memory.
+  </text>
+
+  {/* Layer 1 — agents */}
+  {
+    AGENTS.map((agent) => (
+      <g>
+        <rect
+          x={agent.x}
+          y={agent.y}
+          width={agent.w}
+          height={agent.h}
+          rx={RADIUS}
+          fill={SURFACE_RAISED}
+          stroke={LINE_STRONG}
+          stroke-width={STROKE}
+        />
+        {AGENT_LINES[agent.id].map((line) => (
+          <text
+            x={agent.x + agent.w / 2}
+            y={agent.y + line.dy}
+            fill={line.size === 12 ? TEXT : TEXT_FAINT}
+            font-size={line.size}
+            font-weight={line.weight}
+            text-anchor="middle"
+          >
+            {line.text}
+          </text>
+        ))}
+      </g>
+    ))
+  }
+
+  {/* Agents → transport */}
+  {
+    FAN.map((leg) => (
+      <line
+        x1={leg.fromX}
+        y1={leg.fromY}
+        x2={leg.toX}
+        y2={leg.toY}
+        stroke="rgba(148,163,216,0.45)"
+        stroke-width={STROKE}
+        marker-end={`url(#${arrowId})`}
+      />
+    ))
+  }
+
+  {/* Layer 2 — transport */}
+  <g>
+    <rect
+      x={MCP.x}
+      y={MCP.y}
+      width={MCP.w}
+      height={MCP.h}
+      rx={RADIUS}
+      fill="rgba(79,214,224,0.1)"
+      stroke={CYAN}
+      stroke-width={STROKE}
+    />
+    <text
+      x={MCP.x + MCP.w / 2}
+      y={MCP.y + 19}
+      fill={CYAN}
+      font-size="12"
+      font-weight="600"
+      text-anchor="middle"
+    >
+      MCP stdio
+    </text>
+    <text
+      x={MCP.x + MCP.w / 2}
+      y={MCP.y + 33}
+      fill={TEXT_DIM}
+      font-size="9.5"
+      text-anchor="middle"
+    >
+      {claims.mcpTools} tools · {claims.mcpProfiles} profiles
+    </text>
+  </g>
+
+  {/* The band: engine and store are on your machine */}
+  <rect
+    x={BAND.x}
+    y={BAND.y}
+    width={BAND.w}
+    height={BAND.h}
+    rx={RADIUS + 4}
+    fill="rgba(79,214,224,0.03)"
+    stroke="rgba(79,214,224,0.22)"
+    stroke-width={STROKE}
+  />
+  <text x="44" y="218" fill={TEXT} font-size="12" font-weight="600">
+    Your machine only
+  </text>
+  <text x="44" y="236" fill={TEXT_DIM} font-size="9.5">
+    No account. No API key. No network. No background daemon.
+  </text>
+  <g>
+    <rect
+      x={PILL.x}
+      y={PILL.y}
+      width={PILL.w}
+      height={PILL.h}
+      rx={RADIUS}
+      fill="rgba(79,214,224,0.12)"
+      stroke="rgba(79,214,224,0.4)"
+      stroke-width={STROKE}
+    />
+    <text
+      x={PILL.x + PILL.w / 2}
+      y={PILL.y + 19}
+      fill={CYAN}
+      font-size="10"
+      font-weight="600"
+      text-anchor="middle"
+    >
+      {claims.backgroundDaemons} background daemons
+    </text>
+  </g>
+
+  {/* Transport → engine */}
+  <line
+    x1={MCP.x + MCP.w / 2}
+    y1={MCP.y + MCP.h}
+    x2={MCP.x + MCP.w / 2}
+    y2={ENGINE.y}
+    stroke={CYAN}
+    stroke-width={STROKE}
+    marker-end={`url(#${accentArrowId})`}
+  />
+
+  {/* Layer 3 — the engine */}
+  <g>
+    <rect
+      x={ENGINE.x}
+      y={ENGINE.y}
+      width={ENGINE.w}
+      height={ENGINE.h}
+      rx={RADIUS}
+      fill={SURFACE_PANEL}
+      stroke={CYAN}
+      stroke-width={STROKE}
+    />
+    <text x={ENGINE.x + 16} y={ENGINE.y + 22} fill={TEXT} font-size="12" font-weight="600">
+      Muse Memory engine
+    </text>
+    <text
+      x={ENGINE.x + ENGINE.w - 16}
+      y={ENGINE.y + 22}
+      fill={TEXT_FAINT}
+      font-size="9.5"
+      text-anchor="end"
+    >
+      v{claims.version}
+    </text>
+    {
+      BLOCKS.map((block) => (
+        <g>
+          <rect
+            x={block.x}
+            y={block.y}
+            width={block.w}
+            height={block.h}
+            rx={RADIUS}
+            fill={SURFACE_RAISED}
+            stroke={LINE_STRONG}
+            stroke-width={STROKE}
+          />
+          <text
+            x={block.x + block.w / 2}
+            y={block.y + 19}
+            fill={TEXT}
+            font-size="12"
+            font-weight="500"
+            text-anchor="middle"
+          >
+            {block.label}
+          </text>
+          <text
+            x={block.x + block.w / 2}
+            y={block.y + 33}
+            fill={TEXT_FAINT}
+            font-size="9.5"
+            text-anchor="middle"
+          >
+            {block.note}
+          </text>
+        </g>
+      ))
+    }
+  </g>
+
+  {/* Engine → store */}
+  {
+    STORES.map((store) => (
+      <line
+        x1={storeCenter(store) + (store.x < 200 ? 16 : -16)}
+        y1={ENGINE.y + ENGINE.h}
+        x2={storeCenter(store)}
+        y2={store.y}
+        stroke="rgba(148,163,216,0.45)"
+        stroke-width={STROKE}
+        marker-end={`url(#${arrowId})`}
+      />
+    ))
+  }
+
+  {/* Layer 4 — the store */}
+  {
+    STORES.map((store) => (
+      <g>
+        <rect
+          x={store.x}
+          y={store.y}
+          width={store.w}
+          height={store.h}
+          rx={RADIUS}
+          fill={SURFACE_RAISED}
+          stroke={LINE_STRONG}
+          stroke-width={STROKE}
+        />
+        <text x={store.x + 16} y={store.y + 22} fill={TEXT} font-size="12" font-weight="600">
+          {store.label}
+        </text>
+        {
+          STORE_FILES.map((file, i) => (
+            <text x={store.x + 16} y={store.y + 44 + i * 14} fill={TEXT_DIM} font-size="9.5">
+              {file}
+            </text>
+          ))
+        }
+      </g>
+    ))
+  }
+</svg>
