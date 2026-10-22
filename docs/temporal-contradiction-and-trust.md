@@ -166,7 +166,65 @@ export interface SemanticFactTriple {
 
 ---
 
-### E. Federation Handshake Protocol (`T-088`)
+### E. Claim-Based Contradiction Detection (`T-320`)
+
+The scoped-invalidation rule above governs *author-supplied* fact triples. Everything
+else — the free-text memories an agent actually writes — is compared by extracting
+**polarity claims**: what a subject is, under which relation, with which target
+value, in which scope.
+
+```typescript
+export interface PolarityClaim {
+  entity: string;    // "wiki recompile gate"
+  relation: string;  // "status" | "database" | "port" | "protocol" | "runtime" | "theme" | "policy"
+  target: string;    // "enabled" | "postgresql" | "3000"
+  scope?: string;    // "production" | "tier 2"
+}
+```
+
+$$\text{Conflict} \iff (\text{relation}_1 = \text{relation}_2) \land (\text{subject}_1 \approx \text{subject}_2) \land \text{scopesCompatible} \land (T_1 \ne T_2)$$
+
+- **Subject-bound.** Two memories contradict only when they make opposing
+  statements *about the same thing*. "The team server enables bearer token
+  authentication" and "The team server enables the SSE hub" are not in conflict
+  because they are not opposite claims.
+- **Scope-aware.** "Pooling is enabled in production" and "pooling is disabled on
+  localhost" are distinct contextual truths, not a contradiction. A scoped claim
+  also never contradicts an unscoped one: the scoped claim *refines* the general
+  claim rather than opposing it.
+- **Rationale-aware.** For technology claims the trailing phrase is usually a
+  rationale ("uses bun runtime for fast startup"), so it only counts as a scope
+  when it names a real environment.
+
+> **Why this matters.** Flagging a pair moves **both** memories to `conflicted`.
+> That costs 25 health points each — four false positives fail the store-integrity
+> pillar outright — and removes both memories from every future sync broadcast,
+> while still serving them into agent prompts. A false negative only leaves a
+> tension unreported, so detection is deliberately biased toward precision.
+
+Before `T-320` the engine tested seven bare regex pairs against the concatenated
+title and content of both sides. Any two memories that happened to contain an
+"enable"-ish and a "disable"-ish word were flagged, regardless of subject or
+context. Measured against ten realistic non-contradictory pairs, it flagged
+**8 of 10**. The calibrated engine flags **0 of 10**.
+
+#### Dry-run surfaces
+
+Detection never has to be a blind write:
+
+| Surface | Effect |
+| :--- | :--- |
+| `memory conflicts` | Lists the conflicts recorded in the keep-both `conflicts` table. |
+| `memory conflicts --dry-run` | Read-only scan reporting the pairs the engine **would** flag. |
+| `propose({ checkConflict: true, conflictDryRun: true })` | Detects and audit-logs (`conflict_detected_dry_run`) without flagging either memory. |
+| `detectConflict(store, candidate, { dryRun: true })` | Returns the detection with `dryRun: true` and mutates nothing. |
+
+The dry-run scan is the operator's preview for peer-to-peer sync ingestion, which
+is the one path that flags contradictions automatically.
+
+---
+
+### F. Federation Handshake Protocol (`T-088`)
 
 In distributed monorepos and mesh-mode multi-agent swarms, isolated subagents may discover and flag conflicts independently.
 
@@ -193,7 +251,7 @@ Gossiped contradictions arriving during `ingestKnowledge()` automatically regist
 
 ---
 
-### F. Provenance Veracity Ranking (`T-089`)
+### G. Provenance Veracity Ranking (`T-089`)
 
 To protect context from model hallucinations, prompt injection, and agent inbreeding, memories are assigned canonical veracity weights based on origin:
 
@@ -217,7 +275,7 @@ Querying with `minVeracity: "agent"` (0.7) filters out untrusted external crawls
 
 ---
 
-### G. `src_ts` Evidence-Age Stamping (`T-090`)
+### H. `src_ts` Evidence-Age Stamping (`T-090`)
 
 A newly proposed memory must never appear fresher than its underlying source document. When ingesting a transcript or documentation page from 6 months ago, setting `created_at` to today would falsely give it near-zero recency decay.
 
@@ -301,6 +359,7 @@ Before releasing or merging features interacting with temporal memory and contra
 - [x] **Bi-Temporal Precision**: Verify `as_of` queries return `{results, undetermined}` without date invention (`bun test test/as_of_queries.test.ts`).
 - [x] **Conflict Retention**: Verify contradictions populate the `conflicts` table without deleting either memory (`bun test test/conflicts_table.test.ts`).
 - [x] **Scoped Coexistence**: Verify distinct platform/environment scopes coexist without false-positive conflict (`bun test test/scoped_invalidation.test.ts`).
+- [x] **Contradiction Calibration**: Verify the claim-based engine clears a labelled fixture with precision and recall above 0.9 (`bun test test/contradiction_calibration.test.ts`).
 - [x] **Federation Dedup**: Verify canonical pair hashing in mesh handshakes (`bun test test/federation_handshake.test.ts`).
 - [x] **Veracity Rank Boosts**: Verify user inputs receive +0.15 boost and break ties over agent inferences (`bun test test/veracity_ranking.test.ts`).
 - [x] **Evidence Age Capping**: Verify `src_ts` restricts freshness decay (`bun test test/src_ts_evidence_age.test.ts`).

@@ -79,6 +79,7 @@ Full matrix: [`cli-reference.md`](./cli-reference.md).
 | `memory current get` / `memory current set "<text>" --project P` | Read/write active constraints. |
 | `memory link <id> --related <id1,id2>` | Bidirectional relation between entries. |
 | `memory audit [--operation OP] [--entry-id ID]` | Query the append-only audit ledger. |
+| `memory conflicts [--dry-run]` | List recorded contradictions; `--dry-run` previews what would be flagged. |
 | `memory doctor` | Full ecosystem health diagnostic. |
 | `memory harvest "<text>" --project P` | Distil a turn into a fix/decision unit. |
 | `memory verify <id> --strict` | Run an entry's verification command, or the full integrity gate. |

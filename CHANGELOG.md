@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Contradiction engine flagged unrelated memories as contradictory (`src/quality/contradiction.ts`, `src/quality/polarity.ts`, `src/quality/scope.ts`)**: the engine compared two memories by testing seven bare regex pairs against their concatenated title and content, so any two memories that happened to contain an "enable"-ish and a "disable"-ish word were flagged as contradictory — regardless of subject or context. "Postgres connection pooling is enabled in production" and "Postgres connection pooling is disabled on localhost" are distinct contextual truths, not a conflict, yet the engine flagged them. Because flagging moves **both** memories to `conflicted`, one false positive cost 25 health points per memory (four false positives fail the store-integrity pillar outright), removed both memories from every future sync broadcast, and still served them into agent prompts. Detection now extracts **polarity claims** — subject, relation, target, scope — and only opposes claims about the same subject in a compatible scope. Measured against ten realistic non-contradictory pairs, the engine flagged 8 of 10 before and 0 of 10 after. Author-supplied fact triples keep the existing semantic path.
+- **Scope was resolved per entry instead of per claim (`src/quality/invalidation.ts`)**: one qualifier anywhere in a memory assigned its scope to every fact extracted from it, so "enabled at tier 0" and "disabled at tier 2" were read as the same context. Scope is now resolved against the claim it qualifies.
+
+### Added
+- **`memory conflicts [--dry-run]` (`src/cli/conflicts.ts`)**: lists the contradictions recorded in the keep-both `conflicts` table, and with `--dry-run` performs a read-only scan reporting the memory pairs the engine *would* flag. Peer-to-peer sync ingestion is the one path that flags contradictions automatically; this is the operator's preview for it.
+- **Dry-run contradiction detection (`src/store.ts`, `src/quality/contradiction.ts`)**: `propose({ checkConflict: true, conflictDryRun: true })` detects and audit-logs (`conflict_detected_dry_run`) without flagging either memory; `detectConflict(store, candidate, { dryRun: true })` returns the detection with `dryRun: true` and mutates nothing.
+- **Calibration fixture for the contradiction engine (`test/calibration/contradiction_calibration.json`)**: 21 labelled memory pairs with an expected verdict, gated at precision and recall above 0.9.
+
 ## [3.0.1] - 2026-10-22
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.0.0...v3.0.1
