@@ -192,9 +192,15 @@ propose → candidate → confirmed → superseded
 ```bash
 memory doctor            # storage, schemas, secrets, agent wiring
 memory health            # 5-pillar health gate, letter grade
+memory health --project P  # ...scoped to one memory project
 memory stats             # counts by status and type
 memory context --query "how does auth work" --budget 2000
 ```
 
 A healthy install reports: SQLite reachable, schema version current, no
 secrets in the store, and the expected agents wired.
+
+The health report states its own scope in `scope`: `filter` (the requested
+project, or `null` for the whole store), `projects` (every project whose
+memories were considered) and `entry_count`. Read it before comparing two
+numbers — an unscoped report covers every project in the store.

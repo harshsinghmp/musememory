@@ -603,7 +603,7 @@ memory current get | set "<text>"         # read/write active constraints
 memory link <id> --related <id1,id2>      # bidirectional relation between entries
 memory audit [--operation OP]             # query the append-only audit ledger
 memory doctor                             # full ecosystem health diagnostic
-memory health                             # 5-pillar health gate with a letter grade
+memory health                             # 5-pillar health gate with a letter grade (--project P to scope it)
 memory verify <id> --strict               # run an entry's verification command
 memory harvest "<text>" --project P       # distil a turn into a fix/decision unit
 memory wiki compile                       # compile memories into an Obsidian wiki
