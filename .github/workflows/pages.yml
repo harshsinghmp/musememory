@@ -38,9 +38,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       # ── Showreel freshness gate (hash-verified) ──────────────────────────
-      # The committed showreel.mp4 is rendered from the HyperFrames
-      # composition (apps/website/showreel-hf/) — the render is done locally
-      # via `bun run site:showreel`, never during deploy. The hash of the
+      # The committed showreel.mp4 is rendered from the composition in
+      # apps/website/showreel/ — the render is done locally via
+      # `bun run site:showreel`, never during deploy. The hash of the
       # composition + build script + fonts is stored beside the video; a
       # mismatch fails the deploy fast so the video can never drift from
       # its source. To refresh: run `bun run site:showreel`, commit the new
@@ -49,9 +49,9 @@ jobs:
         id: reelhash
         run: |
           INPUTS=$( (cat \
-            apps/website/showreel-hf/index.html \
+            apps/website/showreel/index.html \
             apps/website/scripts/build-showreel.ts \
-            ; sha256sum apps/website/showreel-hf/assets/fonts/*.woff2) \
+            ; sha256sum apps/website/src/assets/fonts/*.woff2) \
             | sha256sum | cut -d' ' -f1)
           STORED=$(cat apps/website/public/brand/.showreel-hash 2>/dev/null || echo "none")
           echo "hash=$INPUTS" >> "$GITHUB_OUTPUT"
@@ -65,7 +65,7 @@ jobs:
       - name: Fail on stale showreel (source changed, video not rebuilt)
         if: steps.reelhash.outputs.stale == 'true' && inputs.rebuild-showreel != true
         run: |
-          echo "::error::showreel.mp4 is stale — the HyperFrames composition changed without a re-render."
+          echo "::error::showreel.mp4 is stale — the composition changed without a re-render."
           echo "Refresh locally with: bun run site:showreel"
           echo "Then commit the new public/showreel.mp4, showreel-poster.png, and public/brand/.showreel-hash."
           exit 1
