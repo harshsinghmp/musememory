@@ -1,6 +1,6 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.0.1`  
+> **Version**: `v3.0.2`  
 > **Status**: Patch Release — correctness fixes from the cross-file invariant audit, machine-verified published claims, and the website redesign.
 
 ---
