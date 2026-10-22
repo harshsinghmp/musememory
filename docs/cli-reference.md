@@ -94,6 +94,7 @@ Ecosystem, Migration & Connectivity:
   sync [status|broadcast|ingest|pool] Cross-agent knowledge sync & P2P gossip mesh
   mesh [query|check|link|unlink|propagate] Multi-repo & monorepo cross-project mesh
   health                        Run unified 5-pillar architectural health evaluation
+  conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
