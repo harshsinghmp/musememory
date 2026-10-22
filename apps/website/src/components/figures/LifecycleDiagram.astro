@@ -1,0 +1,251 @@
+---
+/**
+ * The memory lifecycle, as a state machine.
+ *
+ * Mirrors the lifecycle documented in `docs/agent-reference.md` §6:
+ *
+ *   propose → candidate → confirmed → superseded
+ *                   ↘ stale → archived
+ *                   ↘ rejected
+ *                   ↘ conflicted (kept-both, resolved by supersede/historical/reject)
+ *                   ↘ deleted (tombstone; restorable with `memory restore`)
+ *
+ * `confirmed` is the only state served by default, so it is the only node
+ * that carries the accent, a soft halo and a label saying so. `deleted` is a
+ * tombstone, so it is drawn dashed and faint with the `restore` arrow drawn
+ * back to `candidate` — a deletion is reversible, not a wall.
+ *
+ * Colour contract: hex values are inlined because an inline SVG cannot read
+ * the page's custom properties. They mirror the site tokens
+ * (`--bg`, `--line`, `--text`, `--violet`).
+ */
+import claims from "../../../../../claims.json";
+
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+const FONT = "Inter, ui-sans-serif, system-ui, sans-serif";
+const SURFACE_RAISED = "#0c1019";
+const LINE_STRONG = "rgba(148,163,216,0.3)";
+const TEXT = "#e8ecf8";
+const TEXT_DIM = "#9aa5c3";
+const TEXT_FAINT = "#8791ad";
+const VIOLET = "#8b7cf7";
+
+/** Stroke weight shared by every outline in the figure set. */
+const STROKE = 1.5;
+/** Corner radius shared by every rounded box in the figure set. */
+const RADIUS = 8;
+
+/* ── Node styles ───────────────────────────────────────────────────────── */
+const KINDS = {
+  /** Entry point of the machine: a write has been proposed. */
+  start: { fill: SURFACE_RAISED, stroke: LINE_STRONG, name: TEXT, note: TEXT_FAINT },
+  /** Written but not yet trusted. */
+  accent: { fill: "rgba(139,124,247,0.14)", stroke: VIOLET, name: TEXT, note: "#b8aefb" },
+  /** The only state served by default. */
+  served: { fill: "rgba(139,124,247,0.26)", stroke: VIOLET, name: TEXT, note: "#c3bbff" },
+  /** Terminal states: the memory is out of active knowledge. */
+  terminal: { fill: SURFACE_RAISED, stroke: LINE_STRONG, name: TEXT_DIM, note: TEXT_FAINT },
+  /** A tombstone: deleted, but restorable. */
+  tombstone: { fill: "none", stroke: TEXT_FAINT, name: TEXT_FAINT, note: TEXT_FAINT },
+} as const;
+
+type NodeKind = keyof typeof KINDS;
+
+/* ── Geometry ──────────────────────────────────────────────────────────── */
+const VIEW = { w: 720, h: 312 };
+const NODE = { w: 104, h: 44 };
+const ROW_1 = 48;
+const ROW_2 = 166;
+const ROW_3 = 236;
+
+interface StateNode {
+  id: string;
+  kind: NodeKind;
+  x: number;
+  y: number;
+  name: string;
+  note: string;
+}
+
+const NODES: StateNode[] = [
+  { id: "propose", kind: "start", x: 24, y: ROW_1, name: "propose", note: "write gate" },
+  { id: "candidate", kind: "accent", x: 213, y: ROW_1, name: "candidate", note: "unverified" },
+  { id: "confirmed", kind: "served", x: 402, y: ROW_1, name: "confirmed", note: "served by default" },
+  { id: "superseded", kind: "terminal", x: 592, y: ROW_1, name: "superseded", note: "replaced" },
+  { id: "stale", kind: "terminal", x: 24, y: ROW_2, name: "stale", note: "decays" },
+  { id: "rejected", kind: "terminal", x: 300, y: ROW_2, name: "rejected", note: "failed checks" },
+  { id: "conflicted", kind: "terminal", x: 440, y: ROW_2, name: "conflicted", note: "kept both" },
+  { id: "deleted", kind: "tombstone", x: 580, y: ROW_2, name: "deleted", note: "tombstone" },
+  { id: "archived", kind: "terminal", x: 24, y: ROW_3, name: "archived", note: "cold storage" },
+];
+
+const byId = (id: string): StateNode => {
+  const found = NODES.find((n) => n.id === id);
+  if (!found) throw new Error(`unknown lifecycle node: ${id}`);
+  return found;
+};
+
+/** Centre x of a node. */
+const cx = (node: StateNode): number => node.x + NODE.w / 2;
+/** Right edge of a node. */
+const right = (node: StateNode): number => node.x + NODE.w;
+/** Bottom edge of a node. */
+const bottom = (node: StateNode): number => node.y + NODE.h;
+
+/** Where the `confirmed` halo sits — a soft glow, not a second border. */
+const HALO = { pad: 7, fill: "rgba(139,124,247,0.16)" };
+
+interface Edge {
+  id: string;
+  d: string;
+  dashed?: boolean;
+}
+
+const candidate = byId("candidate");
+const confirmed = byId("confirmed");
+const deleted = byId("deleted");
+
+/** The halo is where the arrows to and from `confirmed` stop. */
+const confirmedHaloLeft = confirmed.x - HALO.pad;
+const confirmedHaloRight = right(confirmed) + HALO.pad;
+
+const EDGES: Edge[] = [
+  // The spine.
+  { id: "propose-candidate", d: `M ${right(byId("propose"))} 70 L ${candidate.x} 70` },
+  { id: "candidate-confirmed", d: `M ${right(candidate)} 70 L ${confirmedHaloLeft} 70` },
+  { id: "confirmed-superseded", d: `M ${confirmedHaloRight} 70 L ${byId("superseded").x} 70` },
+  // Branches off `candidate`.
+  { id: "candidate-stale", d: "M 228 92 L 76 166" },
+  { id: "candidate-rejected", d: "M 258 92 L 352 166" },
+  { id: "candidate-conflicted", d: "M 288 92 L 492 166" },
+  { id: "candidate-deleted", d: "M 310 92 L 632 166" },
+  // Decay.
+  { id: "stale-archived", d: "M 76 210 L 76 236" },
+  // The tombstone is reversible.
+  {
+    id: "deleted-candidate",
+    d: `M ${cx(deleted)} ${bottom(deleted)} L ${cx(deleted)} 224 L 243 224 L 243 ${bottom(candidate)}`,
+    dashed: true,
+  },
+];
+
+const uid = Math.random().toString(36).slice(2, 8);
+const markerId = `lifecycle-arrow-${uid}`;
+const titleId = `lifecycle-title-${uid}`;
+const descId = `lifecycle-desc-${uid}`;
+---
+
+<svg
+  viewBox={`0 0 ${VIEW.w} ${VIEW.h}`}
+  width="100%"
+  style="height:auto;display:block"
+  preserveAspectRatio="xMidYMid meet"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby={`${titleId} ${descId}`}
+  font-family={FONT}
+>
+  <title id={titleId}>Memory lifecycle</title>
+  <desc id={descId}>
+    State diagram: propose leads to candidate, candidate can be confirmed,
+    superseded, or moved to stale, rejected, conflicted or deleted. Stale
+    decays into archived. Confirmed is the only state served by default, and a
+    deletion is a tombstone that can be restored.
+  </desc>
+
+  <defs>
+    <marker
+      id={markerId}
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+      markerUnits="strokeWidth"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={TEXT_FAINT}></path>
+    </marker>
+  </defs>
+
+  <text x="24" y="26" fill={TEXT} font-size="15" font-weight="600" letter-spacing="0.2">
+    Memory lifecycle
+  </text>
+
+  {/* Soft halo behind the only state that is served by default */}
+  <rect
+    x={confirmed.x - HALO.pad}
+    y={confirmed.y - HALO.pad}
+    width={NODE.w + HALO.pad * 2}
+    height={NODE.h + HALO.pad * 2}
+    rx={RADIUS + HALO.pad}
+    fill={HALO.fill}
+  />
+
+  {/* Transitions */}
+  {
+    EDGES.map((edge) => (
+      <path
+        d={edge.d}
+        fill="none"
+        stroke={edge.dashed ? "rgba(135,145,173,0.6)" : "rgba(148,163,216,0.45)"}
+        stroke-width={STROKE}
+        stroke-linecap="round"
+        stroke-dasharray={edge.dashed ? "5 4" : undefined}
+        marker-end={`url(#${markerId})`}
+      />
+    ))
+  }
+
+  {/* States */}
+  {
+    NODES.map((node) => {
+      const style = KINDS[node.kind];
+      return (
+        <g>
+          <rect
+            x={node.x}
+            y={node.y}
+            width={NODE.w}
+            height={NODE.h}
+            rx={RADIUS}
+            fill={style.fill}
+            stroke={style.stroke}
+            stroke-width={STROKE}
+            stroke-dasharray={node.kind === "tombstone" ? "5 4" : undefined}
+          />
+          <text
+            x={cx(node)}
+            y={node.y + 19}
+            fill={style.name}
+            font-size="12"
+            font-weight="600"
+            text-anchor="middle"
+          >
+            {node.name}
+          </text>
+          <text
+            x={cx(node)}
+            y={node.y + 33}
+            fill={style.note}
+            font-size="9.5"
+            text-anchor="middle"
+          >
+            {node.note}
+          </text>
+        </g>
+      );
+    })
+  }
+
+  <text x="222" y="216" fill={TEXT_DIM} font-size="10" text-anchor="middle">
+    restore
+  </text>
+
+  <text x="24" y="296" fill={TEXT_FAINT} font-size="10">
+    A deletion is a tombstone — excluded from every read path, and brought back with memory restore.
+  </text>
+  <text x="696" y="296" fill={TEXT_FAINT} font-size="10" text-anchor="end">
+    Muse Memory v{claims.version}
+  </text>
+</svg>

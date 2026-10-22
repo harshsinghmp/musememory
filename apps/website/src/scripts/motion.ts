@@ -1,4 +1,6 @@
-// Motion runtime: scroll reveals, scroll parallax, pointer tilt, card sheen.
+// Motion runtime: scroll reveals, scroll parallax, pointer tilt, card sheen,
+// and copy-to-clipboard.
+//
 // Inlined by the layout; zero dependencies, respects reduced motion.
 //
 // NOTE: returns ONLY raw JavaScript. The reveal CSS lives in global.css
@@ -9,9 +11,9 @@
 // silently — reveals never fired.
 //
 // Every effect below writes CSS custom properties or classes only. No effect
-// adds, removes, or measures a layout box during a frame other than the batched
-// read-then-write pass in the parallax loop, so scrolling stays on the
-// compositor.
+// adds, removes, or measures a layout box during a frame other than the
+// batched read-then-write pass in the parallax loop, so scrolling stays on
+// the compositor.
 
 export function initMotion(): string {
   return `
@@ -109,6 +111,56 @@ export function initMotion(): string {
       var r = card.getBoundingClientRect();
       card.style.setProperty("--mx", (e.clientX - r.left) + "px");
       card.style.setProperty("--my", (e.clientY - r.top) + "px");
+    });
+  });
+
+  // ── Copy to clipboard ────────────────────────────────────────────────────
+  // A <button data-copy="#selector"> copies the text of the matching element.
+  // The button reports success in its own label rather than a toast, so the
+  // confirmation lives where the eye already is.
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    var sel = btn.getAttribute("data-copy");
+    var source = sel ? document.querySelector(sel) : null;
+    if (!source) return;
+    var label = btn.querySelector("[data-copy-label]") || btn;
+    var idle = label.textContent || "Copy";
+
+    // The manual-copy hint must name the right modifier for the platform.
+    var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
+    var manualHint = isMac ? "Press \u2318C" : "Press Ctrl+C";
+
+    var flash = function (text, tone) {
+      label.textContent = text;
+      btn.setAttribute("data-copied", tone);
+      window.setTimeout(function () {
+        label.textContent = idle;
+        btn.removeAttribute("data-copied");
+      }, 1600);
+    };
+
+    btn.addEventListener("click", function () {
+      var text = (source.textContent || "").trim();
+      var done = function () { flash("Copied", "true"); };
+      var failed = function () { flash(manualHint, "false"); };
+
+      // The async Clipboard API needs a secure context; the local preview
+      // server is http://, so fall back to a selection the user can copy.
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, failed);
+        return;
+      }
+      try {
+        var sel = window.getSelection();
+        var range = document.createRange();
+        range.selectNodeContents(source);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        var ok = document.execCommand("copy");
+        sel.removeAllRanges();
+        ok ? done() : failed();
+      } catch (e) {
+        failed();
+      }
     });
   });
 })();

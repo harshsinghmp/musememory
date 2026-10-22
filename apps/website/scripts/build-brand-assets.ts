@@ -12,7 +12,7 @@
  *
  * This script generates the SVG in-memory from the brand tokens below, then
  * rasterises it with resvg (pure Rust, no system browser) using the fonts that
- * are already vendored in `showreel-hf/assets/fonts`. Output is deterministic:
+ * are already vendored in `src/assets/fonts`. Output is deterministic:
  * same input bytes -> same PNG bytes.
  *
  * Usage:
@@ -38,7 +38,7 @@ import claims from "../../../claims.json";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = resolve(__dirname, "../public");
 const BRAND_DIR = join(PUBLIC_DIR, "brand");
-const FONT_DIR = resolve(__dirname, "../showreel-hf/assets/fonts");
+const FONT_DIR = resolve(__dirname, "../src/assets/fonts");
 
 /* ── Brand tokens ─────────────────────────────────────────────────────────
    These mirror `src/styles/global.css`. They are duplicated here on purpose:
@@ -149,7 +149,7 @@ function mesh(w: number, h: number): string {
 const PROOF: Array<[string, string]> = [
   ["sub-2ms recall", T.cyan],
   ["0 background daemons", T.violet],
-  [`${claims.agentPlatforms} coding agents wired`, T.green],
+  ["majority of coding agents", T.green],
   ["MIT · no account", T.amber],
 ];
 

@@ -99,6 +99,21 @@ const motionScript = initMotion();
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
+    <noscript>
+      {/* The scroll-reveal animation ships elements at opacity 0 and lets the
+          IntersectionObserver show them. Without script nothing would ever
+          reveal them, so the page would read as a hero followed by blank
+          space. This restores the static, fully-readable document. */}
+      <style>
+        .reveal {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+        .copy {
+          display: none !important;
+        }
+      </style>
+    </noscript>
     <slot />
     <script is:inline set:html={motionScript} />
   </body>
@@ -113,7 +128,7 @@ const motionScript = initMotion();
     z-index: 100;
     padding: 0.7rem 1.2rem;
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    background: var(--violet);
+    background: var(--accent-primary);
     color: #fff;
     font-weight: 600;
     transition: translate 0.2s ease;
