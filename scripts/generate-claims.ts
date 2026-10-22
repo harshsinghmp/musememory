@@ -116,23 +116,61 @@ const checkOnly = process.argv.includes("--check");
 
 if (checkOnly) {
   let stale = false;
-  for (const [path, next] of [
-    [OUT, serialized],
-    [toolMatrixPath, JSON.stringify(toolMatrix, null, 2) + "\n"],
+  const current = readFileSync(OUT, "utf8");
+  const currentClaims = JSON.parse(current) as typeof claims;
+
+  // The structural counts are derived from a stable source: if one of them
+  // moved, the source changed and the manifest must be regenerated.
+  for (const key of [
+    "version",
+    "mcpTools",
+    "mcpProfiles",
+    "agentPlatforms",
+    "migratorProviders",
+    "credentialRuleFamilies",
+    "backgroundDaemons",
   ] as const) {
-    let current = "";
-    try {
-      current = readFileSync(path, "utf8");
-    } catch {
-      current = "";
-    }
-    if (current !== next) {
+    if (currentClaims[key] !== claims[key]) {
       stale = true;
-      console.error(`STALE: ${path}`);
+      console.error(
+        `STALE: claims.json — ${key} is ${JSON.stringify(currentClaims[key])}, source says ${JSON.stringify(claims[key])}`,
+      );
     }
   }
+
+  // The test count is different: the suite grows every time a test is
+  // added, so an exact match would fail CI on every unrelated test commit.
+  // The failure that actually matters is OVER-claiming — publishing a count
+  // higher than the suite contains. Stale-low is merely imprecise, and the
+  // release process regenerates the manifest so the published figure is exact
+  // at the moment it ships.
+  if (currentClaims.tests.count > claims.tests.count) {
+    stale = true;
+    console.error(
+      `STALE: claims.json — claims ${currentClaims.tests.count} tests but the suite contains ${claims.tests.count}`,
+    );
+  } else if (currentClaims.tests.count < claims.tests.count) {
+    console.log(
+      `note: claims.json reports ${currentClaims.tests.count} tests; the suite now has ${claims.tests.count}. ` +
+        `Run "bun run claims:generate" to publish the exact figure.`,
+    );
+  }
+  if (currentClaims.tests.files > claims.tests.files) {
+    stale = true;
+    console.error(
+      `STALE: claims.json — claims ${currentClaims.tests.files} test files but the suite contains ${claims.tests.files}`,
+    );
+  }
+
+  // The tool matrix must match exactly: it is a list, not a statistic.
+  const currentMatrix = readFileSync(toolMatrixPath, "utf8");
+  if (currentMatrix !== JSON.stringify(toolMatrix, null, 2) + "\n") {
+    stale = true;
+    console.error(`STALE: ${toolMatrixPath}`);
+  }
+
   if (stale) {
-    console.error("Run: bun run scripts/generate-claims.ts");
+    console.error("Run: bun run claims:generate");
     process.exit(1);
   }
   console.log("claims.json and docs/mcp-tool-matrix.json are up to date.");
