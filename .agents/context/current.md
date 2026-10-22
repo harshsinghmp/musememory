@@ -5,9 +5,64 @@
 
 ---
 
+## 🔬 Latest Session — Audit, Documentation & Website Redesign (2026-10-21)
+
+A cross-file invariant audit, a documentation audit, and a full website
+redesign landed together. Everything below is verified by the test suite.
+
+### Code fixes (all regression-tested)
+
+- **Prompt-injection bypass closed (BLOCKER)**: `setCurrent()` in `src/governor.ts` now sanitises injected context blocks before writing `CURRENT.md`, and the session-handoff discovery line in `src/mcp.ts` is sanitised too. Previously only the *stored memory* was sanitised (by `propose()`), so a `memory_capture(type="constraint")` could persist an injection that was replayed into every later prompt. Fixes T-110's stated scope. Cover: `test/audit_blocker_regressions.test.ts`.
+- **Store could fail its own schema (BLOCKER)**: `schema.json` had `additionalProperties: false` but omitted `stale_embedder`, a flag the embedder writes onto entries. Every entry that failed embedding was reported corrupt by `memory validate`, `memory doctor` and `memory verify --strict`.
+- **Bi-temporal queries served the wrong snapshot (BLOCKER)**: the L1 context cache key omitted `as_of` (and the include/type/tag flags), so a "what did we believe in Q1?" query could be answered from a 30-second-old current-state cache entry.
+- **Tiered context dropped `as_of` (BLOCKER)**: `get_context(tier=1, as_of=...)` returned the current state while the untiered path returned the historical one. Both branches now forward `as_of` and `depth`.
+- **Access counter never accumulated (BLOCKER)**: `readEntry()` re-inserted the YAML mirror over the SQLite row, resetting `access_count` to its baseline on every read. The counter fed the access-frequency ranking axis, the LangMem frequency axis and the retention half-life — all were permanently starved. The database row is now authoritative for the counter.
+- **Tier token budget was declared but never enforced**: `resolveTierBudget()` was exported and documented but never called, so Tier 0 emitted 327 tokens against a 200-token budget. The budget now bounds the rendered output and reports what it dropped.
+- **MCP server advertised version `1.6.0`** while the package was at `3.0.0`. The version now comes from `package.json` (`src/version.ts`).
+- **Undiscoverable tools**: `memory_recall`, `memory_get_constraints` and `memory_set_constraints` were callable but absent from `ListTools`. All three are now registered.
+- **Undeclared destructive flags**: `memory_delete` honoured undocumented `apply`/`force` aliases that silently disabled the dry-run default. Only the declared `dry_run` and `confirm` can now disable it.
+- **Snapshot restore had no path containment**: `restoreSnapshotRing()` now resolves strictly inside `.memory/snapshots/`.
+- **`"checkpoint" as any`**: the audit operation is now a declared member of the `AuditOperation` union.
+- **Corroboration predicate de-duplicated**: the 13-line "is this source synthetic" predicate existed in two files. The predicate is now shared (`src/quality/corroboration.ts`); the two *bars* it feeds stay deliberately different and are documented as such.
+- **Title/tag limits declared but not used**: `MAX_TITLE_LENGTH` and `MAX_TAGS` existed while the enforced values were magic numbers. The store and harvester now use the constants, and the draft-title limit is declared as `MAX_DRAFT_TITLE_LENGTH`.
+
+### Published-claim integrity (new)
+
+`scripts/generate-claims.ts` derives every countable claim from `src/` and
+writes `claims.json`; `scripts/generate-cli-reference.ts` writes
+`docs/cli-reference.md` and `docs/mcp-tool-matrix.json`. The website imports
+`claims.json` instead of hard-coding figures.
+
+This exists because the site advertised **80+ coding agents** (real: 52),
+**45+ credential shapes** (real: 8 rule families) and **69 tools across 6
+profiles** (real: 115 across 7), while the README was already honest at 52.
+`test/marketing_claims.test.ts` now fails the build on any drift, on any
+stale figure in the published prose, and on any agent-facing document that
+names a tool which does not exist.
+
+### Documentation
+
+- `docs/agent-reference.md` — new: the agent contract (install, layout, mandatory session protocol, trust gates, failure semantics).
+- `docs/cli-reference.md` — new: generated CLI + MCP reference.
+- `docs/roadmap.md` — new: the sprint board, moved out of the README.
+- `README.md` — restructured: 60-second start, "How it works", "Where your memory lives", a documentation map that separates human docs from agent docs, and a 54KB → 39KB reduction.
+- `.agents/context/product.md` — rewritten against the live registry; it previously named six tools that do not exist.
+- `.agents/standards/frontend-astro.md` — rewritten to match this repo's actual stack (static output, plain CSS, no SSR adapter, no Tailwind, no Motion.dev).
+
+### Website
+
+- Redesigned `apps/website`: shared `Nav`/`Footer`/`Logo` components (the 404 page previously had no navigation at all), a real mobile menu (the nav links were hidden below 860px with no replacement), full SEO head (canonical, OG, Twitter, icons, manifest, skip link), a new "Your memory is a folder" section, and a capability grid that replaces eight long editorial bands.
+- New brand system: a redesigned monogram (the previous mark read as a zigzag, not an "M"), favicon, Apple touch icon, PWA icons, OG card, Twitter card, README banner — all generated deterministically with resvg from the fonts already vendored in the repo.
+- New agent-readable layer: `llms.txt` and `llms-full.txt`, generated from the built HTML.
+- Fixed two real defects the audits caught: a `scrollable-region-focusable` axe failure on `/docs`, and a reveal runtime that stranded any `.reveal` taller than the viewport (the observer used a ratio threshold).
+
+---
+
 ## ⏭️ Next Up (Post-Wave 22 Focus)
 - **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall) to replace removed legacy demo.
 - **Wave 23**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. Hebbian co-activation retrieval expansion, query-seeded PPR restart set, retrieval weight auto-tuner, and contradiction engine calibration).
+- **Consolidate the remaining duplicated tables** (deferred from this session as behaviour-changing; full detail with exact locations in [`docs/roadmap.md`](../../docs/roadmap.md) → *Engineering debt*): the three divergent per-type TTL tables in `src/retention.ts`, the eight separate token estimators, the divergent limit-clamping ceilings across retrieval paths, and the remaining zero-caller exports.
+- **Remove the legacy `web/` directory** — done in this session. It was a second, hand-written copy of the site that `apps/website/` superseded; keeping it was the same "second copy that gets forgotten" failure mode this session fixed everywhere else.
 
 ---
 

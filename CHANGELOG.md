@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-22
+
+### Summary
+Correctness release. Fixes five defects found by a cross-file invariant audit: a prompt-injection channel through `CURRENT.md`, a store that could fail its own schema validator, bi-temporal queries answered from a stale cache entry, a tiered context path that silently dropped `as_of`, and an access counter that never accumulated. Also makes every published number machine-verified, and redesigns the website.
+
+### Fixed
+- **Prompt-injection channel through `CURRENT.md` (`src/governor.ts`, `src/mcp.ts`)**: the stored *memory* was sanitised by `propose()`, but the constraint copy written to `CURRENT.md` was not. Because `CURRENT.md` is replayed verbatim into every later prompt, a single `memory_capture(type="constraint")` or `memory_current(action="append")` could persist an injected instruction that reached every future session in the workspace. Sanitisation now happens at the sink — inside `setCurrent()` — so all five callers are covered, and the session-handoff discovery line is sanitised too.
+- **Store could fail its own schema validator (`schema.json`)**: `schema.json` declared `additionalProperties: false` but omitted `stale_embedder`, a flag the embedder writes onto entries. Every entry that failed embedding was permanently reported as corrupt by `memory validate`, `memory doctor` and `memory verify --strict`.
+- **Bi-temporal queries served the wrong snapshot (`src/retrieval.ts`)**: the L1 context cache key omitted `as_of` (and the include/type/tag flags), so a "what did we believe in Q1?" query could be answered from a 30-second-old *current-state* cache entry.
+- **Tiered context dropped `as_of` and `depth` (`src/mcp.ts`)**: `get_context(tier=1, as_of=…)` returned the current state while the untiered path returned the historical one. Both branches now forward the declared arguments.
+- **Access counter never accumulated (`src/store.ts`)**: `readEntry()` re-inserted the YAML mirror over the SQLite row on every read, resetting `access_count` to its baseline. The counter feeds the access-frequency ranking axis, the LangMem frequency axis and the access-weighted retention half-life — all three were permanently starved. The database row is now authoritative for the counter.
+- **Tier token budget was declared but never enforced (`src/retrieval/tiered.ts`)**: `resolveTierBudget()` was exported and documented but never called, so Tier 0 routinely emitted 327 tokens against a 200-token budget. The budget now bounds the rendered output and reports what it dropped.
+- **MCP server advertised a stale version (`src/mcp.ts`, `src/version.ts`)**: the server reported `1.6.0` while the package was at `3.0.0`. The version now comes from `package.json`.
+- **Undiscoverable MCP tools (`src/mcp.ts`, `src/connect.ts`)**: `memory_recall`, `memory_get_constraints` and `memory_set_constraints` were callable through the tool switch but absent from `ListTools`, so no client could find them by listing. All three are now registered and allow-listed.
+- **Undeclared destructive flags on `memory_delete` (`src/mcp.ts`)**: the dry-run default was disabled by undocumented `apply` and `force` aliases that appeared in no schema. Only the declared `dry_run` and `confirm` can now disable it.
+- **Snapshot restore had no path containment (`src/snapshot.ts`)**: `restoreSnapshotRing()` now resolves strictly inside `.memory/snapshots/`, matching the sibling loader's sanitiser.
+- **Untyped audit operation (`src/types.ts`, `src/compaction/engine.ts`)**: `"checkpoint"` was written into the hash-chained ledger through an `as any` cast because it was missing from the `AuditOperation` union. It is now a declared member.
+- **Corroboration predicate duplicated (`src/quality/corroboration.ts`, `src/promotion/engine.ts`)**: the "is this source synthetic" predicate existed verbatim in two files. The predicate is now shared; the two *bars* it feeds — the stricter multi-day promotion bar and the signal-count confidence bar — remain deliberately different and are documented as such.
+- **Title and tag limits declared but not enforced (`src/types.ts`, `src/store.ts`, `src/harvest.ts`)**: `MAX_TITLE_LENGTH` and `MAX_TAGS` existed while the enforced values were magic numbers, and the draft path used a third, undeclared limit. The store and harvester now use the constants, and `MAX_DRAFT_TITLE_LENGTH` declares the draft limit explicitly.
+- **Inaccurate published figures across the site and CLI**: the website advertised "80+ coding agents" (52), "45+ credential shapes" (8 rule families) and "69 tools across 6 profiles" (115 across 7), and the CLI `--help` text repeated the agent-platform figure. All corrected against the source.
+
+### Changed
+- **Every published number is now generated from the source**: `scripts/generate-claims.ts` derives the tool, profile, platform, import-format, credential-rule and test counts from `src/` into `claims.json`; `scripts/generate-cli-reference.ts` generates `docs/cli-reference.md` and `docs/mcp-tool-matrix.json`. The website imports the manifest instead of hard-coding figures, and `test/marketing_claims.test.ts` fails the build on any drift — including a stale figure in the README prose, a hand-typed count in a page, or an agent-facing document naming a tool that does not exist.
+- **Documentation restructured for human and machine readers separately**: `docs/agent-reference.md` (new) is the agent contract — install, file layout, mandatory session protocol, trust gates, failure semantics, and an explicit table of commands that do *not* exist. `docs/cli-reference.md` (new, generated) replaces a hand-written tool table that named five non-existent tools. `docs/roadmap.md` (new) moves the sprint board out of the README. The README gains a 60-second start, a "How it works" section, a "Where your memory lives" section and a documentation map, and shrinks from 54KB to 39KB.
+- **Website redesign**: shared `Nav`/`Footer`/`Logo` components (the 404 page previously had no navigation at all), a working mobile menu (the nav links were hidden below 860px with no replacement), a complete SEO head (canonical, Open Graph, Twitter cards, icon set, web manifest, skip link), a capability grid replacing eight long editorial bands, and a new "Your memory is a folder" section. All four pages pass axe-core with zero critical/serious findings and all nine responsive viewports pass the visual audit.
+- **New brand system**: a redesigned monogram (the previous mark read as a zigzag rather than an "M"), favicon, Apple touch icon, PWA icons, Open Graph card, Twitter card and README banner — generated deterministically with resvg from the fonts already vendored in the repository, replacing a pipeline that required a 150MB browser download to flatten a vector.
+- **Agent-readable website layer**: `llms.txt` and `llms-full.txt` are published and generated from the built HTML, so they cannot drift from the site.
+- **Documentation link integrity is enforced**: `scripts/check-doc-links.ts` runs in CI and catches dead relative links and machine-specific `file:///` URLs. Thirteen such links — all pointing into the original author's local checkout — were fixed.
+- **Removed the legacy `web/` directory**: a second, hand-written copy of the site that the Astro build superseded, unreferenced and not deployed.
+
+### Security
+- **The `CURRENT.md` injection channel is closed** — see *Fixed* above. This is the T-110 defence extended to the sink that was bypassing it.
+- **Secret scanning is unchanged**: the Vibeguard rules still cover 8 credential families (AI API keys, GitHub and npm tokens, AWS keys, private key blocks, Slack tokens, credentialed connection strings and generic credential assignments). The published figure was wrong, not the scanner.
+
+### Known issues (unchanged, tracked in `docs/roadmap.md`)
+Three larger duplications whose correction changes runtime behaviour were deliberately deferred rather than fixed blind: the three divergent per-type TTL tables in `src/retention.ts`, the eight separate token estimators, and the divergent limit-clamping ceilings across retrieval paths.
+
 ## [3.0.0] - 2026-10-20
 
 ### Summary

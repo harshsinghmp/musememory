@@ -2,7 +2,7 @@
 
 > **Status**: Production Ready · Shipped in `v3.0.0`  
 > **Tickets Covered**: `T-313`, `T-144`, `T-314`, `T-315`  
-> **Key Modules**: [`src/learning/feedback.ts`](file:///home/harsh/Projects/github/musememory/src/learning/feedback.ts), [`src/quality/utility.ts`](file:///home/harsh/Projects/github/musememory/src/quality/utility.ts), [`src/learning/distill.ts`](file:///home/harsh/Projects/github/musememory/src/learning/distill.ts), [`src/learning/negative.ts`](file:///home/harsh/Projects/github/musememory/src/learning/negative.ts), [`src/compounding/temporal.ts`](file:///home/harsh/Projects/github/musememory/src/compounding/temporal.ts), [`src/retrieval.ts`](file:///home/harsh/Projects/github/musememory/src/retrieval.ts)
+> **Key Modules**: [`src/learning/feedback.ts`](../src/learning/feedback.ts), [`src/quality/utility.ts`](../src/quality/utility.ts), [`src/learning/distill.ts`](../src/learning/distill.ts), [`src/learning/negative.ts`](../src/learning/negative.ts), [`src/compounding/temporal.ts`](../src/compounding/temporal.ts), [`src/retrieval.ts`](../src/retrieval.ts)
 
 ---
 
