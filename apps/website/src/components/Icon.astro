@@ -1,0 +1,60 @@
+---
+/**
+ * Renders one of the line icons in `src/assets/icons` inline.
+ *
+ * The SVG files are imported as raw text and only their *inner* markup is
+ * injected, so the glyph inherits `currentColor` from the surrounding text,
+ * needs no extra network request, and keeps a single source of truth for the
+ * stroke attributes. An unknown name renders nothing and logs a warning
+ * rather than throwing.
+ */
+interface Props {
+  name: string;
+  size?: number;
+  class?: string;
+  title?: string;
+}
+
+const { name, size = 20, class: className, title } = Astro.props;
+
+const rawIcons = import.meta.glob("../assets/icons/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
+const icons = Object.fromEntries(
+  Object.entries(rawIcons).map(([path, raw]) => [
+    path.split("/").pop()?.replace(/\.svg$/, "") ?? "",
+    raw,
+  ]),
+);
+
+const source = icons[name];
+const inner = source ? (source.match(/<svg[^>]*>([\s\S]*)<\/svg>/i)?.[1] ?? "") : "";
+
+if (!source) {
+  console.warn(`[Icon] Unknown icon "${name}" - nothing rendered.`);
+}
+---
+
+{
+  inner && (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      width={size}
+      height={size}
+      role={title ? "img" : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : "true"}
+      class={className}
+      set:html={inner}
+    />
+  )
+}

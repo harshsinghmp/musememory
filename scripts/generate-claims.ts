@@ -91,6 +91,21 @@ async function build() {
     migratorProviders: PROVIDER_DEFINITIONS.length,
     credentialRuleFamilies: SECRET_RULES.length,
     backgroundDaemons: 0,
+    /**
+     * Published latency bounds, in the units the site quotes them.
+     *
+     * These are the UPPER BOUNDS the product claims, not a measurement
+     * captured at generation time — latency depends on the machine, so a
+     * generated number would be a lie. They live in one table so the hero
+     * stats, the latency chart and the copy can never quote three different
+     * figures. `memory benchmark` reproduces them on your hardware.
+     */
+    latency: {
+      hotCacheMicros: 50,
+      recallMillis: 2,
+      semanticMillis: 4,
+      networkMillis: 300,
+    },
     tests: {
       count: suite.tests,
       assertions: suite.assertions,

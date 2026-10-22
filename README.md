@@ -22,7 +22,7 @@
 
 ![CI Tests](https://img.shields.io/badge/Tests-1335%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
-![Agent Coverage](https://img.shields.io/badge/Agents-52_Verified-4F46E5?style=for-the-badge&logo=openai)
+![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
 
 **Persistent, local-first memory for AI agents and the projects they work on.**
@@ -210,7 +210,7 @@ rather than serving it as if it were still true.
 - 🌳 **Hierarchical Tree Retrieval & Progressive Disclosure**: Sharded tree partitions with 3-tier progressive disclosure (`L1` abstracts, `L2` summaries, `L3` full context) for massive knowledge bases.
 - 📚 **Obsidian Markdown Wiki & Entity Graph Compiler**: Dual-persistence knowledge compounding compiling linked Markdown pages (`wiki/concepts/`, `wiki/entities/`) with bidirectional `[[wikilinks]]`.
 - 🛡️ **Vibeguard Zero-Leakage Secret Scanner**: Regex-powered memory defense intercepting and rejecting API keys, AWS credentials, private keys, database URIs, and passwords before writes.
-- 🔌 **Zero-Permission Auto-Wiring (52 Agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.
+- 🔌 **Zero-Permission Auto-Wiring (the majority of coding agents)**: Automatically detects and wires Claude Code, Cursor, Antigravity, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, and the rest of the tools developers actually use.
 - 🔄 **Universal Memory Migrator (30 Engines)**: One-click migration from Letta, Mem0, Supermemory, Cognee, Beads, Mnemosyne, GBrain, and more with state preservation.
 - 🎨 **Cognitive Studio Visual Dashboard (`memory ui`)**: Embedded zero-dependency web interface featuring 3D force-directed knowledge graphs, live `CURRENT.md` monitor, wiki reader, and persona editor.
 - ⏰ **Proactive Nudges & Routines Scheduler**: Cron-invoked daily briefings, staleness policy tracking, and ambient open-loop trackers with zero resident background daemons.
@@ -328,7 +328,7 @@ npx musememory upgrade
 #### What `memory upgrade` automatically handles:
 1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
 2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
-3. **52 Agent Platform Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, etc.) and auto-wires them with zero permissions.
+3. **Coding Agent Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, and the rest of the mainstream field) and auto-wires them with zero permissions.
 4. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
 
 ---
@@ -382,7 +382,7 @@ npx musememory stats
 npx musememory briefing
 ```
 
-### 3️⃣ Connect Coding Agents (52 Platforms)
+### 3️⃣ Connect Coding Agents (the majority of platforms)
 ```bash
 # Scan workstation for installed AI coding agents
 npx musememory agents

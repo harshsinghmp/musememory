@@ -123,10 +123,12 @@ describe("Published-claim integrity", () => {
       });
     }
 
-    it("the README states the verified agent-platform count", () => {
+    it("the README states coverage without publishing a count", () => {
+      // The copy rule: no user-facing surface may state how many agents are
+      // supported. The claim is "the majority of coding agents".
       const text = readFileSync(join(ROOT, "README.md"), "utf8");
-      expect(text).toContain(`${claims.agentPlatforms} Agents`);
-      expect(text).toContain(`${claims.agentPlatforms} Platforms`);
+      expect(text).toContain("the majority of coding agents");
+      expect(text).not.toMatch(/\b\d+\+?\s+(?:coding\s+)?(?:agents?|platforms?)\b/i);
     });
 
     it("the README states the verified import-format count", () => {
@@ -145,10 +147,14 @@ describe("Published-claim integrity", () => {
 
       const index = readFileSync(join(ROOT, "apps/website/src/pages/index.astro"), "utf8");
       expect(index).toContain('import claims from "../../../../claims.json"');
-      expect(index).toContain("claims.agentPlatforms");
-      expect(index).toContain("claims.credentialRuleFamilies");
       expect(index).toContain("claims.migratorProviders");
+      expect(index).toContain("claims.mcpTools");
       expect(index).toContain("claims.tests.count");
+      expect(index).toContain("claims.latency.recallMillis");
+      // The agent count is deliberately NOT published anywhere on the site:
+      // the claim is "the majority of coding agents".
+      expect(index).not.toContain("claims.agentPlatforms");
+      expect(index).not.toContain("claims.credentialRuleFamilies");
     });
 
     it("the site's version display comes from the manifest, not from prose", () => {

@@ -18,6 +18,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dry-run contradiction detection (`src/store.ts`, `src/quality/contradiction.ts`)**: `propose({ checkConflict: true, conflictDryRun: true })` detects and audit-logs (`conflict_detected_dry_run`) without flagging either memory; `detectConflict(store, candidate, { dryRun: true })` returns the detection with `dryRun: true` and mutates nothing.
 - **Calibration fixture for the contradiction engine (`test/calibration/contradiction_calibration.json`)**: 21 labelled memory pairs with an expected verdict, gated at precision and recall above 0.9.
 
+## [3.0.2] - 2026-10-22
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.0.1...v3.0.2
+
+### Summary
+Website release. The site is rebuilt on the developer-vertical anatomy with a
+fluid token system, a new cinematic showreel replaces the old terminal
+recording, and the qa-launch release gate becomes executable code that runs in
+CI. No engine behaviour, public API, CLI surface or MCP tool name changes.
+
+### Added
+- **Rebuilt website** (`apps/website/`): the developer anatomy — hero → demo → architecture → code grid → proof → quickstart → licence — with copy on the AIDA spine and PAS driving the problem block. A token-first stylesheet with fluid `clamp()` spacing and type ramps, logical properties throughout, and no fixed values in components.
+- **New showreel** (`apps/website/showreel/index.html`): an original twelve-second "Memory Lattice" film on the AIDA spine, rendered deterministically by a Playwright + ffmpeg pipeline. Every visual is a pure function of `t`, so the render is reproducible and needs no browser download to flatten a vector.
+- **Graphic assets**: a twelve-icon line set on a 24px grid (`src/assets/icons/`), and three inline-SVG figures — a recall latency chart, the memory lifecycle state machine, and the system topology with a "your machine only" band around the engine and the store. Every figure is bound to `claims.json`, so no figure can drift from the code.
+- **Executable release gate** (`apps/website/scripts/qa-gate.ts`): the qa-launch gate as code — critical paths, the keyboard-only path, 200% zoom reflow, the no-JavaScript first frame, animation performance, the header/footer chrome, a placeholder/debug sweep, the payload budget and a second rendering engine. It exits non-zero on any blocking failure and runs in CI.
+- **Published-copy contract** (`test/published_copy_contracts.test.ts`): no user-facing surface may state a count of supported agents, and the latency bounds must come from one place in `claims.json`.
+
+### Changed
+- **The copy rule**: the project now says "the majority of coding agents" rather than a number. A number ages badly and invites a precision the registry cannot promise; the precise count stays in `claims.json`, where it is a fact about the code rather than a promise about the market.
+- **Shared brand fonts**: moved from the showreel's private folder to `apps/website/src/assets/fonts/`, where the brand pipeline and the showreel renderer share one copy.
+- **The agent-readable layer** (`llms.txt`, `llms-full.txt`) derives its figures from the same manifest as the site.
+
+### Fixed
+- **The page read blank without JavaScript**: all 43 `.reveal` elements shipped at `opacity: 0` and relied on an `IntersectionObserver` to show them. A `<noscript>` fallback now restores the static document.
+- **The mobile menu overflowed the viewport**: `.nav-actions` packed to the start of its flex row, dragging the absolutely-positioned sheet off the left edge.
+- **The header rendered as raw inline text**: the stylesheet rewrite dropped the nav rules. A missing CSS rule does not throw — the element takes its browser defaults, invisible to axe and to an overflow check. The chrome moved into the component that owns it and is now measured by the gate.
+- **The copy button's fallback hint** read "Press ⌘C" on every platform; it now names the platform's modifier.
+- **A `<p>` inside a `<dl>`'s wrapper div** — an axe-core `definition-list` violation on the metric grid.
+- **Two animated elements combined `filter: blur()` with a transform animation**, forcing a per-frame re-rasterisation of the blur. The softness now comes from the gradient stops, so the motion stays on the compositor.
+
+### Removed
+- The HyperFrames showreel composition and its private font copy.
+
+### Known issues
+None. The release gate reports 17/17, SHIP
+(`.agents/artifacts/qa-gate-2026-10-22.md`).
+
 ## [3.0.1] - 2026-10-22
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.0.0...v3.0.1

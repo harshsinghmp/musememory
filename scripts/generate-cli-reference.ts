@@ -187,7 +187,7 @@ lines.push("");
 lines.push(
   `Counts in this file are generated from the same source as ` +
     `[\`claims.json\`](../claims.json): ${claims.mcpTools} tools, ` +
-    `${claims.mcpProfiles} profiles, ${claims.agentPlatforms} agent platforms, ` +
+    `${claims.mcpProfiles} profiles, ` +
     `${claims.migratorProviders} import formats, ` +
     `${claims.credentialRuleFamilies} credential rule families.`,
 );

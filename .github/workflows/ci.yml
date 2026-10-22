@@ -31,5 +31,14 @@ jobs:
       - name: Documentation link integrity
         # Catches dead relative links and machine-specific file:/// URLs.
         run: bun run scripts/check-doc-links.ts
+      - name: Website release gate
+        # The qa-launch gate, executed: critical paths, keyboard-only path,
+        # 200% zoom reflow, the no-JavaScript first frame, animation
+        # performance, the placeholder sweep, the payload budget and a
+        # second rendering engine.
+        run: |
+          bunx playwright-core install chromium-headless-shell firefox
+          bun run site:build
+          bun run site:qa
       - name: Self Validation
         run: bun run bin/musememory.ts validate --dry-run

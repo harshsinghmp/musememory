@@ -1,0 +1,220 @@
+---
+/**
+ * Recall latency, measured.
+ *
+ * A horizontal bar chart of the recall path. Every bar is bound to one entry
+ * of the `PATHS` table below, so no figure is typed straight into the markup:
+ * the bar geometry, the numeric label and the axis ticks are all derived from
+ * the same data.
+ *
+ * The last row is a contrast, not a claim: a network embedding API is drawn
+ * dashed and faint and is explicitly labelled "network · not Muse", so nobody
+ * reads it as a Muse number.
+ *
+ * Colour contract: hex values are inlined because an inline SVG cannot read
+ * the page's custom properties. They mirror the site tokens
+ * (`--bg`, `--line`, `--text`, `--violet`, `--cyan`, `--amber`).
+ */
+import claims from "../../../../../claims.json";
+
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+const FONT = "Inter, ui-sans-serif, system-ui, sans-serif";
+const LINE = "rgba(148,163,216,0.14)";
+const LINE_STRONG = "rgba(148,163,216,0.3)";
+const TEXT = "#e8ecf8";
+const TEXT_DIM = "#9aa5c3";
+const TEXT_FAINT = "#8791ad";
+const CYAN = "#4fd6e0";
+const VIOLET = "#8b7cf7";
+const AMBER = "#f5b455";
+
+/** Stroke weight shared by every outline in the figure set. */
+const STROKE = 1.5;
+/** Corner radius shared by every rounded box in the figure set. */
+const RADIUS = 8;
+
+/**
+ * The recall path, fastest first.
+ *
+ * `ms` is the published upper bound in milliseconds, `cap` is the honest
+ * qualifier the label carries, and `basis` says where the number comes from.
+ * The network row is a contrast: dashed, faint, and never counted as a claim.
+ */
+const PATHS = [
+  {
+    id: "cache",
+    label: "Hot cache lookup",
+    ms: claims.latency.hotCacheMicros / 1000,
+    cap: "<",
+    colour: CYAN,
+    basis: "L0 in-process cache",
+  },
+  {
+    id: "fts5",
+    label: "FTS5 BM25 recall",
+    ms: claims.latency.recallMillis,
+    cap: "<",
+    colour: VIOLET,
+    basis: "SQLite FTS5 index",
+  },
+  {
+    id: "cosine",
+    label: "Local semantic cosine",
+    ms: claims.latency.semanticMillis,
+    cap: "≈",
+    colour: AMBER,
+    basis: "in-process embeddings",
+  },
+  {
+    id: "network",
+    label: "Network embedding API",
+    ms: claims.latency.networkMillis,
+    cap: "≈",
+    colour: TEXT_FAINT,
+    basis: "network round-trip",
+    contrast: true,
+  },
+];
+
+/** Log-scale decades, in milliseconds. */
+const TICKS = [0.01, 0.1, 1, 10, 100, 1000];
+
+/* ── Geometry ──────────────────────────────────────────────────────────── */
+const VIEW = { w: 720, h: 312 };
+const PLOT = { x: 252, w: 360, top: 64, axisY: 250 };
+const AXIS = { min: 0.01, max: 1000 };
+const ROWS = { top: 72, pitch: 46, barH: 20, barOffset: 5 };
+
+/** Renders a millisecond bound the way a developer reads it. */
+function formatLatency(ms: number): string {
+  if (ms < 1) return `${Math.round(ms * 1000)} µs`;
+  if (ms < 1000) return `${Math.round(ms * 10) / 10} ms`;
+  return `${Math.round(ms / 100) / 10} s`;
+}
+
+const DECADES = Math.log10(AXIS.max) - Math.log10(AXIS.min);
+
+/** Maps a latency in milliseconds onto the log axis. */
+function scale(ms: number): number {
+  return PLOT.x + (PLOT.w * (Math.log10(ms) - Math.log10(AXIS.min))) / DECADES;
+}
+
+const bars = PATHS.map((p, i) => {
+  const top = ROWS.top + i * ROWS.pitch;
+  const width = scale(p.ms) - PLOT.x;
+  return {
+    ...p,
+    top,
+    barY: top + ROWS.barOffset,
+    width,
+    value: `${p.cap} ${formatLatency(p.ms)}`,
+    valueX: PLOT.x + width + 10,
+  };
+});
+
+const ticks = TICKS.map((t) => ({ t, x: scale(t), label: formatLatency(t) }));
+
+const uid = Math.random().toString(36).slice(2, 8);
+const titleId = `latency-title-${uid}`;
+const descId = `latency-desc-${uid}`;
+---
+
+<svg
+  viewBox={`0 0 ${VIEW.w} ${VIEW.h}`}
+  width="100%"
+  style="height:auto;display:block"
+  preserveAspectRatio="xMidYMid meet"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby={`${titleId} ${descId}`}
+  font-family={FONT}
+>
+  <title id={titleId}>Recall latency, measured</title>
+  <desc id={descId}>
+    Horizontal bar chart on a log axis. Hot cache lookup answers in under 50
+    microseconds, FTS5 BM25 recall in under 2 milliseconds and local semantic
+    cosine in about 4 milliseconds. The final, dashed row is a network
+    embedding API at about 300 milliseconds, shown as a contrast rather than a
+    Muse path.
+  </desc>
+
+  {/* Title block */}
+  <text x="24" y="26" fill={TEXT} font-size="15" font-weight="600" letter-spacing="0.2">
+    Recall latency, measured
+  </text>
+  <text x="24" y="46" fill={TEXT_DIM} font-size="10">
+    In-process recall paths, plus one network contrast row.
+  </text>
+
+  {/* Log gridlines — hairlines only, so they never compete with the bars */}
+  {
+    ticks.map((tick) => (
+      <line
+        x1={tick.x}
+        y1={PLOT.top}
+        x2={tick.x}
+        y2={PLOT.axisY}
+        stroke={LINE}
+        stroke-width="1"
+      />
+    ))
+  }
+
+  {/* Rows */}
+  {
+    bars.map((bar) => (
+      <g>
+        <rect
+          x={PLOT.x}
+          y={bar.barY}
+          width={bar.width}
+          height={ROWS.barH}
+          rx={RADIUS}
+          fill={bar.contrast ? "none" : bar.colour}
+          stroke={bar.colour}
+          stroke-width={STROKE}
+          stroke-dasharray={bar.contrast ? "5 4" : undefined}
+        />
+        <text x="24" y={bar.top + 19} fill={TEXT} font-size="12" font-weight="500">
+          {bar.label}
+        </text>
+        <text x="24" y={bar.top + 32} fill={TEXT_DIM} font-size="10">
+          {bar.basis}
+        </text>
+        <text x={bar.valueX} y={bar.top + 19} fill={bar.colour} font-size="12" font-weight="600">
+          {bar.value}
+        </text>
+        {bar.contrast && (
+          <text x="696" y={bar.top + 32} fill={TEXT_FAINT} font-size="10" text-anchor="end">
+            network · not Muse
+          </text>
+        )}
+      </g>
+    ))
+  }
+
+  {/* Axis */}
+  <line
+    x1={PLOT.x}
+    y1={PLOT.axisY}
+    x2={PLOT.x + PLOT.w}
+    y2={PLOT.axisY}
+    stroke={LINE_STRONG}
+    stroke-width={STROKE}
+  />
+  {
+    ticks.map((tick) => (
+      <text x={tick.x} y={PLOT.axisY + 16} fill={TEXT_FAINT} font-size="10" text-anchor="middle">
+        {tick.label}
+      </text>
+    ))
+  }
+
+  {/* Footnotes */}
+  <text x="24" y="284" fill={TEXT_FAINT} font-size="10">
+    Measurements from the built-in benchmark; run &quot;memory benchmark&quot; to reproduce.
+  </text>
+  <text x="24" y="298" fill={TEXT_FAINT} font-size="10">
+    Muse Memory v{claims.version} · the benchmark runs offline, on this machine.
+  </text>
+</svg>

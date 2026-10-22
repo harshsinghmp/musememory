@@ -1,6 +1,6 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.0.1`  
+> **Version**: `v3.0.2`  
 > **Status**: Patch Release — correctness fixes from the cross-file invariant audit, machine-verified published claims, and the website redesign.
 
 ---
@@ -55,6 +55,73 @@ names a tool which does not exist.
 - New brand system: a redesigned monogram (the previous mark read as a zigzag, not an "M"), favicon, Apple touch icon, PWA icons, OG card, Twitter card, README banner — all generated deterministically with resvg from the fonts already vendored in the repo.
 - New agent-readable layer: `llms.txt` and `llms-full.txt`, generated from the built HTML.
 - Fixed two real defects the audits caught: a `scrollable-region-focusable` axe failure on `/docs`, and a reveal runtime that stranded any `.reveal` taller than the viewport (the observer used a ratio threshold).
+
+---
+
+## 🔬 Latest Session — Website Rebuild, New Showreel & Published-Copy Contracts (2026-10-22)
+
+A second pass over the same repository, dispatched through the **secretary**
+skills: `content` (copy frameworks), `design` (the developer-vertical
+anatomy), `animate` (motion), and `qa-launch` (the release gate). Five
+findings that were not in the first audit are recorded below; the fixes are
+all regression-tested.
+
+### The copy rule
+
+No user-facing surface may state a count of supported agents. The claim is
+"the majority of coding agents" — a number would age badly and invite a
+precision the registry cannot promise. The precise count stays in
+`claims.json`, where it is a fact about the code rather than a promise about
+the market. `test/published_copy_contracts.test.ts` enforces this across the
+README, all three site pages, the nav, the footer, both asset generators and
+the showreel composition.
+
+### The website
+
+- **Rebuilt on the design skill's developer anatomy**: hero → demo →
+  architecture → code grid → proof → quickstart → licence, with copy on the
+  content skill's AIDA spine and PAS driving the problem block.
+- **New design-token system** (`src/styles/global.css`): fluid `clamp()`
+  spacing and type scales, logical properties throughout, and no fixed
+  values in components. Every container is width-bounded and grid children
+  carry `min-width: 0`, so nothing can break out of the viewport.
+- **New graphic assets**: a 12-icon line set (`src/assets/icons/`, all on a
+  24px grid, measured to a 14–21px optical band) and three inline-SVG
+  figures — a latency chart, a lifecycle state machine and an architecture
+  topology — each bound to `claims.json` so no figure can drift from the code.
+- **A new showreel**, written from scratch: a 12-second "memory lattice"
+  film with an AIDA script, rendered deterministically from
+  `apps/website/showreel/index.html` by a Playwright + ffmpeg pipeline. The
+  previous HyperFrames composition and its private font copy are gone; the
+  fonts now live at `src/assets/fonts/` and are shared with the brand
+  pipeline.
+- **The published latency bounds now live in one place** — `claims.json` →
+  `latency` — and both the hero stats and the latency chart read them, so
+  the page cannot quote two different numbers for the same path.
+
+### Defects the QA gate found (all fixed)
+
+- **The page read blank without JavaScript (P0)**: all 43 `.reveal` elements
+  ship at `opacity: 0` and rely on an `IntersectionObserver`. A `<noscript>`
+  fallback in `Base.astro` now restores the static document.
+- **The mobile menu overflowed the viewport (P1)**: `.nav-actions` is a flex
+  row without `justify-content`, so the group packed to the start and the
+  absolutely-positioned sheet anchored off the left edge (`x = -73`).
+- **The copy button's fallback hint said "Press ⌘C" on every platform (P1)**.
+- **A `<p>` inside a `<dl>`'s wrapper div (P1)** — an axe-core
+  `definition-list` violation on the metric grid.
+- **Two animated elements combined `filter: blur()` with a transform
+  animation (P2)** — a per-frame re-rasterisation of the blur. The softness
+  now comes from the gradient stops, so the motion stays on the compositor.
+
+### The gate itself is executable
+
+`apps/website/scripts/qa-gate.ts` runs the qa-launch gate checklist as
+code — critical paths, the keyboard-only path, 200% zoom reflow, the
+no-JavaScript first frame, animation performance, a placeholder/debug
+sweep, the payload budget, and a second rendering engine. It exits non-zero
+on any blocking failure, so CI runs it. Report:
+`.agents/artifacts/qa-gate-2026-10-22.md` — **16/16, SHIP**.
 
 ---
 

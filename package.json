@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
@@ -26,7 +26,8 @@
     "typecheck": "tsc --noEmit",
     "validate": "bun run dist/index.js validate --dry-run",
     "start": "bun run dist/index.js mcp",
-    "prepublishOnly": "bun run build && bun test"
+    "prepublishOnly": "bun run build && bun test",
+    "site:qa": "bun run --cwd apps/website scripts/qa-gate.ts"
   },
   "bin": {
     "memory": "dist/index.js",

@@ -19,6 +19,9 @@
  *   bun run --cwd apps/website scripts/build-llms-txt.ts
  */
 import { readdirSync, statSync } from "node:fs";
+// The curated map quotes the same numbers the site does, from the same
+// generated manifest, so the two cannot disagree.
+import claims from "../../../claims.json";
 import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -139,7 +142,10 @@ function walk(dir: string): string[] {
 }
 
 const PAGES: Array<{ path: string; title: string }> = [
-  { path: "index.html", title: "Home — what Muse Memory is, how it works, benchmarks, FAQ" },
+  {
+    path: "index.html",
+    title: "Home — the problem, how it works, architecture, the command surface, proof, FAQ",
+  },
   { path: "docs/index.html", title: "Docs — quickstart, CLI, MCP tools, hooks, trust gates" },
   { path: "compare/index.html", title: "Compare — 14-capability comparison against other memory approaches" },
 ];
@@ -147,10 +153,10 @@ const PAGES: Array<{ path: string; title: string }> = [
 const CURATED = `# Muse Memory
 
 > Persistent, local-first memory for AI coding agents. Runs in-process on the user's
-> machine: sub-2ms recall, write-time citation verification, 52 coding agents wired by
-> one command, zero background daemons, MIT licensed.
+> machine: sub-${claims.latency.recallMillis}ms recall, write-time citation verification, the majority
+> of coding agents wired by one command, ${claims.backgroundDaemons} background daemons, MIT licensed.
 >
-> Version 3.0.0 · https://harshsinghmp.github.io/musememory/
+> Version ${claims.version} · https://harshsinghmp.github.io/musememory/
 
 Muse Memory gives an AI coding agent a memory that survives between sessions. Every
 memory is checked against the real code before it is stored and re-checked before it
@@ -190,8 +196,8 @@ ${PAGES.map((p) => `- [${p.title}](https://harshsinghmp.github.io${BASE}/${p.pat
 | \`muse_why\` | Explain why the code is the way it is, from ADRs and past fixes. |
 | \`memory_supersede\` | Replace an outdated memory with a newer one. |
 
-112 tools are registered in total, exposed through 7 task-focused profiles
-(\`core\`, \`coding\`, \`debugging\`, \`review\`, \`architecture\`, \`maintenance\`, \`full\`).
+${claims.mcpTools} tools are registered in total, exposed through ${claims.mcpProfiles} task-focused
+profiles (\`core\`, \`coding\`, \`debugging\`, \`review\`, \`architecture\`, \`maintenance\`, \`full\`).
 
 ## Behaviour an agent must know
 
