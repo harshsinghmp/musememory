@@ -44,7 +44,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 
 ### 📖 Durable Muse Memory Context
 - 📖 [Context Map](./.agents/context/index.md) — Navigation index for durable truth. · 📦 [Product Scope](./.agents/context/product.md) — Live MCP tool matrix, 7 profiles, CLI surface, trust gates.
-- 🏗️ [Architecture & Storage](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, repo layout. · 📍 [Current State](./.agents/context/current.md) — v3.0.0 status, active invariants.
+- 🏗️ [Architecture & Storage](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, repo layout. · 📍 [Current State](./.agents/context/current.md) — v3.0.2 status, active invariants.
 - 🏛️ [Locked Decisions](./.agents/context/decisions.md) — ADRs (zero-daemon, dual persistence, MCP stdio). · 🗺️ [Roadmap](./.agents/context/roadmap.md) — Active roadmap and milestones.
 - 🤖 [Agent Reference](./docs/agent-reference.md) — Machine-facing contract: install, layout, session protocol, trust gates, failure semantics.
 - 🔌 [CLI & MCP Reference](./docs/cli-reference.md) — **Generated** from `src/`; never hand-edit. `mcp-tool-matrix.json` and `claims.json` likewise.
