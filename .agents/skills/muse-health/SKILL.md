@@ -38,6 +38,14 @@ metrics (the technical-debt scan, the documentation/code drift audit) always
 cover the whole workspace, because source code is shared between projects and
 cannot be attributed to one of them; `scope.code_scope` records this.
 
+**The same filter works on every audit surface.** `muse_tech_debt`,
+`muse_bug_clusters`, `memory_anchor_audit` and `memory_drift_audit` all take
+`project`, and so do the studio's `/api/health`, `/api/drift`,
+`/api/cognition/clusters` and `/api/cognition/debt` endpoints
+(`?project=my-app`). The Cognitive Studio's **Project Scope** control in the
+header drives all of them and keeps the value in the URL, so a scoped view is
+shareable and survives a reload.
+
 ### Step 2: Evaluate 5-Pillar Scorecard
 The engine evaluates 5 distinct hardening dimensions, outputting an overall letter grade (**A–F**) and a gate status (**PASS**, **WARN**, or **FAIL**):
 

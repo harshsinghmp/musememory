@@ -204,3 +204,10 @@ The health report states its own scope in `scope`: `filter` (the requested
 project, or `null` for the whole store), `projects` (every project whose
 memories were considered) and `entry_count`. Read it before comparing two
 numbers — an unscoped report covers every project in the store.
+
+The same `project` filter is available on every audit surface: the
+`muse_health`, `muse_tech_debt`, `muse_bug_clusters`, `memory_anchor_audit` and
+`memory_drift_audit` MCP tools, and the studio's `/api/health`, `/api/drift`,
+`/api/cognition/clusters` and `/api/cognition/debt` endpoints
+(`?project=P`). Code-side metrics stay workspace-wide by design — source code
+is shared between projects — so `scope.code_scope` always reads `workspace`.
