@@ -58,6 +58,25 @@ An agent integrating Muse must follow this order.
 constraints, ranked memories, negative lessons and code anchors, and is what
 task-shaped profiles (`coding`, `debugging`, `review`, `architecture`) expose.
 
+### The delivery contract
+
+**A commit is not a delivery.** Work is *landed* only when it is reachable from
+the integration branch **on the remote**. Until then it is *local* — and it
+must be described as local, in every artifact and every report.
+
+Before describing work as landed, shipped, merged or released, run the gate:
+
+```bash
+bun run check:landed
+```
+
+It exits non-zero when the work cannot be proven delivered, and prints the
+exact commands and SHAs to quote. The words *landed / shipped / merged /
+released / "verified on `dev`"* are only earned after it exits 0.
+
+The same contract applies to this repository's own agent standards — see
+[`.agents/standards/landing-gate.md`](../.agents/standards/landing-gate.md).
+
 ## 4. CLI
 
 ```

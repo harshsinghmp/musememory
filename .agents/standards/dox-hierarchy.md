@@ -36,7 +36,8 @@ Update the closest owning `AGENTS.md` when a change affects:
 3. Refresh every affected Child DOX Index.
 4. Remove stale or contradictory text immediately.
 5. Run existing verification when relevant.
-6. Report any docs intentionally left unchanged and why.
+6. **Run the Landing Gate** — `bun run check:landed`. The closeout may not write remote-state language (*landed*, *shipped*, *verified on `dev`*) before this passes. If it fails, the entry says **local** and the report says what is missing. See [The Landing Gate](./landing-gate.md).
+7. Report any docs intentionally left unchanged and why.
 
 ---
 
