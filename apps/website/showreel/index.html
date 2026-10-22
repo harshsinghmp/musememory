@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Muse Memory — showreel composition</title>
+<style>
+  /* ══════════════════════════════════════════════════════════════════════
+     THE MEMORY LATTICE — a 12-second cinematic showreel.
+
+     Deterministic by construction: every visual is a pure function of the
+     `t` query parameter (seconds). The renderer screenshots frame N with
+     ?t=<n/30>, so the same input always produces the same pixels.
+
+     Copy framework: AIDA, the same spine the landing page uses.
+       0.0–2.6s  ATTENTION   the agent forgets
+       2.6–5.4s  INTEREST    the note is checked against the code
+       5.4–8.6s  DESIRE      verified, versioned, local, fast
+       8.6–12.0s ACTION       the wordmark and the one command
+     ══════════════════════════════════════════════════════════════════════ */
+
+  @font-face {
+    font-family: "Inter";
+    src: url("../src/assets/fonts/inter-var.woff2") format("woff2-variations");
+    font-weight: 100 900;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Plex Mono";
+    src: url("../src/assets/fonts/plex-400.woff2") format("woff2");
+    font-weight: 400;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Plex Mono";
+    src: url("../src/assets/fonts/plex-600.woff2") format("woff2");
+    font-weight: 600;
+    font-display: block;
+  }
+
+  :root {
+    --bg: #07090f;
+    --ink: #e8ecf8;
+    --dim: #9aa5c3;
+    --faint: #8791ad;
+    --violet: #8b7cf7;
+    --cyan: #4fd6e0;
+    --green: #5fd39a;
+    --amber: #f5b455;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage { position: relative; width: 1280px; height: 720px; overflow: hidden; }
+
+  /* ── Layer 1: the deep field ─────────────────────────────────────────── */
+  #field { position: absolute; inset: 0; }
+  .dust { position: absolute; border-radius: 50%; }
+
+  /* Two large soft blooms that drift — the room light. */
+  .bloom {
+    position: absolute; border-radius: 50%; filter: blur(120px); mix-blend-mode: screen;
+  }
+
+  /* ── Layer 2: the lattice ────────────────────────────────────────────── */
+  #lattice { position: absolute; inset: 0; }
+  #lattice svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── Layer 3: typography ─────────────────────────────────────────────── */
+  #type { position: absolute; inset: 0; display: grid; place-items: center; }
+  .beat {
+    position: absolute; text-align: center; width: 100%;
+    padding: 0 90px;
+  }
+  .beat-kicker {
+    font-family: "Plex Mono", monospace; font-size: 15px; font-weight: 600;
+    letter-spacing: 0.34em; text-transform: uppercase; color: var(--cyan);
+    margin-bottom: 26px;
+  }
+  .beat-line {
+    font-size: 76px; font-weight: 800; letter-spacing: -0.045em; line-height: 1.02;
+    text-wrap: balance;
+  }
+  .beat-sub {
+    margin-top: 28px; font-size: 25px; font-weight: 400; color: var(--dim);
+    letter-spacing: -0.01em; line-height: 1.4;
+  }
+  .beat-line em { font-style: normal; color: var(--cyan); }
+
+  /* ── Layer 4: proof chips ────────────────────────────────────────────── */
+  #chips {
+    position: absolute; left: 0; right: 0; bottom: 64px;
+    display: flex; justify-content: center; gap: 18px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 11px 20px; border-radius: 999px;
+    border: 1px solid rgba(148, 163, 216, 0.22);
+    background: rgba(16, 22, 36, 0.72);
+    font-size: 18px; font-weight: 600; color: var(--ink);
+    white-space: nowrap;
+  }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+
+  /* ── Layer 5: the close ──────────────────────────────────────────────── */
+  #close { position: absolute; inset: 0; display: grid; place-items: center; }
+  .close-inner { text-align: center; }
+  .close-mark { margin: 0 auto 30px; }
+  .close-word {
+    font-size: 62px; font-weight: 800; letter-spacing: -0.04em;
+  }
+  .close-word span { color: var(--cyan); }
+  .close-cmd {
+    margin-top: 30px; display: inline-block;
+    padding: 15px 30px; border-radius: 14px;
+    border: 1px solid rgba(148, 163, 216, 0.3);
+    background: rgba(10, 14, 23, 0.9);
+    font-family: "Plex Mono", monospace; font-size: 26px; color: var(--ink);
+  }
+  .close-note {
+    margin-top: 22px; font-size: 18px; color: var(--faint);
+    letter-spacing: 0.16em; text-transform: uppercase; font-family: "Plex Mono", monospace;
+  }
+
+  /* ── Layer 6: film treatment ─────────────────────────────────────────── */
+  #vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, transparent 42%, rgba(0,0,0,0.72) 100%);
+  }
+  /* The grain plate must fill the frame: an <svg> without intrinsic size
+     defaults to 300x150 and leaves a visible seam. */
+  #grain {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; opacity: 0.05; mix-blend-mode: overlay;
+  }
+  /* A soft focus plate behind the type keeps it legible while the lattice
+     stays visible around it. */
+  #focus {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(58% 44% at 50% 50%, rgba(7,9,15,0.8) 0%, rgba(7,9,15,0.46) 55%, transparent 100%);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="field"></div>
+  <div id="lattice"><svg id="lattice-svg" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice"></svg></div>
+  <div id="focus"></div>
+  <div id="type"></div>
+  <div id="chips"></div>
+  <div id="close"></div>
+  <div id="vignette"></div>
+  <svg id="grain" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <filter id="gn"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" /></filter>
+    <rect width="100%" height="100%" filter="url(#gn)" />
+  </svg>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── Deterministic pseudo-randomness ──────────────────────────────────
+     A seeded LCG: the same frame always produces the same dust field, so
+     the render is reproducible byte-for-byte. */
+  function rng(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  const DUR = 12.0;
+  const params = new URLSearchParams(location.search);
+  const T = Math.max(0, Math.min(DUR, parseFloat(params.get("t") || "0")));
+
+  /* ── Easing ─────────────────────────────────────────────────────────── */
+  const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  const easeOut = (p) => 1 - Math.pow(1 - clamp01(p), 3);
+  const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  const easeIn = (p) => clamp01(p) * clamp01(p) * clamp01(p);
+  /** Normalised progress of a window [start, end] within the timeline. */
+  const win = (start, end) => clamp01((T - start) / (end - start));
+
+  /* ── Scene boundaries ───────────────────────────────────────────────── */
+  const S1 = [0.0, 2.6];
+  const S2 = [2.6, 5.4];
+  const S3 = [5.4, 8.6];
+  const S4 = [8.6, 12.0];
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 1 — the field
+     ══════════════════════════════════════════════════════════════════════ */
+  const field = document.getElementById("field");
+  {
+    // Two blooms that drift and change hue across the film.
+    const b1 = document.createElement("div");
+    b1.className = "bloom";
+    const b2 = document.createElement("div");
+    b2.className = "bloom";
+    field.appendChild(b1);
+    field.appendChild(b2);
+
+    const p = T / DUR;
+    const size = 620;
+    b1.style.width = size + "px";
+    b1.style.height = size + "px";
+    b1.style.background = "rgba(139,124,247,0.5)";
+    b1.style.left = 120 + 90 * p + "px";
+    b1.style.top = 60 + 50 * Math.sin(p * 3.1) + "px";
+    b1.style.opacity = String(0.16 + 0.16 * (1 - p));
+
+    b2.style.width = (size * 0.8) + "px";
+    b2.style.height = (size * 0.8) + "px";
+    b2.style.background = "rgba(79,214,224,0.42)";
+    b2.style.left = 760 - 120 * p + "px";
+    b2.style.top = 220 - 60 * Math.cos(p * 2.6) + "px";
+    b2.style.opacity = String(0.12 + 0.14 * (1 - p));
+
+    // A deterministic dust field. Depth is faked with size + opacity + blur.
+    const r = rng(20261022);
+    for (let i = 0; i < 90; i++) {
+      const d = document.createElement("div");
+      d.className = "dust";
+      const depth = r();
+      const size2 = 1.2 + depth * 3.4;
+      const x = r() * 1280;
+      const y = r() * 720;
+      const drift = (T * (8 + depth * 26)) % 1440;
+      d.style.width = size2 + "px";
+      d.style.height = size2 + "px";
+      d.style.left = ((x - drift + 1440) % 1440 - 80) + "px";
+      d.style.top = (y + Math.sin(T * 0.6 + i) * 8) + "px";
+      d.style.background = depth > 0.82 ? "rgba(79,214,224,0.9)" : "rgba(200,214,255,0.5)";
+      d.style.opacity = String((0.08 + depth * 0.4) * (0.6 + 0.4 * Math.sin(T * 1.4 + i * 0.7)));
+      d.style.filter = depth > 0.7 ? "blur(1.5px)" : "none";
+      field.appendChild(d);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 2 — the lattice
+
+     A constellation of memories surrounding a clear centre (so the type has
+     room), joined by threads. Depth is faked with size, opacity and blur.
+     The story it tells, in three movements:
+       scene 1  the core node shatters — the memory is unverified
+       scene 2  a single thread is drawn from the core to the code it
+                cites, and that thread turns green: the check passed
+       scene 3  the whole graph lights and branches — the memory is part of
+                a versioned, growing body of knowledge
+       scene 4  everything recedes behind the wordmark
+     ══════════════════════════════════════════════════════════════════════ */
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("lattice-svg");
+  const el = (n, attrs) => {
+    const e = document.createElementNS(NS, n);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+
+  // [x, y, depth] — depth 0 = far (small, dim, blurred), 1 = near.
+  // The constellation deliberately leaves the middle band clear.
+  const NODES = [
+    [640, 104, 1.00],  // 0  core — the note itself
+    [640, 610, 1.00],  // 1  target — the code it cites
+    [268, 172, 0.72], [430, 96, 0.52], [852, 104, 0.60], [1012, 176, 0.74],
+    [196, 336, 0.44], [1084, 330, 0.46], [150, 470, 0.28], [1128, 468, 0.30],
+    [320, 596, 0.50], [420, 668, 0.30], [880, 662, 0.34], [972, 588, 0.52],
+    [126, 236, 0.22], [1156, 232, 0.24], [556, 46, 0.34], [736, 44, 0.32],
+    [36, 400, 0.16], [1244, 400, 0.18], [500, 690, 0.20], [790, 688, 0.22],
+  ];
+
+  // Threads: the focus thread (core -> code) plus a peer web.
+  const EDGES = [
+    [0, 1, true],   // the focus thread — the verification
+    [0, 2], [0, 3], [0, 4], [0, 5], [0, 13], [0, 15], [0, 17], [0, 19],
+    [1, 11], [1, 12], [1, 13], [1, 14], [1, 18], [1, 20],
+    [2, 3], [2, 6], [2, 15], [3, 16], [4, 5], [4, 7], [4, 17],
+    [6, 8], [7, 9], [8, 18], [9, 10], [10, 11], [12, 20], [13, 16], [14, 19],
+  ];
+
+  const gThreads = el("g", {});
+  const gNodes = el("g", {});
+  svg.appendChild(gThreads);
+  svg.appendChild(gNodes);
+
+  // Scene 1: the core shatters. Scene 2: the focus thread draws and
+  // verifies. Scene 3: the graph blooms. Scene 4: it recedes.
+  const shatter = win(S1[0] + 0.9, S1[1]);
+  const form = win(S2[0] + 0.2, S2[0] + 1.3);
+  const verify = win(S2[0] + 1.3, S2[1]);
+  const bloom = win(S3[0], S3[0] + 1.5);
+  const recede = win(S4[0], S4[0] + 1.4);
+
+  const defs = el("defs", {});
+  defs.innerHTML =
+    '<linearGradient id="threadGrad" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#8b7cf7" stop-opacity="0.9"/>' +
+    '<stop offset="1" stop-color="#4fd6e0" stop-opacity="0.9"/></linearGradient>' +
+    '<radialGradient id="coreGlow"><stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>' +
+    '<stop offset="0.35" stop-color="#8b7cf7" stop-opacity="0.45"/>' +
+    '<stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/></radialGradient>';
+  svg.insertBefore(defs, svg.firstChild);
+
+  const threads = [];
+  for (let i = 0; i < EDGES.length; i++) {
+    const [a, b, focus] = EDGES[i];
+    const line = el("line", {
+      x1: NODES[a][0], y1: NODES[a][1], x2: NODES[b][0], y2: NODES[b][1],
+      stroke: focus ? "#4fd6e0" : "url(#threadGrad)",
+      "stroke-width": focus ? 2 : 1.2,
+      "stroke-linecap": "round",
+    });
+    gThreads.appendChild(line);
+    threads.push({ el: line, a, b, i, focus: !!focus });
+  }
+
+  const nodeEls = NODES.map((n) => {
+    const g = el("g", {});
+    const [x, y, depth] = n;
+    if (depth > 0.85) {
+      g.appendChild(el("circle", { cx: x, cy: y, r: 52 * depth, fill: "url(#coreGlow)" }));
+    }
+    g.appendChild(el("circle", {
+      cx: x, cy: y,
+      r: (2.2 + depth * 3.4).toFixed(2),
+      fill: depth > 0.85 ? "#e8ecf8" : depth > 0.55 ? "#4fd6e0" : "#8b7cf7",
+    }));
+    gNodes.appendChild(g);
+    return g;
+  });
+
+  // The code the note cites: a small document glyph at the bottom centre.
+  const target = el("g", {});
+  target.innerHTML =
+    '<rect x="618" y="588" width="44" height="50" rx="8" fill="none" ' +
+    'stroke="#4fd6e0" stroke-width="2.6"/>' +
+    '<path d="M631 606 h18 M631 617 h13" stroke="#4fd6e0" stroke-width="2.6" stroke-linecap="round"/>';
+  gNodes.appendChild(target);
+
+  // A verification ring that snaps around the target when the check passes.
+  const ring = el("circle", {
+    cx: 640, cy: 613, r: 30, fill: "none",
+    stroke: "#5fd39a", "stroke-width": 2,
+  });
+  gNodes.appendChild(ring);
+
+  for (const th of threads) {
+    const [ax, ay] = NODES[th.a];
+    const [bx, by] = NODES[th.b];
+    const depth = (NODES[th.a][2] + NODES[th.b][2]) / 2;
+
+    let grown;
+    if (th.focus) {
+      // The focus thread draws from the core down to the code.
+      grown = easeOut(form);
+    } else {
+      // Peer threads appear in sequence as the graph blooms.
+      grown = easeOut(clamp01(bloom * 1.9 - th.i * 0.045));
+    }
+    const mx = ax + (bx - ax) * grown;
+    const my = ay + (by - ay) * grown;
+    th.el.setAttribute("x2", mx.toFixed(1));
+    th.el.setAttribute("y2", my.toFixed(1));
+
+    const broken = 1 - shatter * 0.85;
+    const base = 0.1 + depth * 0.55;
+    const focusBoost = th.focus ? verify : 0;
+    const opacity = th.focus
+      ? (0.25 + 0.75 * form) * broken * (1 - bloom * 0.55) * (1 - recede * 0.9)
+      : base * bloom * broken * (1 - recede * 0.85);
+
+    th.el.setAttribute("opacity", Math.max(0, opacity).toFixed(3));
+    th.el.setAttribute("stroke-width", (th.focus ? 1.6 + focusBoost * 2.6 : 0.8 + depth * 1.1).toFixed(2));
+    th.el.setAttribute("stroke", th.focus ? (verify > 0.05 ? "#5fd39a" : "#4fd6e0") : "url(#threadGrad)");
+  }
+
+  for (let i = 0; i < nodeEls.length; i++) {
+    const n = NODES[i];
+    const [nx, ny, depth] = n;
+    const isCore = i === 0;
+    const isTarget = i === 1;
+    const g = nodeEls[i];
+
+    let x = nx, y = ny, scale = 1, opacity = 1, blur = 0;
+
+    if (isCore) {
+      // The core pulses, then shatters outward in scene 1, then reforms.
+      const pulse = 1 + Math.sin(T * 3.2) * 0.1;
+      const scatter = shatter * 52;
+      const ang = 0.6 + i * 1.7;
+      x += Math.cos(ang) * scatter;
+      y += Math.sin(ang) * scatter;
+      scale = pulse * (1 - shatter * 0.5) * (1 + verify * 0.22) * (1 - recede * 0.45);
+      opacity = (0.6 + 0.4 * (1 - shatter * 0.6)) * (1 - recede * 0.85);
+      blur = shatter * 3;
+    } else if (isTarget) {
+      // The target resolves in scene 2 and is verified in green.
+      const appear = easeOut(form);
+      scale = appear * (0.72 + 0.28 * verify);
+      opacity = appear * (1 - recede * 0.9);
+    } else {
+      const appear = easeOut(clamp01(bloom * 1.9 - i * 0.04));
+      scale = appear * (1 - recede * 0.5);
+      opacity = (0.15 + 0.75 * depth) * appear * (1 - recede * 0.88);
+      blur = (1 - depth) * 2.6;
+    }
+    g.setAttribute("transform", "translate(" + x.toFixed(1) + " " + y.toFixed(1) + ") scale(" + scale.toFixed(3) + ")");
+    g.setAttribute("opacity", Math.max(0, opacity).toFixed(3));
+    g.setAttribute("filter", blur > 0.3 ? "blur(" + blur.toFixed(1) + "px)" : "");
+  }
+
+  // The target glyph and its verification ring.
+  {
+    const appear = easeOut(form);
+    target.setAttribute("opacity", (appear * (0.3 + 0.7 * verify) * (1 - bloom * 0.88) * (1 - recede * 0.95)).toFixed(3));
+    target.setAttribute("stroke", verify > 0.05 ? "#5fd39a" : "#4fd6e0");
+    // The ring snaps outward once, at the moment the check passes.
+    const ringP = clamp01((verify - 0.15) / 0.6);
+    ring.setAttribute("r", (26 + ringP * 46).toFixed(1));
+    ring.setAttribute("opacity", (ringP > 0 && ringP < 1 ? (1 - ringP) * 0.9 : 0).toFixed(3));
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 3 — typography
+     ══════════════════════════════════════════════════════════════════════ */
+  const typeLayer = document.getElementById("type");
+  const beats = [
+    {
+      from: S1[0] + 0.15, to: S1[1] - 0.15, out: S1[1],
+      kicker: "The problem",
+      html: 'Your agent forgets.<br><em>Every session starts from zero.</em>',
+      sub: "The context window is a scratch pad, not a notebook.",
+    },
+    {
+      from: S2[0] + 0.25, to: S2[1] - 0.15, out: S2[1],
+      kicker: "The mechanism",
+      html: 'Every note is checked<br>against the <em>code it cites.</em>',
+      sub: "A citation that cannot be resolved never reaches the store.",
+    },
+    {
+      from: S3[0] + 0.3, to: S3[1] - 0.15, out: S3[1],
+      kicker: "The result",
+      html: 'Verified. Versioned.<br><em>Yours, and local.</em>',
+      sub: "Branch-scoped, git-blamable, and priced at nothing.",
+    },
+  ];
+
+  for (const b of beats) {
+    const d = document.createElement("div");
+    d.className = "beat";
+    d.innerHTML =
+      '<p class="beat-kicker">' + b.kicker + "</p>" +
+      '<p class="beat-line">' + b.html + "</p>" +
+      '<p class="beat-sub">' + b.sub + "</p>";
+    typeLayer.appendChild(d);
+
+    const inP = easeOut(win(b.from, b.from + 0.65));
+    const outP = easeIn(win(b.out - 0.45, b.out));
+    const o = inP * (1 - outP);
+    const rise = (1 - inP) * 34 + outP * -22;
+    const scale = 0.985 + 0.015 * inP;
+    d.style.opacity = o.toFixed(3);
+    d.style.transform = "translateY(" + rise.toFixed(2) + "px) scale(" + scale.toFixed(4) + ")";
+    d.style.visibility = o < 0.004 ? "hidden" : "visible";
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 4 — proof chips (scene 3)
+     ══════════════════════════════════════════════════════════════════════ */
+  const chipLayer = document.getElementById("chips");
+  const CHIPS = [
+    ["sub-2ms recall", "#4fd6e0"],
+    ["zero daemons", "#8b7cf7"],
+    ["no account", "#f5b455"],
+    ["no telemetry", "#5fd39a"],
+  ];
+  for (let i = 0; i < CHIPS.length; i++) {
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.innerHTML = '<i style="background:' + CHIPS[i][1] + '"></i>' + CHIPS[i][0];
+    chipLayer.appendChild(c);
+    const p = easeOut(clamp01((bloom * 1.4) - i * 0.09));
+    c.style.opacity = p.toFixed(3);
+    c.style.transform = "translateY(" + ((1 - p) * 20).toFixed(2) + "px)";
+  }
+  chipLayer.style.opacity = String((1 - recede).toFixed(3));
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 5 — the close (scene 4)
+     ══════════════════════════════════════════════════════════════════════ */
+  const closeLayer = document.getElementById("close");
+  {
+    const div = document.createElement("div");
+    div.className = "close-inner";
+    div.innerHTML =
+      '<svg class="close-mark" width="104" height="104" viewBox="0 0 64 64" aria-hidden="true">' +
+      '<defs><linearGradient id="cm" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="#8b7cf7"/><stop offset="1" stop-color="#4fd6e0"/>' +
+      "</linearGradient></defs>" +
+      '<polyline points="8,52 20,17 32,39 44,17 56,52" fill="none" stroke="url(#cm)" ' +
+      'stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="8" cy="52" r="6" fill="#8b7cf7"/><circle cx="20" cy="17" r="6" fill="#4fd6e0"/>' +
+      '<circle cx="44" cy="17" r="6" fill="#4fd6e0"/><circle cx="56" cy="52" r="6" fill="#8b7cf7"/>' +
+      '<circle cx="32" cy="39" r="7.5" fill="#e8ecf8"/></svg>' +
+      '<p class="close-word">Muse<span>Memory</span></p>' +
+      '<p class="close-cmd">npx musememory connect</p>' +
+      '<p class="close-note">one command &middot; no account &middot; runs on your machine</p>';
+    closeLayer.appendChild(div);
+
+    const p = easeOut(win(S4[0] + 0.15, S4[0] + 1.15));
+    const outP = easeIn(win(DUR - 0.5, DUR - 0.05));
+    const o = p * (1 - outP);
+    div.style.opacity = o.toFixed(3);
+    div.style.transform = "translateY(" + ((1 - p) * 26 - outP * 12).toFixed(2) + "px) scale(" +
+      (0.97 + 0.03 * p).toFixed(4) + ")";
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LAYER 6 — cinematic camera
+     A very slow push-in across the whole film, plus a settle at the end.
+     ══════════════════════════════════════════════════════════════════════ */
+  {
+    const p = T / DUR;
+    const push = 1.02 + 0.05 * easeInOut(p);
+    const stage = document.getElementById("stage");
+    stage.style.transform = "scale(" + push.toFixed(4) + ")";
+    stage.style.transformOrigin = "50% 50%";
+  }
+
+  // Mark the frame as ready so the capture loop can wait for it.
+  document.documentElement.setAttribute("data-frame-ready", "1");
+})();
+</script>
+</body>
+</html>

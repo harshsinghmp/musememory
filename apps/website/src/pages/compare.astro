@@ -15,7 +15,7 @@ const rows = [
   { cap: "Deterministic lifecycle state machine", muse: "yes", vec: "no", graph: "yes", session: "no" },
   { cap: "Structural code anchors (line-invariant)", muse: "yes", vec: "no", graph: "no", session: "no" },
   { cap: "Secret defense on every write path", muse: "yes", vec: "no", graph: "no", session: "partial" },
-  { cap: `One command wires ${claims.agentPlatforms} coding agents`, muse: "yes", vec: "partial", graph: "partial", session: "partial" },
+  { cap: "One command wires the majority of coding agents", muse: "yes", vec: "partial", graph: "partial", session: "partial" },
   { cap: "Git-reviewable memory files", muse: "yes", vec: "no", graph: "no", session: "no" },
   { cap: "Lifecycle hooks (hands-free capture/inject)", muse: "yes", vec: "partial", graph: "partial", session: "yes" },
   { cap: "Token-budgeted fused context tool", muse: "yes", vec: "partial", graph: "no", session: "no" },
@@ -119,27 +119,27 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
   <Footer />
 
   <style>
-    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-panel); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel); }
     .compare { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 760px; }
-    .compare th, .compare td { padding: 0.85rem 1.1rem; text-align: left; border-bottom: 1px solid var(--line); }
-    .compare thead th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); background: rgba(139,124,247,0.05); }
-    .th-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 0.74rem; }
+    .compare th, .compare td { padding: 0.85rem 1.1rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+    .compare thead th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); background: rgba(139,124,247,0.05); }
+    .th-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-tertiary); font-size: 0.74rem; }
     .compare tbody tr:last-child td { border-bottom: none; }
     .compare tbody tr:hover td { background: rgba(139,124,247,0.04); }
     .compare td:not(:first-child) { text-align: center; font-size: 1rem; }
     .musecol { font-weight: 700; }
-    .yes { color: var(--green); font-weight: 600; }
-    .part { color: var(--amber); font-weight: 600; }
-    .no { color: var(--text-faint); }
-    .legend { margin-top: 1rem; font-size: 0.85rem; color: var(--text-dim); display: flex; gap: 1.2rem; flex-wrap: wrap; }
-    .table-note { margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-faint); max-width: 70ch; }
+    .yes { color: var(--accent-success); font-weight: 600; }
+    .part { color: var(--accent-warning); font-weight: 600; }
+    .no { color: var(--text-tertiary); }
+    .legend { margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); display: flex; gap: 1.2rem; flex-wrap: wrap; }
+    .table-note { margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-tertiary); max-width: 70ch; }
     .cta-final {
       padding: clamp(3rem, 8vw, 5.5rem) 0;
       text-align: center;
-      background: radial-gradient(40rem 20rem at 50% 120%, rgba(139,124,247,0.18), transparent 65%), var(--bg-raised);
-      border-top: 1px solid var(--line);
+      background: radial-gradient(40rem 20rem at 50% 120%, rgba(139,124,247,0.18), transparent 65%), var(--surface-raised);
+      border-top: 1px solid var(--border-subtle);
     }
-    .cta-inner h2 { font-size: var(--fs-h2); margin-bottom: 1.5rem; }
+    .cta-inner h2 { font-size: var(--text-2xl); margin-bottom: 1.5rem; }
     .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
     .btn-lg { padding: 1em 2em; font-size: 1rem; }
   </style>
