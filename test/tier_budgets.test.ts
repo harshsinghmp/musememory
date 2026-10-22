@@ -134,5 +134,26 @@ describe("T-125: Tier budgets as named constants with provenance", () => {
       expect(res.markdown).toContain("### Memory Manifest (Tier 0)");
       expect(res.totalTokensUsed).toBeLessThanOrEqual(TIER_0_MAX_BUDGET);
     });
+
+    it("actually enforces the tier budget when the result set is large", () => {
+      // The budget standard was declared but never applied: a single entry
+      // never exceeded it, so the enforcement gap was invisible. Twenty
+      // entries with long titles do exceed it.
+      for (let i = 0; i < 20; i++) {
+        propose(store, {
+          title: `Redis Caching Invariant Number ${i} With A Long Descriptive Title`,
+          content: `Cache TTL must be under 3600 seconds. Variant ${i}.`,
+          project: "test-proj",
+          type: "decision",
+        });
+      }
+
+      const tier0 = queryTieredContext(store, tmpDir, "Redis Caching Invariant", { tier: 0 });
+      expect(tier0.totalTokensUsed).toBeLessThanOrEqual(TIER_0_MAX_BUDGET);
+      expect(tier0.markdown).toContain("### Memory Manifest (Tier 0)");
+
+      const tier1 = queryTieredContext(store, tmpDir, "Redis Caching Invariant", { tier: 1 });
+      expect(tier1.totalTokensUsed).toBeLessThanOrEqual(TIER_1_MAX_BUDGET);
+    });
   });
 });

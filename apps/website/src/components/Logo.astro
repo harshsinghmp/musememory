@@ -1,0 +1,100 @@
+---
+/**
+ * The Muse Memory mark, inlined as SVG so it inherits currentColor and the
+ * brand gradient. Used by the nav, the footer and the 404 page so the logo
+ * exists in exactly one place (it was previously copy-pasted per page and
+ * had already drifted).
+ *
+ * The mark is a capital M drawn as one continuous path with the middle
+ * vertex pulled below the baseline into a glowing core node: two recall
+ * anchors, one memory held between them.
+ */
+interface Props {
+  size?: number;
+  /** Render the "Memory" half of the wordmark in the accent colour. */
+  withWordmark?: boolean;
+  title?: string;
+}
+const { size = 22, withWordmark = false, title } = Astro.props;
+const gradId = `mm-grad-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+{
+  withWordmark ? (
+    <span class="brand">
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 64 64"
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : "true"}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#8b7cf7"></stop>
+            <stop offset="1" stop-color="#4fd6e0"></stop>
+          </linearGradient>
+        </defs>
+        <polyline
+          points="8,52 20,17 32,39 44,17 56,52"
+          fill="none"
+          stroke={`url(#${gradId})`}
+          stroke-width="7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <circle cx="8" cy="52" r="6" fill="#8b7cf7"></circle>
+        <circle cx="20" cy="17" r="6" fill="#4fd6e0"></circle>
+        <circle cx="44" cy="17" r="6" fill="#4fd6e0"></circle>
+        <circle cx="56" cy="52" r="6" fill="#8b7cf7"></circle>
+        <circle cx="32" cy="39" r="7.5" fill="#e8ecf8"></circle>
+      </svg>
+      <span class="brand-word">Muse<span>Memory</span></span>
+    </span>
+  ) : (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      role={title ? "img" : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : "true"}
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8b7cf7"></stop>
+          <stop offset="1" stop-color="#4fd6e0"></stop>
+        </linearGradient>
+      </defs>
+      <polyline
+        points="8,52 20,17 32,39 44,17 56,52"
+        fill="none"
+        stroke={`url(#${gradId})`}
+        stroke-width="7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle cx="8" cy="52" r="6" fill="#8b7cf7"></circle>
+      <circle cx="20" cy="17" r="6" fill="#4fd6e0"></circle>
+      <circle cx="44" cy="17" r="6" fill="#4fd6e0"></circle>
+      <circle cx="56" cy="52" r="6" fill="#8b7cf7"></circle>
+      <circle cx="32" cy="39" r="7.5" fill="#e8ecf8"></circle>
+    </svg>
+  )
+}
+
+<style>
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: -0.015em;
+    color: var(--text);
+  }
+  .brand-word span {
+    color: var(--cyan);
+  }
+</style>

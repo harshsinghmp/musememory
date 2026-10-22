@@ -1,373 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+
   <defs>
-    <!-- Background Palette: Ultra Dark Forest Obsidian -->
-    <linearGradient id="ultraDarkBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#020904" />
-      <stop offset="40%" stop-color="#041208" />
-      <stop offset="80%" stop-color="#030d06" />
-      <stop offset="100%" stop-color="#010603" />
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
     </linearGradient>
-
-    <!-- Bamboo Green to Ultra Light Mint Gradients -->
-    <linearGradient id="bambooTitleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="30%" stop-color="#dcfce7" />
-      <stop offset="70%" stop-color="#4ade80" />
-      <stop offset="100%" stop-color="#22c55e" />
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
     </linearGradient>
-
-    <linearGradient id="bambooGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4ade80" stop-opacity="1" />
-      <stop offset="100%" stop-color="#16a34a" stop-opacity="0.8" />
-    </linearGradient>
-
-    <linearGradient id="mintGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f0fdf4" />
-      <stop offset="100%" stop-color="#86efac" />
-    </linearGradient>
-
-    <!-- Glassmorphism Card Shading & Borders -->
-    <linearGradient id="glassCardBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0b2413" stop-opacity="0.75" />
-      <stop offset="50%" stop-color="#06190d" stop-opacity="0.65" />
-      <stop offset="100%" stop-color="#041208" stop-opacity="0.85" />
-    </linearGradient>
-
-    <linearGradient id="heroGlassCardBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0e2f19" stop-opacity="0.8" />
-      <stop offset="60%" stop-color="#071e10" stop-opacity="0.7" />
-      <stop offset="100%" stop-color="#04140a" stop-opacity="0.9" />
-    </linearGradient>
-
-    <linearGradient id="glassBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#86efac" stop-opacity="0.5" />
-      <stop offset="40%" stop-color="#22c55e" stop-opacity="0.25" />
-      <stop offset="80%" stop-color="#15803d" stop-opacity="0.1" />
-      <stop offset="100%" stop-color="#4ade80" stop-opacity="0.3" />
-    </linearGradient>
-
-    <linearGradient id="rebusBadgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#14532d" stop-opacity="0.7" />
-      <stop offset="100%" stop-color="#052e16" stop-opacity="0.9" />
-    </linearGradient>
-
-    <!-- Glow & Bloom Filters -->
-    <filter id="bloom-bamboo" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="8" result="blur1" />
-      <feGaussianBlur stdDeviation="16" result="blur2" />
-      <feMerge>
-        <feMergeNode in="blur2" />
-        <feMergeNode in="blur1" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-
-    <filter id="soft-glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
-
-    <!-- Ambient Lighting Nodes -->
-    <radialGradient id="ambientBambooHero" cx="20%" cy="30%" r="55%">
-      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.18" />
-      <stop offset="60%" stop-color="#16a34a" stop-opacity="0.04" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
     </radialGradient>
-
-    <radialGradient id="ambientMintRight" cx="85%" cy="35%" r="50%">
-      <stop offset="0%" stop-color="#86efac" stop-opacity="0.15" />
-      <stop offset="50%" stop-color="#15803d" stop-opacity="0.03" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    <radialGradient id="meshA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
     </radialGradient>
-
-    <!-- Bento Grid Dot Texture -->
-    <pattern id="bentoMesh" width="28" height="28" patternUnits="userSpaceOnUse">
-      <circle cx="14" cy="14" r="0.9" fill="#22c55e" fill-opacity="0.22" />
-    </pattern>
+    <radialGradient id="meshB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4fd6e0" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#4fd6e0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7db1" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#ff7db1" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-
-  <!-- Canvas Container with Outer Border -->
-  <rect x="0" y="0" width="1200" height="500" rx="16" fill="url(#ultraDarkBg)" />
-  <rect x="0" y="0" width="1200" height="500" rx="16" fill="url(#bentoMesh)" />
-
-  <!-- Ambient Bamboo Lighting -->
-  <rect x="0" y="0" width="800" height="350" fill="url(#ambientBambooHero)" rx="16" />
-  <rect x="600" y="0" width="600" height="400" fill="url(#ambientMintRight)" rx="16" />
-
-  <!-- Outer Glass Frame -->
-  <rect x="1.5" y="1.5" width="1197" height="497" rx="15" fill="none" stroke="url(#glassBorder)" stroke-width="1.5" />
-
-  <!-- ========================================================================= -->
-  <!--                             BENTO GRID LAYOUT                             -->
-  <!-- ========================================================================= -->
-
-  <!-- CARD 1: HERO BENTO (Col 1-2 Span, Top Left) -->
-  <g transform="translate(32, 32)">
-    <!-- Glassmorphic Card Surface -->
-    <rect width="670" height="270" rx="16" fill="url(#heroGlassCardBg)" />
-    <rect width="670" height="270" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Top Rebus Equation Pill -->
-    <g transform="translate(28, 26)">
-      <rect width="370" height="30" rx="15" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      
-      <!-- Rebus Visual Equation: 🧠 + ⚡ + 🔒 = ∞ -->
-      <!-- Brain Icon -->
-      <g transform="translate(14, 6)">
-        <path d="M 6 2 C 3 2 1 4 1 7 C 1 9 2 10.5 3.5 11.2 C 2.5 12.2 2 13.5 2 15 C 2 17.5 4 19 6.5 19 C 7.5 19 8.5 18.5 9 18 C 9.5 18.5 10.5 19 11.5 19 C 14 19 16 17.5 16 15 C 16 13.5 15.5 12.2 14.5 11.2 C 16 10.5 17 9 17 7 C 17 4 15 2 12 2 C 11 2 10 2.5 9 3.2 C 8 2.5 7 2 6 2 Z" fill="none" stroke="#dcfce7" stroke-width="1.4" />
-      </g>
-      <text x="37" y="20" fill="#86efac" font-family="'JetBrains Mono', monospace, sans-serif" font-size="12" font-weight="700">+</text>
-      
-      <!-- Lightning Icon -->
-      <path d="M 57 8 L 50 17 L 55 17 L 53 23 L 61 14 L 56 14 Z" fill="#4ade80" filter="url(#soft-glow)" />
-      <text x="69" y="20" fill="#86efac" font-family="'JetBrains Mono', monospace, sans-serif" font-size="12" font-weight="700">+</text>
-      
-      <!-- Shield / Lock Icon -->
-      <g transform="translate(85, 7)" stroke="#22c55e" stroke-width="1.4" fill="none">
-        <path d="M 5 1 L 10 3.5 v 3.5 c 0 3.5 -2.5 5.5 -5 6.5 c -2.5 -1 -5 -3 -5 -6.5 v -3.5 Z" />
-      </g>
-      <text x="104" y="20" fill="#86efac" font-family="'JetBrains Mono', monospace, sans-serif" font-size="12" font-weight="700">=</text>
-
-      <!-- Rebus Result Text -->
-      <text x="122" y="20" fill="#f0fdf4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="11.5" font-weight="700" letter-spacing="0.8">ZERO AGENT AMNESIA</text>
-    </g>
-
-    <!-- Main Title & Logo Icon -->
-    <g transform="translate(28, 102)">
-      <!-- Stylized Bamboo Leaf / Synapse Emblem -->
-      <g transform="translate(0, -28)">
-        <ellipse cx="14" cy="14" rx="14" ry="14" fill="#052e16" stroke="#22c55e" stroke-width="1.2" />
-        <path d="M 8 20 C 8 10 14 6 20 6 C 20 16 14 20 8 20 Z" fill="#4ade80" filter="url(#soft-glow)" />
-        <path d="M 11 17 C 14 11 18 9 18 9" stroke="#052e16" stroke-width="1.2" stroke-linecap="round" fill="none" />
-      </g>
-
-      <text x="40" y="0" fill="url(#bambooTitleGrad)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="46" font-weight="900" letter-spacing="-1.2">
-        MUSE MEMORY
-      </text>
-    </g>
-
-    <!-- Hero Tagline & Description -->
-    <g transform="translate(28, 142)">
-      <text x="0" y="0" fill="#f0fdf4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.1">
-        Autonomous Cognitive Memory Engine for AI Agents
-      </text>
-      <text x="0" y="25" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="13.5" font-weight="400" letter-spacing="0.1">
-        Give your AI coding assistants long-term memory that compounds over time.
-      </text>
-      <text x="0" y="46" fill="#6ee7b7" fill-opacity="0.85" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif" font-size="13.5" font-weight="400" letter-spacing="0.1">
-        Remembers project conventions, architecture choices, and bug workarounds.
-      </text>
-    </g>
-
-    <!-- Hero Quick Trust Strip -->
-    <g transform="translate(28, 226)">
-      <!-- Local First Tag -->
-      <rect width="126" height="26" rx="6" fill="#062110" stroke="#22c55e" stroke-opacity="0.4" stroke-width="1" />
-      <circle cx="12" cy="13" r="3.5" fill="#4ade80" filter="url(#soft-glow)" />
-      <text x="23" y="17" fill="#dcfce7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="11" font-weight="600">Local-First Vault</text>
-
-      <!-- Zero Daemon Tag -->
-      <g transform="translate(136, 0)">
-        <rect width="124" height="26" rx="6" fill="#062110" stroke="#22c55e" stroke-opacity="0.4" stroke-width="1" />
-        <circle cx="12" cy="13" r="3.5" fill="#4ade80" filter="url(#soft-glow)" />
-        <text x="23" y="17" fill="#dcfce7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="11" font-weight="600">Zero-Daemon</text>
-      </g>
-
-      <!-- Token Efficient Tag -->
-      <g transform="translate(270, 0)">
-        <rect width="136" height="26" rx="6" fill="#062110" stroke="#22c55e" stroke-opacity="0.4" stroke-width="1" />
-        <circle cx="12" cy="13" r="3.5" fill="#4ade80" filter="url(#soft-glow)" />
-        <text x="23" y="17" fill="#dcfce7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="11" font-weight="600">Token Efficient</text>
-      </g>
-    </g>
+  <rect width="1280" height="640" fill="#07090f"/>
+  <g>
+    <ellipse cx="204.8" cy="76.8" rx="588.8000000000001" ry="332.8" fill="url(#meshA)"/>
+    <ellipse cx="1126.4" cy="51.2" rx="512" ry="294.40000000000003" fill="url(#meshB)"/>
+    <ellipse cx="793.6" cy="627.2" rx="537.6" ry="281.6" fill="url(#meshC)"/>
   </g>
-
-  <!-- CARD 2: DYNAMIC CONTEXT GROUNDING (Top Right 1) -->
-  <g transform="translate(722, 32)">
-    <rect width="446" height="125" rx="16" fill="url(#glassCardBg)" />
-    <rect width="446" height="125" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Rebus Visual Header: 🎯 + ⚡ -->
-    <g transform="translate(24, 20)">
-      <rect width="66" height="26" rx="13" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      <g transform="translate(10, 5)" stroke="#4ade80" stroke-width="1.4" fill="none">
-        <circle cx="8" cy="8" r="7" />
-        <circle cx="8" cy="8" r="3" />
-        <line x1="8" y1="0" x2="8" y2="3" />
-        <line x1="8" y1="13" x2="8" y2="16" />
-        <line x1="0" y1="8" x2="3" y2="8" />
-        <line x1="13" y1="8" x2="16" y2="8" />
-      </g>
-      <path d="M 45 6 L 39 15 L 43 15 L 41 21 L 49 12 L 45 12 Z" fill="#dcfce7" />
-    </g>
-
-    <text x="102" y="38" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="16" font-weight="700">
-      Smart Context Grounding
-    </text>
-    
-    <text x="24" y="70" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12.5" font-weight="400">
-      Packs only the most relevant memories into your agent's
-    </text>
-    <text x="24" y="88" fill="#6ee7b7" fill-opacity="0.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12.5" font-weight="400">
-      active prompt window. Zero context bloat or token waste.
-    </text>
+  <rect x="0" y="0" width="1280" height="640" fill="url(#meshA)" opacity="0.10"/>
+  <text x="96" y="268.8" font-family="Inter" font-size="56.9"
+    font-weight="800" letter-spacing="-2" fill="#e8ecf8">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="96" y="309.4" font-family="Inter"
+    font-size="23.4" font-weight="500" fill="#9aa5c3">Persistent memory for AI coding agents that verifies itself</text>
+  <g>
+    <rect x="157.2" y="396.5" width="187.9" height="51.8"
+      rx="25.9" fill="#101624" fill-opacity="0.85" stroke="#4fd6e0" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="177.1" cy="422.4" r="4.1" fill="#4fd6e0"/>
+    <text x="186.6" y="428.6"
+      font-family="Inter" font-size="17.26984126984127" font-weight="500" fill="#e8ecf8">sub-2ms recall</text>
   </g>
-
-  <!-- CARD 3: LIVING ARCHITECTURAL DECISIONS (Top Right 2) -->
-  <g transform="translate(722, 177)">
-    <rect width="446" height="125" rx="16" fill="url(#glassCardBg)" />
-    <rect width="446" height="125" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Rebus Visual Header: 🏛️ + 📜 -->
-    <g transform="translate(24, 20)">
-      <rect width="66" height="26" rx="13" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      <!-- Pillar Glyph -->
-      <g transform="translate(10, 5)" stroke="#4ade80" stroke-width="1.3" fill="none">
-        <line x1="2" y1="14" x2="14" y2="14" />
-        <line x1="3" y1="2" x2="13" y2="2" />
-        <line x1="5" y1="2" x2="5" y2="14" />
-        <line x1="8" y1="2" x2="8" y2="14" />
-        <line x1="11" y1="2" x2="11" y2="14" />
-      </g>
-      <!-- Scroll Glyph -->
-      <g transform="translate(38, 5)" stroke="#dcfce7" stroke-width="1.3" fill="none">
-        <rect x="2" y="2" width="12" height="12" rx="2" />
-        <line x1="5" y1="6" x2="11" y2="6" />
-        <line x1="5" y1="9" x2="9" y2="9" />
-      </g>
-    </g>
-
-    <text x="102" y="38" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="16" font-weight="700">
-      Living Architectural Decisions (ADR)
-    </text>
-    
-    <text x="24" y="70" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12.5" font-weight="400">
-      Preserves the "why" behind code structure and trade-offs.
-    </text>
-    <text x="24" y="88" fill="#6ee7b7" fill-opacity="0.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12.5" font-weight="400">
-      Prevents future agent sessions from breaking hard-won rules.
-    </text>
+  <g>
+    <rect x="359.3" y="396.5" width="252.1" height="51.8"
+      rx="25.9" fill="#101624" fill-opacity="0.85" stroke="#8b7cf7" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="379.2" cy="422.4" r="4.1" fill="#8b7cf7"/>
+    <text x="388.7" y="428.6"
+      font-family="Inter" font-size="17.26984126984127" font-weight="500" fill="#e8ecf8">0 background daemons</text>
   </g>
-
-  <!-- ========================================================================= -->
-  <!--                             BOTTOM BENTO ROW                              -->
-  <!-- ========================================================================= -->
-
-  <!-- CARD 4: PERSISTENT LONG-TERM MEMORY (Bottom Left) -->
-  <g transform="translate(32, 322)">
-    <rect width="364" height="146" rx="16" fill="url(#glassCardBg)" />
-    <rect width="364" height="146" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Rebus: 🧠 ➔ 💾 -->
-    <g transform="translate(22, 18)">
-      <rect width="78" height="26" rx="13" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      <!-- Brain -->
-      <g transform="translate(9, 5)" stroke="#4ade80" stroke-width="1.3" fill="none">
-        <path d="M 4 2 C 2 2 1 3.5 1 5.5 C 1 7.5 2.5 8.5 3.5 9 C 3 10 3 11 4 12 C 5 13 7 13 8 12 C 9 13 11 13 12 12 C 13 11 13 10 12.5 9 C 13.5 8.5 15 7.5 15 5.5 C 15 3.5 14 2 12 2 C 10.5 2 9.5 2.8 8 2.8 C 6.5 2.8 5.5 2 4 2 Z" />
-      </g>
-      <text x="29" y="18" fill="#dcfce7" font-family="monospace" font-size="11">→</text>
-      <!-- Disk / Vault -->
-      <g transform="translate(49, 5)" stroke="#86efac" stroke-width="1.3" fill="none">
-        <rect x="2" y="2" width="12" height="12" rx="2" />
-        <line x1="4" y1="5" x2="12" y2="5" />
-        <rect x="4" y="8" width="8" height="5" rx="1" />
-      </g>
-    </g>
-
-    <text x="110" y="36" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="15" font-weight="700">
-      Long-Term Persistence
-    </text>
-
-    <text x="22" y="70" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      Retains project patterns, developer quirks,
-    </text>
-    <text x="22" y="88" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      and resolved bugs across restarts.
-    </text>
-    <text x="22" y="112" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600">
-      • Survives session wipes
-    </text>
+  <g>
+    <rect x="625.7" y="396.5" width="273.6" height="51.8"
+      rx="25.9" fill="#101624" fill-opacity="0.85" stroke="#5fd39a" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="645.6" cy="422.4" r="4.1" fill="#5fd39a"/>
+    <text x="655.1" y="428.6"
+      font-family="Inter" font-size="17.26984126984127" font-weight="500" fill="#e8ecf8">52 coding agents wired</text>
   </g>
-
-  <!-- CARD 5: ZERO-DAEMON & PRIVACY (Bottom Center) -->
-  <g transform="translate(418, 322)">
-    <rect width="364" height="146" rx="16" fill="url(#glassCardBg)" />
-    <rect width="364" height="146" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Rebus: 🔒 + 🏠 -->
-    <g transform="translate(22, 18)">
-      <rect width="70" height="26" rx="13" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      <!-- Lock -->
-      <g transform="translate(10, 5)" stroke="#4ade80" stroke-width="1.3" fill="none">
-        <rect x="2" y="6" width="10" height="8" rx="2" />
-        <path d="M 4 6 V 3.5 a 3 3 0 0 1 6 0 V 6" />
-      </g>
-      <text x="26" y="18" fill="#dcfce7" font-family="monospace" font-size="11">+</text>
-      <!-- House / Local -->
-      <g transform="translate(42, 5)" stroke="#86efac" stroke-width="1.3" fill="none">
-        <path d="M 1 7 L 8 1 L 15 7 v 7 a 1 1 0 0 1 -1 1 h -12 a 1 1 0 0 1 -1 -1 Z" />
-      </g>
-    </g>
-
-    <text x="102" y="36" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="15" font-weight="700">
-      Zero-Daemon &amp; Local
-    </text>
-
-    <text x="22" y="70" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      No background battery-draining servers.
-    </text>
-    <text x="22" y="88" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      Stored inside your repository in SQLite.
-    </text>
-    <text x="22" y="112" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600">
-      • 100% private, zero leak
-    </text>
+  <g>
+    <rect x="913.5" y="396.5" width="209.3" height="51.8"
+      rx="25.9" fill="#101624" fill-opacity="0.85" stroke="#f5b455" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="933.3" cy="422.4" r="4.1" fill="#f5b455"/>
+    <text x="942.8" y="428.6"
+      font-family="Inter" font-size="17.26984126984127" font-weight="500" fill="#e8ecf8">MIT · no account</text>
   </g>
+  <rect x="96.0" y="512.0" width="1088.0" height="2.0" fill="url(#rule)" opacity="0.55"/>
+  <text x="96.0" y="576.0" font-family="IBM Plex Mono" font-size="19.3" fill="#9aa5c3">npx musememory connect</text>
+<circle cx="1081.60" cy="296.96" r="87.04" fill="url(#halo)"/>
+  <polyline points="953.60,348.16 1015.04,184.32 1081.60,296.96 1148.16,184.32 1209.60,348.16" fill="none" stroke="url(#grad)" stroke-width="14.72"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="953.60" cy="348.16" r="13.44" fill="#8b7cf7"/>
+  <circle cx="1015.04" cy="184.32" r="13.44" fill="#4fd6e0"/>
+  <circle cx="1148.16" cy="184.32" r="13.44" fill="#4fd6e0"/>
+  <circle cx="1209.60" cy="348.16" r="13.44" fill="#8b7cf7"/>
+  <circle cx="1081.60" cy="296.96" r="18.14" fill="#e8ecf8"/>
 
-  <!-- CARD 6: SELF-HEALING & HYGIENE (Bottom Right) -->
-  <g transform="translate(804, 322)">
-    <rect width="364" height="146" rx="16" fill="url(#glassCardBg)" />
-    <rect width="364" height="146" rx="16" fill="none" stroke="url(#glassBorder)" stroke-width="1.2" />
-
-    <!-- Rebus: 🧬 + 🔄 -->
-    <g transform="translate(22, 18)">
-      <rect width="70" height="26" rx="13" fill="url(#rebusBadgeGrad)" stroke="#4ade80" stroke-opacity="0.4" stroke-width="1" />
-      <!-- DNA / Spark -->
-      <g transform="translate(10, 5)" stroke="#4ade80" stroke-width="1.3" fill="none">
-        <path d="M 2 2 C 7 7 9 9 14 14 M 14 2 C 9 7 7 9 2 14" />
-        <circle cx="2" cy="2" r="1.5" fill="#4ade80" />
-        <circle cx="14" cy="14" r="1.5" fill="#4ade80" />
-        <circle cx="14" cy="2" r="1.5" fill="#4ade80" />
-        <circle cx="2" cy="14" r="1.5" fill="#4ade80" />
-      </g>
-      <text x="27" y="18" fill="#dcfce7" font-family="monospace" font-size="11">+</text>
-      <!-- Recycle / Refresh -->
-      <g transform="translate(42, 5)" stroke="#86efac" stroke-width="1.3" fill="none" stroke-linecap="round">
-        <path d="M 12 5 A 5 5 0 0 0 2 5" />
-        <path d="M 2 2 v 3 h 3" />
-        <path d="M 2 9 A 5 5 0 0 0 12 9" />
-        <path d="M 12 12 v -3 h -3" />
-      </g>
-    </g>
-
-    <text x="102" y="36" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="15" font-weight="700">
-      Self-Healing Hygiene
-    </text>
-
-    <text x="22" y="70" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      Automatically supersedes outdated rules,
-    </text>
-    <text x="22" y="88" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif" font-size="12" font-weight="400">
-      prunes decay, and reconciles conflicts.
-    </text>
-    <text x="22" y="112" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600">
-      • Auto-deduplication
-    </text>
-  </g>
-
-  <!-- Bottom Accent Light Line -->
-  <rect x="100" y="498" width="1000" height="2" fill="url(#bambooTitleGrad)" opacity="0.8" filter="url(#soft-glow)" />
 </svg>

@@ -351,7 +351,7 @@ function commitHandoff(
   writeFileSync(currentMdPath, markdownContent, "utf8");
 
   recordAuditEvent(memoryDir, {
-    operation: "checkpoint" as any,
+    operation: "checkpoint",
     entry_id: "CURRENT.md",
     project: options?.project ?? "workspace",
     actor: options?.agent ?? "compaction_engine",

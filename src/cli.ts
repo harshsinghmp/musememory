@@ -151,8 +151,8 @@ Ecosystem, Migration & Connectivity:
                                  Auto-wire MCP into detected coding agents; --with-hooks also installs
                                  the lifecycle hook pack (SessionStart/PostToolUse/Stop) into .agents/hooks.json;
                                  --harness claude is the explicit opt-in for harness-specific paths like ~/.claude
-  agents / detect-agents        Scan workstation for 80+ coding agent platforms
-  detect                        Scan machine for 24+ external memory formats
+  agents / detect-agents        Scan workstation for detected coding agent platforms
+  detect                        Scan machine for external memory formats to migrate
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
   learn / sync-chats [--confirm] Auto-discover and harvest memories from all agent chats across machine
   harvest <file|text> --project P Distill conversation transcripts into structured memory units

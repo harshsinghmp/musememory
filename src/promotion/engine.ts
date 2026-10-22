@@ -6,7 +6,7 @@ import { openStore } from "../store.ts";
 import type { MemoryEntry, MemoryScope, PromotionRecord, EvidenceItem, MemoryUtility } from "../types.ts";
 import type { PromotionEvaluation, PromotionResult, AppendEvidenceOptions, CurateResult } from "./types.ts";
 import { generalizeContent, isContentGeneralizable } from "./generalization.ts";
-import { evaluateCorroboration } from "../quality/corroboration.ts";
+import { evaluateCorroboration, isSyntheticSource } from "../quality/corroboration.ts";
 
 /** Minimum successful reuse applications required for automatic global promotion */
 export const MIN_PROMOTION_SUCCESSFUL_USES = 5;
@@ -98,21 +98,16 @@ export function checkCorroboration(entry: MemoryEntry): CorroborationResult {
   const dates = new Set<string>();
   const nonSyntheticSources = new Set<string>();
 
-  const isSynthetic = (source?: string, type?: string) => {
-    const s = (source ?? "").toLowerCase();
-    const t = (type ?? "").toLowerCase();
-    return (
-      s === "agent" ||
-      s === "transcript" ||
-      s === "assistant" ||
-      s === "inference" ||
-      s === "distillation" ||
-      s === "machine" ||
-      s === "synthetic" ||
-      t === "synthetic" ||
-      t === "infer"
-    );
-  };
+  // The synthetic-source predicate is shared with the confidence evaluator
+  // (src/quality/corroboration.ts). It used to be duplicated verbatim here,
+  // which is how the two corroboration definitions drifted apart.
+  //
+  // The two bars are intentionally different and both are load-bearing:
+  //   - PROMOTION bar (this function): evidence must span >= 2 distinct
+  //     calendar days AND at least one non-synthetic source.
+  //   - CONFIDENCE bar (evaluateCorroboration): >= 2 corroboration signals
+  //     of any kind.
+  const isSynthetic = isSyntheticSource;
 
   if (entry.evidence && entry.evidence.length > 0) {
     for (const ev of entry.evidence) {

@@ -209,7 +209,7 @@ export function getUpgradeMilestones(): UpgradeMilestone[] {
     },
     {
       level: 4,
-      stage: "LEVEL 4 [🤖 80+ Agent Auto-Wiring Matrix]",
+      stage: "LEVEL 4 [🤖 Agent Auto-Wiring Matrix]",
       description: "Scanning workstation platforms and auto-wiring newly detected agents",
     },
     {
@@ -705,7 +705,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
     },
     {
       level: 4,
-      title: "80+ Agent Platforms & Skills Auto-Wiring",
+      title: "Agent Platforms & Skills Auto-Wiring",
       action: async () => {
         try {
           const reports = connectAgent("all", undefined, { dryRun, force: false });

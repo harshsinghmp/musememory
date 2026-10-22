@@ -4,7 +4,7 @@
 **Depth**: Deep (Local scan, ecosystem signals, frontier literature, competitive analysis, architectural specification)  
 **Date**: 2026-09-06  
 **Operating Identity**: Muse (Chief Agency Orchestrator)  
-**Primary Repository**: [`musememory`](file:///home/harsh/Projects/github/musememory)  
+**Primary Repository**: [`musememory`](../../)  
 
 ---
 

@@ -51,6 +51,11 @@ export function queryTieredContext(
   const userProfile = getUserProfile(memoryDir, { query });
   const coreBlock = formatCoreBlock(memoryDir);
 
+  // T-125: the tier budget is a standard with named provenance, so it has to
+  // actually bound the output. It used to be declared and never applied:
+  // Tier 0 was budgeted at 200 tokens and routinely emitted 327.
+  const budgetTokens = resolveTierBudget(tier, options.tokenBudget);
+
   if (tier === 0) {
     const parts: string[] = [];
     if (queryResult.degraded && queryResult.degraded_notes && queryResult.degraded_notes.length > 0) {
@@ -60,13 +65,12 @@ export function queryTieredContext(
     if (queryResult.results.length === 0) {
       parts.push("*(No matching memories)*");
     } else {
-      for (const item of queryResult.results) {
-        const t = item.entry.type ? `[${item.entry.type}] ` : "";
-        parts.push(`- \`${item.entry.id}\` ${t}${item.entry.title}`);
-      }
+      const candidates = queryResult.results.map(
+        (item) => `- \`${item.entry.id}\` ${item.entry.type ? `[${item.entry.type}] ` : ""}${item.entry.title}`,
+      );
+      parts.push(...fitToBudget(parts, candidates, budgetTokens));
     }
-    const markdown = parts.join("\n");
-    const totalTokensUsed = Math.ceil(markdown.length / 4);
+    const { markdown, totalTokensUsed } = clampMarkdown(parts, budgetTokens);
     return {
       markdown,
       entries: queryResult.results,
@@ -112,18 +116,18 @@ export function queryTieredContext(
   if (queryResult.results.length === 0) {
     parts.push("*(No matching invariant routes)*");
   } else {
-    for (const item of queryResult.results) {
+    const candidates = queryResult.results.map((item) => {
       const t = item.entry.type ? `[${item.entry.type}] ` : "";
       const tags =
         item.entry.tags && item.entry.tags.length > 0
           ? ` (tags: ${item.entry.tags.join(", ")})`
           : "";
-      parts.push(`- \`${item.entry.id}\` ${t}${item.entry.title}${tags}`);
-    }
+      return `- \`${item.entry.id}\` ${t}${item.entry.title}${tags}`;
+    });
+    parts.push(...fitToBudget(parts, candidates, budgetTokens));
   }
 
-  const markdown = parts.join("\n");
-  const totalTokensUsed = Math.ceil(markdown.length / 4);
+  const { markdown, totalTokensUsed } = clampMarkdown(parts, budgetTokens);
   return {
     markdown,
     entries: queryResult.results,
@@ -140,4 +144,48 @@ export function queryTieredContext(
     confident_answers: queryResult.confident_answers,
     draft_answers: queryResult.draft_answers,
   };
+}
+
+/** Token estimate, matching the convention used by this module. */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Adds as many candidate lines as fit in the remaining budget, then reports
+ * how many were left out. Dropping whole lines keeps the output well-formed
+ * (no half-cut entries) and honest about the omission.
+ */
+function fitToBudget(base: string[], candidates: string[], budgetTokens: number): string[] {
+  const used = estimateTokens(base.join("\n"));
+  const out: string[] = [];
+  let current = used;
+  for (const line of candidates) {
+    const cost = estimateTokens(line) + 1;
+    if (current + cost > budgetTokens) {
+      const omitted = candidates.length - out.length;
+      if (omitted > 0) {
+        out.push(`- _… ${omitted} more entr${omitted === 1 ? "y" : "ies"} omitted (tier budget reached)_`);
+      }
+      break;
+    }
+    out.push(line);
+    current += cost;
+  }
+  return out;
+}
+
+/**
+ * Hard cap on the rendered markdown. The candidate-fitting above handles the
+ * part that grows with the store; this catches the case where the fixed
+ * blocks alone already exceed the budget.
+ */
+function clampMarkdown(parts: string[], budgetTokens: number): { markdown: string; totalTokensUsed: number } {
+  const markdown = parts.join("\n");
+  const totalTokensUsed = estimateTokens(markdown);
+  if (totalTokensUsed <= budgetTokens) return { markdown, totalTokensUsed };
+  const maxChars = Math.max(0, budgetTokens * 4 - 40);
+  const marker = "\n\n_[truncated to fit the tier token budget]_";
+  const clipped = markdown.slice(0, maxChars) + marker;
+  return { markdown: clipped, totalTokensUsed: estimateTokens(clipped) };
 }

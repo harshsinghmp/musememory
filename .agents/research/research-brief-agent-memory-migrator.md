@@ -3,7 +3,7 @@
 **Depth**: deep  
 **Date**: 2026-08-22  
 **Target Repository**: `harshsinghmp/musememory`  
-**Primary Deliverable**: Interactive Dashboard at [`musemeory-comparison.html`](file:///home/harsh/Projects/musememory/musemeory-comparison.html) & Autonomous First-Install Migrator
+**Primary Deliverable**: Interactive Dashboard at [`docs/research/musememory-comparison.html`](../../docs/research/musememory-comparison.html) & Autonomous First-Install Migrator
 
 ---
 

@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
 
+# Agent-readable documentation layer. These are explicit so a crawler can
+# distinguish the machine-facing contract from the human-facing pages.
+Allow: /musememory/llms.txt
+Allow: /musememory/llms-full.txt
+
 Sitemap: https://harshsinghmp.github.io/musememory/sitemap.xml

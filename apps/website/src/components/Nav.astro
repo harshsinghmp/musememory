@@ -1,0 +1,176 @@
+---
+/**
+ * Site header, shared by every page.
+ *
+ * The mobile menu is a `<details>`/`<summary>` pair rather than a JS toggle:
+ * it opens and closes with zero script, stays keyboard-operable, and
+ * announces its state to assistive tech for free. The previous header hid
+ * `.nav-links` below 760px with no replacement, so phone visitors had no
+ * navigation at all.
+ */
+import Logo from "./Logo.astro";
+
+const base = import.meta.env.BASE_URL;
+interface Props {
+  /** Anchor on the home page to point the primary CTA at. */
+  ctaHref?: string;
+  /** Extra nav entries, e.g. "Compare" on the compare page itself. */
+  links?: Array<{ href: string; label: string; external?: boolean }>;
+}
+const {
+  ctaHref = `${base}/#install`,
+  links = [
+    { href: `${base}/#how-it-works`, label: "How it works" },
+    { href: `${base}/#capabilities`, label: "Capabilities" },
+    { href: `${base}/compare`, label: "Compare" },
+    { href: `${base}/docs`, label: "Docs" },
+  ],
+} = Astro.props;
+---
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand-link" href={`${base}/`} aria-label="Muse Memory — home">
+      <Logo withWordmark />
+    </a>
+
+    <nav class="nav-links" aria-label="Main">
+      {links.map((l) => (
+        <a href={l.href}>{l.label}</a>
+      ))}
+    </nav>
+
+    <div class="nav-actions">
+      <a
+        class="btn btn-primary nav-cta"
+        href={ctaHref}
+        data-astro-prefetch
+      >
+        Get started
+      </a>
+
+      <details class="nav-menu">
+        <summary aria-label="Open navigation menu">
+          <span class="bars" aria-hidden="true"></span>
+        </summary>
+        <nav class="nav-sheet" aria-label="Mobile">
+          {links.map((l) => (
+            <a href={l.href}>{l.label}</a>
+          ))}
+          <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
+          <a href="https://www.npmjs.com/package/musememory" rel="noopener">npm ↗</a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>
+
+<style>
+  .brand-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text);
+  }
+  .brand-link:hover {
+    text-decoration: none;
+  }
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+  }
+  .nav-menu {
+    display: none;
+    position: relative;
+  }
+  .nav-menu > summary {
+    list-style: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .nav-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .bars,
+  .bars::before,
+  .bars::after {
+    display: block;
+    width: 17px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text);
+    transition: transform 0.22s ease, opacity 0.18s ease;
+  }
+  .bars {
+    position: relative;
+  }
+  .bars::before,
+  .bars::after {
+    content: "";
+    position: absolute;
+    left: 0;
+  }
+  .bars::before {
+    top: -6px;
+  }
+  .bars::after {
+    top: 6px;
+  }
+  .nav-menu[open] .bars {
+    background: transparent;
+  }
+  .nav-menu[open] .bars::before {
+    transform: translateY(6px) rotate(45deg);
+  }
+  .nav-menu[open] .bars::after {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+  .nav-sheet {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.6rem);
+    min-width: 220px;
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.6rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--bg-panel);
+    box-shadow: 0 24px 60px var(--edge-dark);
+  }
+  .nav-sheet a {
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+  .nav-sheet a:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.05);
+    text-decoration: none;
+  }
+
+  @media (max-width: 860px) {
+    .nav-links {
+      display: none;
+    }
+    .nav-menu {
+      display: block;
+    }
+  }
+  /* The CTA stays visible on phones — it is the primary action, and the
+     mobile menu already covers navigation. It only gets more compact. */
+  @media (max-width: 420px) {
+    .nav-cta {
+      padding: 0.62em 1em;
+      font-size: 0.8rem;
+    }
+  }
+</style>

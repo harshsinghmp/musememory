@@ -1,5 +1,10 @@
 ---
 import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import claims from "../../../../claims.json";
+
+const base = import.meta.env.BASE_URL;
 
 const rows = [
   { cap: "Runs 100% local — zero daemons, zero cloud", muse: "yes", vec: "no", graph: "no", session: "yes" },
@@ -10,7 +15,7 @@ const rows = [
   { cap: "Deterministic lifecycle state machine", muse: "yes", vec: "no", graph: "yes", session: "no" },
   { cap: "Structural code anchors (line-invariant)", muse: "yes", vec: "no", graph: "no", session: "no" },
   { cap: "Secret defense on every write path", muse: "yes", vec: "no", graph: "no", session: "partial" },
-  { cap: "One command wires 80+ platforms", muse: "yes", vec: "partial", graph: "partial", session: "partial" },
+  { cap: `One command wires ${claims.agentPlatforms} coding agents`, muse: "yes", vec: "partial", graph: "partial", session: "partial" },
   { cap: "Git-reviewable memory files", muse: "yes", vec: "no", graph: "no", session: "no" },
   { cap: "Lifecycle hooks (hands-free capture/inject)", muse: "yes", vec: "partial", graph: "partial", session: "yes" },
   { cap: "Token-budgeted fused context tool", muse: "yes", vec: "partial", graph: "no", session: "no" },
@@ -29,19 +34,17 @@ const icon = (v: string) => (v === "yes" ? "✓" : v === "partial" ? "~" : "✕"
 const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no");
 ---
 
-<Base title="Muse Memory vs vector stores, graph platforms, session search" description="A 12-capability comparison of Muse Memory against vector stores, knowledge-graph platforms, and session search tools. Muse is the only one that is simultaneously local-first, fully keyless, and git-versioned.">
-  <header class="nav">
-    <div class="container nav-inner">
-      <a class="brand" href={`${import.meta.env.BASE_URL}/`}>Muse<span>Memory</span></a>
-      <nav class="nav-links">
-        <a href={`${import.meta.env.BASE_URL}/docs`}>Docs</a>
-        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
-      </nav>
-      <a class="btn btn-primary" href={`${import.meta.env.BASE_URL}/#install`}>Get started</a>
-    </div>
-  </header>
+<Base title="Muse Memory vs vector stores, graph platforms, session search" description="A 14-capability comparison of Muse Memory against vector stores, knowledge-graph platforms, and session search tools. Muse is the only one that is simultaneously local-first, fully keyless, and git-versioned.">
+  <Nav
+    links={[
+      { href: `${base}/#how-it-works`, label: "How it works" },
+      { href: `${base}/#capabilities`, label: "Capabilities" },
+      { href: `${base}/#proof`, label: "Benchmarks" },
+      { href: `${base}/docs`, label: "Docs" },
+    ]}
+  />
 
-  <main>
+  <main id="main">
     <section class="section">
       <div class="container">
         <div class="section-head">
@@ -62,11 +65,15 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
 
         <div class="table-wrap reveal">
           <table class="compare">
+            <caption class="sr-only">
+              Capability comparison between Muse Memory, dense vector stores,
+              entity-relationship graph platforms, and session search tools.
+            </caption>
             <thead>
               <tr>
-                <th>Capability</th>
+                <th scope="col">Capability</th>
                 {cols.map((c) => (
-                  <th>
+                  <th scope="col">
                     {c.label}<br /><span class="th-sub">{c.sub}</span>
                   </th>
                 ))}
@@ -75,7 +82,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
             <tbody>
               {rows.map((r) => (
                 <tr>
-                  <td>{r.cap}</td>
+                  <th scope="row">{r.cap}</th>
                   {cols.map((c) => (
                     <td class={cls(r[c.key] as string)} class:list={{ musecol: c.key === "muse" }}>
                       {icon(r[c.key] as string)}
@@ -93,7 +100,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
           <span class="no">✕</span> not documented
         </p>
         <p class="table-note">
-          Methodology: capability claims follow a documented-features-only standard — code beats docs, quick evolutions on all sides. Muse row reflects v2.3.
+          Methodology: capability claims follow a documented-features-only standard — code beats docs, quick evolutions on all sides. Muse row reflects v{claims.version}.
         </p>
       </div>
     </section>
@@ -102,22 +109,14 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
       <div class="container cta-inner">
         <h2>Verified memory beats confident guesswork</h2>
         <div class="cta-actions">
-          <a class="btn btn-primary btn-lg" href={`${import.meta.env.BASE_URL}/#install`}>Install now</a>
-          <a class="btn btn-ghost btn-lg" href={`${import.meta.env.BASE_URL}/docs`}>Read the docs</a>
+          <a class="btn btn-primary btn-lg" href={`${base}/#install`}>Install now</a>
+          <a class="btn btn-ghost btn-lg" href={`${base}/docs`}>Read the docs</a>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="container footer-inner">
-      <p><strong>Muse Memory</strong> — autonomous cognitive memory for AI agents · MIT</p>
-      <nav>
-        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub</a>
-        <a href={`${import.meta.env.BASE_URL}/docs`}>Docs</a>
-      </nav>
-    </div>
-  </footer>
+  <Footer />
 
   <style>
     .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-panel); }

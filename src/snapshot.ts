@@ -9,6 +9,7 @@ import { scanSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import type { MemoryEntry } from "./types.ts";
 import { getSettings } from "./settings.ts";
+import { resolveWithin } from "./paths.ts";
 
 /**
  * Export all entries from store into a portable JSON snapshot.
@@ -294,13 +295,19 @@ export function listSnapshotRing(target: "current" | "state", memoryDir: string)
 }
 
 export function restoreSnapshotRing(snapshotName: string, memoryDir: string): void {
+  // Containment: the snapshot name is caller-supplied, so it must be
+  // resolved strictly inside .memory/snapshots/. Without this, a name like
+  // "../../etc/passwd" would read an arbitrary file and copy it over
+  // .memory/CURRENT.md. The sibling loader (loadExecutionSnapshot)
+  // sanitises its identifier for the same reason.
+  const safeName = snapshotName.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
   const snapshotsDir = join(memoryDir, "snapshots");
-  const snapPath = join(snapshotsDir, snapshotName);
+  const snapPath = resolveWithin(snapshotsDir, safeName);
   if (!existsSync(snapPath)) {
     throw new Error(`Snapshot not found: ${snapPath}`);
   }
 
-  const targetFile = snapshotName.startsWith("current__") ? "CURRENT.md" : "state.db";
+  const targetFile = safeName.startsWith("current__") ? "CURRENT.md" : "state.db";
   const targetPath = join(memoryDir, targetFile);
 
   const content = readFileSync(snapPath);

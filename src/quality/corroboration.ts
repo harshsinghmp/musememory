@@ -39,6 +39,31 @@ export interface CorroborationEvaluation {
 }
 
 /**
+ * Whether an observation came from a machine rather than a human.
+ *
+ * This predicate was duplicated verbatim in `src/promotion/engine.ts`, which
+ * is how the two "is this corroborated?" definitions drifted apart: one
+ * counted evidence items, the other counted distinct calendar days. The
+ * *predicate* must have exactly one implementation even when the two callers
+ * apply different thresholds to it.
+ */
+export function isSyntheticSource(source?: string, type?: string): boolean {
+  const s = (source ?? "").toLowerCase();
+  const t = (type ?? "").toLowerCase();
+  return (
+    s === "agent" ||
+    s === "transcript" ||
+    s === "assistant" ||
+    s === "inference" ||
+    s === "distillation" ||
+    s === "machine" ||
+    s === "synthetic" ||
+    t === "synthetic" ||
+    t === "infer"
+  );
+}
+
+/**
  * Evaluates independent corroboration count and Bayesian confidence for a memory entry.
  *
  * Corroboration signals include:
@@ -47,27 +72,20 @@ export interface CorroborationEvaluation {
  * 3. Independent non-synthetic sources
  * 4. Positive user/authoritative reinforcement
  * 5. Authoritative or user-confirmed verification boost
+ *
+ * `isCorroborated` here is the CONFIDENCE bar (n >= 2 signals and at least
+ * one non-synthetic source). The PROMOTION bar in
+ * `src/promotion/engine.ts::checkCorroboration` is deliberately stricter —
+ * it additionally requires evidence spanning two distinct calendar days. The
+ * two are different gates and are named as such; the underlying predicate is
+ * shared.
  */
 export function evaluateCorroboration(entry: MemoryEntry): CorroborationEvaluation {
   const dates = new Set<string>();
   const sources = new Set<string>();
   const reasons: string[] = [];
 
-  const isSynthetic = (source?: string, type?: string) => {
-    const s = (source ?? "").toLowerCase();
-    const t = (type ?? "").toLowerCase();
-    return (
-      s === "agent" ||
-      s === "transcript" ||
-      s === "assistant" ||
-      s === "inference" ||
-      s === "distillation" ||
-      s === "machine" ||
-      s === "synthetic" ||
-      t === "synthetic" ||
-      t === "infer"
-    );
-  };
+  const isSynthetic = isSyntheticSource;
 
   if (entry.created_at) dates.add(entry.created_at.slice(0, 10));
   if (entry.last_confirmed_at) dates.add(entry.last_confirmed_at.slice(0, 10));

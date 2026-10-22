@@ -93,6 +93,7 @@
       "additionalProperties": false
     },
     "fingerprint": { "type": "string" },
+    "stale_embedder": { "type": "boolean" },
     "temporal_mode": { "type": "string", "enum": ["current", "historical", "timeless"] },
     "quality": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "VERIFIED", "CONFLICTED", "STALE"] },
     "utility": {

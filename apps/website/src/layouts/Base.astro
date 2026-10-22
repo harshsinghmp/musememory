@@ -1,17 +1,46 @@
 ---
+/**
+ * The one HTML shell every page uses.
+ *
+ * SEO contract (kept here so it cannot drift per page):
+ *   - one canonical URL, derived from `site` + the built path
+ *   - complete Open Graph + Twitter card set, with an absolute image URL
+ *     (relative OG image URLs are silently dropped by most scrapers)
+ *   - icon set covering SVG, PNG and Apple touch
+ *   - a `robots` directive and a `theme-color` for the browser chrome
+ *
+ * Every URL is built from `import.meta.env.BASE_URL`: the site is served
+ * from /musememory/, so a root-absolute path resolves on the domain root
+ * and 404s.
+ */
 import "../styles/global.css";
 import { initMotion } from "../scripts/motion.ts";
+
 interface Props {
   title?: string;
   description?: string;
+  /** Path (relative to `public/`) of the social card image. */
   ogImage?: string;
+  /** Canonical path of this page, e.g. "/docs". Defaults to the built path. */
+  canonicalPath?: string;
+  /** `index` for the landing page, `noindex` for thin/utility pages. */
+  robots?: string;
+  /** JSON-LD blocks to emit in <head>. */
+  jsonLd?: Array<Record<string, unknown>>;
 }
+
 const {
   title = "Muse Memory — Agent memory that verifies itself",
   description = "Zero-daemon, sub-2ms persistent memory for AI coding agents. Citations verified at write time, stale memories withheld at recall time. 80+ platforms wired in one command — fully local, keyless, MIT.",
   ogImage = "brand/og.png",
+  canonicalPath,
+  robots = "index, follow, max-image-preview:large, max-snippet:-1",
+  jsonLd = [],
 } = Astro.props;
-const ogAbs = `${import.meta.env.BASE_URL}/${ogImage.replace(/^\//, "")}`;
+
+const base = import.meta.env.BASE_URL;
+const ogAbs = new URL(ogImage.replace(/^\//, ""), new URL(base, Astro.site ?? "https://harshsinghmp.github.io")).href;
+const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site ?? "https://harshsinghmp.github.io").href;
 const motionScript = initMotion();
 ---
 
@@ -20,30 +49,77 @@ const motionScript = initMotion();
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content={robots} />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07090f" />
+    <meta name="generator" content={Astro.generator} />
+
+    <meta property="og:site_name" content="Muse Memory" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:image" content={ogAbs} />
+    <meta property="og:image:secure_url" content={ogAbs} />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Muse Memory — persistent memory for AI coding agents that verifies itself" />
+
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogAbs} />
-    <!-- Must go through BASE_URL: the site is served from /musememory/, so a
-         root-absolute /favicon.svg resolves on the domain root and 404s. -->
-    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}/favicon.svg`} />
+    <meta name="twitter:image:alt" content="Muse Memory — persistent memory for AI coding agents that verifies itself" />
+
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="icon" type="image/png" sizes="192x192" href={`${base}/icon-192.png`} />
+    <link rel="apple-touch-icon" sizes="180x180" href={`${base}/apple-touch-icon.png`} />
+    <link rel="manifest" href={`${base}/site.webmanifest`} />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
+
+    {jsonLd.map((block) => (
+      <script
+        is:inline
+        type="application/ld+json"
+        set:html={JSON.stringify(block)}
+      />
+    ))}
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <slot />
     <script is:inline set:html={motionScript} />
   </body>
 </html>
+
+<style>
+  .skip-link {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    translate: -50% -120%;
+    z-index: 100;
+    padding: 0.7rem 1.2rem;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    background: var(--violet);
+    color: #fff;
+    font-weight: 600;
+    transition: translate 0.2s ease;
+  }
+  .skip-link:focus {
+    translate: -50% 0;
+    text-decoration: none;
+  }
+</style>

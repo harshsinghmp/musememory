@@ -78,13 +78,11 @@ jobs:
           echo "${{ steps.reelhash.outputs.hash }}" > public/brand/.showreel-hash
           echo "⚠ Commit the regenerated showreel + updated public/brand/.showreel-hash." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Generate brand assets (favicon, OG card, banner, icons)
+        run: bun run --cwd apps/website brand
+
       - name: Build website
         run: bun run site:build
-
-      - name: Refresh committed brand assets (banner/OG changed)
-        run: |
-          cd apps/website
-          bun scripts/render-brand-assets.ts
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

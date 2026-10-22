@@ -104,7 +104,7 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     },
     {
       level: 2,
-      title: "80+ Coding Agent Auto-Wiring Matrix",
+      title: "Coding Agent Auto-Wiring Matrix",
       action: async () => {
         const { connectAgent } = await import("../connect.ts");
         reports = connectAgent("all", undefined, { dryRun: false, force: false });
@@ -361,7 +361,7 @@ export async function handleAgentsCommand(): Promise<number> {
   const installed = agents.filter((a) => a.installed);
   const connected = installed.filter((a) => a.connected);
 
-  console.log(`[AGENTS] Workstation Coding Agents Scan (80+ Baseline):`);
+  console.log(`[AGENTS] Workstation Coding Agents Scan:`);
   console.log(`------------------------------------------------`);
   for (const a of agents) {
     if (a.installed) {

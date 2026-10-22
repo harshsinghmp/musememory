@@ -1,5 +1,10 @@
 ---
 import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import claims from "../../../../claims.json";
+
+const base = import.meta.env.BASE_URL;
 
 const sections = [
   {
@@ -40,7 +45,7 @@ memory optimize                # prune noise + VACUUM (auto-cadence)`,
       "muse_why — traces code evolution backwards through ADRs and bug fixes before you refactor.",
       "muse_memory_for_code / muse_code_for_memory — bidirectional code ↔ memory lookups.",
       "memory_anchor_create / verify / audit — structural, line-invariant code anchors with write-time citation verification.",
-      "69 tools total, delivered through 6 task-focused profiles (core, coding, debugging, review, architecture, maintenance) so agents never face tool bloat.",
+      `${claims.mcpTools} tools total, delivered through ${claims.mcpProfiles} task-focused profiles (core, coding, debugging, review, architecture, maintenance, full) so agents never face tool bloat.`,
     ],
   },
   {
@@ -76,7 +81,7 @@ memory audit --operation dispute_triggered`,
     id: "trust",
     title: "Trust gates",
     body: [
-      "Write time: Vibeguard scans every write for 45+ credential shapes (fail-fast); anchors are verified against the live filesystem and hallucinated citations are rejected.",
+      `Write time: Vibeguard scans every write against ${claims.credentialRuleFamilies} credential rule families — AI API keys, GitHub and npm tokens, AWS keys, private key blocks, Slack tokens, credentialed connection strings and generic credential assignments (fail-fast); anchors are verified against the live filesystem and hallucinated citations are rejected.`,
       "Recall time: the freshness gate withholds memories whose anchors drifted or whose cited files vanished — reported, never silently served. Include them with muse_context include_drifted: true to get provenance warnings.",
       "Sync time: P2P gossip packets are sealed, vector-clocked, deduplicated, and secret-scanned in both directions.",
     ],
@@ -87,18 +92,9 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
 ---
 
 <Base title="Docs — Muse Memory" description="Connect Muse Memory to your agents, capture verified memories, and recall them in under 2ms. Quickstart, CLI, MCP tools, hooks, and trust gates.">
-  <header class="nav">
-    <div class="container nav-inner">
-      <a class="brand" href={`${import.meta.env.BASE_URL}/`}>Muse<span>Memory</span></a>
-      <nav class="nav-links">
-        <a href={`${import.meta.env.BASE_URL}/compare`}>Comparison</a>
-        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub ↗</a>
-      </nav>
-      <a class="btn btn-primary" href={`${import.meta.env.BASE_URL}/#install`}>Get started</a>
-    </div>
-  </header>
+  <Nav />
 
-  <main>
+  <main id="main">
     <section class="section">
       <div class="container docs-grid">
         <aside class="docs-toc">
@@ -110,6 +106,18 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
         <div class="docs-body">
           <h1>Docs</h1>
           <p class="docs-intro">Everything needed to run Muse Memory day-to-day: connect your agents, capture what matters, recall it in under 2ms. The full API reference lives in the <a href="https://github.com/harshsinghmp/musememory#readme" rel="noopener">repo README</a>.</p>
+
+          <aside class="docs-callout">
+            <p class="docs-callout-title">Reading this with an agent?</p>
+            <p>
+              Point it at <a href={`${base}/llms.txt`}><code>llms.txt</code></a> for the
+              curated map, <a href={`${base}/llms-full.txt`}><code>llms-full.txt</code></a> for
+              the whole site as plain text, or the
+              <a href="https://github.com/harshsinghmp/musememory/blob/main/docs/agent-reference.md" rel="noopener">agent reference</a>
+              for the exact CLI, MCP and file-layout contracts. Everything on this page is
+              written to be read by a person, an agent, or both.
+            </p>
+          </aside>
 
           {sections.map((s, i) => (
             <section class="docs-section reveal" style={`--reveal-delay:${Math.min(i * 60, 240)}ms`} id={s.id}>
@@ -125,15 +133,7 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="container footer-inner">
-      <p><strong>Muse Memory</strong> — autonomous cognitive memory for AI agents · MIT</p>
-      <nav>
-        <a href="https://github.com/harshsinghmp/musememory" rel="noopener">GitHub</a>
-        <a href={`${import.meta.env.BASE_URL}/compare`}>Comparison</a>
-      </nav>
-    </div>
-  </footer>
+  <Footer />
 
   <style>
     .docs-grid { display: grid; grid-template-columns: 200px 1fr; gap: 3rem; }
@@ -147,7 +147,21 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
     .docs-toc a { color: var(--text-dim); font-size: 0.9rem; }
     .docs-toc a:hover { color: var(--text); text-decoration: none; }
     .docs-body h1 { font-size: var(--fs-h2); margin-bottom: 0.4em; }
-    .docs-intro { color: var(--text-dim); margin-bottom: 2.5rem; }
+    .docs-intro { color: var(--text-dim); margin-bottom: 2rem; }
+    .docs-callout {
+      border: 1px solid var(--line-strong);
+      border-left: 2px solid var(--cyan);
+      border-radius: var(--radius-sm);
+      background: var(--bg-panel);
+      padding: 1rem 1.2rem;
+      margin-bottom: 2.2rem;
+    }
+    .docs-callout-title {
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .docs-callout p { color: var(--text-dim); font-size: 0.93rem; max-width: 62ch; }
     .docs-section { margin-bottom: 2.8rem; scroll-margin-top: 80px; }
     .docs-section h2 { font-size: var(--fs-h3); margin-bottom: 0.7em; }
     .docs-section p { color: var(--text-dim); margin-bottom: 0.8rem; max-width: 62ch; }
@@ -156,9 +170,20 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
       border: 1px solid var(--line-strong);
       border-radius: var(--radius);
       padding: 1rem 1.2rem;
-      overflow-x: auto;
       margin: 0.8rem 0;
     }
-    .term code { background: none; border: none; padding: 0; color: var(--text); font-size: 0.88rem; line-height: 1.7; white-space: pre; }
+    /* Wrap rather than scroll. A horizontally scrollable <pre> is not keyboard
+       reachable (axe scrollable-region-focusable, serious) and on a phone a
+       command that wraps is easier to read than one you have to drag. */
+    .term code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
   </style>
 </Base>
