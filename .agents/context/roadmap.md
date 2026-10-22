@@ -167,7 +167,7 @@
 |---|---|---|
 | **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 527 tests) | R25 (--include-abstract, --scope) |
 | **Hands-free hooks** | ✅ 3/6 events shipped (GAP-2) | R24 (full plugin registry) |
-| **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) | R23 (extend to multi-repo) |
+| **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) + calibrated contradiction engine (T-320) | R23 (extend to multi-repo) |
 | **Version control** | ⚠️ No branch-aware memory | R23 (memory branch/checkout/blame) |
 | **Compounding** | ✅ 7-state lifecycle + archival ladder | R23 (access-weighted retention, half-life decay) |
 | **Team/SaaS** | ⚠️ Not yet built | R26 (pricing page, Plausible, SaaS prototype) |

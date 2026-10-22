@@ -58,15 +58,18 @@ names a tool which does not exist.
 
 ---
 
-## ⏭️ Next Up (Post-Wave 22 Focus)
+## ⏭️ Next Up (Post-Wave 23 Focus)
 - **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall) to replace removed legacy demo.
-- **Wave 23**: Review next backlog items from `.agents/context/ticket-plan.md` (e.g. Hebbian co-activation retrieval expansion, query-seeded PPR restart set, retrieval weight auto-tuner, and contradiction engine calibration).
+- **Wave 23 remainder**: `T-316` (Hebbian co-activation edges into write-time `linked_memory_ids` seeding — **unblocked**, dep `T-095` landed; note the ticket premise is partly stale: `T-307` already landed the retrieval-expansion side) and `T-318` (retrieval weight auto-tuner from ROI telemetry — **unblocked**, deps `T-127` + `T-140` both landed). `T-317` (query-seeded PPR restart set) stays **blocked** on `T-178` (graph retrieval A/B gate).
+- **Conflicted memories are still served into agent prompts** (found while fixing `T-320`): `src/retrieval.ts` filters `superseded`/`rejected`/`archived`/`expired` but not `conflicted`, so a genuinely contradicted memory is injected with no badge. Deliberately left out of `T-320` — it changes retrieval output and therefore the golden recall fixtures; it needs its own ticket and test pass.
 - **Consolidate the remaining duplicated tables** (deferred from this session as behaviour-changing; full detail with exact locations in [`docs/roadmap.md`](../../docs/roadmap.md) → *Engineering debt*): the three divergent per-type TTL tables in `src/retention.ts`, the eight separate token estimators, the divergent limit-clamping ceilings across retrieval paths, and the remaining zero-caller exports.
 - **Remove the legacy `web/` directory** — done in this session. It was a second, hand-written copy of the site that `apps/website/` superseded; keeping it was the same "second copy that gets forgotten" failure mode this session fixed everywhere else.
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23: Contradiction Engine Calibration**:
+  - `T-320`: The contradiction engine compared two memories by testing seven bare regex pairs against their concatenated title and content, so any two memories containing an "enable"-ish and a "disable"-ish word were flagged as contradictory regardless of subject or context. Measured: **8 of 10** realistic non-contradictory pairs were flagged. Flagging flips *both* memories to `conflicted` — 25 health points each (four false positives fail the store-integrity pillar), removal from every future sync broadcast, and still served into agent prompts. Detection now extracts **polarity claims** (`subject`, `relation`, `target`, `scope`) and opposes claims only about the same subject in a compatible scope; re-probe of the same ten pairs: **0 of 10** flagged. New `src/quality/scope.ts` (canonical scope vocabulary, general qualifier extraction, strong/weak scope classification) and `src/quality/polarity.ts` (claim extraction + comparison); scope is now resolved per claim instead of per entry in `src/quality/invalidation.ts`. Dry-run surfaces: `memory conflicts [--dry-run]` (new CLI, read-only preview of what peer-to-peer sync would flag — the one path that flags automatically), `propose({ checkConflict: true, conflictDryRun: true })`, and `detectConflict(store, candidate, { dryRun: true })`. Calibration fixture `test/calibration/contradiction_calibration.json` (21 labelled pairs) gated at precision and recall ≥ 0.9 (`test/contradiction_calibration.test.ts`, `test/cli_conflicts.test.ts`, commits `18bf4f9`, `dc90539`).
 - [x] **Wave 22: Failure Attribution, Negative Memory Mining & Retrieval Compounding**:
   - `T-313`: Scoped failure attribution matching code anchors (`file_path`, `symbol_name`), affected paths, and reproduction commands; session-deduplicated strikes (max 1/session); dual-decay strike counter (2 clean runs or 30 days without failure); constitutional immunity protecting constraints, timeless memories, and salience $\ge 0.95$ from auto-dispute (`test/failure_attribution.test.ts`, commit `41feec4`, `3b270b5`).
   - `T-144`: Trajectory fix-pair mining discovering negative memories (`AVOID: ...`) from *Error ➔ Remediation ➔ No Recurrence* observation sequences with affinity filters excluding non-mutating commands (`ls`, `cat`), dynamic line number normalization, Vibeguard secret scrubbing, and session volume cap of max 3 candidates (`test/fix_pair_mining.test.ts`, commit `cc4b5c5`).
@@ -267,4 +270,5 @@ Removed remaining competitor product names and external comparison links from we
 - **Verification Gate**: Before declaring changes complete, `bun test`, `bun run build`, and `tsc --noEmit` must pass.
 
 ## 1. Verified Shipped Reality
+- **2026-10-22**: T-320 contradiction engine calibration
 - **2026-10-20**: Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)
