@@ -46,7 +46,12 @@ const MIME: Record<string, string> = {
 function serve(): ReturnType<typeof createServer> {
   const srv = createServer((req, res) => {
     const url = (req.url ?? "/").split("?")[0];
-    let file = join(DIST, url);
+    // The site is served under a base path. Strip it, or every stylesheet
+    // 404s and the page renders unstyled — which looks exactly like a
+    // missing CSS rule.
+    const base = "/musememory";
+    const rel = url.startsWith(base) ? url.slice(base.length) || "/" : url;
+    let file = join(DIST, rel);
     try {
       if (statSync(file).isDirectory()) file = join(file, "index.html");
     } catch {
@@ -177,6 +182,51 @@ async function main() {
         errors.length === 0,
         errors.length ? errors.slice(0, 3).join(" | ") : "clean",
         "P0",
+      );
+      await page.close();
+    }
+
+    // ── 1b. Chrome layout ────────────────────────────────────────────────
+    // A missing stylesheet rule does not throw: the element simply lays out
+    // with its browser defaults. That is invisible to an overflow check and
+    // invisible to axe. It has to be measured.
+    {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+      const chrome = await page.evaluate(() => {
+        const header = document.querySelector("header.nav") as HTMLElement | null;
+        const inner = document.querySelector(".nav-inner") as HTMLElement | null;
+        const links = [...document.querySelectorAll(".nav-links a")] as HTMLElement[];
+        const footer = document.querySelector("footer.footer") as HTMLElement | null;
+        const linkRects = links.map((a) => a.getBoundingClientRect());
+        // Two adjacent links must be separated by a real gap, not touching.
+        let minGap = Infinity;
+        for (let i = 1; i < linkRects.length; i++) {
+          minGap = Math.min(minGap, linkRects[i]!.left - linkRects[i - 1]!.right);
+        }
+        return {
+          headerDisplay: header ? getComputedStyle(header).display : "missing",
+          headerPosition: header ? getComputedStyle(header).position : "missing",
+          headerHasBg: header ? getComputedStyle(header).backgroundColor : "missing",
+          innerDisplay: inner ? getComputedStyle(inner).display : "missing",
+          linkCount: links.length,
+          minGap: linkRects.length > 1 ? minGap : 999,
+          footerDisplay: footer ? getComputedStyle(footer).display : "missing",
+          footerCols: footer
+            ? getComputedStyle(footer.querySelector(".footer-grid")).gridTemplateColumns.split(" ").length
+            : 0,
+        };
+      });
+      record(
+        "chrome:layout",
+        "Header and footer chrome render as designed, not as browser defaults",
+        chrome.headerPosition === "sticky" &&
+          chrome.innerDisplay === "flex" &&
+          chrome.linkCount >= 4 &&
+          chrome.minGap > 4 &&
+          chrome.footerCols >= 4,
+        `header=${chrome.headerPosition} inner=${chrome.innerDisplay} links=${chrome.linkCount} minGap=${chrome.minGap.toFixed(1)}px footerCols=${chrome.footerCols}`,
+        "P1",
       );
       await page.close();
     }

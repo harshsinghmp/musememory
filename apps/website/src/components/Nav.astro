@@ -58,6 +58,41 @@ const {
 </header>
 
 <style>
+  /* ── The header bar ────────────────────────────────────────────────────
+     These live here rather than in global.css because the nav is the one
+     piece of chrome that every page shares but nothing else does; keeping
+     them scoped means the styles cannot drift away from the markup. */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgb(7 9 15 / 78%);
+    border-block-end: 1px solid var(--border-subtle);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    min-block-size: 4rem;
+  }
+  .nav-links {
+    display: flex;
+    gap: var(--space-lg);
+    margin-inline-start: auto;
+    font-size: var(--text-sm);
+  }
+  .nav-links a {
+    color: var(--text-secondary);
+    /* A comfortable hit area (SC 2.5.8) without changing the type size. */
+    padding-block: var(--space-2xs);
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+  .nav-links a:hover {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
   .brand-link {
     display: inline-flex;
     align-items: center;
@@ -149,6 +184,7 @@ const {
   @media (max-width: 900px) {
     .nav-links { display: none; }
     .nav-menu { display: block; }
+    .nav-inner { gap: var(--space-sm); }
   }
   /* The CTA stays visible on phones — it is the primary action, and the
      mobile menu already covers navigation. It only gets more compact. */
