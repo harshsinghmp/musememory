@@ -71,25 +71,37 @@ and they already have. The consequence: a `constraint` is written with
 "stale by policy (90d limit)". **Fix:** one table, one owner, and derive the
 stale policy from the expiry policy rather than restating it.
 
-### 2. Eight separate token estimators
+### 2. Nine separate token estimators
 
-`src/compress.ts`, `src/compaction/tokens.ts`, `src/orchestrator/context.ts`,
-`src/benchmark/suite.ts`, `src/retrieval.ts`, `src/retrieval/tree-index.ts`,
+`src/compress.ts`, `src/compaction/tokens.ts`, `src/orchestrator/context.ts`
+(two — one text, one per-entry), `src/benchmark/suite.ts`, `src/retrieval.ts`,
+`src/retrieval/tree-index.ts`, `src/retrieval/tiered.ts`,
 `src/store/sidecars.ts`, `src/pageindex/engine.ts` — and
 `src/retrieval/ranking.ts` / `src/retrieval/engine.ts` use *different field
 sets* (content-only vs title+content). Two "identical" budgets can therefore
-mean different token counts depending on the path. **Fix:** one
-`estimateTokens(text)` in `src/compaction/tokens.ts`, imported everywhere.
+mean different token counts depending on the path. Six further inline
+estimator expressions (no named function) sit in `src/store/sidecars.ts`,
+`src/pageindex/engine.ts`, `src/retrieval.ts`, `src/retrieval/engine.ts` and
+`src/retrieval/ranking.ts`.
+
+**Fix:** one `estimateTokens(text)` in `src/compaction/tokens.ts`, imported
+everywhere — **but the collapse is not behaviour-neutral.**
+`src/orchestrator/context.ts` deliberately consumes the *pessimistic* measure
+(`dualMeasureTokens(...).conservativeTokens`), so folding it onto the standard
+`chars/4` measure would change tier-0/1 budgets and the golden recall
+fixtures. The pessimistic measure has to be part of the shared contract, not
+discarded by it.
 
 ### 3. Divergent limit-clamping ceilings
 
 `src/retrieval.ts` clamps to 500; `src/retrieval/engine.ts` and
 `src/retrieval/ranking.ts` clamp to 200; `src/mcp.ts` uses 5–50, 10–100 and
-50–500 in six separate places. `muse_context` cannot return more than 200
+50–500 in **seven** separate places (four distinct ranges across the repo).
+`muse_context` cannot return more than 200
 results while `get_context` can return 500, from the same store and the same
 query. **Fix:** one exported limit policy, referenced by every retrieval path.
 
-### 4. Fourteen exports with zero callers
+### 4. Twelve exports with zero callers
 
 `src/sqlite.ts::deleteMemoryById`, `src/graph.ts::detectGraphProvider`,
 `src/types.ts::MAX_TITLE_LENGTH` *(now used)*, `src/types.ts::MAX_TAGS`
@@ -104,6 +116,15 @@ harvester now use the constants, and `MAX_DRAFT_TITLE_LENGTH` was added for
 the 140-character draft title). The remainder are candidates for deletion, but
 some may be intended public API for library consumers — **fix:** confirm
 intent per symbol before removing.
+
+> **Count correction (2026-10-22).** The heading above was "Fourteen"; the
+> list is 12 dead exports plus 2 already resolved, so the dead set is
+> **twelve**. The wider figure — exports with no caller *outside their own
+> file* — is **74** (12 dead plus 62 that are internal-only but still
+> `export`ed, e.g. `src/plasticity.ts::loadHebbianGraph`,
+> `src/sqlite.ts::rowToMemoryEntry`, `src/store.ts::recordAccess`). Use the
+> narrower 12 when the intent is deletion; use 74 when the intent is to stop
+> advertising internals as public API.
 
 ## ✅ Phase 4 — Done (shipped to production)
 
