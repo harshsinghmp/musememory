@@ -2090,8 +2090,13 @@ export function formatPromptContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): FormattedContext {
+  // Cache key must discriminate every option that changes the RESULT, not
+  // just the ones that change the shape. `as_of` in particular selects a
+  // different snapshot of the store (bi-temporal queries, T-083): omitting it
+  // made a "what did we believe in Q1?" query return today's answer from the
+  // 30s TTL cache. The include* / types / tags flags have the same problem.
   const cacheKey = store.cache
-    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}`
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}:${options.as_of || ""}:${options.includeSuperseded ? "1" : "0"}:${options.includeArchived ? "1" : "0"}:${options.includeUntrusted ? "1" : "0"}:${options.types?.join(",") || ""}:${options.tags?.join(",") || ""}`
     : undefined;
 
   if (cacheKey && store.cache) {

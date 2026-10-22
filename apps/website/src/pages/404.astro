@@ -1,11 +1,19 @@
 ---
 import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
 
 const base = import.meta.env.BASE_URL;
 ---
 
-<Base title="404 — Muse Memory" description="That page was never stored. Head back to the Muse Memory home page or read the docs.">
-  <main class="nf">
+<Base
+  title="404 — Muse Memory"
+  description="That page was never stored. Head back to the Muse Memory home page or read the docs."
+  robots="noindex, follow"
+>
+  <Nav />
+
+  <main id="main" class="nf">
     <div class="container nf-inner">
       <svg width="72" height="72" viewBox="0 0 64 64" aria-hidden="true">
         <defs>
@@ -14,27 +22,47 @@ const base = import.meta.env.BASE_URL;
             <stop offset="1" stop-color="#4fd6e0"></stop>
           </linearGradient>
         </defs>
-        <path d="M14 40 L26 24 L38 40 L50 24" stroke="url(#nf1)" stroke-width="4" fill="none" stroke-linecap="round"></path>
-        <circle cx="50" cy="24" r="5" fill="#f27b7b"></circle>
+        <polyline
+          points="8,52 20,17 32,39 44,17 56,52"
+          fill="none"
+          stroke="url(#nf1)"
+          stroke-width="7"
+          stroke-linecap="round"
+          stroke-linejoin="round"></polyline>
+        <circle cx="44" cy="17" r="6" fill="#f27b7b"></circle>
+        <circle cx="32" cy="39" r="7.5" fill="#e8ecf8"></circle>
       </svg>
       <p class="nf-code">404</p>
       <h1>This memory was never stored.</h1>
-      <p class="nf-sub">The page you're after isn't in the store — but unlike your agent, now you know why.</p>
+      <p class="nf-sub">
+        The page you're after isn't in the store — but unlike your agent, now you know why.
+      </p>
       <div class="nf-actions">
         <a class="btn btn-primary" href={`${base}/`}>Back home</a>
         <a class="btn btn-ghost" href={`${base}/docs`}>Read the docs</a>
+        <a class="btn btn-ghost" href={`${base}/compare`}>Compare tools</a>
       </div>
     </div>
   </main>
 
+  <Footer />
+
   <style>
-    .nf { min-height: 100vh; display: grid; place-items: center; text-align: center; }
+    .nf {
+      min-height: 70vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: clamp(3rem, 8vw, 6rem) 0;
+    }
     .nf-code {
-      font-family: ui-monospace, Menlo, monospace;
+      font-family: var(--font-mono), ui-monospace, Menlo, monospace;
       font-size: clamp(3rem, 8vw, 5rem);
       font-weight: 800;
       background: linear-gradient(92deg, var(--violet), var(--cyan));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
       margin: 1rem 0 0;
     }
     h1 { font-size: var(--fs-h2); margin: 0.4em 0; }

@@ -10,7 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["bun"],
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": false
   },
-  "include": ["bin", "src", "test"]
+  "include": ["bin", "src", "test", "claims.json"]
 }

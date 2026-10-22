@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="628" viewBox="0 0 1200 628">
+
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4fd6e0" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#4fd6e0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7db1" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#ff7db1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="628" fill="#07090f"/>
+  <g>
+    <ellipse cx="192" cy="75.36" rx="552" ry="326.56" fill="url(#meshA)"/>
+    <ellipse cx="1056" cy="50.24" rx="480" ry="288.88" fill="url(#meshB)"/>
+    <ellipse cx="744" cy="615.4399999999999" rx="504" ry="276.32" fill="url(#meshC)"/>
+  </g>
+  <rect x="0" y="0" width="1200" height="628" fill="url(#meshA)" opacity="0.10"/>
+  <text x="90" y="263.76" font-family="Inter" font-size="55.8"
+    font-weight="800" letter-spacing="-2" fill="#e8ecf8">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="90" y="303.6" font-family="Inter"
+    font-size="22.9" font-weight="500" fill="#9aa5c3">Persistent memory for AI coding agents that verifies itself</text>
+  <g>
+    <rect x="126.3" y="389.1" width="184.4" height="50.8"
+      rx="25.4" fill="#101624" fill-opacity="0.85" stroke="#4fd6e0" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="145.8" cy="414.5" r="4.1" fill="#4fd6e0"/>
+    <text x="155.1" y="420.6"
+      font-family="Inter" font-size="16.946031746031746" font-weight="500" fill="#e8ecf8">sub-2ms recall</text>
+  </g>
+  <g>
+    <rect x="324.6" y="389.1" width="247.4" height="50.8"
+      rx="25.4" fill="#101624" fill-opacity="0.85" stroke="#8b7cf7" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="344.1" cy="414.5" r="4.1" fill="#8b7cf7"/>
+    <text x="353.4" y="420.6"
+      font-family="Inter" font-size="16.946031746031746" font-weight="500" fill="#e8ecf8">0 background daemons</text>
+  </g>
+  <g>
+    <rect x="586.0" y="389.1" width="268.4" height="50.8"
+      rx="25.4" fill="#101624" fill-opacity="0.85" stroke="#5fd39a" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="605.5" cy="414.5" r="4.1" fill="#5fd39a"/>
+    <text x="614.8" y="420.6"
+      font-family="Inter" font-size="16.946031746031746" font-weight="500" fill="#e8ecf8">52 coding agents wired</text>
+  </g>
+  <g>
+    <rect x="868.3" y="389.1" width="205.4" height="50.8"
+      rx="25.4" fill="#101624" fill-opacity="0.85" stroke="#f5b455" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="887.8" cy="414.5" r="4.1" fill="#f5b455"/>
+    <text x="897.2" y="420.6"
+      font-family="Inter" font-size="16.946031746031746" font-weight="500" fill="#e8ecf8">MIT · no account</text>
+  </g>
+  <rect x="90.0" y="502.4" width="1020.0" height="2.0" fill="url(#rule)" opacity="0.55"/>
+  <text x="90.0" y="565.2" font-family="IBM Plex Mono" font-size="18.9" fill="#9aa5c3">npx musememory connect</text>
+<circle cx="1014.00" cy="291.39" r="85.41" fill="url(#halo)"/>
+  <polyline points="888.40,341.63 948.69,180.86 1014.00,291.39 1079.31,180.86 1139.60,341.63" fill="none" stroke="url(#grad)" stroke-width="14.44"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="888.40" cy="341.63" r="13.19" fill="#8b7cf7"/>
+  <circle cx="948.69" cy="180.86" r="13.19" fill="#4fd6e0"/>
+  <circle cx="1079.31" cy="180.86" r="13.19" fill="#4fd6e0"/>
+  <circle cx="1139.60" cy="341.63" r="13.19" fill="#8b7cf7"/>
+  <circle cx="1014.00" cy="291.39" r="17.80" fill="#e8ecf8"/>
+
+</svg>

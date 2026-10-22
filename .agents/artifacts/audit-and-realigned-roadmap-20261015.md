@@ -16,19 +16,19 @@ While the test suite demonstrates clean execution (649/649 green) and 21 major a
 ### 🚨 Critical Vulnerabilities & Code Gaps Discovered
 
 1. **Silent SQLite Initialization Crash & Fallback to Flat-Files (GAP-01)**:
-   - **Location**: [`src/sqlite.ts:169-171`](file:///home/harsh/Projects/github/musememory/src/sqlite.ts#L169-L171) & [`src/store.ts:173-177`](file:///home/harsh/Projects/github/musememory/src/store.ts#L173-L177)
+   - **Location**: [`src/sqlite.ts:169-171`](../../src/sqlite.ts#L169-L171) & [`src/store.ts:173-177`](../../src/store.ts#L173-L177)
    - **Defect**: `initSchema` attempts `CREATE INDEX IF NOT EXISTS idx_memories_mem_path ON memories(mem_path)` unconditionally on existing tables. On stores created prior to v1, `memories` lacks `mem_path`. SQLite throws `SQLiteError: no such column: mem_path`.
    - **Impact**: `openStore` catches this error, swallows it, leaves `store.db` as `undefined`, and silently degrades to flat-file storage. Crucially, `runMigrations` in `src/migrate.ts` never executes for these stores.
    - **Remediation**: Guard index creation by inspecting existing columns via `PRAGMA table_info(memories)` or delegate index creation to `src/migrate.ts` migration `v1`.
 
 2. **Stored-Command Validation Failure on Legacy Memories (GAP-02)**:
-   - **Location**: [`.memory/memories/m_1791995990650_...yaml`](file:///home/harsh/Projects/github/musememory/.memory/memories/m_1791995990650_avoidneverre-invokebinsh-cformemorytest_commandexecutionb4.yaml#L36) & [`src/schema.ts`](file:///home/harsh/Projects/github/musememory/src/schema.ts)
+   - **Location**: `.memory/memories/m_1791995990650_avoidneverre-invokebinsh-cformemorytest_commandexecutionb4.yaml` (a local store file, not in the repository) & [`src/schema.ts`](../../src/schema.ts)
    - **Defect**: Pre-`T-001` memory entries contain legacy `test_command` values (e.g. `grep -n 'bin/sh' src/verify.ts`). Following `T-001`'s template gating, `memory validate` and `memory doctor` exit with code 1 (`/test_command is not an executable command`).
    - **Impact**: Breaks automated health checks and CLI compliance.
    - **Remediation**: Add a stored-command doctor sweep/migration to sanitize non-template test commands.
 
 3. **Terminal Hang on Interactive Stdin in Test Suite & Hooks (GAP-03)**:
-   - **Location**: [`src/hooks/pack.ts:220-227`](file:///home/harsh/Projects/github/musememory/src/hooks/pack.ts#L220-L227)
+   - **Location**: [`src/hooks/pack.ts:220-227`](../../src/hooks/pack.ts#L220-L227)
    - **Defect**: `readStdinJson()` synchronously calls `readFileSync(0, "utf8")` without verifying whether stdin is a TTY.
    - **Impact**: When running in an interactive terminal or non-piped runner, `test/hooks.test.ts` blocks indefinitely waiting for EOF on fd 0.
    - **Remediation**: Guard with `if (process.stdin.isTTY) return {};` before attempting synchronous reads on fd 0.

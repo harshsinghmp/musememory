@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ALL_MEMORY_TOOLS } from "../src/connect.ts";
 import { createServer } from "../src/mcp.ts";
+
+// The expected tool count is read from the generated claims manifest rather
+// than hardcoded: a hardcoded count is a second place to forget to update
+// whenever a tool is added, and it failed exactly that way.
+const claims = JSON.parse(readFileSync(join(import.meta.dir, "..", "claims.json"), "utf8"));
 
 describe("T-011: ALL_MEMORY_TOOLS Alignment with Registered MCP Tools", () => {
   let tmpDir: string;
@@ -33,8 +38,8 @@ describe("T-011: ALL_MEMORY_TOOLS Alignment with Registered MCP Tools", () => {
     const missingTools = Array.from(registeredToolNames).filter((t) => !allMemoryToolsSet.has(t));
     expect(missingTools).toEqual([]);
 
-    // 3. Exactly 112 registered tools
-    expect(ALL_MEMORY_TOOLS.length).toBe(112);
-    expect(registeredToolNames.size).toBe(112);
+    // 3. The registered count matches the generated claims manifest.
+    expect(ALL_MEMORY_TOOLS.length).toBe(claims.mcpTools);
+    expect(registeredToolNames.size).toBe(claims.mcpTools);
   });
 });

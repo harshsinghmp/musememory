@@ -22,5 +22,14 @@ jobs:
         run: bun test
       - name: Static Typecheck
         run: bunx tsc --noEmit
+      - name: Published-claims manifest is up to date
+        # claims.json and the MCP tool matrix are generated from src/. If
+        # they are stale, every published number on the site and in the
+        # README is quietly wrong. The check fails with the regeneration
+        # command.
+        run: bun run scripts/generate-claims.ts --check
+      - name: Documentation link integrity
+        # Catches dead relative links and machine-specific file:/// URLs.
+        run: bun run scripts/check-doc-links.ts
       - name: Self Validation
         run: bun run bin/musememory.ts validate --dry-run

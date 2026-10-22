@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdir
 import { join } from "node:path";
 import yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor } from "./types.ts";
+import { MAX_TITLE_LENGTH, MAX_TAGS, MAX_DRAFT_TITLE_LENGTH } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
 import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
@@ -532,7 +533,11 @@ function getFromYaml(store: Store, id: string): MemoryEntry | null {
 /** R23: Track access timestamp and count on retrieval (used by retention scoring). */
 export function recordAccess(store: Store, entry: MemoryEntry): MemoryEntry {
   const now = nowIso();
-  const currentCount = entry.access_count ?? 0;
+  // The database row is authoritative for the counter: the YAML mirror never
+  // learns the new value, so reading it from the entry object would always
+  // produce the same number and the counter would never accumulate.
+  const dbCount = store.db ? getMemoryById(store.db, entry.id)?.access_count : undefined;
+  const currentCount = dbCount ?? entry.access_count ?? 0;
   entry.last_accessed_at = now;
   entry.access_count = currentCount + 1;
   if (store.db) {
@@ -591,8 +596,21 @@ function readEntry(store: Store, id: string): MemoryEntry | null {
 
     if (store.db) {
       // T-025: row + FTS sync in one commit.
+      //
+      // The YAML mirror is a *secondary* copy. `access_count` and
+      // `last_accessed_at` are owned by the database (they are updated on
+      // every read and are never written back to YAML), so re-inserting the
+      // YAML verbatim would reset the counter to its baseline on every read
+      // and the access-frequency ranking signal would stay pinned at 1.
+      // Preserve the DB-owned values across the re-insert.
       try {
-        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, fromYaml));
+        const existing = getMemoryById(store.db!, id);
+        const merged: MemoryEntry = {
+          ...fromYaml,
+          access_count: existing?.access_count ?? fromYaml.access_count,
+          last_accessed_at: existing?.last_accessed_at ?? fromYaml.last_accessed_at,
+        };
+        withTransaction(store.db, () => insertOrReplaceMemory(store.db!, merged));
       } catch {}
     }
     if (store.cache) {
@@ -975,8 +993,10 @@ export function propose(
   }
 
   const isDraft = Boolean(opts.draft || (opts.title && opts.title.startsWith("[DRAFT]")));
-  const rawTitle = opts.title ?? cleanContent.slice(0, 120);
-  const title = isDraft ? ensureDraftTitle(rawTitle).slice(0, 140) : rawTitle.slice(0, 120);
+  const rawTitle = opts.title ?? cleanContent.slice(0, MAX_TITLE_LENGTH);
+  const title = isDraft
+    ? ensureDraftTitle(rawTitle).slice(0, MAX_DRAFT_TITLE_LENGTH)
+    : rawTitle.slice(0, MAX_TITLE_LENGTH);
   const content_hash = opts.content_hash ?? computeContentHash(cleanContent);
 
   // T-104: Retention admission gate
@@ -1148,7 +1168,7 @@ export function propose(
     created_at: createdAt,
     updated_at: updatedAt,
     source: opts.source ?? "manual",
-    tags: opts.tags?.slice(0, 8) ?? [],
+    tags: opts.tags?.slice(0, MAX_TAGS) ?? [],
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom ?? opts.valid_from,
     valid_to: opts.validTo ?? opts.valid_to,
