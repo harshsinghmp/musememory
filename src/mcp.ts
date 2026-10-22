@@ -1472,6 +1472,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           type: "object",
           properties: {
             dir: { type: "string", description: "Optional project workspace directory path" },
+            project: { type: "string", description: "Optional memory project scope filter" },
           },
         },
       },
@@ -1608,6 +1609,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           type: "object",
           properties: {
             dir: { type: "string", description: "Optional project workspace directory path" },
+            project: { type: "string", description: "Optional memory project scope filter" },
           },
         },
       },
@@ -2903,7 +2905,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         });
       }
       case "memory_anchor_audit": {
-        const report = auditMemoryAnchors(activeStore, activeRoot);
+        // T-321: optional project scope filter.
+        const report = auditMemoryAnchors(activeStore, activeRoot, {
+          project: a.project ? String(a.project) : undefined,
+        });
         return toolResult(report);
       }
       case "muse_context": {
@@ -2985,7 +2990,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         });
       }
       case "memory_drift_audit": {
-        const report = detectDocumentationCodeDrift(activeStore, activeRoot);
+        // T-321: optional project scope filter.
+        const report = detectDocumentationCodeDrift(activeStore, activeRoot, {
+          project: a.project ? String(a.project) : undefined,
+        });
         return toolResult(report);
       }
       case "muse_why": {
