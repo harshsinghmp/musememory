@@ -510,7 +510,11 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R15: Project Health Gate Endpoint
       if (pathname === "/api/health" && req.method === "GET") {
         try {
-          const report = evaluateProjectHealth(opts.store, workspaceRoot);
+          // T-321: optional project scope filter.
+          const healthProject = url.searchParams.get("project") || undefined;
+          const report = evaluateProjectHealth(opts.store, workspaceRoot, {
+            project: healthProject,
+          });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(report));
         } catch (err: unknown) {

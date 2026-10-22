@@ -1632,6 +1632,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           type: "object",
           properties: {
             dir: { type: "string", description: "Optional workspace directory" },
+            project: { type: "string", description: "Optional memory project scope filter" },
           },
         },
       },
@@ -1642,6 +1643,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           type: "object",
           properties: {
             dir: { type: "string", description: "Optional workspace directory" },
+            project: { type: "string", description: "Optional memory project scope filter" },
           },
         },
       },
@@ -1652,6 +1654,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           type: "object",
           properties: {
             dir: { type: "string", description: "Optional workspace directory path" },
+            project: { type: "string", description: "Optional memory project scope filter" },
           },
         },
       },
@@ -2994,18 +2997,27 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         return toolResult(explanation);
       }
       case "muse_bug_clusters": {
-        const clusters = clusterRecurringBugsAndFriction(activeStore);
+        // T-321: optional project scope filter.
+        const clusters = clusterRecurringBugsAndFriction(activeStore, {
+          project: a.project ? String(a.project) : undefined,
+        });
         return toolResult({
           total_clusters: clusters.length,
           clusters,
         });
       }
       case "muse_tech_debt": {
-        const report = analyzeTechnicalDebt(activeStore, activeRoot);
+        // T-321: optional project scope filter.
+        const report = analyzeTechnicalDebt(activeStore, activeRoot, {
+          project: a.project ? String(a.project) : undefined,
+        });
         return toolResult(report);
       }
       case "muse_health": {
-        const report = evaluateProjectHealth(activeStore, activeRoot);
+        // T-321: optional project scope filter.
+        const report = evaluateProjectHealth(activeStore, activeRoot, {
+          project: a.project ? String(a.project) : undefined,
+        });
         return toolResult(report);
       }
       case "muse_sync_broadcast": {

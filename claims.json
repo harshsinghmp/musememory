@@ -8,8 +8,8 @@
   "credentialRuleFamilies": 8,
   "backgroundDaemons": 0,
   "tests": {
-    "count": 1351,
-    "assertions": 6263,
-    "files": 207
+    "count": 1360,
+    "assertions": 6300,
+    "files": 208
   }
 }

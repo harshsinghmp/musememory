@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import type { Store } from "../store.ts";
-import { get, list, save } from "../store.ts";
+import { get, listForProject, save } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
 import type { MemoryEntry } from "../types.ts";
 import type {
@@ -473,13 +473,16 @@ export function attachAnchorToMemory(
 }
 
 /**
- * Repository-wide audit of all code anchors across all memories in the store.
+ * Repository-wide audit of all code anchors across the memories in the store.
+ *
+ * T-321: `options.project` restricts the audit to one memory project.
  */
 export function auditMemoryAnchors(
   store: Store,
-  workspaceRoot: string
+  workspaceRoot: string,
+  options?: { project?: string },
 ): AnchorAuditReport {
-  const entries = list(store);
+  const entries = listForProject(store, options?.project);
   const details: AnchorVerificationResult[] = [];
   let validCount = 0;
   let driftedCount = 0;

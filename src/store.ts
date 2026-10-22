@@ -724,6 +724,18 @@ export function list(
 }
 
 /**
+ * T-321: Lists store entries, optionally restricted to a single memory project.
+ *
+ * Single owner for the "filter by project, or take the whole store" decision.
+ * Callers that report on a project scope (the health gate, bug clustering,
+ * technical debt) use this so that one filter cannot drift from another.
+ */
+export function listForProject(store: Store, project?: string): MemoryEntry[] {
+  const trimmed = project?.trim();
+  return trimmed ? list(store, { project: trimmed }) : list(store);
+}
+
+/**
  * T-037: Fast integer count of stored memories without loading, parsing, or allocating all entries.
  */
 export function countMemories(store: Store): number {

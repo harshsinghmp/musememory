@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Store } from "../store.ts";
-import { list } from "../store.ts";
+import { listForProject } from "../store.ts";
 import { verifyCodeAnchor } from "../anchors/resolver.ts";
 import type { DriftReport, DriftItem, DriftState } from "./types.ts";
 
@@ -65,9 +65,10 @@ function extractExportedSymbols(filePath: string): string[] {
  */
 export function detectDocumentationCodeDrift(
   store: Store,
-  workspaceRoot: string
+  workspaceRoot: string,
+  options?: { project?: string },
 ): DriftReport {
-  const allEntries = list(store);
+  const allEntries = listForProject(store, options?.project);
   const items: DriftItem[] = [];
 
   let documentedCount = 0;
