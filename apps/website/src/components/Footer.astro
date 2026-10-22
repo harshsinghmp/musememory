@@ -1,0 +1,156 @@
+---
+/**
+ * Site footer, shared by every page. Four link columns plus the wordmark
+ * block, so a visitor who lands on /compare or /docs can still reach the
+ * install instructions, the repo and the package.
+ */
+import Logo from "./Logo.astro";
+import claims from "../../../../claims.json";
+
+const base = import.meta.env.BASE_URL;
+const year = new Date().getFullYear();
+
+const columns = [
+  {
+    title: "Product",
+    links: [
+      { href: `${base}/#how-it-works`, label: "How it works" },
+      { href: `${base}/#capabilities`, label: "Capabilities" },
+      { href: `${base}/#proof`, label: "Benchmarks" },
+      { href: `${base}/compare`, label: "Compare" },
+    ],
+  },
+  {
+    title: "Docs",
+    links: [
+      { href: `${base}/docs`, label: "Docs home" },
+      { href: `${base}/docs#quickstart`, label: "Quickstart" },
+      { href: `${base}/docs#cli`, label: "CLI reference" },
+      { href: `${base}/docs#mcp`, label: "MCP tools" },
+    ],
+  },
+  {
+    title: "Code",
+    links: [
+      { href: "https://github.com/harshsinghmp/musememory", label: "GitHub", external: true },
+      { href: "https://www.npmjs.com/package/musememory", label: "npm", external: true },
+      { href: "https://github.com/harshsinghmp/musememory/blob/main/CHANGELOG.md", label: "Changelog", external: true },
+      { href: "https://github.com/harshsinghmp/musememory/blob/main/LICENSE", label: "MIT licence", external: true },
+    ],
+  },
+  {
+    title: "Agents",
+    links: [
+      { href: `${base}/llms.txt`, label: "llms.txt" },
+      { href: `${base}/llms-full.txt`, label: "llms-full.txt" },
+      { href: "https://github.com/harshsinghmp/musememory/blob/main/docs/agent-reference.md", label: "Agent reference", external: true },
+      { href: `${base}/docs#mcp`, label: "Tool matrix" },
+    ],
+  },
+];
+---
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <a class="footer-logo" href={`${base}/`} aria-label="Muse Memory — home">
+        <Logo withWordmark />
+      </a>
+      <p>
+        Persistent, local-first memory for AI coding agents. Runs in-process on
+        your machine — no account, no API key, no background daemon.
+      </p>
+      <p class="footer-meta">MIT licensed · v{claims.version} · <span id="footer-year">{year}</span></p>
+    </div>
+
+    {columns.map((col) => (
+      <nav class="footer-col" aria-label={col.title}>
+        <p class="footer-col-title">{col.title}</p>
+        {col.links.map((l) => (
+          <a href={l.href} rel={l.external ? "noopener" : undefined}>{l.label}</a>
+        ))}
+      </nav>
+    ))}
+  </div>
+
+  <div class="container footer-base">
+    <p>Muse Memory — persistent memory for AI coding agents that verifies itself.</p>
+    <p>All data stays on your machine. Nothing is uploaded.</p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--line);
+    background: var(--bg-raised);
+    padding: clamp(3rem, 6vw, 4.5rem) 0 1.6rem;
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 1.6fr) repeat(4, minmax(120px, 1fr));
+    gap: clamp(1.6rem, 4vw, 3rem);
+  }
+  .footer-logo {
+    display: inline-flex;
+    color: var(--text);
+  }
+  .footer-logo:hover {
+    text-decoration: none;
+  }
+  .footer-brand p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-top: 0.9rem;
+    max-width: 34ch;
+  }
+  .footer-brand .footer-meta {
+    color: var(--text-faint);
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+  }
+  .footer-col {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+  }
+  .footer-col-title {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 0.2rem;
+  }
+  .footer-col a {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+  .footer-col a:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .footer-base {
+    margin-top: clamp(2rem, 4vw, 3rem);
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    color: var(--text-faint);
+    font-size: 0.82rem;
+  }
+  @media (max-width: 960px) {
+    .footer-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .footer-brand {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (max-width: 520px) {
+    .footer-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

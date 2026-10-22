@@ -1,0 +1,31 @@
+{
+  "name": "Muse Memory",
+  "short_name": "Muse",
+  "description": "Persistent, local-first memory for AI coding agents. Sub-2ms recall, write-time citation verification, zero background daemons.",
+  "start_url": "/musememory/",
+  "scope": "/musememory/",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#07090f",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/musememory/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/musememory/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/musememory/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

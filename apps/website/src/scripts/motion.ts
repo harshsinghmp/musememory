@@ -19,6 +19,16 @@ export function initMotion(): string {
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ── Scroll reveals ───────────────────────────────────────────────────────
+  // threshold 0 (not a ratio): a ratio threshold is measured against the
+  // ELEMENT's own area, so a .reveal taller than the viewport can never
+  // reach 12% and stays invisible forever. threshold 0 fires as soon as any
+  // part of the element crosses into the root, which is height-independent.
+  //
+  // rootMargin is 0 (not a negative bottom margin) so the trigger boundary is
+  // exactly the viewport: every element that is on screen is visible, and
+  // nothing that is off screen is. A shrunk bottom margin would leave a band
+  // where an element is technically on screen but still hidden, which is the
+  // same class of bug as the no-JS and reduced-motion paths already avoid.
   var revealEls = document.querySelectorAll(".reveal");
   if (reduced || !("IntersectionObserver" in window)) {
     revealEls.forEach(function (el) { el.classList.add("is-visible"); });
@@ -30,7 +40,7 @@ export function initMotion(): string {
           io.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    }, { threshold: 0, rootMargin: "0px" });
     revealEls.forEach(function (el) { io.observe(el); });
   }
 
