@@ -260,4 +260,4 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 115 tools, 7 profiles, 52 agent platforms, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 115 tools, 7 profiles, 30 import formats, 8 credential rule families.

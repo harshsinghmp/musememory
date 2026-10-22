@@ -7,9 +7,15 @@
   "migratorProviders": 30,
   "credentialRuleFamilies": 8,
   "backgroundDaemons": 0,
+  "latency": {
+    "hotCacheMicros": 50,
+    "recallMillis": 2,
+    "semanticMillis": 4,
+    "networkMillis": 300
+  },
   "tests": {
-    "count": 1336,
-    "assertions": 6128,
-    "files": 205
+    "count": 1354,
+    "assertions": 6159,
+    "files": 206
   }
 }
