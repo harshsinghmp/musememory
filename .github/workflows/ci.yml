@@ -31,6 +31,11 @@ jobs:
       - name: Documentation link integrity
         # Catches dead relative links and machine-specific file:/// URLs.
         run: bun run scripts/check-doc-links.ts
+      - name: Showreel matches its inputs
+        # The committed video must correspond to the committed composition.
+        # Caught here rather than at deploy, so a stale render never reaches
+        # production in the first place.
+        run: bun run scripts/showreel-hash.ts --check
       - name: Website release gate
         # The qa-launch gate, executed: critical paths, keyboard-only path,
         # 200% zoom reflow, the no-JavaScript first frame, animation
