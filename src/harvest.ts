@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Store } from "./store.ts";
 import { propose, save, list } from "./store.ts";
 import type { MemoryEntry, MemoryType } from "./types.ts";
+import { MAX_TITLE_LENGTH } from "./types.ts";
 import { stripInjectedContextBlocks } from "./security/strip.ts";
 
 export { stripInjectedContextBlocks };
@@ -39,7 +40,7 @@ export function extractHarvestUnits(text: string): HarvestedUnit[] {
         const title = currentTitle || content.slice(0, 80).replace(/^[#\-*\s]+/, "");
         const salience = defaultSalienceForType(currentType);
         units.push({
-          title: title.slice(0, 120),
+          title: title.slice(0, MAX_TITLE_LENGTH),
           content,
           type: currentType,
           salience,

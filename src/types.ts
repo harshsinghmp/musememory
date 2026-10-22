@@ -359,6 +359,13 @@ export const DEFAULT_STALE_DAYS = 90;
 export const DEFAULT_CONTEXT_LIMIT = 5;
 export const MAX_TITLE_LENGTH = 120;
 export const MAX_TAGS = 8;
+/**
+ * Draft entries carry a "[DRAFT] " marker plus a longer working title, so
+ * they are allowed more room than a confirmed title. The limit used to be
+ * the bare literal 140 in src/store.ts, which meant the declared
+ * MAX_TITLE_LENGTH and the enforced limit disagreed depending on the path.
+ */
+export const MAX_DRAFT_TITLE_LENGTH = 140;
 
 // Decay/staleness policy intentionally lives in ./retention.ts, which is the single
 // source of truth for half-life curves, verification multipliers, and thresholds.
@@ -404,6 +411,7 @@ export type AuditOperation =
   | "lifecycle_revert"
   | "lifecycle_forget"
   | "merkle_checkpoint"
+  | "checkpoint"
   | "stage_pending_promotion"
   | "cancel_pending_promotion"
   | "flush_pending_promotions"

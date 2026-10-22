@@ -32,6 +32,8 @@ import {
 } from "./store.ts";
 import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
 import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
+import { stripInjectedContextBlocks } from "./security/strip.ts";
+import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -190,7 +192,7 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
   }
 
   const server = new Server(
-    { name: "musememory", version: "1.6.0" },
+    { name: PACKAGE_NAME, version: PACKAGE_VERSION },
     {
       capabilities: { tools: {}, logging: {} },
       instructions: `MUSE MEMORY PROTOCOL:
@@ -329,6 +331,53 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             },
           },
           required: ["action"],
+        },
+      },
+      {
+        // The three tools below were callable through the CallTool switch but
+        // absent from the ListTools registry, so a client could never
+        // discover them by listing tools. A tool that is not discoverable is
+        // a tool that does not exist for every agent that reads the list.
+        name: "memory_get_constraints",
+        description: "Read the active working constraints and hard invariants recorded in CURRENT.md for the active project",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Project scope name (defaults to active project)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_set_constraints",
+        description: "Append a working constraint or hard invariant to CURRENT.md for the active project",
+        inputSchema: {
+          type: "object",
+          properties: {
+            constraint: { type: "string", description: "The constraint text to append" },
+            project: { type: "string", description: "Project scope name (defaults to active project)" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "memory_recall",
+        description: "Recall active and confirmed memories for a query, with verification levels and related graph links",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            project: { type: "string" },
+            dir: { type: "string", description: "Optional project workspace directory path" },
+            limit: { type: "number" },
+            token_budget: { type: "number", description: "Maximum token budget to consume" },
+            include_superseded: { type: "boolean" },
+            type: { type: "string" },
+            status: { type: "string" },
+            verified: { type: "boolean" },
+            min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
+          },
+          required: ["query"],
         },
       },
       {
@@ -496,7 +545,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       },
       {
         name: "memory_detect_agents",
-        description: "Scan the machine for 80+ coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.)",
+        description: "Scan the machine for installed coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.)",
         inputSchema: {
           type: "object",
           properties: {},
@@ -1801,6 +1850,12 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
                 status: a.status ? String(a.status) : undefined,
                 verified: a.verified === true,
                 tier: tierOpt,
+                // as_of and depth are declared on the tool schema, so they
+                // must be honoured on BOTH branches. Dropping them here made
+                // get_context(tier=1, as_of=...) return the current state
+                // while the untiered path returned the historical one.
+                depth: a.depth ? (String(a.depth) as "L1" | "L2" | "L3") : undefined,
+                as_of: a.as_of ? String(a.as_of) : undefined,
                 minVeracity: a.min_veracity as any,
               })
             : formatPromptContext(activeStore, activeMemoryDir, queryStr, {
@@ -1991,8 +2046,10 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             }
             if (activeMemoryDir) {
               try {
+                // T-110: the session handoff is replayed into later prompts
+                // too, so the discovery line is sanitised at the sink.
                 updateSessionHandoff(activeMemoryDir, {
-                  discoveries: [String(a.title || a.content || "")],
+                  discoveries: [stripInjectedContextBlocks(String(a.title || a.content || ""))],
                 });
               } catch {}
             }
@@ -2123,7 +2180,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const entry = get(activeStore, id);
         if (!entry) return toolError(`no entry found with id ${id}`);
 
-        const isDryRun = a.dry_run !== false && a.confirm !== true && a.apply !== true && a.force !== true;
+        // Only the two DECLARED flags may disable the dry-run default
+        // (T-063). `apply` and `force` were previously honoured here as
+        // undocumented aliases, which let a client that never saw the schema
+        // silently switch a destructive operation out of dry-run mode.
+        const isDryRun = a.dry_run !== false && a.confirm !== true;
         if (isDryRun) {
           return toolResult({
             dry_run: true,

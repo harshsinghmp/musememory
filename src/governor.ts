@@ -5,6 +5,7 @@ import type { Store } from "./store.ts";
 import { list, get, save, propose, link, nowIso } from "./store.ts";
 import type { MemoryEntry, MemoryType, MemoryStatus } from "./types.ts";
 import { daysSince, stalePolicyDays } from "./retrieval.ts";
+import { stripInjectedContextBlocks } from "./security/strip.ts";
 
 // -----------------------------------------------------------------------------
 // CURRENT.md (Active Constraints & In-Flight Real-Time Session State)
@@ -403,7 +404,14 @@ export function getCurrent(memoryDir: string): string[] {
 }
 
 export function setCurrent(memoryDir: string, text: string, project = "default"): string[] {
-  const trimmed = text.trim();
+  // T-110: strip injected context blocks at the sink, not only at the store.
+  // CURRENT.md is replayed verbatim into every later prompt (see
+  // syncConstraints / parseCurrentFile), so a raw constraint written here is
+  // a prompt-injection vector even though the *stored memory* is sanitised
+  // by propose(). Sanitising inside setCurrent() covers every caller:
+  // the MCP capture/append paths, the CLI, the store and the web UI.
+  const sanitized = stripInjectedContextBlocks(text);
+  const trimmed = sanitized.trim();
   if (!trimmed) return getCurrent(memoryDir);
   const current = parseCurrentFile(memoryDir);
   const stamp = `[${new Date().toISOString()}] (${project}) ${trimmed}`;
