@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.1] - 2026-10-22
 
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.0.0...v3.0.1
+
 ### Summary
 Correctness release. Fixes five defects found by a cross-file invariant audit: a prompt-injection channel through `CURRENT.md`, a store that could fail its own schema validator, bi-temporal queries answered from a stale cache entry, a tiered context path that silently dropped `as_of`, and an access counter that never accumulated. Also makes every published number machine-verified, and redesigns the website.
 

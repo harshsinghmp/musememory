@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.0.0`  
-> **Status**: Major Release (Failure Attribution, Negative Memory Mining, HOT.md Working Set Compounding & LangMem Logarithmic Frequency Ranking)
+> **Version**: `v3.0.1`  
+> **Status**: Patch Release — correctness fixes from the cross-file invariant audit, machine-verified published claims, and the website redesign.
 
 ---
 
