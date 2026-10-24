@@ -138,6 +138,7 @@ export async function handleSearchCommand({ positional, flags }: ParsedArgs): Pr
     tokenBudget,
     project: flags["project"],
     includeSuperseded: flags["include-superseded"] === "true",
+    includeConflicted: flags["include-conflicted"] === "true",
     type: flags["type"],
     status: flags["status"],
     verified: flags["verified"] === "true",

@@ -459,6 +459,14 @@ export interface SearchOptions {
   limit?: number;
   project?: string;
   includeSuperseded?: boolean;
+  /**
+   * T-405: include memories flagged `conflicted` by the contradiction engine.
+   * Default: excluded from every prompt-serving read path (recall, ranked
+   * context, fused muse context, FTS store queries), because a conflicted
+   * memory is a known potential falsehood. Audit surfaces (conflicts
+   * listings, status-scoped queries) are unaffected.
+   */
+  includeConflicted?: boolean;
   type?: MemoryType | string;
   /** Multi-type filter (SOW-106 agent contracts). */
   types?: string[];

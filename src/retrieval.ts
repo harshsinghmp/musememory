@@ -1689,6 +1689,14 @@ export function queryContext(
         hidden_count++;
         return false;
       }
+      // T-405: conflicted memories are known potential falsehoods — withheld
+      // from prompts by default (badgeless injection defect #313). A caller
+      // that explicitly asks for the conflicted status (audits, conflicts
+      // listings) still receives them — same guard as the archived gate.
+      if (!options.includeConflicted && options.status !== "conflicted" && e.status === "conflicted") {
+        hidden_count++;
+        return false;
+      }
       if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
         hidden_count++;
         return false;
@@ -2096,7 +2104,7 @@ export function formatPromptContext(
   // made a "what did we believe in Q1?" query return today's answer from the
   // 30s TTL cache. The include* / types / tags flags have the same problem.
   const cacheKey = store.cache
-    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}:${options.as_of || ""}:${options.includeSuperseded ? "1" : "0"}:${options.includeArchived ? "1" : "0"}:${options.includeUntrusted ? "1" : "0"}:${options.types?.join(",") || ""}:${options.tags?.join(",") || ""}`
+    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}:${options.as_of || ""}:${options.includeSuperseded ? "1" : "0"}:${options.includeConflicted ? "1" : "0"}:${options.includeArchived ? "1" : "0"}:${options.includeUntrusted ? "1" : "0"}:${options.types?.join(",") || ""}:${options.tags?.join(",") || ""}`
     : undefined;
 
   if (cacheKey && store.cache) {
