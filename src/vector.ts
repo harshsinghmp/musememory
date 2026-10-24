@@ -209,6 +209,8 @@ export interface HybridSearchOptions {
   /** Restrict candidate rows to this project (undefined = cross-project search). */
   project?: string;
   includeSuperseded?: boolean;
+  /** T-405: include conflicted rows in hybrid search candidates (excluded by default). */
+  includeConflicted?: boolean;
   includeArchived?: boolean;
   includeExpired?: boolean;
   /** Clock for expiry evaluation; defaults to Date.now(). */
@@ -229,6 +231,7 @@ export interface HybridSearchOptions {
 function passesRowFilter(entry: MemoryEntry, o: HybridSearchOptions, now: number): boolean {
   if (o.project && entry.project !== o.project) return false;
   if (!o.includeSuperseded && (entry.status === "superseded" || entry.status === "rejected")) return false;
+  if (!o.includeConflicted && entry.status === "conflicted") return false;
   if (!o.includeArchived && entry.status === "archived") return false;
   if (!o.includeExpired && isExpired(entry, now)) return false;
   return true;

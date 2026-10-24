@@ -176,6 +176,8 @@ export async function rankAndRetrieveMemories(
     activeFilePath?: string;
     targetSymbol?: string;
     includeSuperseded?: boolean;
+    /** T-405: include conflicted memories in ranked candidates (excluded by default). */
+    includeConflicted?: boolean;
     now?: number;
     /** R21: precomputed semantic cosine scores by entry id. */
     semanticScores?: Map<string, number>;
@@ -271,6 +273,12 @@ export async function rankAndRetrieveMemories(
   }
   if (!options.includeSuperseded) {
     entries = entries.filter((e) => e.status !== "superseded" && e.status !== "rejected");
+  }
+  // T-405: conflicted candidates vetoed before scoring — a rank discount
+  // (STATUS_PENALTY -0.8) is not a filter; #313 showed conflicted entries
+  // surfacing as kept:high_relevance.
+  if (!options.includeConflicted) {
+    entries = entries.filter((e) => e.status !== "conflicted");
   }
   // T-108: Re-injection suppression per session
   if (options.sessionId && options.suppressReinjection !== false) {

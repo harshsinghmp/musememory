@@ -139,12 +139,16 @@ export async function resolveMuseContext(
 
   // Also query store for timeless or active constraints
   const allEntries = list(store);
+  const conflictedIds = new Set(
+    allEntries.filter((e) => e.status === "conflicted").map((e) => e.id),
+  );
   const constraintEntries = allEntries.filter(
     (e) =>
       (e.type === "constraint" || e.temporal_mode === "timeless") &&
       e.status !== "archived" &&
       e.status !== "superseded" &&
-      e.status !== "rejected"
+      e.status !== "rejected" &&
+      !(e.status === "conflicted" && !input.include_conflicted)
   );
 
   for (const ce of constraintEntries) {
@@ -173,6 +177,10 @@ export async function resolveMuseContext(
     for (const e of allEntries) {
       if (!e.anchors || e.anchors.length === 0) continue;
       if (e.status === "archived" || e.status === "superseded") continue;
+      // T-405: conflicted entries' code anchors stay out of the lens too —
+      // otherwise the anchor coordinates leak the existence of a memory the
+      // pool gate just withheld (mirror of the route-lens strip).
+      if (e.status === "conflicted" && !input.include_conflicted) continue;
 
       for (const anc of e.anchors) {
         let fileMatch = false;
@@ -217,6 +225,7 @@ export async function resolveMuseContext(
         suppressReinjection: false,
         suppressSelfEcho: false,
         suppressSeenChunks: false,
+        includeConflicted: input.include_conflicted === true,
         recordSeenChunks: false,
         echoHorizonMs: input.echo_horizon_ms,
         agent: input.agent,
@@ -234,6 +243,19 @@ export async function resolveMuseContext(
       });
 
   // Merge anchored memories to front of candidate pool
+  // T-405: strip conflicted ids from the ids-only lenses too (matched_routes,
+  // route_prioritized_ids) so a badgeless existence leak cannot route around
+  // the content gate through the route manifest.
+  if (!input.include_conflicted && conflictedIds.size > 0) {
+    routeLookup.matched_routes = routeLookup.matched_routes.map((rt) => ({
+      ...rt,
+      entry_ids: rt.entry_ids.filter((id) => !conflictedIds.has(id)),
+    }));
+    routeLookup.prioritized_entry_ids = routeLookup.prioritized_entry_ids.filter(
+      (id) => !conflictedIds.has(id),
+    );
+  }
+
   const candidatePool: MemoryEntry[] = trivialGate.isTrivial ? [] : [...entriesWithMatchingAnchors];
 
   if (!trivialGate.isTrivial) {
@@ -250,6 +272,23 @@ export async function resolveMuseContext(
     for (const r of ranked) {
       if (!candidatePool.some((c) => c.id === r.entry.id)) {
         candidatePool.push(r.entry);
+      }
+    }
+  }
+
+  // T-405: Contradiction engine verdicts — conflicted memories withheld by
+  // default unless include_conflicted: true. Applied at the pool choke point
+  // (before the trust gate) so code anchors, route pulls and ranked candidates
+  // share ONE gate instead of three per-source filters.
+  const withheldConflicted: Array<{ id: string; reason: string }> = [];
+  if (!input.include_conflicted && conflictedIds.size > 0) {
+    for (let i = candidatePool.length - 1; i >= 0; i--) {
+      if (conflictedIds.has(candidatePool[i].id)) {
+        const removed = candidatePool.splice(i, 1)[0];
+        withheldConflicted.push({
+          id: removed.id,
+          reason: "conflicted_status - resolve in memory conflicts; opt-in via include_conflicted: true",
+        });
       }
     }
   }
@@ -489,6 +528,12 @@ export async function resolveMuseContext(
   if (withheldUntrusted.length > 0) {
     suggestedNextSteps.push(
       `${withheldUntrusted.length} untrusted memor${withheldUntrusted.length === 1 ? "y" : "ies"} withheld — pass include_untrusted: true to include them`,
+    );
+  }
+
+  if (withheldConflicted.length > 0) {
+    suggestedNextSteps.push(
+      `${withheldConflicted.length} conflicted memor${withheldConflicted.length === 1 ? "y" : "ies"} withheld — resolve them via memory conflicts or pass include_conflicted: true`,
     );
   }
 

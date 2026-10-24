@@ -24,6 +24,11 @@ export interface MuseContextInput {
   include_drifted?: boolean;
   /** T-075: Include memories with untrusted provenance (filtered by default). */
   include_untrusted?: boolean;
+  /**
+   * T-405: Include memories flagged `conflicted` by the contradiction engine
+   * (excluded by default — a conflicted memory is a known potential falsehood).
+   */
+  include_conflicted?: boolean;
   /** T-108: Session ID for turn-level re-injection suppression and LRU tracking. */
   session_id?: string;
   /** T-108: Turn number within session (1-indexed). Defaults to auto-incremented session turn. */
