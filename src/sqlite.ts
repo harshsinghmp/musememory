@@ -611,6 +611,8 @@ export function searchMemoriesFts(
     status?: string;
     limit?: number;
     includeSuperseded?: boolean;
+    /** T-405: include conflicted rows in FTS results (excluded by default). */
+    includeConflicted?: boolean;
     overfetch?: boolean;
   },
 ): FtsSearchHits {
@@ -661,7 +663,15 @@ export function searchMemoriesFts(
   // query an over-fetch buffer so active results fill the requested limit.
   const targetLimit = filters?.limit;
   if (targetLimit) {
-    const shouldOverfetch = filters?.overfetch !== false && !filters?.includeSuperseded && !filters?.status;
+    // Overfetch whenever any post-fetch hide-gate can still remove rows: an
+    // explicit status filter owns the window (its caller asked for the status),
+    // otherwise both lifecycle gates must be fully open. The connective is OR
+    // — includeSuperseded alone does not disarm the conflicted gate, and vice
+    // versa (T-405: sibling-gate truncation, critic round 1).
+    const shouldOverfetch =
+      filters?.overfetch !== false &&
+      !filters?.status &&
+      (!filters?.includeSuperseded || !filters?.includeConflicted);
     const fetchLimit = shouldOverfetch ? Math.min(500, Math.max(targetLimit * 2, targetLimit + 10)) : targetLimit;
     sql += ` LIMIT ?`;
     params.push(fetchLimit);
@@ -675,6 +685,11 @@ export function searchMemoriesFts(
     for (const r of rows) {
       const entry = rowToMemoryEntry(r);
       if (!filters?.includeSuperseded && !filters?.status && (entry.status === "superseded" || entry.status === "rejected")) {
+        hidden_count++;
+        continue;
+      }
+      // T-405: conflicted rows count as hidden prompt material, not results
+      if (!filters?.includeConflicted && !filters?.status && entry.status === "conflicted") {
         hidden_count++;
         continue;
       }

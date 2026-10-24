@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { openStore } from "../store.ts";
-import { evaluateProjectHealth } from "../health/index.ts";
+import { evaluateProjectHealth, resolveProjectName, formatAvailable } from "../health/index.ts";
 import { requireRoot, type ParsedArgs } from "./shared.ts";
 
 export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
@@ -13,7 +13,21 @@ export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
 
   // T-321: `--project` scopes the report to one memory project. Without it
   // the report covers the whole store and says so.
-  const project = parsed.flags["project"] as string | undefined;
+  // T-406: resolve the requested project to the canonical store casing, or
+  // fail loudly — a silent empty report labelled with the caller's casing
+  // reads like a store problem to the person who just spent the tokens.
+  const requestedProject = (parsed.flags["project"] as string | undefined)?.trim() || undefined;
+  const canonicalProject = resolveProjectName(store, requestedProject);
+  if (requestedProject && canonicalProject === undefined) {
+    console.error(
+      `Error: no memories for project "${requestedProject}" — available: ${formatAvailable(store)}`,
+    );
+    return 1;
+  }
+  const project = canonicalProject;
+  if (canonicalProject && canonicalProject !== requestedProject) {
+    console.error(`Note: project filter matched canonical "${canonicalProject}" (requested "${requestedProject}").`);
+  }
 
   const report = evaluateProjectHealth(store, root, { project });
 

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-24
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.0...v3.1.1
+
+### Summary
+Patch release. Two defects found by the post-release bug-hunt are fixed and
+delivered through the bounded gauntlet-loop process (contract-frozen scope,
+blind fresh critics, mutation-verified tests): memories the contradiction
+engine has flagged `conflicted` are no longer injected into agent prompts, and
+project scoping on the health surfaces resolves case-insensitively and fails
+loudly on unknown projects.
+
+**A SemVer patch: both items are defect fixes ([#313](https://github.com/harshsinghmp/musememory/issues/313),
+[#314](https://github.com/harshsinghmp/musememory/issues/314)) — the new `include_conflicted`
+opt-in is additive, and every other surface keeps its shipped shape. Stores
+carrying conflicted memories will notice their absence from prompts; pass
+`include_conflicted: true` to reproduce the old (leaky) behavior deliberately.**
+
+### Fixed
+- **Conflicted memories are withheld from prompts by default ([#313](https://github.com/harshsinghmp/musememory/issues/313), [PR #321](https://github.com/harshsinghmp/musememory/pull/321))**: a memory the contradiction engine has marked `conflicted` is a known potential falsehood, yet it was only rank-discounted (−0.8), never filtered — it surfaced into recall results, ranked candidates (`kept:high_relevance`), fused muse context (`relevant_memories`, `confident_answers`, route manifests, code anchors) and FTS store queries with no badge. One shared `includeConflicted` opt-in is now honored at every prompt-serving gate: the `queryContext` lifecycle gate (hidden-count-aware, with the explicit-status guard so audit queries still reach conflicted rows), the FTS hidden-row gate with an overfetch connective armed whenever any post-fetch hide-gate stays active, the vector hybrid row gate and engine passthrough, the ranking candidate veto, and the muse-context pool choke point plus anchor/route lens strips, constraint projection and a withheld notice. The MCP `search`/`memory_recall` tools expose `include_conflicted` beside `include_superseded`, and the CLI mirrors `--include-conflicted`. Temporal/as-of queries deliberately keep serving state-at-the-time (a conflict verdict is dated after the historical point). The frozen golden recall fixture was untouched — the corpus carries zero conflicted entries (verified, not assumed); seven new tests pin the behavior, and the suite stands at **1408 pass / 0 fail** across 213 files. Fresh Critic verdict 9.5/10 after a mutation-verified overfetch test.
+- **Project scoping is case-insensitive and fails loud ([#314](https://github.com/harshsinghmp/musememory/issues/314), [PR #322](https://github.com/harshsinghmp/musememory/pull/322))**: `memory health --project ALPHA` against a store holding `alpha` returned a silent empty report labelled with the caller's casing — the MCP `muse_health` tool and the studio `/api/health?project=` endpoint shared the silent-empty behavior. A single resolution owner (`resolveProjectName`, `src/health/resolve.ts` — exact match wins, unique case-insensitive match returns the store's spelling, unknown or ambiguous stays unresolved) is wired into all three surfaces, which now fail loudly (CLI exit 1, MCP error result, studio 404 — each echoing the requested name and the available projects) instead of silently. The gate itself stays a pure exact-canonical reporter (existing scope tests pass unmodified); `--json` output on the CLI stays pure (the resolution note rides stderr). Eight new tests; Fresh Critic verdict 9/10 after an empirical stdout-purity probe.
+
 ## [3.1.0] - 2026-10-24
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.0.2...v3.1.0

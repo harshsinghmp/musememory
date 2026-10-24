@@ -111,7 +111,7 @@ import {
   analyzeTechnicalDebt,
   runDistillRouter,
 } from "./cognition/index.ts";
-import { evaluateProjectHealth, reconcileCodeAnchors } from "./health/index.ts";
+import { evaluateProjectHealth, reconcileCodeAnchors, resolveProjectName, formatAvailable } from "./health/index.ts";
 import { analyzeMemoryCodeImpact } from "./intelligence/index.ts";
 import { generatePrContext } from "./compaction/index.ts";
 import {
@@ -248,6 +248,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             limit: { type: "number" },
             token_budget: { type: "number", description: "Maximum token budget to consume" },
             include_superseded: { type: "boolean" },
+            include_conflicted: { type: "boolean", description: "Include memories flagged conflicted by the contradiction engine (excluded by default — known potential falsehoods)" },
             hybrid: { type: "boolean", description: "Use the offline vector+BM25 index (requires 'memory reindex'); falls back to live scoring when absent" },
             type: { type: "string" },
             status: { type: "string" },
@@ -372,6 +373,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             limit: { type: "number" },
             token_budget: { type: "number", description: "Maximum token budget to consume" },
             include_superseded: { type: "boolean" },
+            include_conflicted: { type: "boolean", description: "Include memories flagged conflicted by the contradiction engine (excluded by default — known potential falsehoods)" },
             type: { type: "string" },
             status: { type: "string" },
             verified: { type: "boolean" },
@@ -1988,6 +1990,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             limit: clampLimit(a.limit, 10, 100, 1),
             tokenBudget: typeof a.token_budget === "number" ? a.token_budget : undefined,
             includeSuperseded: a.include_superseded === true,
+            includeConflicted: a.include_conflicted === true,
             type: a.type ? String(a.type) : undefined,
             status: a.status ? String(a.status) : undefined,
             verified: a.verified === true,
@@ -3023,8 +3026,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "muse_health": {
         // T-321: optional project scope filter.
+        // T-406: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const report = evaluateProjectHealth(activeStore, activeRoot, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult(report);
       }

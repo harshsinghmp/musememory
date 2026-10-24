@@ -97,7 +97,8 @@ All releases and git tags must follow strict `vX.Y.Z` semantic versioning:
 
 ### Release Invariants
 - Sync `package.json` `"version"` with the `vX.Y.Z` tag in the release commit.
-- Stage on `release/vX.Y.Z` from `dev` → merge to `master` → back-merge to `dev`.
+- Any version bump regenerates derived artifacts **in the same commit**: `claims.json` embeds the package version, so a bump without `bun run claims:generate` fails CI's `claims:check` (caught live on the v3.1.0 cut).
+- Stage on `release/vX.Y.Z` from `dev` → merge to `main` → back-merge to `dev`.
 - CI publishes on `v*` tag push (`git tag -a vX.Y.Z -m "release: vX.Y.Z"`). Never publish manually.
 - **README "What's New" Rule**:
   - Keep only the current release/feature highlights in `README.md` under `## 🚀 What's New`.

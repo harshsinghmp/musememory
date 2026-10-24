@@ -201,6 +201,7 @@ export class RetrievalEngine {
           // row filter as the exact path or stale/cross-project rows leak into context.
           project: options.project,
           includeSuperseded: options.includeSuperseded,
+          includeConflicted: options.includeConflicted,
           includeArchived: options.includeArchived,
           includeExpired: options.includeExpired,
           now: options.now,
