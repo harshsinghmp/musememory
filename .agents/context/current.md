@@ -136,6 +136,21 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Released: v3.1.0** (2026-10-24) — Waves 23–26 shipped to `main`:
+  - PR #318 merged at `c5a141d` (*"Release: v3.1.0"*); annotated tag
+    [`v3.1.0`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.0)
+    pushed on the release commit; GitHub release published with notes
+    derived from the stamped changelog. `package.json` is `3.1.0` and
+    `[Unreleased]` is empty again.
+  - Governance disclosure: the `main` branch-guard ruleset requires one
+    approving review; the merge used `--admin` on the principal's order to
+    cut the release (the `test` check was green first). Disclosed also in
+    the handoff.
+  - The post-release back-merge reunited `main` with `dev`
+    (`fix/showreel-hash-path` lived only on `main` until now; the branch is
+    pruned). Gate evidence, quoted: `bun run check:landed` →
+    **RESULT: LANDED**; `git merge-base --is-ancestor HEAD origin/dev`
+    exits 0 at `c5a141d`; `bun test` re-run on the merged tree: 1393 / 0.
 - [x] **Wave 26: The Landing Gate — a commit is not a delivery**:
   - On 2026-10-22 two complete waves (T-320, T-321) were committed to a local branch and a local `dev`, and the session ended. No push, no PR, no CI run — while the close-out document described them as landed, under a heading reading *"Recently Landed Waves (Verified on `dev`)"*. `dev` did not contain them; `origin/dev` had already moved to v3.0.2, so the branch had diverged and the work was invisible to review and to the release. **The code was correct and every test was green. The failure was a false claim about the remote that nothing had ever checked.**
   - `scripts/check-landed.ts` is now the machine-checkable form of that claim: work is **landed** only when it is reachable from the integration branch **on the remote**, and until then it is **local**. The gate verifies `HEAD` is an ancestor of `origin/dev` and that nothing is unpushed, exits non-zero otherwise, and prints the exact commands and SHAs so a report can quote the evidence rather than assert it. A pre-review mode (`--pr --branch <name>`) verifies a branch is pushed, has an open PR, and has no failing checks. Wired into CI for both `pull_request` and `push`.
