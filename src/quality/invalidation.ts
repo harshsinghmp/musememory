@@ -1,4 +1,6 @@
 import type { MemoryEntry, SemanticFactTriple } from "../types.ts";
+import { canonicalizeScope, extractTrailingScope } from "./scope.ts";
+export { canonicalizeScope } from "./scope.ts";
 export type { SemanticFactTriple };
 
 export interface ScopedAlignmentResult {
@@ -43,26 +45,9 @@ const RELATION_ALIASES: Record<string, string> = {
   runtime_engine: "runtime",
 };
 
-// Canonical scope aliases
-const SCOPE_ALIASES: Record<string, string> = {
-  prod: "production",
-  production: "production",
-  dev: "development",
-  development: "development",
-  test: "testing",
-  testing: "testing",
-  staging: "staging",
-  analytics: "analytics",
-  warehouse: "analytics",
-  olap: "analytics",
-  macos: "desktop",
-  desktop: "desktop",
-  mobile: "mobile",
-  ios: "mobile",
-  android: "mobile",
-  frontend: "frontend",
-  backend: "backend",
-};
+// Canonical scope aliases live in ./scope.ts (T-320) so that the scope
+// vocabulary has exactly one owner shared by the triple machinery and the
+// polarity claim extractor.
 
 // Mutually exclusive target pairs (polarities or competing options)
 const CONFLICTING_TARGET_PAIRS: [RegExp, RegExp][] = [
@@ -83,11 +68,6 @@ export function normalizeTerm(term?: string): string {
 export function canonicalizeRelation(rel?: string): string {
   const norm = normalizeTerm(rel);
   return RELATION_ALIASES[norm] || norm;
-}
-
-export function canonicalizeScope(scope?: string): string {
-  const norm = normalizeTerm(scope);
-  return SCOPE_ALIASES[norm] || norm;
 }
 
 /**
@@ -111,32 +91,37 @@ export function extractFactTriples(
   const lowerText = text.toLowerCase();
 
   // Scope detection heuristic from text and tags
-  let detectedScope: string | undefined;
+  let tagScope: string | undefined;
   if (entry.tags) {
     for (const tag of entry.tags) {
       if (tag.startsWith("scope:")) {
-        detectedScope = canonicalizeScope(tag.replace("scope:", ""));
+        tagScope = canonicalizeScope(tag.replace("scope:", ""));
         break;
       }
     }
   }
-  if (!detectedScope) {
-    if (/\b(in\s+production|for\s+production|prod\s+server|production\s+database|production\s+environment)\b/i.test(text)) {
-      detectedScope = "production";
-    } else if (/\b(in\s+development|for\s+development|dev\s+server|development\s+environment|local\s+dev)\b/i.test(text)) {
-      detectedScope = "development";
-    } else if (/\b(for\s+analytics|analytics\s+warehouse|analytics\s+database|in\s+olap)\b/i.test(text)) {
-      detectedScope = "analytics";
-    } else if (/\b(on\s+macos|macos\s+desktop|for\s+desktop)\b/i.test(text)) {
-      detectedScope = "desktop";
-    } else if (/\b(on\s+mobile|mobile\s+ios|on\s+ios|on\s+android|mobile\s+app)\b/i.test(text)) {
-      detectedScope = "mobile";
-    } else if (/\b(in\s+staging|staging\s+environment)\b/i.test(text)) {
-      detectedScope = "staging";
-    } else if (/\b(in\s+testing|for\s+test|test\s+environment)\b/i.test(text)) {
-      detectedScope = "testing";
-    }
+  let fixedScope: string | undefined;
+  if (/\b(in\s+production|for\s+production|prod\s+server|production\s+database|production\s+environment)\b/i.test(text)) {
+    fixedScope = "production";
+  } else if (/\b(in\s+development|for\s+development|dev\s+server|development\s+environment|local\s+dev)\b/i.test(text)) {
+    fixedScope = "development";
+  } else if (/\b(for\s+analytics|analytics\s+warehouse|analytics\s+database|in\s+olap)\b/i.test(text)) {
+    fixedScope = "analytics";
+  } else if (/\b(on\s+macos|macos\s+desktop|for\s+desktop)\b/i.test(text)) {
+    fixedScope = "desktop";
+  } else if (/\b(on\s+mobile|mobile\s+ios|on\s+ios|on\s+android|mobile\s+app)\b/i.test(text)) {
+    fixedScope = "mobile";
+  } else if (/\b(in\s+staging|staging\s+environment)\b/i.test(text)) {
+    fixedScope = "staging";
+  } else if (/\b(in\s+testing|for\s+test|test\s+environment)\b/i.test(text)) {
+    fixedScope = "testing";
   }
+
+  // T-320: Scope is resolved per claim, not per entry. A fixed vocabulary
+  // match anywhere in the text is the weakest signal; a qualifier attached to
+  // the claim itself ("at tier 2", "for legacy stores") is the strongest.
+  const scopeFor = (claimEndIndex: number): string | undefined =>
+    tagScope ?? fixedScope ?? extractTrailingScope(text, claimEndIndex);
 
   // Database pattern
   const dbMatch = text.match(/\b(primary\s+database|database|warehouse|persistence|db)\b.*?uses?\s+([A-Za-z0-9_]+)/i) ||
@@ -147,7 +132,7 @@ export function extractFactTriples(
       entity: "database",
       relation: "database",
       target: target.startsWith("postgres") ? "postgresql" : target,
-      scope: detectedScope,
+      scope: scopeFor((dbMatch.index ?? 0) + dbMatch[0].length),
     });
   }
 
@@ -158,7 +143,7 @@ export function extractFactTriples(
       entity: "gateway",
       relation: "port",
       target: portMatch[2],
-      scope: detectedScope,
+      scope: scopeFor((portMatch.index ?? 0) + portMatch[0].length),
     });
   }
 
@@ -170,7 +155,7 @@ export function extractFactTriples(
       entity: "user_theme",
       relation: "theme",
       target,
-      scope: detectedScope,
+      scope: scopeFor((themeMatch.index ?? 0) + themeMatch[0].length),
     });
   }
 
@@ -182,7 +167,7 @@ export function extractFactTriples(
       entity: "runtime",
       relation: "runtime",
       target,
-      scope: detectedScope,
+      scope: scopeFor((runtimeMatch.index ?? 0) + runtimeMatch[0].length),
     });
   }
 
@@ -193,7 +178,7 @@ export function extractFactTriples(
       entity: normalizeTerm(statusMatch[1]),
       relation: "status",
       target: normalizeTerm(statusMatch[3]),
-      scope: detectedScope,
+      scope: scopeFor((statusMatch.index ?? 0) + statusMatch[0].length),
     });
   }
 

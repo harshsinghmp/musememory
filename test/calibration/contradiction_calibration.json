@@ -1,0 +1,160 @@
+{
+  "$comment": "T-320 contradiction engine calibration fixture. Each case is a labelled pair of memory texts. `expect` is the ground truth verdict: 'conflict' = the pair genuinely contradicts; 'no_conflict' = the pair is compatible, scope-differentiated, or orthogonal. The calibration test asserts precision and recall against these labels.",
+  "version": 1,
+  "cases": [
+    {
+      "id": "true-conflict-status",
+      "expect": "conflict",
+      "note": "Same subject, opposite status, no scope qualifier.",
+      "a": { "title": "The wiki recompile gate is enabled", "content": "The wiki recompile gate is enabled so the wiki stays in sync with the store." },
+      "b": { "title": "The wiki recompile gate is disabled", "content": "The wiki recompile gate is disabled to avoid rewriting the wiki on every save." }
+    },
+    {
+      "id": "true-conflict-status-same-scope",
+      "expect": "conflict",
+      "note": "Same subject, opposite status, identical scope.",
+      "a": { "title": "Connection pooling is enabled in production", "content": "Connection pooling is enabled in production to bound database connections." },
+      "b": { "title": "Connection pooling is disabled in production", "content": "Connection pooling is disabled in production because the proxy owns pooling." }
+    },
+    {
+      "id": "true-conflict-database",
+      "expect": "conflict",
+      "note": "Same database entity, different engine.",
+      "a": { "title": "The primary database uses PostgreSQL", "content": "The primary database uses PostgreSQL for relational durability." },
+      "b": { "title": "The primary database uses MySQL", "content": "The primary database uses MySQL for relational durability." }
+    },
+    {
+      "id": "true-conflict-port",
+      "expect": "conflict",
+      "note": "Same service, different port binding.",
+      "a": { "title": "The gateway binds to port 3000", "content": "The gateway binds to port 3000 for inbound traffic." },
+      "b": { "title": "The gateway binds to port 8080", "content": "The gateway binds to port 8080 for inbound traffic." }
+    },
+    {
+      "id": "true-conflict-protocol",
+      "expect": "conflict",
+      "note": "Same API surface, different protocol.",
+      "a": { "title": "The public API uses REST", "content": "The public API uses REST for external consumers." },
+      "b": { "title": "The public API uses GraphQL", "content": "The public API uses GraphQL for external consumers." }
+    },
+    {
+      "id": "true-conflict-runtime",
+      "expect": "conflict",
+      "note": "Same runtime slot, different engine.",
+      "a": { "title": "The CLI uses bun runtime", "content": "The CLI uses bun runtime for fast startup." },
+      "b": { "title": "The CLI uses node runtime", "content": "The CLI uses node runtime for broad compatibility." }
+    },
+    {
+      "id": "true-conflict-policy",
+      "expect": "conflict",
+      "note": "Same imperative, opposite universal policy.",
+      "a": { "title": "Always run the test suite", "content": "Always run the test suite before pushing to main." },
+      "b": { "title": "Never run the test suite", "content": "Never run the test suite before pushing to main." }
+    },
+    {
+      "id": "true-conflict-permission",
+      "expect": "conflict",
+      "note": "Same subject, opposite permission.",
+      "a": { "title": "The API allows cross-origin requests", "content": "The API allows cross-origin requests from any origin." },
+      "b": { "title": "The API denies cross-origin requests", "content": "The API denies cross-origin requests from any origin." }
+    },
+    {
+      "id": "no-conflict-scope-production-localhost",
+      "expect": "no_conflict",
+      "note": "REGRESSION: scope-differentiated status claim (production vs localhost).",
+      "a": { "title": "Postgres connection pooling is enabled in production", "content": "Postgres connection pooling is enabled in production to bound connections." },
+      "b": { "title": "Postgres connection pooling is disabled on localhost", "content": "Postgres connection pooling is disabled on localhost to keep dev startup fast." }
+    },
+    {
+      "id": "no-conflict-scope-default-ci",
+      "expect": "no_conflict",
+      "note": "REGRESSION: scope-differentiated status claim (default vs CI).",
+      "a": { "title": "The nightly backup schedule is enabled by default", "content": "The nightly backup schedule is enabled by default for self-hosted installs." },
+      "b": { "title": "The nightly backup schedule is disabled in CI", "content": "The nightly backup schedule is disabled in CI to keep builds hermetic." }
+    },
+    {
+      "id": "no-conflict-orthogonal-subjects",
+      "expect": "no_conflict",
+      "note": "REGRESSION: same verb, different objects.",
+      "a": { "title": "Audit log rotation is enabled for observations", "content": "Audit log rotation is enabled for observations to bound file growth." },
+      "b": { "title": "Audit log rotation is disabled for the memory store", "content": "Audit log rotation is disabled for the memory store because SQLite handles it." }
+    },
+    {
+      "id": "no-conflict-scope-model-present",
+      "expect": "no_conflict",
+      "note": "REGRESSION: conditional scopes (model present vs absent).",
+      "a": { "title": "The vector embedding pipeline is enabled when a model is present", "content": "The vector embedding pipeline is enabled when a model is present." },
+      "b": { "title": "The vector embedding pipeline is disabled when no model is present", "content": "The vector embedding pipeline is disabled when no model is present." }
+    },
+    {
+      "id": "no-conflict-scope-tier",
+      "expect": "no_conflict",
+      "note": "REGRESSION: tier-scoped tier-0 vs tier-2 statements.",
+      "a": { "title": "Tiered context caching is enabled at tier 0", "content": "Tiered context caching is enabled at tier 0 for the manifest route." },
+      "b": { "title": "Tiered context caching is disabled at tier 2", "content": "Tiered context caching is disabled at tier 2 to bound body tokens." }
+    },
+    {
+      "id": "no-conflict-scope-legacy-fresh",
+      "expect": "no_conflict",
+      "note": "REGRESSION: legacy vs fresh store scopes.",
+      "a": { "title": "The migration backfill is enabled for legacy stores", "content": "The migration backfill is enabled for legacy stores." },
+      "b": { "title": "The migration backfill is disabled for fresh stores", "content": "The migration backfill is disabled for fresh stores." }
+    },
+    {
+      "id": "no-conflict-scope-read-only",
+      "expect": "no_conflict",
+      "note": "REGRESSION: write vs read-only scopes.",
+      "a": { "title": "The wiki recompile gate is enabled on save", "content": "The wiki recompile gate is enabled on save." },
+      "b": { "title": "The wiki recompile gate is disabled in read only mode", "content": "The wiki recompile gate is disabled in read only mode." }
+    },
+    {
+      "id": "no-conflict-scope-compaction-restore",
+      "expect": "no_conflict",
+      "note": "REGRESSION: before-compaction vs during-restore scopes.",
+      "a": { "title": "The snapshot ring is enabled before compaction", "content": "The snapshot ring is enabled before compaction." },
+      "b": { "title": "The snapshot ring is disabled during restore", "content": "The snapshot ring is disabled during restore." }
+    },
+    {
+      "id": "no-conflict-orthogonal-themes",
+      "expect": "no_conflict",
+      "note": "REGRESSION: same subject, different relations (audit rotation vs memory store).",
+      "a": { "title": "The store enables the YAML mirror write path", "content": "The store enables the YAML mirror write path." },
+      "b": { "title": "The store enables the SQLite outbox for durable writes", "content": "The store enables the SQLite outbox for durable writes." }
+    },
+    {
+      "id": "no-conflict-migration-context",
+      "expect": "no_conflict",
+      "note": "REGRESSION: a migration note names the old and the new engine; neither is the current state.",
+      "a": { "title": "Migrated from MySQL to PostgreSQL", "content": "Migrated from MySQL to PostgreSQL during the v3 storage rewrite." },
+      "b": { "title": "The primary database uses MySQL", "content": "The primary database uses MySQL for relational durability." }
+    },
+    {
+      "id": "no-conflict-different-api-surfaces",
+      "expect": "no_conflict",
+      "note": "REGRESSION: protocol conflict only when the API surface is the same.",
+      "a": { "title": "The admin API uses REST", "content": "The admin API uses REST for internal tooling." },
+      "b": { "title": "The public API uses GraphQL", "content": "The public API uses GraphQL for external consumers." }
+    },
+    {
+      "id": "no-conflict-different-port-owners",
+      "expect": "no_conflict",
+      "note": "REGRESSION: two services binding different ports are not in conflict.",
+      "a": { "title": "The API binds to port 3000", "content": "The API binds to port 3000 for inbound traffic." },
+      "b": { "title": "The worker binds to port 8080", "content": "The worker binds to port 8080 for the job queue." }
+    },
+    {
+      "id": "no-conflict-same-polarity",
+      "expect": "no_conflict",
+      "note": "Same subject, same polarity — agreement, not contradiction.",
+      "a": { "title": "The plugin registry is enabled", "content": "The plugin registry is enabled for every agent host." },
+      "b": { "title": "The plugin registry is enabled", "content": "The plugin registry is enabled for every agent host." }
+    },
+    {
+      "id": "no-conflict-mixed-scope",
+      "expect": "no_conflict",
+      "note": "REGRESSION: a scoped claim refines a general one; the general claim does not state what happens in that scope, so the pair is not an established contradiction.",
+      "a": { "title": "The cache is enabled", "content": "The cache is enabled for every read path." },
+      "b": { "title": "The cache is disabled by default", "content": "The cache is disabled by default so reads always hit the source of truth." }
+    }
+  ]
+}

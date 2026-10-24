@@ -724,6 +724,18 @@ export function list(
 }
 
 /**
+ * T-321: Lists store entries, optionally restricted to a single memory project.
+ *
+ * Single owner for the "filter by project, or take the whole store" decision.
+ * Callers that report on a project scope (the health gate, bug clustering,
+ * technical debt) use this so that one filter cannot drift from another.
+ */
+export function listForProject(store: Store, project?: string): MemoryEntry[] {
+  const trimmed = project?.trim();
+  return trimmed ? list(store, { project: trimmed }) : list(store);
+}
+
+/**
  * T-037: Fast integer count of stored memories without loading, parsing, or allocating all entries.
  */
 export function countMemories(store: Store): number {
@@ -933,6 +945,12 @@ export function propose(
     conflict_ids?: string[];
     dedup?: boolean;
     checkConflict?: boolean;
+    /**
+     * T-320: Run contradiction detection without flagging the pair.
+     * The detection is audit-logged but neither memory is moved to
+     * `conflicted`, so no health penalty and no sync removal occur.
+     */
+    conflictDryRun?: boolean;
     /** R23: Semantic dotted-path addressing (e.g. "auth.session.jwt-expiry"). */
     mem_path?: string;
     /** T-038: Unique idempotency key to prevent duplicate writes during retries. */
@@ -1276,14 +1294,37 @@ export function propose(
 
   // Optional automated contradiction detection
   if (opts.checkConflict) {
-    const conflict = detectConflict(store, {
-      title: entry.title,
-      content: entry.content,
-      project: entry.project,
-      type: entry.type,
-      id: entry.id,
-    });
+    // T-320: dry-run detection reports the contradiction without flagging the
+    // pair. Flagging flips BOTH memories to `conflicted`, which costs 25
+    // health points each and removes both from every future sync broadcast.
+    const conflictDryRun = opts.conflictDryRun === true;
+    const conflict = detectConflict(
+      store,
+      {
+        title: entry.title,
+        content: entry.content,
+        project: entry.project,
+        type: entry.type,
+        id: entry.id,
+      },
+      { dryRun: conflictDryRun },
+    );
     if (conflict.conflicted && conflict.conflictingEntry) {
+      if (conflictDryRun) {
+        if (store.memoryDir) {
+          recordAuditEvent(store.memoryDir, {
+            operation: "conflict_detected_dry_run",
+            entry_id: entry.id,
+            project: entry.project,
+            details: {
+              would_conflict_with: conflict.conflictingEntry.id,
+              reason: conflict.reason || "Contradiction detected",
+              confidence: conflict.confidence,
+            },
+          });
+        }
+        return entry;
+      }
       const flagged = flagConflict(
         store,
         conflict.conflictingEntry.id,

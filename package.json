@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
@@ -21,6 +21,8 @@
     "build:gif": "bun run --cwd apps/website scripts/build-readme-gif.ts",
     "claims:generate": "bun scripts/generate-claims.ts && bun scripts/generate-cli-reference.ts",
     "claims:check": "bun scripts/generate-claims.ts --check",
+    "check:landed": "bun run scripts/check-landed.ts",
+    "check:landed:pr": "bun run scripts/check-landed.ts --pr",
     "docs:check": "bun scripts/check-doc-links.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

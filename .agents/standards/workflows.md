@@ -49,9 +49,14 @@ To balance velocity with rigor, overhead is strictly proportional to task risk:
 
 ### Phase 5: 🚢 Ship & Archive (Crew)
 - Create structured Conventional Commits following the Git standard.
+- **Run the Landing Gate**: `bun run check:landed`. Phase 5 is not complete
+  until it exits `RESULT: LANDED`. A green test suite is not a delivery —
+  the work must be reachable from `origin/dev`. See
+  [The Landing Gate](./landing-gate.md).
 - **Archive Work Artifacts**: Move completed plans or temporary scratchpads into `.agents/archive/` using the timestamped format `[title]-[YYYYMMDD-HHMMSS].md`.
-- **DOX Pass**: Update `./.agents/context/current.md` and the nearest owning `AGENTS.md`.
+- **DOX Pass**: Update `./.agents/context/current.md` and the nearest owning `AGENTS.md`. The close-out may only write "landed" language under a *"Recently Landed Waves"* heading **after** the gate has passed; until then the entry says **local**.
 - **Memory Update**: Persist newly confirmed invariants or architectural decisions into `./.memory`.
+- **Report**: the final report to the user carries the Remote State block from [The Landing Gate](./landing-gate.md) §5.
 
 ---
 
@@ -63,5 +68,6 @@ To balance velocity with rigor, overhead is strictly proportional to task risk:
    a. `updatedocs` skill — complete mode (doc↔code drift sync; CHANGELOG/docs alignment).
    b. `updateagents` skill — all modes (AGENTS.md + `.agents/` context synchronization).
    c. `git` skill — end-to-end, **stopping before release**. Release cutting is principal-confirmed only; never auto-release.
+   d. **The Landing Gate** — `bun run check:landed`. This is the step that proves the merge actually happened on the remote rather than being assumed. See [The Landing Gate](./landing-gate.md).
 4. **Docs upkeep.** Update CHANGELOG.md, CONTRIBUTING.md, and credits (package.json author/contributors, README credits) whenever required: behavioral changes, new dependencies, new contributors, process changes.
 5. Gates unchanged: green per commit, Why/What/Verification commit bodies, zero secret exposure, English only.

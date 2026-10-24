@@ -13,7 +13,7 @@
 | [`product.md`](./product.md) | Product scope, the live MCP tool matrix, the 7 task profiles, the CLI surface, and the trust gates an agent must assume | Understanding user commands, capabilities, and MCP protocols |
 | [`architecture.md`](./architecture.md) | Dual-Scope storage (`.memory/`), SQLite DB, retrieval scoring formula, and file layout | System design, file locations, state machine, and data flow |
 | [`brand.md`](./brand.md) | Persona profiles (`USER.md` archetypes), voice, and presentation rules | Writing prompts, terminal output copy, and user documentation |
-| [`current.md`](./current.md) | Current shipped state (**v3.0.2**), test coverage, and active constraints | Before starting work on bugs, features, or refactors |
+| [`current.md`](./current.md) | Current shipped state (**v3.1.0**), test coverage, and active constraints | Before starting work on bugs, features, or refactors |
 | [`decisions.md`](./decisions.md) | Locked architectural decisions (zero-daemon, file-backed SQLite, atomic I/O) | Evaluating technical choices or refactors |
 | [`roadmap.md`](./roadmap.md) | Planned improvements, ecosystem expansions, and backlog | Scoping new capabilities |
 | [`ticket-plan.md`](./ticket-plan.md) | Detailed ticket plan for the next work waves | Planning a specific wave of work |

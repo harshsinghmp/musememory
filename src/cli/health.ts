@@ -11,7 +11,11 @@ export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
   }
   const { root, store } = ctx;
 
-  const report = evaluateProjectHealth(store, root);
+  // T-321: `--project` scopes the report to one memory project. Without it
+  // the report covers the whole store and says so.
+  const project = parsed.flags["project"] as string | undefined;
+
+  const report = evaluateProjectHealth(store, root, { project });
 
   if (parsed.flags.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -30,6 +34,12 @@ export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
   console.log(`\n${bold}🏥 MUSE MEMORY 5-PILLAR PROJECT HEALTH GATE${reset}`);
   console.log(`${"=".repeat(50)}`);
   console.log(`Project:       ${bold}${report.project}${reset}`);
+  console.log(
+    `Scope:         ${report.scope.entry_count} ` +
+      `${report.scope.entry_count === 1 ? "memory" : "memories"} across ` +
+      `${report.scope.projects.length} project${report.scope.projects.length === 1 ? "" : "s"}` +
+      (report.scope.filter ? ` (filtered to "${report.scope.filter}")` : ""),
+  );
   console.log(`Overall Grade: ${bold}${report.overall_grade}${reset} (${report.overall_score}/100)`);
   console.log(`Gate Status:   ${statusColor}${bold}${report.gate_status}${reset}\n`);
 

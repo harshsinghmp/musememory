@@ -16,6 +16,7 @@
 | [`system-design.md`](./system-design.md) | Domain modelling, resilience, migration rehearsal, schemas. |
 | [`workflows.md`](./workflows.md) | Scaled tiers, the 5-phase pipeline, PR-per-feature and the post-merge sequence. |
 | [`git-workflow.md`](./git-workflow.md) | Branch lifecycle, commit standards, SemVer. |
+| [`landing-gate.md`](./landing-gate.md) | The delivery contract: a commit is not a delivery. `bun run check:landed` proves work reached the remote before *landed* may be used. |
 | [`dox-hierarchy.md`](./dox-hierarchy.md) | Reading order, child document shape, the closeout checklist, the pruning loop. |
 | [`council-roles.md`](./council-roles.md) | Muse / Sol / Jasper / Crew / Nexus responsibilities and subagent dispatch policy. |
 | [`memory-context.md`](./memory-context.md) | Context hygiene, the `.memory` store lifecycle, durable proposals. |

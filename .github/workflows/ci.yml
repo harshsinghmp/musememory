@@ -11,6 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The delivery gate at the end of this job proves a commit reached
+          # the remote, so the checkout needs the remote's branch refs and the
+          # real history. The default checkout is depth-1 and carries only the
+          # ref that was checked out, which would leave `origin/<branch>`
+          # missing and make the gate fail for every pull request.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -47,3 +54,21 @@ jobs:
           bun run site:qa
       - name: Self Validation
         run: bun run bin/musememory.ts validate --dry-run
+      - name: Delivery gate — the branch is pushed and reviewable
+        # A commit is not a delivery. This step refuses to let a pull request
+        # pass review if its branch was never pushed, if it has no pull
+        # request, or if its own checks are failing. See
+        # .agents/standards/landing-gate.md.
+        run: bun run scripts/check-landed.ts --pr --branch "${{ github.head_ref }}"
+        env:
+          # The gate reads the pull request and its check rollup through the
+          # GitHub CLI, which needs an authenticated token. The workflow
+          # token is read-only, which is all the gate asks for.
+          GH_TOKEN: ${{ github.token }}
+        if: github.event_name == 'pull_request'
+      - name: Delivery gate — the pushed commit is landed
+        # On a push to an integration branch, this proves the commit is
+        # reachable from the branch's remote head and that nothing is left
+        # unpushed. It is the machine-checkable form of "verified on dev".
+        run: bun run scripts/check-landed.ts --integration "${{ github.ref_name }}"
+        if: github.event_name == 'push'

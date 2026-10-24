@@ -1,5 +1,5 @@
 import type { Store } from "../store.ts";
-import { list } from "../store.ts";
+import { listForProject } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
 import type { BugCluster } from "./types.ts";
 
@@ -58,8 +58,11 @@ function classifyBug(entry: MemoryEntry): BugCluster["category"] {
 /**
  * Clusters recurring bug fixes, negative lessons, and failure records into architectural fragility hotspots.
  */
-export function clusterRecurringBugsAndFriction(store: Store): BugCluster[] {
-  const entries = list(store);
+export function clusterRecurringBugsAndFriction(
+  store: Store,
+  options?: { project?: string },
+): BugCluster[] {
+  const entries = listForProject(store, options?.project);
   const bugEntries = entries.filter(
     (e) =>
       e.status !== "archived" &&

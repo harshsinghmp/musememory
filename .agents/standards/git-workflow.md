@@ -18,6 +18,18 @@
 6. For production bugs, use `hotfix/*` rather than merging unfinished work from `dev`.
 7. Prefer a new revert commit over rewriting shared history.
 
+> **Delivery is a separate step from committing.** A branch with a clean,
+> green, well-formatted commit history is still **local** until it is reachable
+> from `origin/dev`. Run `bun run check:landed` before describing any work as
+> landed, shipped or merged — see [The Landing Gate](./landing-gate.md). Rule 3
+> above is enforced by that gate, not by memory.
+>
+> **Never `git add -A` in a checkout another agent may be writing.** Stage the
+> exact paths you edited and verify with `git status --short` immediately
+> before staging; a broad `git add` silently absorbs a concurrent agent's
+> in-progress edits into your commit. The lease protocol is in
+> `.agents/artifacts/WORKTREE-LEASE.md`.
+
 ---
 
 ## 2. Meaningful Git Commit Standard
