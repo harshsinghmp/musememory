@@ -1,24 +1,60 @@
-# HANDOFF — 2026-10-24T11:46:48Z
-branch: `dev` | phase: **v3.1.0 released to `main`** — tag `v3.1.0`, GitHub release published, release train empty
+# HANDOFF — 2026-10-24T16:19:41Z
+branch: `dev` | phase: **T-405 + T-406 fix trains landed on `dev`** — v3.1.0 on `main`, release train empty
 
 ## Next Step
-Resume the backlog. The two filed issues are the highest-value defects the
-last two waves surfaced, and both are ready:
+The two filed issues (#313, #314) are landed — see *Fix trains, this session*
+below. Backlog in priority order:
 
-- **#313 (T-405, HIGH)** — conflicted memories are still injected into agent
-  prompts. Three retrieval paths (`src/retrieval.ts:1686-1701`,
-  `src/retrieval/ranking.ts:272-273`, `src/orchestrator/context.ts:144-147`)
-  exclude `superseded`/`rejected`/`archived`/`expired` but not `conflicted`;
-  the soft −0.8 `STATUS_PENALTY` (`src/types.ts:342`) is a discount, not a
-  filter. It changes retrieval output, so the golden recall fixtures must be
-  regenerated in the same PR.
-- **#314 (T-406, LOW)** — `--project` matches case-sensitively and an
-  exact-match miss returns an empty report whose label still reads the input
-  (e.g. `--project ALPHA` against `alpha`).
+1. **Optional patch release `v3.1.1`** — both trains are behavior fixes on
+   `dev`; cut via the 11-phase release engine when the principal says go
+   (same governance disclosure would apply on `main`).
+2. **Production-Grade Showcase Demo** — re-record the terminal demo (see
+   `current.md` → *Next Up*).
+3. **Wave 24 remainder** — T-316 (Hebbian co-activation edges, unblocked),
+   T-318 (ROI auto-tuner, unblocked); T-317 stays blocked on T-178.
+4. **Silent-casing fan-out** — `muse_tech_debt`, `memory_anchor_audit`,
+   `memory_drift_audit`, `/api/drift`, `/api/cognition/*` still silently
+   accept casing misses; the resolution helper
+   (`src/health/resolve.ts`) is ready to fan out as one small train.
+5. **T-405/T-406 closeout filings** — ambiguous-case wording (say the case
+   collision), Studio client 404 echo (`fetchHealth` shows placeholders),
+   wikilink hop-gate conflicted filter (retrieval.ts ~1462), `get_context`
+   handler hardcoding `includeSuperseded:false` while the schema advertises
+   it, hybrid-path `status` plumbing (pre-existing for every status),
+   queryContext superseded/rejected gate status guard (same class T-405
+   fixed).
+6. **Consolidation wave** — duplicate TTL tables, nine token estimators,
+   clamp ceilings, zero-caller exports (behaviour-changing; `current.md` →
+   *Next Up*).
+7. Also waiting on the principal: the parked spec PRs (#52–#56, R28–R32) each
+   carry a `feat/*` spec branch and need review before their waves can start.
 
-Both are recorded in `current.md` → *Next Up* and in `.agents/context/ticket-plan.md`.
-Also waiting on the principal: the parked spec PRs (#52–#56, R28–R32) each
-carry a `feat/*` spec branch and need review before their waves can start.
+## Fix trains (this session)
+- **T-405 (#313)** — PR #321 merged into `dev` at `e30a1b7` (2026-10-24).
+  Conflicted memories are withheld from prompts by default via one shared
+  `includeConflicted` opt-in honored at every consumer gate (queryContext +
+  cache key, FTS + overfetch connective, vector row gate, engine passthrough,
+  ranking veto, muse pool choke point + anchor/route lens strips +
+  constraints + withheld notice, MCP schemas/mapping, CLI flag). Golden
+  recall fixture untouched — the frozen corpus carries zero conflicted
+  entries (verified). Tests-first RED receipts (2 fail → 7 files, suite
+  1408/0 across 213 files); Fresh Critic verdicts 8 → **9.5/10** with a
+  mutation-verified overfetch test (revert-in-isolation → exactly the new
+  test fails, restore byte-identical). Artifacts:
+  `.agents/artifacts/GAUNTLET_JOB_CONTRACT.md`, `ITERATION_LEDGER.md`,
+  `ACCEPTANCE_PACKET.md` (uncommitted working copies).
+- **T-406 (#314)** — PR #322 merged into `dev` at `d3a8f6b` (2026-10-24).
+  `resolveProjectName`/`listProjectNames`/`formatAvailable`
+  (`src/health/resolve.ts`) resolve health-scoping requests case-insensitively
+  and fail loud on unknown/ambiguous asks (CLI exit 1 · MCP isError · Studio
+  404); the gate stays a pure exact-canonical reporter; `--json` stdout kept
+  parseable (critic probe STDOUT_LINES 1/0). Tests-first RED receipts (2 pass
+  by construction / 6 fail on wiring → 8/0 full file, suite 1408/0); Fresh
+  Critic verdicts 8 → **9/10**. Artifacts:
+  `GAUNTLET_JOB_CONTRACT-T406.md`, `ITERATION_LEDGER-T406.md`,
+  `ACCEPTANCE_PACKET-T406.md`.
+- Both tickets carry landing notes in `.agents/context/ticket-plan.md`
+  (T-405, T-406) and a joint block in `current.md` → *Recently Landed Waves*.
 
 ## Released (this session)
 - **v3.1.0** — PR #318 merged into `main` at `c5a141d` (*"Release: v3.1.0"*),
