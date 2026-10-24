@@ -85,7 +85,21 @@ has since changed.
 - **The health report no longer attributes a store-wide number to one
   arbitrary project.** It states its own scope — the filter, the projects it
   covered, the entry count — and `memory health --project P` asks for one
-  project's health directly.
+  project's health directly. The same filter now reaches every audit
+  surface — anchor audit, drift audit, bug clusters, technical debt — plus
+  a labelled **Project Scope** control in the studio whose value is carried
+  in the URL, so a scoped report can be shared or reloaded.
+
+**Delivery discipline**
+
+- **A commit is not a delivery.** `check:landed` runs in CI on every pull
+  request and push: work is *landed* only when it is reachable from the
+  integration branch *on the remote*, and every report must be able to
+  quote that evidence instead of asserting it.
+- **Shared checkouts are leased.** Two agents in one tree cannot collide
+  silently: the checkout is leased before git mutations, broad `git add`
+  is banned, and staging is verified against `git status` immediately
+  before a commit.
 - **The page no longer reads blank without JavaScript**, and the mobile menu
   no longer overflows the viewport.
 

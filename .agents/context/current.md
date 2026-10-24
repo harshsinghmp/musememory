@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.0.2`  
-> **Status**: Patch Release — correctness fixes from the cross-file invariant audit, machine-verified published claims, and the website redesign.
+> **Version**: `v3.1.0`  
+> **Status**: Minor Release — claim-scoped contradiction engine, project-scoped health on every audit surface (CLI, MCP, studio), a `memory conflicts` preview CLI, and the machine-checked landing gate.
 
 ---
 
@@ -125,7 +125,7 @@ on any blocking failure, so CI runs it. Report:
 
 ---
 
-## ⏭️ Next Up (Post-Wave 24 Focus)
+## ⏭️ Next Up (Post-Release Focus)
 - **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall) to replace removed legacy demo.
 - **Wave 24 remainder**: `T-316` (Hebbian co-activation edges into write-time `linked_memory_ids` seeding — **unblocked**, dep `T-095` landed; note the ticket premise is partly stale: `T-307` already landed the retrieval-expansion side) and `T-318` (retrieval weight auto-tuner from ROI telemetry — **unblocked**, deps `T-127` + `T-140` both landed). `T-317` (query-seeded PPR restart set) stays **blocked** on `T-178` (graph retrieval A/B gate).
 - **Conflicted memories are still served into agent prompts** (found while fixing `T-320`, tracked as **`T-405`** / [issue #313](https://github.com/harshsinghmp/musememory/issues/313)): the status filters in `src/retrieval.ts:1686-1701`, `src/retrieval/ranking.ts:272-273` and `src/orchestrator/context.ts:144-147` exclude `superseded`/`rejected`/`archived`/`expired` but not `conflicted`, so a genuinely contradicted memory is injected with no badge. It *is* soft-penalised (−0.8 via `STATUS_PENALTY`, `src/types.ts:342`) and removed from sync broadcasts — but a rank discount is not a filter, and the gap is **wider** than originally recorded (three retrieval paths, not one). Deliberately left out of `T-320` — it changes retrieval output and therefore the golden recall fixtures; it needs its own ticket and test pass.
