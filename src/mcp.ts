@@ -111,7 +111,7 @@ import {
   analyzeTechnicalDebt,
   runDistillRouter,
 } from "./cognition/index.ts";
-import { evaluateProjectHealth, reconcileCodeAnchors } from "./health/index.ts";
+import { evaluateProjectHealth, reconcileCodeAnchors, resolveProjectName, formatAvailable } from "./health/index.ts";
 import { analyzeMemoryCodeImpact } from "./intelligence/index.ts";
 import { generatePrContext } from "./compaction/index.ts";
 import {
@@ -3026,8 +3026,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "muse_health": {
         // T-321: optional project scope filter.
+        // T-406: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const report = evaluateProjectHealth(activeStore, activeRoot, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult(report);
       }

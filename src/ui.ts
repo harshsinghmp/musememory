@@ -11,7 +11,7 @@ import { RetrievalEngine } from "./retrieval/index.ts";
 import { validateStore } from "./schema.ts";
 import { exportSnapshot } from "./snapshot.ts";
 import { getStorageLayout } from "./store.ts";
-import { evaluateProjectHealth } from "./health/index.ts";
+import { evaluateProjectHealth, resolveProjectName, formatAvailable } from "./health/index.ts";
 import { listAdrs, detectDocumentationCodeDrift } from "./adrs/index.ts";
 import {
   explainWhyCodeIsTheWayItIs,
@@ -511,9 +511,22 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/health" && req.method === "GET") {
         try {
           // T-321: optional project scope filter.
-          const healthProject = url.searchParams.get("project") || undefined;
+          // T-406: the requested name resolves case-insensitively to the
+          // canonical store spelling; an unknown project answers 404 with
+          // what IS available instead of a silent 200-empty report.
+          const requestedProject = url.searchParams.get("project")?.trim() || undefined;
+          const canonicalProject = resolveProjectName(opts.store, requestedProject);
+          if (requestedProject && canonicalProject === undefined) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: `no memories for project "${requestedProject}" — available: ${formatAvailable(opts.store)}`,
+              }),
+            );
+            return;
+          }
           const report = evaluateProjectHealth(opts.store, workspaceRoot, {
-            project: healthProject,
+            project: canonicalProject,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(report));
