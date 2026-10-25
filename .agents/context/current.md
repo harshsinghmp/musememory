@@ -1,6 +1,6 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.1.0`  
+> **Version**: `v3.1.2`  
 > **Status**: Minor Release — claim-scoped contradiction engine, project-scoped health on every audit surface (CLI, MCP, studio), a `memory conflicts` preview CLI, and the machine-checked landing gate.
 
 ---
@@ -133,6 +133,14 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Released: v3.1.2** (2026-10-25) — completes the silent-casing fan-out:
+  - PR #330 merged at `d7e875b` (*"Release: v3.1.2"*); annotated tag
+    [`v3.1.2`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.2)
+    pushed on `d7e875b`; GitHub release published. Back-merge #331 merged at
+    `fb8ff75`; `dev` re-synced.
+  - `package.json` is `3.1.2`; `[Unreleased]` empty.
+  - npm publish still blocked (same E404 as v3.1.0/v3.1.1 — principal-only).
+
 - [x] **Released: v3.1.1** (2026-10-24) — the two post-release defect fixes shipped to `main`:
   - PR #324 merged at `5f97870` (*"Release: v3.1.1"*); annotated tag
     [`v3.1.1`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.1)
