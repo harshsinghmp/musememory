@@ -1,5 +1,5 @@
-# HANDOFF — 2026-10-24T16:19:41Z
-branch: `dev` | phase: **v3.1.1 released to `main`; release train empty** — tag `v3.1.1`, GitHub release published, npm publish blocked (principal-only)
+# HANDOFF — 2026-10-25T23:45:00Z
+branch: `dev` | phase: **v3.1.1 released to `main`; fan-out train landed** — `dev` @ `17c0abe`, issue #327 closed, npm publish still blocked (principal-only)
 
 ## Next Step
 The two filed issues (#313, #314) are **released in v3.1.1** (`main` @ `5f97870`,
@@ -10,6 +10,10 @@ priority order:
    with E404 `PUT musememory@3.1.1` exactly like v3.1.0's tag did (v3.0.1/v3.0.2
    succeeded on Oct 22); the CI npm token no longer owns the package. The
    principal publishes with owner credentials + 2FA, or rotates the token.
+
+1. **v3.1.2 patch release (optional)** — `dev` now carries the fan-out fix
+   (#328, `17c0abe`) on top of v3.1.1; run the 11-phase release engine when
+   ready. npm publish remains principal-only regardless.
 1. **Production-Grade Showcase Demo** — re-record the terminal demo (see
    `current.md` → *Next Up*).
 3. **Wave 24 remainder** — T-316 (Hebbian co-activation edges, unblocked),
