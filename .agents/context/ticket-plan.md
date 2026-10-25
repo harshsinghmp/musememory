@@ -550,12 +550,97 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 19. **Wave 18: Ingestion, Suppression & Curation Gates** (`T-106`–`T-113`) — [x] Landed on dev
 20. **Wave 19: Scoring Refinements & Abstract Sidecars** (`T-118`–`T-125`) — [x] Landed on dev
 21. **Wave 20: Quality Telemetry, Honesty Gates & Retrieval Fault Signals** (`T-127`–`T-135`) — [x] Landed on dev
+22. **Wave 21: Invariant Mutation Safety & Constitutional Immunity** (`T-050`, `T-313`) — [x] Landed on dev
+23. **Wave 22: Failure Attribution & Negative Mining** (`T-144`, `T-314`, `T-315`) — [x] Landed on dev
+24. **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub** (`T-405`–`T-422`) — [ ] Active Roadmap
 
-## v12 Totals
+---
+
+# v13 — DASHBOARD OVERHAUL, TERRAIN MAPS & HIGH-SPEED AGENT HUB (WAVE 23, 2026-10-26)
+
+Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) and architectural design blueprint (`.agents/artifacts/2026-10-26-dashboard-rehaul-rashin-research-and-wave-23-tickets.md`).
+
+## PR 1 / Issue #1: Left-Rail Cyber-Minimalist Shell, Typography & Dual-Scope Switcher
+- [ ] T-405 · UI Shell: Fixed 76px vertical left rail with clean brand mark, numbered sections (`01 OVERVIEW`..`06 ABOUT`), warm-dark aesthetic, JetBrains Mono & Archivo Black typography (English-only, zero kanji) · src/ui.ts · F
+- [ ] T-406 · Dual-Scope Memory Switcher: Header segment toggle `[ Local Project Scope (./.memory) | Global User Scope (~/.memory) | Cross-Project Mesh ]` with instant live refetch · src/ui.ts, src/store.ts, src/root.ts · F
+- [ ] T-407 · Sub-10ms UI Route Architecture: Split single embedded HTML into modular static cached templates with ETag headers and pre-compressed buffers · src/ui.ts · F
+
+## PR 2 / Issue #2: Memory Studio 2.0: Instant Graph/List View Toggle, Physics Settling & Activity Heatmap
+- [ ] T-408 · Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
+- [ ] T-409 · Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
+- [ ] T-410 · Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
+
+## PR 3 / Issue #3: Workspace Terrain Vault: Auto-Generated Context Maps & Split Markdown Reader
+- [ ] T-411 · Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
+- [ ] T-412 · Terrain Vault Split-Pane UI: Left file tree with `GEN` badges and right rendered markdown viewer with scanline animation on `REINDEX` · src/ui.ts · F
+- [ ] T-413 · Terrain Token-Efficiency Test & Benchmark: Test suite verifying deterministic generation, zero secret leaks, and token savings · test/vault_terrain.test.ts · F
+
+## PR 4 / Issue #4: Universal Agents Hub: Detection, 1-Click MCP Wiring & Prompt Snippets
+- [ ] T-414 · Coding Agent Auto-Discovery: Detect installed agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot CLI, Hermes, Crush, Goose, Aider, Codex) with `WIRED`/`UNWIRED`/`ABSENT` status · src/connect.ts, src/ui.ts · F
+- [ ] T-415 · 1-Click Wire / Unwire API: `POST /api/agents/wire` and `POST /api/agents/unwire` writing safe native MCP configs with backup protection · src/ui.ts, src/connect.ts · F
+- [ ] T-416 · "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
+
+## PR 5 / Issue #5: About & Cognitive Mission Control: Architecture Specs, Quick Start & CLI Cheatsheet
+- [ ] T-417 · Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
+- [ ] T-418 · Quick-Start Interactive Onboarding: Multi-step interactive setup cards for leading agents (Antigravity, OpenCode, Claude Code, Cursor) with copyable commands · src/ui.ts · F
+- [ ] T-419 · "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
+
+## PR 6 / Issue #6: System Speed, In-Memory Caching & Performance Hardening
+- [ ] T-420 · In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
+- [ ] T-421 · Fast-Exit & Visibility Sensors: Document `visibilitychange` listeners to stop all background polling intervals and animation frames when browser tab is inactive · src/ui.ts · F
+- [ ] T-422 · Automated UI Performance Benchmark Suite: Headless benchmark asserting sub-10ms UI responses, 60fps graph rendering, and zero memory leaks · test/ui_performance.test.ts · F
+
+---
+
+# v14 — STRATEGIC HORIZONS & SOVEREIGN LIFEOS RETIREMENT (WAVES 24–29, 2026-10-26)
+
+Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive horizons, and LifeOS sovereignty audit.
+
+## Wave 24: Showcase, Interactive Playground & DX Assets
+- [ ] T-423 · Terminal Showreel & GIF Recording: Script and record high-fidelity terminal demo (`showreel.mp4`, `muse-memory-demo.gif`) on v3.0.0 highlighting failure attribution, negative mining, and HOT.md compounding · assets/, docs/ · N
+- [ ] T-424 · Interactive WASM/SQLite Web Playground: In-browser memory studio preview on `apps/website` with zero backend server dependencies · apps/website · F
+- [ ] T-425 · Competitive Benchmark Showcase: Real-time latency, recall accuracy, and token-cost comparison matrix vs Mem0, Zep, and Letta · apps/website, docs/ · N
+- [ ] T-426 · Multi-Agent Interactive Demos: Interactive agent switcher in website docs demonstrating context injection across Antigravity, OpenCode, Claude Code, and Cursor · apps/website · N
+
+## Wave 25: R17 Tri-Cognitive Playbooks & Episodic Narrative Horizon
+- [ ] T-427 · Procedural Playbook Engine (`ProceduralMemory`): Model and persist executable step trajectories, pre-conditions, verification assertions, and rollback recipes · src/cognition/playbooks.ts · F
+- [ ] T-428 · Episodic Causal Narrative Horizon: Group linear observations into causal episodes (`Goal ➔ Hypothesis ➔ Trajectory ➔ Verification ➔ Retrospective`) · src/cognition/episodes.ts · F
+- [ ] T-429 · Bi-Temporal Validity Windows: Stored dual timestamps (`asserted_at` vs `valid_from`/`valid_until`) allowing historical queries without clobbering active state · src/schema.ts, src/store.ts · F
+- [ ] T-430 · Ebbinghaus Utility-Reinforced Cognitive Forgetting Curve: Exponential decay for unverified candidate notes; reinforcement for green test executions · src/quality/decay.ts · F
+- [ ] T-431 · CLI & MCP Playbook Commands: Wire `memory playbook --run <id>`, `memory playbook --list`, and `muse_playbook_recall` / `muse_playbook_record` MCP tools · src/cli/playbook.ts, src/mcp.ts · F
+
+## Wave 26: R18 AST Associative Callgraph Retrieval & Speculative Pre-Flight
+- [ ] T-432 · Recursive SQLite CTE Associative Expansion (Zero-Daemon HippoRAG): 2-hop associative graph traversal using in-process SQLite recursive CTEs (`WITH RECURSIVE call_tree AS (...)`) · src/sqlite.ts, src/retrieval/ · F
+- [ ] T-433 · Speculative Pre-Flight Context Push: Git and editor hooks pre-calculating token-budgeted memory knapsacks on file opening or branch switching · src/hooks/preflight.ts · F
+- [ ] T-434 · Cross-File Symbol Blast-Radius Risk Scoring: AST identifier cross-reference scoring to rate modification risk for proposed code changes · src/anchors/blast_radius.ts · F
+- [ ] T-435 · AST-Anchored Invariant Auto-Recall: Bind exported symbols and route interfaces directly to governing ADRs and architectural invariants · src/retrieval/anchors.ts · F
+
+## Wave 27: R19 Git-Branchable Memories & Multi-Tenant Agency Enclaves
+- [ ] T-436 · Branchable Memory Overlays (`memory branch` / `branch-merge`): Branch-isolated memory layers tracking git feature branch lifecycles · src/store/branch.ts · F
+- [ ] T-437 · Multi-Tenant Agency Enclaves (`scope: client`): Cryptographically segregated client vaults across Council divisions (Sol, Jasper, Crew, Nexus) · src/store/enclaves.ts · F
+- [ ] T-438 · Zero-Knowledge Memory Attestation: Cryptographic SHA-256 signing of SyncPackets with tamper-evident audit chains for client handoffs · src/sync/attestation.ts · F
+- [ ] T-439 · Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
+
+## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry
+- [ ] T-440 · Automated CI / Test Harness Integration: Bind memory utility directly to real test outcomes (`bun test`, `vitest`, `cargo test`); increment ROI on green, decay on red · src/quality/test_feedback.ts · F
+- [ ] T-441 · Negative Anti-Pattern Regression Sentry: Proactive watchdog matching test failures against `BUG_PRONE_PATTERN` and `DO_NOT_USE` records · src/cognition/sentry.ts · F
+- [ ] T-442 · Flaky Test & Environment Drift Detector: Correlate test flakiness and failure bursts with dependency updates and environmental churn · src/doctor/flaky.ts · F
+- [ ] T-443 · Autonomous Remediation Playbook Generator: Automatically synthesize recurring test fix sequences into verified reusable playbooks · src/cognition/remediation.ts · F
+
+## Wave 29: Sovereign LifeOS Migration & Complete Decommissioning
+- [ ] T-444 · Sovereign LifeOS Ingestion Engine: `muse import-lifeos` CLI tool to automatically ingest `~/.config/LIFEOS/USER/` into `~/.memory/` and `~/.memory/USER.md` · src/cli/import_lifeos.ts · F
+- [ ] T-445 · Native Vibeguard CLI (`muse scan-secrets`): Standalone secret scanning binary in `musememory` eliminating dependency on `~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts` · src/cli/secrets.ts · F
+- [ ] T-446 · Machine Terrain Collector in `src/vault/` & `muse-skills`: Incorporate LifeOS Atlas hardware, daemon, and package scans into unified workspace maps · src/vault/system.ts · F
+- [ ] T-447 · Global `~/.agents/AGENTS.md` De-LifeOSification: Remove all `@LIFEOS` imports and rewrite governance directives to point purely to Muse Memory and Muse Skills · ~/.agents/AGENTS.md · N
+- [ ] T-448 · LifeOS Decommissioning & Retirement Gate: Verification audit confirming zero dangling runtime dependencies before safely backing up and removing `~/.config/LIFEOS` · docs/lifeos_retirement.md · N
+
+## v14 Totals
 | Section | Tickets |
 |---|---|
-| Total Tracked Tickets | 290 |
-| Landed on dev | 212 |
-| Active Remaining | 78 |
+| Total Tracked Tickets | 334 |
+| Landed on dev | 217 |
+| Active Remaining | 117 |
+
+
 
 
