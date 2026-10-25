@@ -2909,8 +2909,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_anchor_audit": {
         // T-321: optional project scope filter.
+        // T-406 fan-out: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const report = auditMemoryAnchors(activeStore, activeRoot, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult(report);
       }
@@ -2994,8 +3004,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "memory_drift_audit": {
         // T-321: optional project scope filter.
+        // T-406 fan-out: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const report = detectDocumentationCodeDrift(activeStore, activeRoot, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult(report);
       }
@@ -3009,8 +3029,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "muse_bug_clusters": {
         // T-321: optional project scope filter.
+        // T-406 fan-out: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const clusters = clusterRecurringBugsAndFriction(activeStore, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult({
           total_clusters: clusters.length,
@@ -3019,8 +3049,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
       }
       case "muse_tech_debt": {
         // T-321: optional project scope filter.
+        // T-406 fan-out: the requested name resolves case-insensitively to the
+        // canonical store spelling; an unknown project is a loud tool error
+        // naming what IS available — not a silent empty report.
+        const requestedProject = a.project ? String(a.project).trim() || undefined : undefined;
+        const canonicalProject = resolveProjectName(activeStore, requestedProject);
+        if (requestedProject && canonicalProject === undefined) {
+          return toolError(
+            `no memories for project "${requestedProject}" — available: ${formatAvailable(activeStore)}`,
+          );
+        }
         const report = analyzeTechnicalDebt(activeStore, activeRoot, {
-          project: a.project ? String(a.project) : undefined,
+          project: canonicalProject,
         });
         return toolResult(report);
       }

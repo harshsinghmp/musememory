@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-10-25
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.1...v3.1.2
+
+### Summary
+Patch release. Completes the silent-casing fan-out begun in v3.1.1: the same
+case-insensitive project resolution and loud-failure behavior that was fixed on
+`memory health` is now applied to all seven remaining audit surfaces (MCP
+`memory_anchor_audit`, `memory_drift_audit`, `muse_bug_clusters`,
+`muse_tech_debt`; Studio `/api/cognition/anchors`, `/api/cognition/debt`,
+`/api/cognition/clusters`). Unknown project names now fail loudly instead of
+returning a silent empty report labelled with the wrong-cased input.
+
+### Fixed
+- MCP and Studio audit surfaces now resolve project names case-insensitively
+  via the shared `resolveProjectName()` owner; unknown projects return a tool
+  error (MCP) or 404 (Studio) naming the available projects.
+
 ## [3.1.1] - 2026-10-24
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.0...v3.1.1

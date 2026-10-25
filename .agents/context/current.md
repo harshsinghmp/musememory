@@ -133,10 +133,34 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Released: v3.1.1** (2026-10-24) — the two post-release defect fixes shipped to `main`:
+  - PR #324 merged at `5f97870` (*"Release: v3.1.1"*); annotated tag
+    [`v3.1.1`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.1)
+    pushed on the release merge; GitHub release published with notes derived
+    from the stamped changelog. `package.json` is `3.1.1` and `[Unreleased]`
+    is empty again.
+  - Governance disclosure: the `main` branch-guard ruleset requires one
+    approving review; the merge used `--admin` on the principal's order to
+    cut the release (the `test` check was green on the release branch first:
+    1408 / 0 across 213 files).
+  - Back-merge reunited `main` with `dev` (PR #325; `dev` push CI green,
+    3·m·12s). Post-merge `check:landed` → **RESULT: LANDED** at `ebf4040`.
+  - Standing blocker disclosed again: the `npm-publish` workflow failed on the
+    tag with the same E404 as v3.1.0's tag (query history: v3.0.1/v3.0.2
+    published fine on Oct 22; v3.1.0 + v3.1.1 both 404 on `PUT musememory@…`,
+    so the CI npm token lost owner rights to the package between Oct 22 and
+    Oct 24). npm publishing stays **principal-only** (owner credentials + 2FA)
+    until the token is repaired.
+  - CI false positive filed: the #325 back-merge PR's delivery-gate step
+    failed `check-landed --pr --branch main` because the gate greps for an
+    *open* PR at the head branch and the run's queue lag let the merge close
+    it first (`RESULT: NOT REVIEWABLE` on identical, separately-green
+    content). Fence in the gate's head-branch semantics for back-merge PRs.
 - [x] **Fix trains: T-405 + T-406** (2026-10-24) — issues #313/#314, delivered through the gauntlet-loop + code-review engines (contract-frozen scope, blind Fresh Critic, mutation-verified tests):
   - **T-405** ([#313](https://github.com/harshsinghmp/musememory/issues/313)): PR #321 merged at `e30a1b7`. Conflicted memories are now excluded **by default** from every prompt-serving retrieval path — queryContext lifecycle gate (hidden_count-aware, status-scoped-guarded), FTS store gate with the overfetch connective armed iff any post-fetch hide-gate stays active, vector row gate + engine passthrough, ranking candidate veto before scoring, muse-context pool choke point + anchor/route lens strips + constraint projection + withheld notice — all sharing one `includeConflicted` opt-in (`SearchOptions` cascade; MCP `include_conflicted` schema symmetry on both search/memory_recall tools; CLI `--include-conflicted`). The frozen golden recall fixture was deliberately untouched — the eval corpus carries zero conflicted entries (verified, not assumed); new tests use a self-contained corpus (T-143 promotion discipline respected). RED receipts real (conflicted entry served `kept:high_relevance` into `confident_answers`); critic verdict **9.5/10** with a mutation-verified overfetch test. As-of/temporal queries deliberately keep serving state-at-the-time (documented decision).
   - **T-406** ([#314](https://github.com/harshsinghmp/musememory/issues/314)): PR #322 merged at `d3a8f6b`. Project names resolve case-insensitively (`resolveProjectName`/`listProjectNames`/`formatAvailable`, `src/health/resolve.ts`) on all three health surfaces, failing **loud** (CLI exit 1 · MCP isError · Studio 404) with the requested name echoed and the available list; resolved-with-case-diff surfaces the canonical label plus a note naming the requested form; `--json` stdout stays pure JSON (probe-verified). The gate stays a pure exact-canonical reporter — `git diff test/health_project_scope.test.ts` empty. Final critic verdict **9/10**.
   - Full-suite receipts at merge time: `bun test` **1408 pass / 0 fail** (213 files, +13 tests); `tsc --noEmit` clean; claims `1400→1408`; docs links all resolve; secret scan clean; `check:landed:pr` → `RESULT: REVIEWABLE` before both merges, `check:landed` → **`RESULT: LANDED`** after (at `e30a1b7`, then at `d3a8f6b`).
+  - **T-406 fan-out** ([#327](https://github.com/harshsinghmp/musememory/issues/327)): PR #328 merged at `17c0abe`. Same silent-casing defect closed on the remaining 7 audit surfaces — MCP `memory_anchor_audit`, `memory_drift_audit`, `muse_bug_clusters`, `muse_tech_debt` + studio `/api/cognition/anchors`, `/api/cognition/debt`, `/api/cognition/clusters` — all routed through the existing `resolveProjectName()` owner; unknown projects now fail loud (MCP tool error · Studio 404) with the available list. Gates/engines stay exact. +17 tests (1425 total, 0 new failures vs the 9 pre-existing env failures on dev).
   - Filed follow-ups (deliberate ledger, see HANDOFF): ambiguous-case wording, Studio client 404 echo, silent-casing fan-out (`muse_tech_debt`, anchor/drift audits, `/api/drift`, `/api/cognition/*`), wikilink hop-gate conflicted filter, `get_context` include_superseded schema-vs-handler mismatch, hybrid-path status plumbing, queryContext superseded-gate status guard.
 - [x] **Released: v3.1.0** (2026-10-24) — Waves 23–26 shipped to `main`:
   - PR #318 merged at `c5a141d` (*"Release: v3.1.0"*); annotated tag
