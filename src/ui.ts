@@ -554,9 +554,22 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/drift" && req.method === "GET") {
         try {
           // T-321: optional project scope filter.
-          const driftProject = url.searchParams.get("project") || undefined;
+          // T-406 fan-out: the requested name resolves case-insensitively to
+          // the canonical store spelling; an unknown project answers 404 with
+          // what IS available instead of a silent 200-empty report.
+          const requestedProject = url.searchParams.get("project")?.trim() || undefined;
+          const canonicalProject = resolveProjectName(opts.store, requestedProject);
+          if (requestedProject && canonicalProject === undefined) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: `no memories for project "${requestedProject}" — available: ${formatAvailable(opts.store)}`,
+              }),
+            );
+            return;
+          }
           const drift = detectDocumentationCodeDrift(opts.store, workspaceRoot, {
-            project: driftProject,
+            project: canonicalProject,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(drift));
@@ -590,9 +603,22 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/cognition/clusters" && req.method === "GET") {
         try {
           // T-321: optional project scope filter.
-          const clustersProject = url.searchParams.get("project") || undefined;
+          // T-406 fan-out: the requested name resolves case-insensitively to
+          // the canonical store spelling; an unknown project answers 404 with
+          // what IS available instead of a silent 200-empty report.
+          const requestedProject = url.searchParams.get("project")?.trim() || undefined;
+          const canonicalProject = resolveProjectName(opts.store, requestedProject);
+          if (requestedProject && canonicalProject === undefined) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: `no memories for project "${requestedProject}" — available: ${formatAvailable(opts.store)}`,
+              }),
+            );
+            return;
+          }
           const clusters = clusterRecurringBugsAndFriction(opts.store, {
-            project: clustersProject,
+            project: canonicalProject,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ total_clusters: clusters.length, clusters }));
@@ -607,9 +633,22 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/cognition/debt" && req.method === "GET") {
         try {
           // T-321: optional project scope filter.
-          const debtProject = url.searchParams.get("project") || undefined;
+          // T-406 fan-out: the requested name resolves case-insensitively to
+          // the canonical store spelling; an unknown project answers 404 with
+          // what IS available instead of a silent 200-empty report.
+          const requestedProject = url.searchParams.get("project")?.trim() || undefined;
+          const canonicalProject = resolveProjectName(opts.store, requestedProject);
+          if (requestedProject && canonicalProject === undefined) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: `no memories for project "${requestedProject}" — available: ${formatAvailable(opts.store)}`,
+              }),
+            );
+            return;
+          }
           const debt = analyzeTechnicalDebt(opts.store, workspaceRoot, {
-            project: debtProject,
+            project: canonicalProject,
           });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(debt));
