@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-26
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.3...v3.2.0
+
+### Summary
+Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secret scanner CLI (`memory scan-secrets`), workstation hardware and agent ecosystem terrain collector (`memory terrain`), user profile persona engine with customizable archetypes & bracketed placeholders (`memory user init [developer|designer|marketer|casual|custom]`), and achieves complete sovereign decoupling from legacy external environments. Introduces the 4-phase "Golden Sequence" best-practice workflow for AI agents in README and agent reference guides.
+
+### Added
+- **Native Vibeguard Secret Scanner CLI (`memory scan-secrets`)**: Zero-external-dependency secret scanner detecting API keys (`sk-*`, `ghp_*`, `npm_*`), private keys, AWS access keys, and database connection strings, with instant terminal redaction (`test/cli_secrets.test.ts`).
+- **Machine Terrain Collector (`memory terrain`)**: Deep hardware, toolchain, and coding agent map generator exporting deterministic markdown diagnostics to `.memory/system.md` (`test/vault_system.test.ts`).
+- **Sovereign User Profile & Archetype System (`memory user [init|get|set]`)**: Sovereign persona engine supporting developer, designer, marketer, casual, and custom archetypes with bracketed placeholders (`[Name]`, `[Role]`, `[Preferences]`) and dynamic task intent detection (`test/user.test.ts`).
+- **The Golden Sequence Guide**: Added comprehensive 4-phase end-to-end pair-programming workflow guide in `README.md` and `docs/agent-reference.md`.
+- **Ecosystem Sovereignty Gate**: Automated test gate verifying zero external imports and sovereign operation (`test/sovereignty_gate.test.ts`).
+
+### Changed
+- Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.
+- Updated project documentation and re-generated all claims, CLI references, and MCP tool matrixes.
+
 ## [3.1.3] - 2026-10-26
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.2...v3.1.3
