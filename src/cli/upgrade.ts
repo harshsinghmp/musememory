@@ -165,7 +165,7 @@ export async function getLatestNpmVersion(packageName: string = "musememory"): P
   try {
     const res = await fetch(`https://registry.npmjs.org/${packageName}/latest`, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(2000),
     });
     if (res.ok) {
       const data: any = await res.json();
@@ -179,6 +179,7 @@ export async function getLatestNpmVersion(packageName: string = "musememory"): P
   try {
     const out = execFileSync("npm", ["show", packageName, "version"], {
       encoding: "utf8",
+      timeout: 1500,
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     if (out && !out.includes("error")) return out;

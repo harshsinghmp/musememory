@@ -1,5 +1,5 @@
-# HANDOFF — 2026-10-25T23:45:00Z
-branch: `dev` | phase: **v3.1.1 released to `main`; fan-out train landed** — `dev` @ `17c0abe`, issue #327 closed, npm publish still blocked (principal-only)
+# HANDOFF — 2026-10-25T23:55:00Z
+branch: `dev` | phase: **v3.1.2 released to `main`** — tag `v3.1.2`, GitHub release published, `dev` re-synced at `fb8ff75`, npm publish still blocked (principal-only)
 
 ## Next Step
 The two filed issues (#313, #314) are **released in v3.1.1** (`main` @ `5f97870`,

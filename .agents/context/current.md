@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.1.0`  
-> **Status**: Minor Release — claim-scoped contradiction engine, project-scoped health on every audit surface (CLI, MCP, studio), a `memory conflicts` preview CLI, and the machine-checked landing gate.
+> **Version**: `v3.1.3`  
+> **Status**: Patch Release — CLI sync pool flag hardening, `@latest` install standard, 3-tier upgrade documentation, and Wave 23–29 roadmap expansion.
 
 ---
 
@@ -126,13 +126,29 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities (failure attribution, HOT.md compounding, memory branch/checkout, MCP context recall) to replace removed legacy demo.- **Wave 24 remainder**: `T-316` (Hebbian co-activation edges into write-time `linked_memory_ids` seeding — **unblocked**, dep `T-095` landed; note the ticket premise is partly stale: `T-307` already landed the retrieval-expansion side) and `T-318` (retrieval weight auto-tuner from ROI telemetry — **unblocked**, deps `T-127` + `T-140` both landed). `T-317` (query-seeded PPR restart set) stays **blocked** on `T-178` (graph retrieval A/B gate).
+- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-405`–`T-422`)**:
+  - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
+  - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
+  - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
+  - Universal Agents Hub: Auto-discovery, 1-click MCP wiring, and drop-in prompt snippets for 10+ agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot, Hermes).
+  - Poster-style About panel with live architectural facts, interactive quick start onboarding, and CLI command deck.
+  - Sub-10ms UI serving performance with in-memory SQLite read caching and visibility-based zero-CPU idling.
+- **Production-Grade Showcase Demo**: Re-record high-fidelity terminal demo video/GIF reflecting v3.0.0 capabilities to replace removed legacy demo.
+- **Wave 24 remainder**: `T-316` (Hebbian co-activation edges into write-time `linked_memory_ids` seeding — **unblocked**, dep `T-095` landed; note the ticket premise is partly stale: `T-307` already landed the retrieval-expansion side) and `T-318` (retrieval weight auto-tuner from ROI telemetry — **unblocked**, deps `T-127` + `T-140` both landed). `T-317` (query-seeded PPR restart set) stays **blocked** on `T-178` (graph retrieval A/B gate).
 - **Consolidate the remaining duplicated tables** (deferred from this session as behaviour-changing; full detail with exact locations in [`docs/roadmap.md`](../../docs/roadmap.md) → *Engineering debt*): the three divergent per-type TTL tables (`src/retention.ts` **and** `src/retention/expiry_policy.ts` — only two of the three are in `retention.ts`), the **nine** separate token estimators (across nine files, plus six inline expressions — the collapse is *not* behaviour-neutral, because `src/orchestrator/context.ts` deliberately consumes the pessimistic measure), the divergent limit-clamping ceilings across retrieval paths (**seven** sites in `src/mcp.ts` alone), and the remaining zero-caller exports (twelve genuinely dead; 74 exported with no external caller).
 - **Remove the legacy `web/` directory** — done in this session. It was a second, hand-written copy of the site that `apps/website/` superseded; keeping it was the same "second copy that gets forgotten" failure mode this session fixed everywhere else.
 
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Released: v3.1.2** (2026-10-25) — completes the silent-casing fan-out:
+  - PR #330 merged at `d7e875b` (*"Release: v3.1.2"*); annotated tag
+    [`v3.1.2`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.2)
+    pushed on `d7e875b`; GitHub release published. Back-merge #331 merged at
+    `fb8ff75`; `dev` re-synced.
+  - `package.json` is `3.1.2`; `[Unreleased]` empty.
+  - npm publish still blocked (same E404 as v3.1.0/v3.1.1 — principal-only).
+
 - [x] **Released: v3.1.1** (2026-10-24) — the two post-release defect fixes shipped to `main`:
   - PR #324 merged at `5f97870` (*"Release: v3.1.1"*); annotated tag
     [`v3.1.1`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.1)

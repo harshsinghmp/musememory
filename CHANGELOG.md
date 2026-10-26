@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-10-26
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.2...v3.1.3
+
+### Summary
+Patch release. Fixes a CLI argument parsing defect where `memory sync --pool` without a path argument created a stray `./true` directory, modernizes README installation and update workflows to mandate `@latest` across all package managers, and records the Wave 23–29 architectural roadmap and Agent OS research specifications.
+
+### Fixed
+- **CLI sync `--pool` boolean flag handling**: `memory sync --pool` without a value passed `--pool "true"`, causing the path resolver to evaluate `./true` as a relative directory. `handleSyncCommand` now filters out boolean `"true"` and empty strings, falling back to the standard pool path unless an explicit directory string is provided.
+
+### Documentation
+- **Mandatory `@latest` package installation standards**: Updated README to enforce `@latest` across all package managers (`bun`, `npm`, `pnpm`, `yarn`, `npx`) and documented 3-tier update workflows (CLI/workstation, project/workspace, and storage self-healing).
+- **Wave 23–29 Architectural Backlog**: Added exploded ticket plans and research specifications for dashboard overhaul, workspace terrain maps, universal agent hub, and tri-cognitive retrieval.
+
 ## [3.1.2] - 2026-10-25
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.1...v3.1.2
