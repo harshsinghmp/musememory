@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-1335%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1444%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -61,6 +61,81 @@ has since changed.
 | **Storage** | `.memory/` (project) + `~/.memory/` (global) |
 | **Data leaves your machine** | Never |
 | **Cost** | Free, MIT, no telemetry |
+
+---
+
+## 🏆 The Golden Sequence: Best-Practice Workflow for AI Agents
+
+To get the absolute best results out of Muse Memory across any AI coding agent (Cursor, Claude Code, Windsurf, OpenCode, Antigravity, Gemini CLI, Hermes, etc.), execute this end-to-end sequence:
+
+```text
+1. INITIALIZE & AUTO-WIRE → 2. PERSONA & PROFILE SETUP → 3. SESSION GROUNDING → 4. IN-FLIGHT TRACKING → 5. DECISION CAPTURE → 6. CONTINUOUS HARVESTING → 7. GOVERNANCE & AUDIT
+```
+
+### 1️⃣ Onboarding & Workstation Auto-Wiring
+Connect all installed AI coding agents on your machine to Muse Memory in one command:
+```bash
+# Wire Muse Memory into every detected agent on your workstation with lifecycle hooks
+npx musememory connect all --with-hooks
+
+# Confirm ecosystem health, database schemas, and toolchain integrity
+memory doctor
+
+# Generate host hardware & toolchain terrain map for agent orientation
+memory terrain --out .memory/system.md
+```
+
+### 2️⃣ Persona Archetype & Working Preferences
+Establish your role and communication habits using sovereign templates with placeholders:
+```bash
+# Initialize standard developer profile (or designer / marketer / casual / custom)
+memory user init developer
+
+# Or initialize a custom profile with bracketed placeholders ([Name], [Role], [Preferences])
+memory user init custom
+
+# Inspect your rendered active profile
+memory user get
+```
+
+### 3️⃣ Daily Agent Development Loop
+In every active pair-programming session with an AI agent, follow this 4-step cadence:
+
+1. **Ground Context (Session Start)**:
+   Agent or prompt retrieves top-ranked architectural decisions, bug fixes, and active constraints:
+   ```bash
+   memory context "refactor auth middleware" --token-budget 2000
+   ```
+2. **Lock Active Working Constraints**:
+   Keep track of invariants, WIP status, and tasks across session boundaries:
+   ```bash
+   memory current checkpoint "migrating session tokens to ed25519"
+   ```
+3. **Capture Non-Trivial Decisions & Bug Fixes**:
+   Every time an architectural choice is made or a bug is resolved, capture it with inline Vibeguard secret defense:
+   ```bash
+   memory capture "Use ed25519 for session tokens; rs256 rejected due to key rotation latency" --project my-app
+   ```
+4. **Mark In-Flight Session Complete**:
+   ```bash
+   memory current done "Token migration completed and verified"
+   ```
+
+### 4️⃣ Compounding, Auditing & Knowledge Governance
+```bash
+# Harvest learnings and fix-pairs from all agent chat logs across your machine
+memory learn
+
+# Compile confirmed memories into Obsidian-compatible Markdown wiki pages
+memory wiki compile
+
+# Run native Vibeguard credential security audit (zero external dependencies)
+memory scan-secrets
+
+# Verify 5-pillar architectural health & clean database optimization
+memory health
+memory optimize
+```
 
 ---
 
@@ -131,6 +206,7 @@ has since changed.
 ## 📑 Table of Contents
 
 - [Start here (60 seconds)](#start-here-60-seconds)
+- [🏆 The Golden Sequence](#-the-golden-sequence-best-practice-workflow-for-ai-agents)
 - [What's new](#whats-new)
 - [What Muse Memory does](#what-muse-memory-does)
 - [How it works](#how-it-works)
