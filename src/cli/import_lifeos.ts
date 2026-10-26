@@ -257,7 +257,7 @@ export async function importLifeos(options: ImportLifeosOptions = {}): Promise<I
       continue;
     }
 
-    const memoryId = `m_lifeos_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const memoryId = `m_${Date.now()}_lifeos_${Math.random().toString(36).slice(2, 7)}`;
     importedMemoryIds.push(memoryId);
     memoriesImported++;
 

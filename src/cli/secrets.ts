@@ -128,7 +128,28 @@ export async function executeSecretScan(options: SecretScanOptions): Promise<Sec
   const targetDir = options.targetDir;
   const customIgnores = options.ignorePatterns || [];
 
-  const files = walkScanFiles(targetDir, targetDir, customIgnores);
+  if (!existsSync(targetDir)) {
+    return {
+      targetDir,
+      scannedFiles: 0,
+      findings: [],
+      clean: false,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  let files: string[] = [];
+  try {
+    const stat = statSync(targetDir);
+    if (stat.isFile()) {
+      files = [targetDir];
+    } else {
+      files = walkScanFiles(targetDir, targetDir, customIgnores);
+    }
+  } catch {
+    files = [];
+  }
+
   const findings: SecretFinding[] = [];
 
   for (const file of files) {
@@ -187,6 +208,13 @@ export async function handleScanSecretsCommand(args: ParsedArgs): Promise<number
   const customIgnores = args.flags.ignore
     ? String(args.flags.ignore).split(",").map((s) => s.trim())
     : [];
+
+  if (!existsSync(targetDir)) {
+    if (!silent) {
+      console.error(`\n❌ Error: Target path does not exist: ${targetDir}`);
+    }
+    return 1;
+  }
 
   const result = await executeSecretScan({
     targetDir,

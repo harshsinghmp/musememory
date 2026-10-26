@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import os from "node:os";
 import { Socket } from "node:net";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { detectAgents } from "../agents/detect.ts";
 import { findOrCreateProjectRoot } from "../root.ts";
 import type { ParsedArgs } from "../cli/shared.ts";
@@ -69,13 +69,16 @@ function probePort(port: number): Promise<boolean> {
   });
 }
 
-function runCommandSafe(cmd: string): string | undefined {
+function runBinarySafe(binary: string, args: string[]): string | undefined {
   try {
-    const out = execSync(cmd, { stdio: ["ignore", "pipe", "ignore"], timeout: 1500 });
-    return out.toString("utf8").trim();
+    const res = spawnSync(binary, args, { stdio: ["ignore", "pipe", "ignore"], timeout: 1500 });
+    if (res.status === 0 && res.stdout) {
+      return res.stdout.toString("utf8").trim();
+    }
   } catch {
     return undefined;
   }
+  return undefined;
 }
 
 /**
@@ -101,12 +104,12 @@ export async function collectSystemTerrain(): Promise<SystemTerrain> {
   };
 
   const toolchains: SystemTerrainToolchains = {
-    bunVersion: (process.versions as any).bun || runCommandSafe("bun --version"),
-    nodeVersion: process.versions.node || runCommandSafe("node --version"),
-    gitVersion: runCommandSafe("git --version")?.replace(/^git version\s*/, ""),
-    cargoVersion: runCommandSafe("cargo --version")?.replace(/^cargo\s*/, ""),
-    pythonVersion: runCommandSafe("python3 --version")?.replace(/^Python\s*/, ""),
-    dockerAvailable: Boolean(runCommandSafe("docker --version")),
+    bunVersion: (process.versions as any).bun || runBinarySafe("bun", ["--version"]),
+    nodeVersion: process.versions.node || runBinarySafe("node", ["--version"]),
+    gitVersion: runBinarySafe("git", ["--version"])?.replace(/^git version\s*/, ""),
+    cargoVersion: runBinarySafe("cargo", ["--version"])?.replace(/^cargo\s*/, ""),
+    pythonVersion: runBinarySafe("python3", ["--version"])?.replace(/^Python\s*/, ""),
+    dockerAvailable: Boolean(runBinarySafe("docker", ["--version"])),
   };
 
   // Common agent daemon ports to probe

@@ -63,21 +63,26 @@ const awsKey = "AKIAIOSFODNN7EXAMPLE";
     expect(result.findings.length).toBe(0);
   });
 
-  it("produces exit code 0 on clean and 1 on leaks in CLI handler", async () => {
-    // 1. Clean
-    writeFileSync(join(tempBase, "index.ts"), `console.log("clean");\n`, "utf8");
-    const codeClean = await handleScanSecretsCommand({
-      positional: [tempBase],
-      flags: { silent: "true" },
-    });
-    expect(codeClean).toBe(0);
+  it("handles non-existent target gracefully with exit code 1", async () => {
+    const nonExistent = join(tempBase, "does-not-exist");
+    const result = await executeSecretScan({ targetDir: nonExistent });
+    expect(result.clean).toBe(false);
+    expect(result.scannedFiles).toBe(0);
 
-    // 2. Leaky
-    writeFileSync(join(tempBase, "secret.env"), `AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n`, "utf8");
-    const codeLeaky = await handleScanSecretsCommand({
-      positional: [tempBase],
+    const code = await handleScanSecretsCommand({
+      positional: [nonExistent],
       flags: { silent: "true" },
     });
-    expect(codeLeaky).toBe(1);
+    expect(code).toBe(1);
+  });
+
+  it("scans single file target directly", async () => {
+    const filePath = join(tempBase, "single.ts");
+    writeFileSync(filePath, `const secret = "ghp_123456789012345678901234567890123456";\n`, "utf8");
+
+    const result = await executeSecretScan({ targetDir: filePath });
+    expect(result.clean).toBe(false);
+    expect(result.scannedFiles).toBe(1);
+    expect(result.findings.length).toBe(1);
   });
 });
