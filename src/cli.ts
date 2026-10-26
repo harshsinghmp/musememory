@@ -84,6 +84,7 @@ import { handleMeshCommand } from "./cli/mesh.ts";
 import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
 import { handleImportLifeosCommand } from "./cli/import_lifeos.ts";
 import { handleScanSecretsCommand } from "./cli/secrets.ts";
+import { handleTerrainCommand } from "./vault/system.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -176,6 +177,7 @@ Ecosystem, Migration & Connectivity:
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
   scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
+  terrain [--out file.md]       Collect machine hardware, toolchain & agent ecosystem map
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms
@@ -374,6 +376,9 @@ export async function main(argv: string[]): Promise<number> {
     case "secrets-scan":
     case "vibe-scan":
       return handleScanSecretsCommand(parsed);
+    case "terrain":
+    case "machine-terrain":
+      return handleTerrainCommand(parsed);
     case "code-impact":
     case "impact":
       return handleCodeImpactCommand(parsed);
