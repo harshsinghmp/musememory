@@ -58,7 +58,7 @@ export function getStandardAgentTranscriptDirs(home: string = homedir()): string
     // 2. OpenCode / OpenAgent
     join(home, ".config", "opencode", "transcripts"),
     join(home, ".local", "share", "opencode", "transcripts"),
-    // 3. Claude Code / LifeOS
+    // 3. Claude Code & runtime transcripts
     join(home, ".claude", "transcripts"),
     join(home, ".claude", "projects"),
     join(home, ".config", "LIFEOS", "runtime", "transcripts"),

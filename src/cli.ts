@@ -158,7 +158,6 @@ Ecosystem, Migration & Connectivity:
   agents / detect-agents        Scan workstation for detected coding agent platforms
   detect                        Scan machine for external memory formats to migrate
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
-  import-lifeos [--from DIR] [--target DIR] [--dry-run] Sovereign LifeOS ingestion & USER.md synthesis
   learn / sync-chats [--confirm] Auto-discover and harvest memories from all agent chats across machine
   harvest <file|text> --project P Distill conversation transcripts into structured memory units
   harvest-auto [--from <glob>] [--project P] Harvest inbox transcripts as candidates and archive them

@@ -272,7 +272,7 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
       const topology = discoverWorkspaceMesh(fixture.appDir, fixture.appMemoryDir);
 
       const propReport = propagateConstraintToMesh(fixture.appStore, topology, {
-        title: "Zero Secret Exposure (LifeOS Vibeguard)",
+        title: "Zero Secret Exposure (Vibeguard Protocol)",
         content: "Never commit API keys, tokens or credentials in any package.",
         tags: ["security", "vibeguard"],
       });
