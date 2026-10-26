@@ -82,6 +82,7 @@ import { handleConflictsCommand } from "./cli/conflicts.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
 import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
+import { handleImportLifeosCommand } from "./cli/import_lifeos.ts";
 
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
@@ -155,6 +156,7 @@ Ecosystem, Migration & Connectivity:
   agents / detect-agents        Scan workstation for detected coding agent platforms
   detect                        Scan machine for external memory formats to migrate
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
+  import-lifeos [--from DIR] [--target DIR] [--dry-run] Sovereign LifeOS ingestion & USER.md synthesis
   learn / sync-chats [--confirm] Auto-discover and harvest memories from all agent chats across machine
   harvest <file|text> --project P Distill conversation transcripts into structured memory units
   harvest-auto [--from <glob>] [--project P] Harvest inbox transcripts as candidates and archive them
@@ -210,6 +212,9 @@ export async function main(argv: string[]): Promise<number> {
       return handleDetectCommand(parsed);
     case "migrate":
       return handleMigrateCommand(parsed);
+    case "import-lifeos":
+    case "lifeos-import":
+      return handleImportLifeosCommand(parsed);
     case "agents":
     case "detect-agents":
       return handleAgentsCommand();
