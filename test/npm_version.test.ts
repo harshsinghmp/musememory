@@ -10,14 +10,14 @@ describe("T-397: getLatestNpmVersion command injection defense", () => {
       expect(typeof version).toBe("string");
       expect(version.length).toBeGreaterThan(0);
     }
-  });
+  }, 10000);
 
   test("accepts valid scoped package names", async () => {
     const version = await getLatestNpmVersion("@modelcontextprotocol/sdk");
     if (version !== null) {
       expect(typeof version).toBe("string");
     }
-  });
+  }, 10000);
 
   test("rejects dangerous package names containing shell metacharacters early", async () => {
     const maliciousNames = [
