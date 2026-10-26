@@ -44,7 +44,7 @@ To balance velocity with rigor, overhead is strictly proportional to task risk:
 
 ### Phase 4: 🛡️ Review & Hardening (Nexus Quality Gate)
 - Run targeted automated tests (`bun test` / `vitest`).
-- Run the Vibeguard SecretScan (`bun ~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts .`).
+- Run the Vibeguard SecretScan (`memory scan-secrets .` or `bun run src/cli.ts scan-secrets .`).
 - Verify WCAG 2.2 AA accessibility and responsive mobile breakpoints.
 
 ### Phase 5: 🚢 Ship & Archive (Crew)

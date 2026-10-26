@@ -35,7 +35,7 @@ Before executing high-risk system commands:
 Before finalizing commits, merges, or deliverables, run the Vibeguard security scan:
 
 ```bash
-bun ~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts .
+memory scan-secrets .
 ```
 
 If the scan reports any credential leakage or pattern matches, resolve them immediately before declaring completion.

@@ -38,13 +38,12 @@ The `./.memory` directory at the project root is the local persistent memory sto
 
 ## 3. Creed Native Context & Canonical LifeOS Sources
 
-When available on the system, agents reference these canonical LifeOS sources:
+Agents reference these canonical sovereign Muse Memory sources:
 
-1. `~/.config/LIFEOS/USER/PRINCIPAL/PRINCIPAL_IDENTITY.md` — Stable principal identity and preferences.
-2. `~/.config/LIFEOS/USER/DIGITAL_ASSISTANT/DA_IDENTITY.md` — Muse and Agency Council roles, routing, and gates.
-3. `~/.config/LIFEOS/USER/TELOS/PRINCIPAL_TELOS.md` — Mission, goals, strategies, and challenges.
-4. `~/.config/LIFEOS/USER/CONFIG/OPERATIONAL_RULES.md` — Principal-specific operating rules.
-5. `~/.config/LIFEOS/USER/PROJECTS.md` — Project routing and aliases.
+1. `~/.memory/USER.md` — Stable principal identity, telos, agency council roles, preferences, and portfolio routing.
+2. `./CURRENT.md` — Active working project constraints, invariants, and open loops.
+3. `~/.memory/` — Global long-term cognitive memory store (via `memory` MCP server).
+4. `./.memory/` — Project-scoped memory store.
 
 ### Durable-Memory Proposal Format
 When a durable fact, preference, constraint, or recurring pattern is learned, propose a narrow Markdown diff:

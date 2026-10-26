@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -18,6 +18,25 @@ function temp(): string {
 }
 
 describe("USER.md profile & preferences engine", () => {
+  let tempGlobalDir: string;
+  const origGlobalDir = process.env.MUSEMEMORY_GLOBAL_DIR;
+
+  beforeEach(() => {
+    tempGlobalDir = temp();
+    process.env.MUSEMEMORY_GLOBAL_DIR = tempGlobalDir;
+    initUserProfile(tempGlobalDir, "developer", false, false);
+  });
+
+  afterEach(() => {
+    if (origGlobalDir !== undefined) {
+      process.env.MUSEMEMORY_GLOBAL_DIR = origGlobalDir;
+    } else {
+      delete process.env.MUSEMEMORY_GLOBAL_DIR;
+    }
+    try {
+      rmSync(tempGlobalDir, { recursive: true, force: true });
+    } catch {}
+  });
   test("ARCHETYPE_TEMPLATES contains clean, zero-fingerprint defaults for all 5 archetypes", () => {
     const archetypes: UserArchetype[] = ["developer", "designer", "marketer", "casual", "custom"];
     for (const arch of archetypes) {

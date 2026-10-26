@@ -25,7 +25,7 @@ export const CANONICAL_CONSTITUTIONAL_RULES: ConstitutionalRule[] = [
     trim_exempt: true,
     category: "runtime",
     severity: "critical",
-    source: "LifeOS Constitution R1",
+    source: "Agency Architecture R1",
   },
   {
     id: "R2-zero-secret-exposure",
@@ -34,7 +34,7 @@ export const CANONICAL_CONSTITUTIONAL_RULES: ConstitutionalRule[] = [
     trim_exempt: true,
     category: "security",
     severity: "critical",
-    source: "LifeOS Vibeguard Protocol",
+    source: "Vibeguard Security Protocol",
   },
   {
     id: "R3-evidence-before-claims",
