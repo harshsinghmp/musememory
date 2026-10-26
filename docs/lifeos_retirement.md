@@ -1,9 +1,9 @@
-# 🏛️ LifeOS Decommissioning & Retirement Gate (Wave 29)
+# 🏛️ Ecosystem Decommissioning & Retirement Gate (Wave 29)
 
-> **Document Status**: Production Verified  
+> **Document Status**: Production Verified & Permanently Decommissioned  
 > **Milestone**: Wave 29 (`T-444` – `T-448`)  
 > **Date**: October 2026  
-> **Target**: Complete decommissioning and sovereign retirement of `~/.config/LIFEOS`.
+> **Target**: Complete decommissioning and sovereign retirement of `~/.config/LIFEOS`. All legacy import tools have been removed from source.
 
 ---
 
@@ -15,19 +15,19 @@ Historically, the agency ecosystem relied on `~/.config/LIFEOS` for:
 3. **Machine & Daemon Discovery**: The LifeOS Atlas hardware and daemon scanning subsystems.
 4. **Agent Governance**: Global `@LIFEOS` imports loaded into `~/.agents/AGENTS.md`.
 
-With **Wave 29**, all capabilities have been natively unified into **Muse Memory** (`musememory`) and **Muse Skills**, creating a self-contained, sovereign, and zero-daemon architecture.
+With **Wave 29**, all capabilities have been natively unified into **Muse Memory** (`musememory`) and **Muse Skills**, creating a self-contained, sovereign, and zero-daemon architecture. Following one-time data synthesis into `~/.memory/USER.md`, all legacy import tools have been permanently removed from the source tree.
 
 ---
 
 ## 2. Component Migration Matrix
 
-| Legacy LifeOS Component | Sovereign Muse Replacement | Verification Status | Ticket |
+| Legacy Component | Sovereign Muse Replacement | Verification Status | Ticket |
 |---|---|---|---|
-| `~/.config/LIFEOS/USER/` (93 files) | `~/.memory/USER.md` + SQLite memory store via `memory import-lifeos` | ✅ 52 notes ingested, `USER.md` synthesized | `T-444` |
+| `~/.config/LIFEOS/USER/` (93 files) | `~/.memory/USER.md` + SQLite memory store (One-time synthesis completed; legacy tool deleted) | ✅ Ingested, sovereign `USER.md` synthesized | `T-444` |
 | `~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts` | `memory scan-secrets [dir]` (native TypeScript Vibeguard engine) | ✅ 1,297 files scanned in 81ms, zero false leaks | `T-445` |
 | LifeOS Atlas hardware / daemon scans | `src/vault/system.ts` (`memory terrain`) | ✅ Deterministic `system.md` generated | `T-446` |
 | `@LIFEOS/...` imports in `~/.agents/AGENTS.md` | Pure Muse Memory & Muse Skills governance directives | ✅ 0 `@LIFEOS` imports remaining | `T-447` |
-| Runtime dependency audit & retirement gate | `test/lifeos_decommission_gate.test.ts` & backup archive | ✅ Gate verified clean | `T-448` |
+| Runtime dependency audit & retirement gate | `test/sovereignty_gate.test.ts` & backup archive | ✅ Gate verified clean, import tools removed | `T-448` |
 
 ---
 

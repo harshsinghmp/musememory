@@ -5,15 +5,16 @@
 
 ---
 
-## 🏛️ Wave 29 — Sovereign LifeOS Migration & Complete Decommissioning (2026-10-26)
+## 🏛️ Wave 29 — Sovereign Ecosystem Migration & Decommissioning Complete (2026-10-26)
 
-All personal identity, telos, operational rules, and hardware terrain scanning migrated out of `~/.config/LIFEOS` into sovereign `musememory` engines, native Vibeguard secret scanning, and de-LifeOSified agent governance:
+All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and de-LifeOSified agent governance. Legacy import tools have been permanently purged from source:
 
-- **Sovereign LifeOS Ingestion Engine (`T-444`)**: `muse import-lifeos` / `src/cli/import_lifeos.ts` parses all 93 files in `~/.config/LIFEOS/USER/`, compiles the sovereign `~/.memory/USER.md` persona, and ingests 52 personal notes into the SQLite memory store with Vibeguard secret defense (`test/import_lifeos.test.ts`).
-- **Native Vibeguard CLI (`T-445`)**: `muse scan-secrets` / `src/cli/secrets.ts` standalone zero-dependency secret scanner replacing `~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts` (`test/cli_secrets.test.ts`).
-- **Machine Terrain Collector (`T-446`)**: `muse terrain` / `src/vault/system.ts` replaces LifeOS Atlas, compiling deterministic hardware, toolchain, and local agent ecosystem maps into `.memory/vault/system.md` (`test/vault_system.test.ts`).
-- **Global Governance De-LifeOSification (`T-447`)**: Removed all 6 `@LIFEOS/...` imports and legacy paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
-- **Retirement Gate & Documentation (`T-448`)**: Created `docs/lifeos_retirement.md` with migration matrix, pre-decommissioning backup tarball instructions, and automated verification gate in `test/lifeos_decommission_gate.test.ts`.
+- **Sovereign Persona & Store Ingestion (`T-444`)**: Identity, telos, and operational rules synthesized directly into sovereign `~/.memory/USER.md` persona and SQLite store. Legacy tool `import_lifeos.ts` permanently deleted from source.
+- **Native Vibeguard CLI (`T-445`)**: `memory scan-secrets [dir]` standalone zero-dependency secret scanner replacing legacy external scripts (`test/cli_secrets.test.ts`).
+- **Machine Terrain Collector (`T-446`)**: `memory terrain [--out file.md]` compiles deterministic hardware, toolchain, and local agent ecosystem maps into `system.md` (`test/vault_system.test.ts`).
+- **Global Governance De-LifeOSification (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
+- **Sovereignty Decommissioning Gate (`T-448`)**: Enforces zero external legacy imports, confirms legacy tool removal, and passes 100% cleanly in `test/sovereignty_gate.test.ts`.
+- **Golden Sequence Documentation**: Published the complete 4-phase best-practice sequence for using Muse Memory with AI coding agents in `README.md`, `docs/agent-reference.md`, and `docs/cli-reference.md`.
 
 ---
 

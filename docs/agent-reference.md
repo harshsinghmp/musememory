@@ -101,6 +101,9 @@ Full matrix: [`cli-reference.md`](./cli-reference.md).
 | `memory conflicts [--dry-run]` | List recorded contradictions; `--dry-run` previews what would be flagged. |
 | `memory doctor` | Full ecosystem health diagnostic. |
 | `memory harvest "<text>" --project P` | Distil a turn into a fix/decision unit. |
+| `memory user [get|init|set]` | Manage `USER.md` persona archetypes & working style preferences. |
+| `memory scan-secrets [dir]` | Native Vibeguard secret scanner (zero external dependencies). |
+| `memory terrain [--out file.md]` | Collect host hardware, toolchain & agent ecosystem terrain map. |
 | `memory verify <id> --strict` | Run an entry's verification command, or the full integrity gate. |
 
 ### Global flags that change behaviour

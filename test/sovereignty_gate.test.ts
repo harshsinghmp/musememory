@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { executeSecretScan } from "../src/cli/secrets.ts";
 import { collectSystemTerrain } from "../src/vault/system.ts";
 
-describe("T-448: LifeOS Decommissioning & Retirement Gate", () => {
+describe("T-448: Sovereign Ecosystem & Decommissioning Gate", () => {
   it("verifies global ~/.memory/USER.md is populated and sovereign", () => {
     const userMdPath = join(homedir(), ".memory", "USER.md");
     expect(existsSync(userMdPath)).toBe(true);
@@ -37,12 +37,15 @@ describe("T-448: LifeOS Decommissioning & Retirement Gate", () => {
     }
   });
 
+  it("verifies legacy ingestion engine tool has been completely removed from source", () => {
+    const legacyToolPath = join(process.cwd(), "src", "cli", "import_lifeos.ts");
+    expect(existsSync(legacyToolPath)).toBe(false);
+  });
+
   it("verifies lifeos_retirement.md documentation exists", () => {
     const docPath = join(process.cwd(), "docs", "lifeos_retirement.md");
     expect(existsSync(docPath)).toBe(true);
     const content = readFileSync(docPath, "utf8");
-    expect(content).toContain("LifeOS Decommissioning & Retirement Gate");
-    expect(content).toContain("T-444");
-    expect(content).toContain("T-448");
+    expect(content).toContain("Ecosystem Decommissioning & Retirement Gate");
   });
 });

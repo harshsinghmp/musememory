@@ -82,7 +82,6 @@ import { handleConflictsCommand } from "./cli/conflicts.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
 import { handleBranchCommand, handleCheckoutCommand, handleBlameCommand, handleLsBranchesCommand } from "./cli/versioning.ts";
-import { handleImportLifeosCommand } from "./cli/import_lifeos.ts";
 import { handleScanSecretsCommand } from "./cli/secrets.ts";
 import { handleTerrainCommand } from "./vault/system.ts";
 
@@ -215,9 +214,6 @@ export async function main(argv: string[]): Promise<number> {
       return handleDetectCommand(parsed);
     case "migrate":
       return handleMigrateCommand(parsed);
-    case "import-lifeos":
-    case "lifeos-import":
-      return handleImportLifeosCommand(parsed);
     case "agents":
     case "detect-agents":
       return handleAgentsCommand();
