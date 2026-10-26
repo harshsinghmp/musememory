@@ -67,6 +67,9 @@
     "url": "git+ssh://git@github.com/harshsinghmp/musememory.git"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ajv": "^8.17.1",
