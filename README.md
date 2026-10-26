@@ -257,13 +257,13 @@ to delete the memory.
 
 ## Start with one command
 
-> [!TIP]
-> ### Install without a global package
-> Set up the memory store and connect your local AI agents with one command:
+> [!IMPORTANT]
+> ### Always install and run with `@latest`
+> To ensure you never execute an outdated or cached version, always explicitly append `@latest` when installing or invoking via NPX or Bun:
 >
 > ```bash
-> npx musememory install
-> # (or with Bun: bunx musememory install)
+> npx musememory@latest install
+> # (or with Bun: bunx musememory@latest install)
 > ```
 >
 > This command automatically:
@@ -272,23 +272,34 @@ to delete the memory.
 > 3. Auto-wires the memory MCP server into installed agents with zero-permission auto-approval.
 > 4. Scans for existing memory stores (Letta, Mem0, Beads, Supermemory, etc.) for instant migration.
 >
-> **Verify anytime**: `npx musememory doctor`  
-> **Explore Studio UI**: `npx musememory ui` (Opens cognitive studio on port 2222)
+> **Verify anytime**: `npx musememory@latest doctor`  
+> **Explore Studio UI**: `npx musememory@latest ui` (Opens cognitive studio on port 2222)
 
 ---
 
 ### 📦 Persistent Installation Options
 
-```bash
-# Option A: Global Install with NPM or Bun (Recommended)
-npm install -g musememory
-# or with Bun:
-bun add -g musememory
+Always specify `@latest` across every package manager to ensure you run the newest engine capabilities and security patches:
 
-# Option B: One-Line Shell Installer
+```bash
+# Option A: Global Workstation Install (Always use @latest)
+bun add -g musememory@latest
+# or with NPM:
+npm install -g musememory@latest
+# or with PNPM:
+pnpm add -g musememory@latest
+# or with Yarn:
+yarn global add musememory@latest
+
+# Option B: Local Project Dependency (Pinned in package.json)
+bun add musememory@latest
+# or with NPM:
+npm install musememory@latest
+
+# Option C: One-Line Shell Installer (Pulls latest release binary)
 curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 
-# Option C: Docker Container
+# Option D: Docker Container
 git clone https://github.com/harshsinghmp/musememory.git && cd musememory
 docker build -t musememory .
 ```
@@ -328,18 +339,27 @@ prose paragraph to learn a flag name.
 
 ---
 
-## 🔄 Upgrading & Self-Healing Maintenance
+## 🔄 Updating the System, Project & Packages
 
-Keep Muse Memory and all your connected AI coding agents at peak cognitive performance with automated updates and self-healing environment repairs.
+Keep Muse Memory and all your connected AI coding agents at peak cognitive performance with automated updates, self-healing environment repairs, and consistent `@latest` versioning.
 
-### ⚡ 1-Command Autonomous Upgrade (`memory upgrade`)
-
-Run `memory upgrade` (or `npx musememory upgrade`) to trigger the **Gamified Level-Up Matrix**:
+### 1️⃣ Updating the Global Package / Workstation CLI
+Always use `@latest` across every package manager to pull the newest releases:
 
 ```bash
+# ⚡ Method 1: Autonomous Self-Healing Updater (Recommended)
 memory upgrade
 # or with NPX zero-install:
-npx musememory upgrade
+npx musememory@latest upgrade
+
+# 📦 Method 2: Explicit Package Manager Upgrade (Always specify @latest)
+bun add -g musememory@latest           # Bun (Fastest)
+npm install -g musememory@latest       # NPM
+pnpm add -g musememory@latest          # PNPM
+yarn global add musememory@latest      # Yarn
+
+# 🌐 Method 3: One-Line Shell Script Update
+curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/scripts/install.sh | bash
 ```
 
 #### What `memory upgrade` automatically handles:
@@ -350,67 +370,83 @@ npx musememory upgrade
 
 ---
 
-### 📦 Manual Package Manager Upgrades
-
-| Toolchain / Runtime | Upgrade Command | Verification |
-| :--- | :--- | :--- |
-| **Bun** (Ultra-Fast) | `bun add -g musememory@latest` | `memory doctor` |
-| **NPM** (Standard Node) | `npm install -g musememory@latest` | `memory doctor` |
-| **PNPM** | `pnpm add -g musememory@latest` | `memory doctor` |
-| **Yarn** | `yarn global add musememory@latest` | `memory doctor` |
-| **NPX** (Zero-Install) | `npx musememory@latest upgrade` | `npx musememory doctor` |
+### 2️⃣ Updating a Project / Workspace
+To upgrade and synchronize memory inside a specific project repository:
 
 ```bash
-# Check if updates are available without applying (exits 0 if up to date, 1 if registry fails)
+# Update project-level dependency (pinned in package.json)
+bun add musememory@latest
+# or with NPM:
+npm install musememory@latest
+
+# Re-scan and re-wire all local project agent configurations
+memory connect all
+
+# Re-index symbol callgraphs and recompile Markdown wiki
+memory reindex
+memory wiki compile
+
+# Inspect and verify active working constraints
+memory current get
+memory briefing
+```
+
+---
+
+### 3️⃣ Updating the System & Memory Storage (Self-Healing & Migrations)
+To audit, repair, or defragment the underlying SQLite database and knowledge files:
+
+```bash
+# Full ecosystem diagnostic and automated schema healing
+memory doctor
+
+# Optimize memory storage: prunes test noise, removes duplicates, runs SQLite VACUUM
+memory optimize
+
+# Scan and migrate legacy stores (Letta, Mem0, Beads, Supermemory)
+memory migrate
+
+# Check for updates without applying (exits 0 if up to date, 1 if update available)
 memory upgrade --check
-
-# Enforce up-to-date installation in CI pipelines (exits 1 if update is available)
-memory upgrade --check --strict
-
-# Preview upgrade actions in dry-run mode
-memory upgrade --dry-run
-
-# Force re-installation and complete platform re-wiring
-memory upgrade --force
 ```
 
 ---
 
 ## 🔄 Complete Lifecycle (Install → Verify → Connect → Uninstall)
 
-Every command works with **zero installation** via `npx musememory <cmd>` (or `bunx musememory <cmd>`). Use plain `memory <cmd>` if installed globally.
+Every command works with **zero installation** via `npx musememory@latest <cmd>` (or `bunx musememory@latest <cmd>`). Use plain `memory <cmd>` if installed globally.
 
 ### 1️⃣ Install & Auto-Wire
 ```bash
 # Full setup: init .memory/, detect agents, wire MCP, scan for migratable stores
-npx musememory install
+npx musememory@latest install
 
 # Initialize workspace only (no agent wiring)
-npx musememory init
+npx musememory@latest init
 ```
 
 ### 2️⃣ Verify & Health Check
 ```bash
 # Comprehensive ecosystem diagnostic (storage, schemas, secrets, MCP wiring)
-npx musememory doctor
+npx musememory@latest doctor
 
 # Memory store breakdown and active briefing
-npx musememory stats
-npx musememory briefing
+npx musememory@latest stats
+npx musememory@latest briefing
 ```
 
 ### 3️⃣ Connect Coding Agents (the majority of platforms)
 ```bash
 # Scan workstation for installed AI coding agents
-npx musememory agents
+npx musememory@latest agents
 
 # Auto-wire all detected agents with zero permissions
-npx musememory connect all
+npx musememory@latest connect all
 
 # Wire one specific agent explicitly
-npx musememory connect claude-code
-npx musememory connect cursor
-npx musememory connect antigravity
+npx musememory@latest connect claude-code
+npx musememory@latest connect cursor
+npx musememory@latest connect antigravity
 npx musememory connect windsurf
 npx musememory connect opencode
 

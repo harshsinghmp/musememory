@@ -379,3 +379,12 @@ Exploded ticket plan: `.agents/context/ticket-plan.md` (269 tracked tickets, 21 
    - `T-153`: Multi-DB topology (shared team store + personal DBs)
    - `T-387`: Client configuration recipes & shared+personal scoping governance
 
+9. **Wave 23: Dashboard Overhaul, Workspace Terrain Maps & High-Speed Agent Hub (v3.1.0 Roadmap)**
+   - `T-405`–`T-407`: Cyber-minimalist left-rail poster navigation shell, dual-scope switcher (`project` | `global` | `mesh`), and sub-10ms UI static route serving
+   - `T-408`–`T-410`: Memory Studio 2.0 with instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap
+   - `T-411`–`T-413`: Workspace Terrain Generator (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) & split-pane markdown reader with scanline reindexing
+   - `T-414`–`T-416`: Universal Agents Hub with live auto-discovery (Antigravity, OpenCode, Claude Code, Cursor, Copilot, Hermes), 1-click MCP wiring, and drop-in prompt snippets
+   - `T-417`–`T-419`: Poster-style About panel (WHAT, THE PIECES live facts table, PRIVACY guarantee), multi-agent quick start guide, and interactive CLI command deck
+   - `T-420`–`T-422`: In-memory SQLite read projection cache, tab visibility sensors for zero idle CPU burn, and headless UI performance benchmark suite
+
+

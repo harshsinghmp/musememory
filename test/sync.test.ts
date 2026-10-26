@@ -304,6 +304,23 @@ describe("R14: Cross-Agent Knowledge Sync & P2P Gossip Protocol", () => {
 
       expect(get(storeB, "m_cli_sync_test")).toBeDefined();
     });
+
+    it("does not create a stray ./true directory when --pool flag is passed as boolean string 'true'", async () => {
+      const origCwd = process.cwd();
+      const testCwd = mkdtempSync(join(tmpdir(), "muse-cwd-test-"));
+      process.chdir(testCwd);
+      try {
+        const code = await handleSyncCommand({
+          positional: ["sync"],
+          flags: { dir: tmpRootA, pool: "true", json: "true" },
+        });
+        expect(code).toBe(0);
+        expect(existsSync(join(testCwd, "true"))).toBe(false);
+      } finally {
+        process.chdir(origCwd);
+        rmSync(testCwd, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("MCP Tools Execution for Gossip Sync", () => {

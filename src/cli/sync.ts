@@ -65,7 +65,10 @@ export async function handleSyncCommand(parsed: ParsedArgs): Promise<number> {
 
   // 3. Shared pool sync action
   if (parsed.flags.pool || (!parsed.flags.status && !parsed.flags.broadcast && !parsed.flags.ingest)) {
-    const poolDir = typeof parsed.flags.pool === "string" ? resolve(process.cwd(), parsed.flags.pool) : undefined;
+    const rawPool = parsed.flags.pool;
+    const poolDir = typeof rawPool === "string" && rawPool !== "true" && rawPool.trim() !== ""
+      ? resolve(process.cwd(), rawPool)
+      : undefined;
     const report = syncWithSharedPool(store, root, poolDir, agentId);
 
     if (parsed.flags.json) {
