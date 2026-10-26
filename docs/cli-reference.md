@@ -80,6 +80,7 @@ Ecosystem, Migration & Connectivity:
   agents / detect-agents        Scan workstation for detected coding agent platforms
   detect                        Scan machine for external memory formats to migrate
   migrate [--from P] [--all]    Ingest external memories with state preservation & secret scrubbing
+  import-lifeos [--from DIR] [--target DIR] [--dry-run] Sovereign LifeOS ingestion & USER.md synthesis
   learn / sync-chats [--confirm] Auto-discover and harvest memories from all agent chats across machine
   harvest <file|text> --project P Distill conversation transcripts into structured memory units
   harvest-auto [--from <glob>] [--project P] Harvest inbox transcripts as candidates and archive them
@@ -97,6 +98,8 @@ Ecosystem, Migration & Connectivity:
   conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
+  scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
+  terrain [--out file.md]       Collect machine hardware, toolchain & agent ecosystem map
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms

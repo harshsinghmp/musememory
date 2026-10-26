@@ -246,7 +246,7 @@ export async function importLifeos(options: ImportLifeosOptions = {}): Promise<I
   // Fetch existing memories to avoid duplicate imports
   const existingTitles = new Set<string>();
   if (store) {
-    const existing = list(store, { tag: "lifeos-import" });
+    const existing = list(store).filter((e) => e.tags?.includes("lifeos-import"));
     for (const entry of existing) {
       existingTitles.add(entry.title.toLowerCase());
     }
@@ -268,7 +268,7 @@ export async function importLifeos(options: ImportLifeosOptions = {}): Promise<I
           content: note.content,
           title: note.title,
           project: "global",
-          type: "convention",
+          type: "operation",
           confirmed: true,
           tags: ["lifeos-import", note.category],
           source: `lifeos://${note.relPath}`,

@@ -628,18 +628,18 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 - [ ] T-443 · Autonomous Remediation Playbook Generator: Automatically synthesize recurring test fix sequences into verified reusable playbooks · src/cognition/remediation.ts · F
 
 ## Wave 29: Sovereign LifeOS Migration & Complete Decommissioning
-- [ ] T-444 · Sovereign LifeOS Ingestion Engine: `muse import-lifeos` CLI tool to automatically ingest `~/.config/LIFEOS/USER/` into `~/.memory/` and `~/.memory/USER.md` · src/cli/import_lifeos.ts · F
-- [ ] T-445 · Native Vibeguard CLI (`muse scan-secrets`): Standalone secret scanning binary in `musememory` eliminating dependency on `~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts` · src/cli/secrets.ts · F
-- [ ] T-446 · Machine Terrain Collector in `src/vault/` & `muse-skills`: Incorporate LifeOS Atlas hardware, daemon, and package scans into unified workspace maps · src/vault/system.ts · F
-- [ ] T-447 · Global `~/.agents/AGENTS.md` De-LifeOSification: Remove all `@LIFEOS` imports and rewrite governance directives to point purely to Muse Memory and Muse Skills · ~/.agents/AGENTS.md · N
-- [ ] T-448 · LifeOS Decommissioning & Retirement Gate: Verification audit confirming zero dangling runtime dependencies before safely backing up and removing `~/.config/LIFEOS` · docs/lifeos_retirement.md · N
+- [x] T-444 · Sovereign LifeOS Ingestion Engine: `muse import-lifeos` CLI tool to automatically ingest `~/.config/LIFEOS/USER/` into `~/.memory/` and `~/.memory/USER.md` · src/cli/import_lifeos.ts · F
+- [x] T-445 · Native Vibeguard CLI (`muse scan-secrets`): Standalone secret scanning binary in `musememory` eliminating dependency on `~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts` · src/cli/secrets.ts · F
+- [x] T-446 · Machine Terrain Collector in `src/vault/` & `muse-skills`: Incorporate LifeOS Atlas hardware, daemon, and package scans into unified workspace maps · src/vault/system.ts · F
+- [x] T-447 · Global `~/.agents/AGENTS.md` De-LifeOSification: Remove all `@LIFEOS` imports and rewrite governance directives to point purely to Muse Memory and Muse Skills · ~/.agents/AGENTS.md · N
+- [x] T-448 · LifeOS Decommissioning & Retirement Gate: Verification audit confirming zero dangling runtime dependencies before safely backing up and removing `~/.config/LIFEOS` · docs/lifeos_retirement.md · N
 
 ## v14 Totals
 | Section | Tickets |
 |---|---|
 | Total Tracked Tickets | 334 |
-| Landed on dev | 217 |
-| Active Remaining | 117 |
+| Landed on dev | 222 |
+| Active Remaining | 112 |
 
 
 
