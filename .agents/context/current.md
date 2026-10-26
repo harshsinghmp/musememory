@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.1.2`  
-> **Status**: Minor Release — claim-scoped contradiction engine, project-scoped health on every audit surface (CLI, MCP, studio), a `memory conflicts` preview CLI, and the machine-checked landing gate.
+> **Version**: `v3.1.3`  
+> **Status**: Patch Release — CLI sync pool flag hardening, `@latest` install standard, 3-tier upgrade documentation, and Wave 23–29 roadmap expansion.
 
 ---
 
