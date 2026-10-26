@@ -115,8 +115,11 @@ Upgrade your local workstation with dry-run protection or live level-up:
 # Preview upgrade actions without making changes
 memory upgrade --dry-run
 
-# Run full self-healing upgrade
+# Run full self-healing upgrade (per-project: repair local constraints, AST indexing & git hooks)
 memory upgrade
+
+# Run global workstation upgrade (targets ~/.memory/, user personas & agent platforms)
+memory upgrade --global
 ```
 
 ---

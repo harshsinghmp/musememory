@@ -439,10 +439,13 @@ curl -fsSL https://raw.githubusercontent.com/harshsinghmp/musememory/main/script
 ```
 
 #### What `memory upgrade` automatically handles:
-1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and pulls the latest published binary.
-2. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
-3. **Coding Agent Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, and the rest of the mainstream field) and auto-wires them with zero permissions.
-4. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
+1. **Package Manager Auto-Detection**: Detects whether your workstation runs `bun`, `npm`, `pnpm`, or `yarn` and updates to the latest release without redundant downgrades.
+2. **Global vs. Per-Project Scoping**:
+   - **Per-Project (`memory upgrade`)**: Operates on `./.memory/`. Repairs local constraints (`CURRENT.md`), project user persona overrides (`USER.md`), re-indexes AST code symbols via CodeGraph/Graphify, and installs Git pre-commit transcript harvesting hooks.
+   - **Global (`memory upgrade --global`)**: Operates on `~/.memory/`. Re-aligns sovereign master profiles (`USER.md`), validates machine-wide constraints, updates global SQLite schemas, heals `~/.local/bin` symlinks, and auto-wires all detected agent platforms workstation-wide.
+3. **Self-Healing Storage Repair**: Recovers missing `.memory/`, `CURRENT.md` constraints, or `USER.md` persona files if corrupted or deleted.
+4. **Coding Agent Re-Discovery**: Scans for newly installed coding agents (Cursor, Claude Code, Windsurf, OpenCode, Codex, Gemini CLI, Hermes, and the rest of the mainstream field) and auto-wires them with zero permissions.
+5. **AST Symbol Graph Re-Indexing**: Re-synchronizes CodeGraph/Graphify symbol caches under `.memory/graph-symbols.json`.
 
 ---
 
