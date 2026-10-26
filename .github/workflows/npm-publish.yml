@@ -19,4 +19,5 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - run: bun install
       - run: bun run build && bun test
+      - run: npm install -g npm@latest
       - run: npm publish --provenance --access public
