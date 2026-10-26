@@ -1,7 +1,8 @@
 import { execSync, execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, lstatSync, unlinkSync, symlinkSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import pkg from "../../package.json" with { type: "json" };
 import { getGlobalMemoryDir, resolveMemoryDir, findOrCreateProjectRoot } from "../root.ts";
 import { initUserProfile, userFilePath } from "../user.ts";
 import { connectAgent } from "../connect.ts";
@@ -570,43 +571,95 @@ export function healBunGlobalConfig(options: HealBunOptions = {}): HealBunResult
 }
 
 /**
+ * Compares two semantic version strings. Returns 1 if a > b, -1 if a < b, 0 if equal.
+ */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] ?? 0;
+    const nb = pb[i] ?? 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+/**
+ * Heals ~/.local/bin/memory symlink if it points to an obsolete directory
+ * or shadows the active global package manager installation.
+ */
+export function healLocalBinSymlinks(): boolean {
+  try {
+    const home = homedir();
+    const localBin = join(home, ".local", "bin");
+    const localMemory = join(localBin, "memory");
+    const localMuse = join(localBin, "musememory");
+    const bunMemory = join(home, ".bun", "bin", "memory");
+    const bunMuse = join(home, ".bun", "bin", "musememory");
+
+    if (existsSync(localMemory) && existsSync(bunMemory)) {
+      const stat = lstatSync(localMemory);
+      if (stat.isSymbolicLink()) {
+        const target = realpathSync(localMemory);
+        if (target !== realpathSync(bunMemory)) {
+          unlinkSync(localMemory);
+          symlinkSync(bunMemory, localMemory);
+          if (existsSync(localMuse) && existsSync(bunMuse)) {
+            try { unlinkSync(localMuse); } catch {}
+            symlinkSync(bunMuse, localMuse);
+          }
+          return true;
+        }
+      }
+    }
+  } catch {}
+  return false;
+}
+
+/**
  * Executes a package manager update command.
  */
 export function executePackageUpgrade(
   pm: "bun" | "npm" | "pnpm" | "yarn",
   dryRun: boolean = false,
-  options: { healBunConfig?: boolean } = {},
+  options: { healBunConfig?: boolean; targetVersion?: string } = {},
 ): string {
+  const versionTag = options.targetVersion ? `@${options.targetVersion}` : "@latest";
   let cmd = "";
   switch (pm) {
     case "bun":
       if (options.healBunConfig) {
         healBunGlobalConfig({ enabled: true });
       }
-      cmd = "bun add -g musememory@latest";
+      cmd = `bun add -g musememory${versionTag}`;
       break;
     case "pnpm":
-      cmd = "pnpm add -g musememory@latest";
+      cmd = `pnpm add -g musememory${versionTag}`;
       break;
     case "yarn":
-      cmd = "yarn global add musememory@latest";
+      cmd = `yarn global add musememory${versionTag}`;
       break;
     default:
-      cmd = "npm install -g musememory@latest";
+      cmd = `npm install -g musememory${versionTag}`;
       break;
   }
 
   if (!dryRun) {
     try {
-      execSync(cmd, { stdio: "inherit" });
+      execSync(cmd, { stdio: "pipe" });
     } catch (err: any) {
       throw new Error(`Failed running upgrade command "${cmd}": ${err.message || err}`);
     }
+    healLocalBinSymlinks();
   }
   return cmd;
 }
 
 export function getCurrentVersion(): string {
+  if (pkg && typeof pkg.version === "string") {
+    return pkg.version;
+  }
   try {
     const pkgPath = join(__dirname, "..", "..", "package.json");
     if (existsSync(pkgPath)) {
@@ -621,7 +674,7 @@ export function getCurrentVersion(): string {
       if (data.version) return data.version;
     }
   } catch {}
-  return "2.1.0";
+  return "3.2.0";
 }
 
 /**
@@ -651,7 +704,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
         console.error(`\n❌ Failed to check for updates: Could not reach registry or resolve latest version.`);
         return 1;
       }
-      if (latestVersion !== currentVersion) {
+      if (compareVersions(currentVersion, latestVersion) < 0) {
         console.log(`\n💡 Update available: v${currentVersion} ➔ v${latestVersion}`);
         console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
         return failOnUpdate ? 1 : 0;
@@ -690,7 +743,12 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
       title: `Package Manager Sync (${pm})`,
       action: async () => {
         if (!dryRun) {
-          executePackageUpgrade(pm, dryRun);
+          const isAheadOrCurrent = latestVersion && compareVersions(currentVersion, latestVersion) >= 0;
+          if (isAheadOrCurrent && !force) {
+            healLocalBinSymlinks();
+            return;
+          }
+          executePackageUpgrade(pm, dryRun, { targetVersion: latestVersion || undefined });
         }
       },
     },

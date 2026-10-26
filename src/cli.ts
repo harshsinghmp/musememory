@@ -15,7 +15,7 @@ import {
   handleDriftCommand,
   handleCompressCommand,
 } from "./cli/ecosystem.ts";
-import { handleUpgradeCommand } from "./cli/upgrade.ts";
+import { handleUpgradeCommand, getCurrentVersion } from "./cli/upgrade.ts";
 import { handleLearnCommand } from "./harvester.ts";
 import {
   handleContextCommand,
@@ -194,6 +194,10 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   const cmd = argv[0];
+  if (cmd === "--version" || cmd === "-v" || cmd === "version") {
+    console.log(`musememory v${getCurrentVersion()}`);
+    return 0;
+  }
   const rest = argv.slice(1);
   const parsed = parseFlags(rest);
 

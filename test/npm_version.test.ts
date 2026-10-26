@@ -1,7 +1,22 @@
 import { describe, test, expect } from "bun:test";
-import { getLatestNpmVersion } from "../src/cli/upgrade.ts";
+import { getLatestNpmVersion, compareVersions, getCurrentVersion } from "../src/cli/upgrade.ts";
 
-describe("T-397: getLatestNpmVersion command injection defense", () => {
+describe("T-397: getLatestNpmVersion and Version Utilities", () => {
+  test("compareVersions accurately handles semver ordering", () => {
+    expect(compareVersions("3.2.0", "3.0.2")).toBe(1);
+    expect(compareVersions("3.0.2", "3.2.0")).toBe(-1);
+    expect(compareVersions("3.2.0", "3.2.0")).toBe(0);
+    expect(compareVersions("v3.2.0", "3.2.0")).toBe(0);
+    expect(compareVersions("3.10.0", "3.2.0")).toBe(1);
+    expect(compareVersions("3.2.1", "3.2.0")).toBe(1);
+  });
+
+  test("getCurrentVersion returns valid semver matching package.json", () => {
+    const ver = getCurrentVersion();
+    expect(typeof ver).toBe("string");
+    expect(ver).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(compareVersions(ver, "3.0.0")).toBeGreaterThanOrEqual(0);
+  });
   test("accepts valid package names without throwing", async () => {
     // Valid standard package name
     const version = await getLatestNpmVersion("typescript");
