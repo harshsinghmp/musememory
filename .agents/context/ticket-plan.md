@@ -648,3 +648,8 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 ## Late additions (post-v3.2.0)
 
 - [ ] T-449 · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake (stateful `g`-flag `RegExp` + definition counted as caller). Dry-run only; no code changed. Branch: `new` · F
+
+## Late additions (post-v3.2.0)
+
+- [ ] T-449 · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake. Dry-run only; no code changed. Branch: `new` · F
+- [ ] T-450 · DEFERRED: scope which `.agents/` subpaths should be gitignored (e.g. artifacts, plans, context/current.md) vs. kept tracked (standards, skills). Audit consumer impact (collaborators, DOX, skills) before removing any. No execution until user scopes. Branch: `new` · N
