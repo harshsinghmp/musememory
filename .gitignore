@@ -19,6 +19,7 @@ build/
 .opencode/
 .jez/
 .orca/
+.freebuff/
 
 # Environment Variables & Secrets (LifeOS Vibeguard Protocol)
 .env
@@ -92,3 +93,6 @@ apps/website/.gif-build/
 .docs.hash
 .context.hash
 **/.context.hash
+
+# Syncthing versioning folder
+.stversions/
