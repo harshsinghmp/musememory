@@ -43,6 +43,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Agent tooling state (Command Code taste/cache, local only)
+.commandcode/
+
+# Syncthing versioning/conflict backups (parent-folder sync artifacts)
+.stversions/
+
 # OS & Editor Metadata
 .DS_Store
 .DS_Store?
