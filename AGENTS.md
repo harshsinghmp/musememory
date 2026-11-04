@@ -19,6 +19,7 @@
 8. **Structured Commits**: Commits must follow `<type>(<scope>): <summary>` with Why/What/Verification blocks.
 9. **Agent Containment & Archive**: All agent artifacts live in `./.agents/*`. Retired plans move to `./.agents/archive/[title]-[timestamp].md`.
 10. **Session Memory & Closeout DOX Pass**: Update `./.agents/context/current.md` and this `AGENTS.md` before completing tasks. **Never touch `./.memory/**`** — it is owned by the MuseMemory engine.
+11. **Workspace Isolation & Sync Boundary**: Never run `updateagents` or any repo-mutating scaffolder from a parent directory. Each Syncthing-synced checkout is a separate workspace and nested clones are separate scopes. Never sync `.git` or a live SQLite store (`.memory/`); transfer git state with `git push` / `git pull`.
 
 ---
 

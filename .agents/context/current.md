@@ -5,6 +5,12 @@
 
 ---
 
+## 🔧 Session — Sync Recovery (2026-11-03)
+
+Restored `AGENTS.md` byte-exact from HEAD after an `updateagents` run from the umbrella directory replaced it (and persona files in sibling repos) with three-line adapters. Added `.commandcode/` and `.stversions/` to `.gitignore`, made the Syncthing ignore rules canonical in `~/.dotfiles/syncthing/`, and recorded the workspace-isolation invariant. The engine fix now stops at nested repository roots and refuses umbrella directories; the global install was refreshed. Repo-local recovery for `muse-agents` and `muse-skills` is owned by their respective agents.
+
+---
+
 ## 🏛️ Wave 29 — Sovereign Ecosystem Migration & Decommissioning Complete (2026-10-26)
 
 All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and de-LifeOSified agent governance. Legacy import tools have been permanently purged from source:
@@ -415,6 +421,7 @@ Removed remaining competitor product names and external comparison links from we
 - **Zero External Daemons**: All operations must execute in-process via SQLite (`memory.db`) or flat files. Never depend on background servers.
 - **Fail Fast**: Throw loudly on secret detection, invalid schema shapes, or unconfirmed supersessions.
 - **Verification Gate**: Before declaring changes complete, `bun test`, `bun run build`, and `tsc --noEmit` must pass.
+- **Workspace Isolation & Sync Boundary**: Never run repo-mutating scaffolders from a parent directory; nested clones are separate scopes. Never sync `.git` or a live SQLite store (`.memory/`).
 
 ## 1. Verified Shipped Reality
 - **2026-10-22**: T-321 per-project health gate scope
