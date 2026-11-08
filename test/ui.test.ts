@@ -919,6 +919,43 @@ describe("Wave 23 PR 5: T-465 command deck", () => {
   });
 });
 
+describe("Wave 23 PR 6: T-466 projection cache", () => {
+  test("serves cached reads and invalidates them on a write", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const first = await fetch(`${base}/api/memories`);
+      expect(first.headers.get("x-cache")).toBe("MISS");
+      const firstBody = await first.text();
+      const second = await fetch(`${base}/api/memories`);
+      expect(second.headers.get("x-cache")).toBe("HIT");
+      expect(await second.text()).toBe(firstBody);
+
+      const statsFirst = await fetch(`${base}/api/stats`);
+      expect(statsFirst.headers.get("x-cache")).toBe("MISS");
+      const statsSecond = await fetch(`${base}/api/stats`);
+      expect(statsSecond.headers.get("x-cache")).toBe("HIT");
+
+      const write = await fetch(`${base}/api/propose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "cache invalidation probe", project: "t466" }),
+      });
+      expect(write.status).toBe(200);
+
+      const after = await fetch(`${base}/api/memories`);
+      expect(after.headers.get("x-cache")).toBe("MISS");
+      const afterBody = await after.json();
+      expect(afterBody.some((m: { content: string }) => m.content.includes("cache invalidation probe"))).toBe(true);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
