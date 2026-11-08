@@ -841,6 +841,33 @@ describe("Wave 23 PR 4: T-462 point-any-agent manifest", () => {
   });
 });
 
+describe("Wave 23 PR 5: T-463 poster About panel", () => {
+  test("serves live architecture facts and the privacy guarantee", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain("about-poster");
+      expect(html).toContain('id="aboutTotal"');
+      expect(html).toContain('id="aboutConstraints"');
+      expect(html).toContain('id="aboutWiki"');
+      expect(html).toContain('id="aboutAudit"');
+      expect(html).toContain("PRIVACY");
+      expect(js).toContain("function renderAbout");
+      expect(js).toContain("renderAbout(s)");
+      expect(css).toContain(".about-grid");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
