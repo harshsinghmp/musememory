@@ -599,10 +599,10 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive horizons, and LifeOS sovereignty audit.
 
 ## Wave 24: Showcase, Interactive Playground & DX Assets
-- [ ] T-423 · Terminal Showreel & GIF Recording: Script and record high-fidelity terminal demo (`showreel.mp4`, `muse-memory-demo.gif`) on v3.0.0 highlighting failure attribution, negative mining, and HOT.md compounding · assets/, docs/ · N
-- [ ] T-424 · Interactive WASM/SQLite Web Playground: In-browser memory studio preview on `apps/website` with zero backend server dependencies · apps/website · F
-- [ ] T-425 · Competitive Benchmark Showcase: Real-time latency, recall accuracy, and token-cost comparison matrix vs Mem0, Zep, and Letta · apps/website, docs/ · N
-- [ ] T-426 · Multi-Agent Interactive Demos: Interactive agent switcher in website docs demonstrating context injection across Antigravity, OpenCode, Claude Code, and Cursor · apps/website · N
+- [x] T-423 · LANDED 2026-11-08 — PR #362: Terminal Showreel & GIF Recording: Script and record high-fidelity terminal demo (`showreel.mp4`, `muse-memory-demo.gif`) on v3.0.0 highlighting failure attribution, negative mining, and HOT.md compounding · assets/, docs/ · N
+- [x] T-424 · LANDED 2026-11-08 — PR #365: Interactive WASM/SQLite Web Playground: In-browser memory studio preview on `apps/website` with zero backend server dependencies · apps/website · F
+- [x] T-425 · LANDED 2026-11-08 — PR #363: Competitive Benchmark Showcase: Real-time latency, recall accuracy, and token-cost comparison matrix vs Mem0, Zep, and Letta · apps/website, docs/ · N
+- [x] T-426 · LANDED 2026-11-08 — PR #364: Multi-Agent Interactive Demos: Interactive agent switcher in website docs demonstrating context injection across Antigravity, OpenCode, Claude Code, and Cursor · apps/website · N
 
 ## Wave 25: R17 Tri-Cognitive Playbooks & Episodic Narrative Horizon
 - [x] T-427 · LANDED 2026-11-08 — PR #356: Procedural Playbook Engine (`ProceduralMemory`): Model and persist executable step trajectories, pre-conditions, verification assertions, and rollback recipes · src/cognition/playbooks.ts · F

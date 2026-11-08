@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI Bun fallback**: when GitHub release assets return 504, CI installs Bun from the npm registry instead of failing the job.
 
 ### Added
+- **Wave 24 showcase and DX (`T-423`–`T-426`)**: reproducible terminal-demo script and recording recipe, vendored `sql.js` in-browser SQLite playground, capability-only benchmark matrix with methodology, and an accessible multi-agent demo switcher.
 - **Wave 25 cognitive playbooks (`T-427`–`T-431`)**: atomic procedural playbooks (preconditions, steps, verification, rollback, outcomes), per-session episodic causal narratives, bi-temporal belief windows (`asserted_at`), reinforced Ebbinghaus decay, and `memory playbook` / `muse_playbook_*` CLI+MCP surfaces.
 - **Studio performance (`T-466`–`T-468`)**: per-scope read projection cache invalidated on writes, hidden-tab rendering pause, and an executable sub-10ms UI benchmark.
 - **About, quick start and command deck (`T-463`–`T-465`)**: poster-style About panel with live facts and privacy, copyable onboarding cards for four leading agents, and a filterable CLI palette.

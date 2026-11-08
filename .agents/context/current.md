@@ -165,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23 and Wave 25 are complete.** Next is **Wave 24 (`T-423`–`T-426`)** with the resolved decisions: capability-only benchmark matrix (no competitor names), vendored `sql.js` playground, terminal-demo recipe, and a multi-agent demo switcher. Then Wave 26–29 (`T-432`–`T-443`):
+- **Waves 23–25 are complete.** Next is **Wave 26–29** (`T-432`–`T-443`): AST associative retrieval (`T-432`–`T-435`), branchable/enclave memory (`T-436`–`T-439`), test-driven reinforcement (`T-440`–`T-443`). Site note: unblock the Astro/cookie prerender error before any visual QA on the new pages:
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 24 (`T-423`–`T-426`)** (2026-11-08) — terminal demo script/recipe, vendored sql.js playground, capability-only benchmark matrix, accessible agent demos. PRs #362–#365. Site prerender has a pre-existing Astro/cookie CJS blocker (entrypoints compile).
 - [x] **Wave 25 (`T-427`–`T-431`)** (2026-11-08) — playbooks, episodes, bi-temporal belief windows, reinforced decay, and playbook CLI/MCP commands. PRs #356–#361.
 - [x] **Post-Wave-23 debt sweep** (2026-11-08) — PR #355 merged at `432cf01`: agents discovery cache, backup retention, unwire tool-grant cleanup, mesh freshness bucket.
 - [x] **Wave 23 gauntlet hardening** (2026-11-08) — PR #354 merged at `d2ea59c`; complete config backups (XDG-aware, timestamped, fail-loud), unknown-agent 404s, honest wire reporting, WAL/layout cache freshness, 44px phone controls. Gauntlet: 7.35 critic → REQUEST-CHANGES review → fixed; **CAPPED, not a PASS**. Evidence: `.agents/artifacts/gauntlet-wave23-pr456/`.
