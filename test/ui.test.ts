@@ -577,6 +577,38 @@ describe("Wave 23 PR 2: T-454 graph/list toggle", () => {
   });
 });
 
+describe("Wave 23 PR 2: T-455 kinetic settling", () => {
+  test("stops the rAF loop at settle energy and wakes on input", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+
+      // Ring-seeded, deterministic layout.
+      expect(js).toContain("Math.sin(angle * 2) * 45");
+      expect(js).not.toContain("(Math.random() - 0.5) * 90");
+
+      // Energy-settling loop.
+      expect(js).toContain("const SETTLE_ENERGY = 0.05");
+      expect(js).toContain("graphEnergy = energy / nodes3d.length");
+      expect(js).toContain("if (!dragging && graphEnergy < SETTLE_ENERGY)");
+      expect(js).toContain("graphLoopStarted = false;");
+      expect(js).toContain("function wakeGraph");
+
+      // Pointer capture + wake on the controls.
+      expect(js).toContain("setPointerCapture");
+      expect(js).toContain("wakeGraph()");
+      expect(html).toContain('id="graphCanvas"');
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
