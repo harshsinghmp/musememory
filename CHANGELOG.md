@@ -13,8 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modular cached studio assets (`T-453`)**: CSS, markup and client JS split into `src/ui_assets.ts`; `/assets/studio.css` and `/assets/studio.js` serve per-encoding strong ETags, gzip, 304 and HEAD; standalone export inlines the same modules.
 - **CI Bun fallback**: when GitHub release assets return 504, CI installs Bun from the npm registry instead of failing the job.
 
+### Added
+- **Graph/list toggle (`T-454`)**: instant switch between the canvas graph and a sortable table (title, type, status, project, created) with a 100ms debounced filter and `aria-sort` headers.
+
 ### Fixed
 - **Caller scan (`T-449`)**: `HeuristicFallbackProvider.getCallers` no longer reuses a stateful `g`-flag regex, no longer counts declarations as callers, and scans directories in sorted order; regression test added.
+- **Test hermeticity (`T-449`)**: `findProjectRoot` no longer treats `$HOME`, its ancestors or `/` as project roots, so temp workspaces below home cannot adopt the global `~/.memory`; the doc-link scan also skips `.stversions` and `.commandcode`.
 
 ## [3.2.0] - 2026-10-26
 

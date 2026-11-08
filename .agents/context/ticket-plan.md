@@ -568,7 +568,7 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 - [x] T-453 · Sub-10ms UI Route Architecture: Split single embedded HTML into modular static cached templates with ETag headers and pre-compressed buffers · src/ui.ts · F — **LOCAL 2026-11-08**: `src/ui_assets.ts` splits CSS / markup / client JS; `/assets/studio.css` + `/assets/studio.js` serve strong ETags, pre-gzipped buffers, `Vary: Accept-Encoding` and 304 fast paths; standalone export inlines the same modules; `test/ui.test.ts` T-453; landed PR #337 at `d0c9600`.
 
 ## PR 2 / Issue #2: Memory Studio 2.0: Instant Graph/List View Toggle, Physics Settling & Activity Heatmap
-- [ ] T-454 · Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
+- [x] T-454 · LANDED 2026-11-08 — PR #339 (`3e621fa`): Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
 - [ ] T-455 · Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
 - [ ] T-456 · Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
 
@@ -649,7 +649,7 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 
 ## Late additions (post-v3.2.0)
 
-- [ ] T-449 · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake (stateful `g`-flag `RegExp` + definition counted as caller). Dry-run only; no code changed. Branch: `new` · F
+- [x] T-449 · LANDED 2026-11-08 via PR #337 (`c0f7aef`, caller scan) + PR #338 (`94620895`, home-store guard, doc-link skip) · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake (stateful `g`-flag `RegExp` + definition counted as caller). Dry-run only; no code changed. Branch: `new` · F
 - [ ] T-450 · DEFERRED: scope which `.agents/` subpaths should be gitignored (e.g. artifacts, plans, context/current.md) vs. kept tracked (standards, skills). Audit consumer impact (collaborators, DOX, skills) before removing any. No execution until user scopes. Branch: `new` · N
 
 ---

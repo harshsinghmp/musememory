@@ -165,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1 landed (`T-451`–`T-453`, PR #337); **next is PR 2 (`T-454`–`T-456`)** on its own branch/PRs:
+- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1 landed (`T-451`–`T-453`, PR #337) and `T-454` landed (PR #339); **next is `T-455` (kinetic-settling canvas) then `T-456` (activity heatmap)**, each on its own branch/PR:
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -180,6 +180,8 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **T-449 test hermeticity** (2026-11-08) — PR #338 merged at `94620895`; `findProjectRoot` no longer adopts `$HOME`/`/` as a project root, doc-link scan skips local sync state, regression test with a fake home. Earlier caller-scan fix merged via #337 (`c0f7aef`). Issue #336 closes.
+- [x] **Wave 23 PR 2 / `T-454`** (2026-11-08) — PR #339 merged at `3e621fa`; instant graph/list toggle with a sortable table, `aria-sort`, and a 100ms debounced filter.
 - [x] **Wave 23 PR 1 (`T-451`–`T-453`)** (2026-11-08) — merged in PR #337 at `d0c9600`; `check:landed` → **LANDED**. Left rail, dual-scope switcher, modular ETag/gzip assets, read-only global/mesh reads, 375/768/1280 verified, 1451/0 at merge. Follow-ups in PR #337's thread: stateful-regex flake fixed (`c0f7aef`), npm Bun CI fallback (`b298beb`). Gauntlet verdict: CAPPED at 7.99 (not a 9.0 PASS) — evidence in `.agents/artifacts/gauntlet-wave23-pr1/`.
 - [x] **Released: v3.1.2** (2026-10-25) — completes the silent-casing fan-out:
   - PR #330 merged at `d7e875b` (*"Release: v3.1.2"*); annotated tag
