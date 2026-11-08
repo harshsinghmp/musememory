@@ -404,6 +404,9 @@ export const STUDIO_JS = `    let allMemories = [];
     let timelineCutoff = null;
     let simAlpha = 1;
     let graphLoopStarted = false;
+    // T-455: the loop stops once the layout stops moving; input wakes it.
+    const SETTLE_ENERGY = 0.05;
+    let graphEnergy = Infinity;
 
     async function refreshMemories() {
       const icon = document.getElementById('refreshIcon');
@@ -726,7 +729,7 @@ export const STUDIO_JS = `    let allMemories = [];
       var label = document.getElementById('studioViewLabel');
       if (label) label.textContent = studioView === 'graph' ? 'Canvas graph' : 'Filterable table';
       if (studioView === 'list') renderStudioTable();
-      else needsRedraw = true;
+      else wakeGraph();
     }
 
     function studioRows() {
@@ -906,7 +909,7 @@ export const STUDIO_JS = `    let allMemories = [];
           updatedAt: m.updated_at || '',
           degree: degreeOf.get(m.id) || 0,
           x: prev ? prev.x : Math.cos(angle) * 260,
-          y: prev ? prev.y : (Math.random() - 0.5) * 90,
+          y: prev ? prev.y : Math.sin(angle * 2) * 45,
           z: prev ? prev.z : Math.sin(angle) * 260,
         };
       });
@@ -922,12 +925,14 @@ export const STUDIO_JS = `    let allMemories = [];
         }
       }
       simAlpha = 1;
+      graphEnergy = Infinity;
       needsRedraw = true;
     }
 
     function simulateStep() {
-      if (nodes3d.length === 0 || simAlpha <= 0.03) return;
+      if (nodes3d.length === 0 || simAlpha <= 0.03) { graphEnergy = 0; return; }
       const alpha = simAlpha;
+      let energy = 0;
       for (let i = 0; i < nodes3d.length; i++) {
         const a = nodes3d[i];
         for (let j = i + 1; j < nodes3d.length; j++) {
@@ -939,6 +944,7 @@ export const STUDIO_JS = `    let allMemories = [];
           dx /= dist; dy /= dist; dz /= dist;
           a.x += dx * force; a.y += dy * force; a.z += dz * force;
           b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+          energy += Math.abs(force) * 2;
         }
       }
       for (let i = 0; i < edges3d.length; i++) {
@@ -950,14 +956,17 @@ export const STUDIO_JS = `    let allMemories = [];
         const force = ((dist - target) / dist) * 0.02 * alpha;
         a.x += dx * force; a.y += dy * force; a.z += dz * force;
         b.x -= dx * force; b.y -= dy * force; b.z -= dz * force;
+        energy += Math.abs(force) * 2;
       }
       for (let i = 0; i < nodes3d.length; i++) {
         const n = nodes3d[i];
         n.x *= (1 - 0.002 * alpha);
         n.y *= (1 - 0.002 * alpha);
         n.z *= (1 - 0.002 * alpha);
+        energy += (Math.abs(n.x) + Math.abs(n.y) + Math.abs(n.z)) * 0.002 * alpha;
       }
       simAlpha = Math.max(0.02, simAlpha * 0.985);
+      graphEnergy = energy / nodes3d.length;
     }
 
     function project(x, y, z, width, height) {
@@ -1051,9 +1060,27 @@ export const STUDIO_JS = `    let allMemories = [];
             drawGraph(canvas);
             needsRedraw = false;
           }
+          if (!dragging && graphEnergy < SETTLE_ENERGY) {
+            graphLoopStarted = false;
+            return;
+          }
         }
+      } else {
+        graphLoopStarted = false;
+        return;
       }
       requestAnimationFrame(tick);
+    }
+
+    function wakeGraph() {
+      if (nodes3d.length === 0) { needsRedraw = true; return; }
+      simAlpha = Math.max(simAlpha, 0.6);
+      graphEnergy = Infinity;
+      needsRedraw = true;
+      if (!graphLoopStarted) {
+        graphLoopStarted = true;
+        requestAnimationFrame(tick);
+      }
     }
 
     function buildClusterFilters() {
@@ -1070,7 +1097,7 @@ export const STUDIO_JS = `    let allMemories = [];
         box.onchange = () => {
           if (box.checked) hiddenClusters.delete(group + ':' + value);
           else hiddenClusters.add(group + ':' + value);
-          needsRedraw = true;
+          wakeGraph();
         };
         label.appendChild(box);
         label.appendChild(document.createTextNode(value));
@@ -1095,18 +1122,26 @@ export const STUDIO_JS = `    let allMemories = [];
           timelineCutoff = new Date(cutoffMs).toISOString();
           label.textContent = new Date(cutoffMs).toLocaleDateString();
         }
-        needsRedraw = true;
+        wakeGraph();
       };
     }
 
     function setupCanvasInteractions() {
       const canvas = document.getElementById('graphCanvas');
+      canvas.addEventListener('pointerdown', (e) => {
+        if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+        wakeGraph();
+      });
+      canvas.addEventListener('pointerup', (e) => {
+        if (canvas.releasePointerCapture) canvas.releasePointerCapture(e.pointerId);
+        wakeGraph();
+      });
       canvas.addEventListener('mousedown', (e) => {
         dragging = true;
         dragMoved = false;
         lastX = e.clientX;
         lastY = e.clientY;
-        needsRedraw = true;
+        wakeGraph();
       });
       window.addEventListener('mousemove', (e) => {
         if (!dragging) return;
@@ -1116,16 +1151,16 @@ export const STUDIO_JS = `    let allMemories = [];
         rotX = Math.max(-1.4, Math.min(1.4, rotX + dy * 0.005));
         lastX = e.clientX;
         lastY = e.clientY;
-        needsRedraw = true;
+        wakeGraph();
       });
       window.addEventListener('mouseup', () => {
         dragging = false;
-        needsRedraw = true;
+        wakeGraph();
       });
       canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
         zoom = Math.max(0.3, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
-        needsRedraw = true;
+        wakeGraph();
       }, { passive: false });
       canvas.addEventListener('click', (e) => {
         if (dragMoved) return;
@@ -1567,7 +1602,7 @@ export const STUDIO_JS = `    let allMemories = [];
         currentTab = tab.dataset.view;
         const panel = document.getElementById('panel-' + currentTab);
         if (panel) panel.classList.add('active');
-        if (currentTab === 'graph') needsRedraw = true;
+        if (currentTab === 'graph') wakeGraph();
         if (currentTab === 'health') fetchHealth();
         if (currentTab === 'adrs') { fetchAdrs(); fetchDrift(); }
         if (currentTab === 'cognition') fetchCognition();
@@ -1635,7 +1670,7 @@ export const STUDIO_JS = `    let allMemories = [];
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
         renderList();
-        needsRedraw = true;
+        wakeGraph();
       }, 30);
     });
 
@@ -1646,7 +1681,7 @@ export const STUDIO_JS = `    let allMemories = [];
         chip.setAttribute('aria-pressed', 'true');
         currentFilter = chip.dataset.type;
         renderList();
-        needsRedraw = true;
+        wakeGraph();
       });
     });
 
