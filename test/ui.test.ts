@@ -276,6 +276,8 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       expect(html).toContain('aria-pressed="true">All</button>');
       expect(html).toContain('<button type="button" class="archetype-card"');
       expect(html).toContain('<span class="archetype-icon">');
+      // Buttons may not close a span with a div end tag.
+      expect(html).not.toMatch(/<span class="archetype-icon">[^<]*<\/div>/);
     } finally {
       srv.close();
       cleanup(root);

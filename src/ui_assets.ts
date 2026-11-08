@@ -183,7 +183,7 @@ export const STUDIO_CSS = `    :root {
     .archetype-card { font: inherit; color: inherit; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px; cursor: pointer; transition: var(--transition); text-align: center; }
     .archetype-card:hover { border-color: var(--accent); background: rgba(99,102,241,0.05); transform: translateY(-2px); }
     .archetype-card.active { border-color: var(--accent); background: rgba(99,102,241,0.12); box-shadow: 0 0 16px var(--accent-glow); }
-    .archetype-icon { font-size: 24px; margin-bottom: 8px; }
+    .archetype-icon { display: block; font-size: 24px; margin-bottom: 8px; }
     .archetype-title { font-weight: 700; font-size: 13px; color: #fff; text-transform: capitalize; }
     
     /* Retrieval Sandbox */
@@ -271,7 +271,7 @@ export const STUDIO_CSS = `    :root {
     body:not([data-scope="project"]) #dActions, body:not([data-scope="project"]) .write-action { display: none; }
     .scope-banner { margin-left: 76px; padding: 6px 20px; background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid var(--panel-border); color: #fcd34d; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
     h1, h2, h3, h4, h5, h6, .brand-title, .card-title-lg, .grade-circle, .stat-val { font-family: 'Archivo Black', 'JetBrains Mono', sans-serif; letter-spacing: 0; }
-    @media (max-width: 900px) { header, .layout { margin-left: 0; } .rail { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--panel-border); } .rail-tools { margin-top: 0; border-top: none; flex-direction: row; flex-wrap: wrap; } .rail-brand { margin: 0 8px 0 0; } .rail-section, .rail-tool, .scope-btn { min-height: 44px; min-width: 44px; } .scope-banner { margin-left: 0; } }
+    @media (max-width: 900px) { header, .layout { margin-left: 0; } .rail { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--panel-border); } .rail-tools { margin-top: 0; border-top: none; flex-direction: row; flex-wrap: wrap; } .rail-brand { margin: 0 8px 0 0; } .rail-section, .rail-tool, .scope-btn { min-height: 44px; min-width: 44px; } .scope-banner { margin-left: 0; } .detail-pane { position: fixed; inset: 0 0 0 auto; width: min(440px, 100%); min-width: 0; z-index: 70; } }
     @media (max-width: 640px) {
       .layout { flex-direction: column; }
       .rail { flex-wrap: nowrap; overflow-x: auto; }
@@ -283,7 +283,7 @@ export const STUDIO_CSS = `    :root {
       .header-actions { width: 100%; }
       .scope-filter { flex: 1 1 100%; }
       .scope-filter-input { width: 100%; }
-      .header-actions .btn-icon, .scope-btn, .rail-section, .rail-tool { min-height: 44px; min-width: 44px; }
+      .header-actions .btn-icon, .scope-btn, .rail-section, .rail-tool, .btn, .chip, .close-btn, .search-input-wrap input { min-height: 44px; min-width: 44px; }
       .view-panel { min-height: 0; }
       .detail-pane { width: 100%; min-width: 0; }
       .close-btn { min-width: 44px; min-height: 44px; }
@@ -317,7 +317,7 @@ export const STUDIO_JS = `    let allMemories = [];
         var notes = {
           project: '',
           global: 'Global scope (~/.memory): memory list, stats, constraints, wiki, persona and audit read from the global store. Health, ADRs, Cognition, Sync and Mesh stay project-scoped. Writes target the project store.',
-          mesh: 'Mesh scope (read-only, first 200 entries): memory list and stats aggregate linked stores. Every other panel, and all writes, stay project-scoped.'
+          mesh: 'Mesh scope (read-only, first 200 entries): memory list and total/confirmed/link counts aggregate linked stores. Constraints, wiki, audit and all writes stay project-scoped.'
         };
         banner.textContent = notes[studioScope] || '';
         banner.hidden = studioScope === 'project';
@@ -485,6 +485,10 @@ export const STUDIO_JS = `    let allMemories = [];
         if (!graphLoopStarted) { graphLoopStarted = true; requestAnimationFrame(tick); }
       } catch (err) {
         console.error('Failed to load memories:', err);
+        if (requestedScope === studioScope && requestGen === scopeGeneration) {
+          allMemories = [];
+          renderList();
+        }
       }
     }
 
@@ -583,7 +587,6 @@ export const STUDIO_JS = `    let allMemories = [];
             const active = c.dataset.arch === archetype;
             if (active) c.classList.add('active');
             else c.classList.remove('active');
-            c.setAttribute('aria-pressed', active ? 'true' : 'false');
           });
         }
       } catch {}
@@ -1496,9 +1499,8 @@ export const STUDIO_JS = `    let allMemories = [];
         if (!requireProjectScope()) return;
         const arch = card.dataset.arch;
         if (!arch) return;
-        document.querySelectorAll('.archetype-card[data-arch]').forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
+        document.querySelectorAll('.archetype-card[data-arch]').forEach(c => c.classList.remove('active'));
         card.classList.add('active');
-        card.setAttribute('aria-pressed', 'true');
         await fetch('/api/user-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1718,11 +1720,11 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             Switch active agent archetypes to steer communication tone, coding depth, and design rules across all connected platforms.
           </p>
           <div class="archetype-grid" id="archetypeGrid">
-            <button type="button" class="archetype-card" data-arch="developer" aria-pressed="false"><span class="archetype-icon">💻</div><span class="archetype-title">Developer</span></button>
-            <button type="button" class="archetype-card" data-arch="designer" aria-pressed="false"><span class="archetype-icon">🎨</div><span class="archetype-title">Designer</span></button>
-            <button type="button" class="archetype-card" data-arch="marketer" aria-pressed="false"><span class="archetype-icon">🚀</div><span class="archetype-title">Marketer</span></button>
-            <button type="button" class="archetype-card" data-arch="casual" aria-pressed="false"><span class="archetype-icon">☕</div><span class="archetype-title">Casual</span></button>
-            <button type="button" class="archetype-card" data-arch="custom" aria-pressed="false"><span class="archetype-icon">⚙️</div><span class="archetype-title">Custom</span></button>
+            <button type="button" class="archetype-card" data-arch="developer"><span class="archetype-icon">💻</span><span class="archetype-title">Developer</span></button>
+            <button type="button" class="archetype-card" data-arch="designer"><span class="archetype-icon">🎨</span><span class="archetype-title">Designer</span></button>
+            <button type="button" class="archetype-card" data-arch="marketer"><span class="archetype-icon">🚀</span><span class="archetype-title">Marketer</span></button>
+            <button type="button" class="archetype-card" data-arch="casual"><span class="archetype-icon">☕</span><span class="archetype-title">Casual</span></button>
+            <button type="button" class="archetype-card" data-arch="custom"><span class="archetype-icon">⚙️</span><span class="archetype-title">Custom</span></button>
           </div>
           <div style="margin-top:20px;">
             <div class="card-title-lg">Active USER.md Instructions</div>

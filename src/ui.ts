@@ -225,14 +225,26 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
       return topologyCache.topology;
     };
+    let meshResultCache: { key: string; at: number; results: Array<{ entry: MemoryEntry; origin: string }> } | undefined;
     const invalidateMeshTopology = (): void => {
       topologyCache = undefined;
+      meshResultCache = undefined;
     };
     const meshMemories = (limit: number): Array<{ entry: MemoryEntry; origin: string }> => {
-      return resolveMeshMemories(opts.store, meshTopology(), { query: "", limit }).map((r) => ({
-        entry: r.memory,
-        origin: r.originProject,
-      }));
+      const topology = meshTopology();
+      const key = `${topology.rootPath}|${topology.updatedAt}|${limit}`;
+      const now = Date.now();
+      if (!meshResultCache || meshResultCache.key !== key || now - meshResultCache.at > 2000) {
+        meshResultCache = {
+          key,
+          at: now,
+          results: resolveMeshMemories(opts.store, topology, { query: "", limit }).map((r) => ({
+            entry: r.memory,
+            origin: r.originProject,
+          })),
+        };
+      }
+      return meshResultCache.results;
     };
     // Reads that have a meaningful global counterpart (CURRENT.md, wiki, persona,
     // audit) follow the scope too. Writes stay project-scoped by design; the
