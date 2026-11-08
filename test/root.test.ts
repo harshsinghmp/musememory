@@ -82,4 +82,30 @@ describe("hierarchical root detection", () => {
     expect(res).toEqual({ root: null, marker: null });
     rmSync(root, { recursive: true, force: true });
   });
+
+  test("does not adopt the user's home store from a temp dir below home (T-449)", () => {
+    const home = temp();
+    mkdirSync(join(home, ".memory", "memories"), { recursive: true });
+    const scratch = join(home, ".cache", "scratch", "project");
+    mkdirSync(scratch, { recursive: true });
+
+    const previous = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      // The global store at ~/.memory must not capture a temp workspace.
+      expect(findProjectRoot(scratch)).toEqual({ root: null, marker: null });
+
+      // A real project below home still wins over the home store.
+      mkdirSync(join(home, "work", "proj", ".memory", "memories"), { recursive: true });
+      expect(findProjectRoot(join(home, "work", "proj", "sub"))).toEqual({
+        root: join(home, "work", "proj"),
+        marker: "memory",
+        memoryDirName: ".memory",
+      });
+    } finally {
+      if (previous === undefined) delete process.env.HOME;
+      else process.env.HOME = previous;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
