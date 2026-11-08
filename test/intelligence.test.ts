@@ -94,6 +94,36 @@ export function handleRequest(raw: string) {
       expect(blast.target).toBe("sanitizeInput");
       expect(blast.affectedFiles.length).toBeGreaterThan(0);
     });
+
+    it("finds every call site across mixed line lengths (T-449 stateful regex)", async () => {
+      writeFileSync(
+        join(testDir, "utils.ts"),
+        `
+export function sanitizeInput(input: string): string {
+  return input.trim();
+}
+`,
+        "utf8",
+      );
+      writeFileSync(
+        join(testDir, "calls.ts"),
+        `export function run() {
+  const first = sanitizeInput("a");
+  sanitizeInput("b");
+}
+`,
+        "utf8",
+      );
+
+      const provider = new HeuristicFallbackProvider();
+      const callers = await provider.getCallers("sanitizeInput", testDir);
+      const callLines = callers.filter((c) => c.file.includes("calls.ts")).map((c) => c.line);
+
+      // A stateful `g`-flag regex skipped the short second line.
+      expect(callLines).toEqual([2, 3]);
+      // A declaration is not a call site.
+      expect(callers.some((c) => c.file.includes("utils.ts"))).toBe(false);
+    });
   });
 
   describe("CodeGraph and Graphify Optional Adapters", () => {
