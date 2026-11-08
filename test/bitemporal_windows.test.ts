@@ -29,6 +29,12 @@ describe("T-429: bi-temporal windows", () => {
     expect(isBiTemporallyVisible(e, { assertedAt: "2026-04-02T00:00:00Z" })).toBe(true);
   });
 
+  test("compares epochs, not strings, and rejects invalid timestamps", () => {
+    const e = entry({ created_at: "2026-03-01T09:00:00+05:30" });
+    expect(isBiTemporallyVisible(e, { validAt: "2026-03-01T05:00:00Z" })).toBe(true);
+    expect(() => isBiTemporallyVisible(e, { validAt: "yesterday" })).toThrow(/Invalid validAt/);
+  });
+
   test("both clocks must agree and empty queries pass through", () => {
     const e = entry({ asserted_at: "2026-04-01T00:00:00Z", valid_to: "2026-02-01T00:00:00Z" });
     expect(isBiTemporallyVisible(e, { validAt: "2026-01-01T00:00:00Z", assertedAt: "2026-01-01T00:00:00Z" })).toBe(false);

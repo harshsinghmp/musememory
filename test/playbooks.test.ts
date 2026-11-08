@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -32,13 +32,21 @@ describe("T-427: procedural playbook engine", () => {
       expect(listPlaybooks(memoryDir).length).toBe(1);
       expect(listPlaybooks(memoryDir, "race").length).toBe(1);
 
+      const second = savePlaybook(memoryDir, {
+        title: "Fix flaky test",
+        goal: "A distinct same-titled playbook",
+        steps: [{ action: "other" }],
+      });
+      expect(second.id).not.toBe(first.id);
+      expect(loadPlaybooks(memoryDir).length).toBe(2);
+
       const updated = savePlaybook(memoryDir, {
+        id: first.id,
         title: "Fix flaky test",
         goal: "Make the failing test deterministic",
         steps: [{ action: "Reproduce" }, { action: "Fix" }, { action: "Verify" }],
       });
       expect(updated.id).toBe(first.id);
-      expect(loadPlaybooks(memoryDir).length).toBe(1);
       expect(updated.steps.length).toBe(3);
       expect(updated.successCount).toBe(0);
 
@@ -50,7 +58,7 @@ describe("T-427: procedural playbook engine", () => {
     }
   });
 
-  test("records outcomes and tolerates a corrupt file", () => {
+  test("records outcomes and fails loud on a corrupt file", () => {
     const memoryDir = dir();
     try {
       const playbook = savePlaybook(memoryDir, { title: "Deploy", goal: "ship", steps: [{ action: "build" }] });
@@ -61,7 +69,9 @@ describe("T-427: procedural playbook engine", () => {
       expect(getPlaybook(memoryDir, playbook.title)?.successCount).toBe(1);
 
       writeFileSync(join(memoryDir, "playbooks.json"), "{not json", "utf8");
-      expect(loadPlaybooks(memoryDir)).toEqual([]);
+      expect(() => loadPlaybooks(memoryDir)).toThrow(/not valid JSON/);
+      expect(() => savePlaybook(memoryDir, { title: "x", goal: "y", steps: [{ action: "z" }] })).toThrow(/not valid JSON/);
+      expect(readFileSync(join(memoryDir, "playbooks.json"), "utf8")).toBe("{not json");
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }
@@ -72,6 +82,8 @@ describe("T-427: procedural playbook engine", () => {
     try {
       expect(() => savePlaybook(memoryDir, { title: "", goal: "x", steps: [{ action: "a" }] })).toThrow();
       expect(() => savePlaybook(memoryDir, { title: "x", goal: "x", steps: [] })).toThrow();
+      expect(() => savePlaybook(memoryDir, { title: "x", goal: "x", steps: [{} as any] })).toThrow(/step 1/);
+      expect(() => savePlaybook(memoryDir, { title: "x", goal: "", steps: [{ action: "a" }] })).toThrow(/goal/);
       expect(existsSync(join(memoryDir, "playbooks.json"))).toBe(false);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });

@@ -20,7 +20,7 @@ describe("T-431: playbook CLI and MCP commands", () => {
         method: "tools/call",
         params: {
           name: "muse_playbook_record",
-          arguments: { dir, title: "Fix flaky test", goal: "make it deterministic", steps: [{ action: "reproduce" }], tags: ["tests"] },
+          arguments: { dir, title: "Fix flaky test", goal: "make it deterministic", steps: [{ action: "reproduce" }], preconditions: ["repro"], verification: ["tests green"], rollback: ["git checkout"], tags: ["tests"] },
         },
       });
       expect(recorded.isError).toBeFalsy();
@@ -32,6 +32,22 @@ describe("T-431: playbook CLI and MCP commands", () => {
       });
       expect(recalled.isError).toBeFalsy();
       expect(recalled.content[0].text).toContain("Fix flaky test");
+
+      const stepUpdate = await call({
+        method: "tools/call",
+        params: {
+          name: "muse_playbook_record",
+          arguments: {
+            dir,
+            id: "Fix flaky test",
+            title: "Fix flaky test",
+            goal: "make it deterministic",
+            steps: [{ action: "reproduce" }, { action: "fix" }],
+          },
+        },
+      });
+      expect(stepUpdate.isError).toBeFalsy();
+      expect(stepUpdate.content[0].text).toContain("## Verification");
 
       const outcome = await call({
         method: "tools/call",
