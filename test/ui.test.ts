@@ -868,6 +868,31 @@ describe("Wave 23 PR 5: T-463 poster About panel", () => {
   });
 });
 
+describe("Wave 23 PR 5: T-464 quick-start onboarding", () => {
+  test("renders copyable setup cards for leading agents", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('id="quickStartGrid"');
+      expect(js).toContain("QUICK_START_AGENTS");
+      expect(js).toContain("function renderQuickStart");
+      expect(js).toContain("function copyText");
+      expect(js).toContain("memory connect claude-code --harness claude");
+      expect(css).toContain(".quickstart-card");
+      expect(css).toContain(".quickstart-cmd");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);

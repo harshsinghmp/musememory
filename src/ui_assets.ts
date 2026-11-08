@@ -292,6 +292,11 @@ export const STUDIO_CSS = `    :root {
     .about-fact span { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
     .about-fact strong { font-size: 16px; color: #fff; }
     .about-privacy { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--panel-border); font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+    /* T-464: quick-start onboarding */
+    .quickstart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .quickstart-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .quickstart-step { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+    .quickstart-cmd { display: block; background: #0a0806; border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #fcd34d; word-break: break-all; }
     /* T-460: agents hub */
     .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
     .agent-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -595,6 +600,41 @@ export const STUDIO_JS = `    let allMemories = [];
           if (absent) { absent.textContent = 'No global store found at ~/.memory. Nothing to show in global scope.'; absent.hidden = false; }
         }
       } catch {}
+    }
+
+    const QUICK_START_AGENTS = [
+      { id: 'claude-code', name: 'Claude Code', command: 'memory connect claude-code --harness claude' },
+      { id: 'opencode', name: 'OpenCode', command: 'memory connect opencode' },
+      { id: 'cursor', name: 'Cursor', command: 'memory connect cursor' },
+      { id: 'antigravity', name: 'Antigravity', command: 'memory connect antigravity' },
+    ];
+
+    function copyText(text, label) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash(label + ' copied.'); },
+          function () { flash('Copy failed.', true); }
+        );
+      } else {
+        flash('Clipboard unavailable in this browser.', true);
+      }
+    }
+
+    function renderQuickStart() {
+      const grid = document.getElementById('quickStartGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      QUICK_START_AGENTS.forEach(function (agent, index) {
+        const card = document.createElement('div');
+        card.className = 'quickstart-card';
+        card.innerHTML = '<div class="quickstart-step">STEP ' + String(index + 1).padStart(2, '0') + ' · ' + escapeHtml(agent.name) + '</div>' +
+          '<code class="quickstart-cmd">' + escapeHtml(agent.command) + '</code>' +
+          '<button type="button" class="btn-icon" data-copy-command="' + escapeHtml(agent.command) + '">Copy command</button>';
+        card.querySelector('[data-copy-command]').addEventListener('click', function () {
+          copyText(agent.command, agent.name + ' command');
+        });
+        grid.appendChild(card);
+      });
     }
 
     function renderAbout(stats) {
@@ -1949,6 +1989,7 @@ export const STUDIO_JS = `    let allMemories = [];
       });
     });
 
+    renderQuickStart();
     setupCanvasInteractions();
     setupTimeline();
 
@@ -2519,6 +2560,13 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             <div class="about-fact"><span>Audit events</span><strong id="aboutAudit">0</strong></div>
           </div>
           <div class="about-privacy">PRIVACY — local files only. No cloud, no telemetry, no background daemon.</div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Quick Start</span>
+            <span class="brand-tag">wire an agent in one command</span>
+          </div>
+          <div class="quickstart-grid" id="quickStartGrid"></div>
         </div>
       </div>
     </div>
