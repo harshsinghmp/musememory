@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23 PR 5 (`T-463`–`T-465`)** (2026-11-08) — poster About panel, quick-start cards and searchable command deck. PRs #348–#350.
 - [x] **Wave 23 PR 4 (`T-460`–`T-462`)** (2026-11-08) — agents hub: discovery statuses, one-click wire/unwire with `.bak` backups and harness opt-in, point-any-agent manifest. PRs #345–#347.
 - [x] **Wave 23 PR 3 / `T-459`** (2026-11-08) — PR #344 merged; generation-time redaction plus a token-savings and leak test (`test/vault_terrain.test.ts`).
 - [x] **Wave 23 PR 3 / `T-458`** (2026-11-08) — PR #343 merged at `65113af`; terrain vault split-pane (tree, GEN badges, markdown viewer, REINDEX scanline).

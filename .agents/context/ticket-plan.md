@@ -583,9 +583,9 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 - [x] T-462 · LANDED 2026-11-08 — PR #347: "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
 
 ## PR 5 / Issue #5: About & Cognitive Mission Control: Architecture Specs, Quick Start & CLI Cheatsheet
-- [ ] T-463 · Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
-- [ ] T-464 · Quick-Start Interactive Onboarding: Multi-step interactive setup cards for leading agents (Antigravity, OpenCode, Claude Code, Cursor) with copyable commands · src/ui.ts · F
-- [ ] T-465 · "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
+- [x] T-463 · LANDED 2026-11-08 — PR #348: Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
+- [x] T-464 · LANDED 2026-11-08 — PR #349: Quick-Start Interactive Onboarding: Multi-step interactive setup cards for leading agents (Antigravity, OpenCode, Claude Code, Cursor) with copyable commands · src/ui.ts · F
+- [x] T-465 · LANDED 2026-11-08 — PR #350: "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
 
 ## PR 6 / Issue #6: System Speed, In-Memory Caching & Performance Hardening
 - [ ] T-466 · In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
