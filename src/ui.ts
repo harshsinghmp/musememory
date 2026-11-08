@@ -201,6 +201,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     // only when ~/.memory already exists (a read must not create it).
     type StudioScope = "project" | "global" | "mesh";
     let globalStoreCache: { dir: string; store: Store } | undefined;
+    // T-466: read projections are cached per scope and invalidated by writes.
+    let projectionVersion = 0;
+    const projectionCache = new Map<string, { version: number; body: string }>();
     const parseScope = (u: URL): StudioScope => {
       const raw = u.searchParams.get("scope");
       return raw === "global" || raw === "mesh" ? raw : "project";
@@ -314,6 +317,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      // Any UI mutation bumps the projection version; the next read misses.
+      if (req.method === "POST") projectionVersion += 1;
+
       // Wave 23 / T-453: modular static assets, cached by ETag and shipped
       // pre-compressed so repeat loads are a 304 or one cached body.
       if (pathname === "/assets/studio.css" && (req.method === "GET" || req.method === "HEAD")) {
@@ -329,6 +335,12 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // API Routes
       if (pathname === "/api/memories" && req.method === "GET") {
         const scope = parseScope(url);
+        const cached = projectionCache.get(scope);
+        if (cached && cached.version === projectionVersion) {
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
+          res.end(cached.body);
+          return;
+        }
         let projected: ProjectedUiMemory[];
         if (scope === "mesh") {
           projected = meshMemories(200).map((r) => ({
@@ -341,13 +353,22 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         } else {
           projected = list(opts.store).map(projectMemoryForUi);
         }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(projected));
+        const body = JSON.stringify(projected);
+        projectionCache.set(scope, { version: projectionVersion, body });
+        res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
+        res.end(body);
         return;
       }
 
       if (pathname === "/api/stats" && req.method === "GET") {
         const scope = parseScope(url);
+        const statsKey = `stats:${scope}`;
+        const cachedStats = projectionCache.get(statsKey);
+        if (cachedStats && cachedStats.version === projectionVersion) {
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
+          res.end(cachedStats.body);
+          return;
+        }
         const metaStore = scope === "global" ? openGlobalStore() : opts.store;
         const metaDir = scope === "global" ? getGlobalMemoryDir() : opts.memoryDir;
         const memories: MemoryEntry[] = scope === "mesh"
@@ -366,8 +387,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           linksCount += (m.related_memory_ids || []).length;
         }
 
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
+        const statsBody = JSON.stringify({
           scope,
           available: scope !== "global" || Boolean(metaStore),
           total: memories.length,
@@ -379,7 +399,10 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           links: Math.floor(linksCount / 2),
           typeCounts,
           handoff: activeState ? activeState.handoff : null,
-        }));
+        });
+        projectionCache.set(statsKey, { version: projectionVersion, body: statsBody });
+        res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
+        res.end(statsBody);
         return;
       }
 
