@@ -165,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1, PR 2 and `T-457` landed; **next is `T-458` (vault split-pane UI) then `T-459` (token benchmark)**, per-ticket branches/PRs:
+- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1, PR 2, `T-457` and `T-458` landed; **next is `T-459` (terrain token benchmark)**, then PR 4 (`T-460`–`T-462`, agents hub):
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23 PR 3 / `T-458`** (2026-11-08) — PR #343 merged at `65113af`; terrain vault split-pane (tree, GEN badges, markdown viewer, REINDEX scanline).
 - [x] **Wave 23 PR 3 / `T-457`** (2026-11-08) — PR #342 merged at `8006427`; deterministic workspace terrain generator and `terrain --workspace` CLI.
 - [x] **Wave 23 PR 2 / `T-455`** (2026-11-08) — PR #340 merged at `05b4fdf`; energy-settling loop with wake hooks, deterministic ring seed, pointer capture.
 - [x] **Wave 23 PR 2 / `T-456`** (2026-11-08) — PR #341 merged at `436d198`; scope-aware activity endpoint, 52-week heatmap and agent session cards.
