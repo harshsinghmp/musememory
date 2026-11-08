@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, parse, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import { initUserProfile, userFilePath } from "./user.ts";
 import { ensureWikiStructure } from "./wiki/index.ts";
@@ -81,7 +81,10 @@ export function findProjectRoot(startDir: string, options: ResolveOptions = {}):
     return { root: envDir, marker: "env", memoryDirName: "" };
   }
 
-  const ancestors = ancestorChain(startDir);
+  // T-449: never treat the user's home directory (or anything above it) as a
+  // project root. The global store lives at ~/.memory, so an upward scan from
+  // a temp dir beneath $HOME would otherwise adopt the global store.
+  const ancestors = projectCandidateChain(startDir);
   for (const dir of ancestors) {
     if (existsSync(join(dir, ".memory"))) return { root: dir, marker: "memory", memoryDirName: ".memory" };
     if (existsSync(join(dir, ".musememory"))) return { root: dir, marker: "memory", memoryDirName: ".musememory" };
@@ -125,6 +128,19 @@ export function findOrCreateProjectRoot(
   const marker = res.marker ?? "auto";
   ensureMemoryDirectory(memoryDir);
   return { root, memoryDir, marker };
+}
+
+function projectCandidateChain(startDir: string): string[] {
+  const home = resolve(process.env.HOME || process.env.USERPROFILE || homedir());
+  const root = parse(home).root;
+  return ancestorChain(startDir).filter((dir) => {
+    const resolved = resolve(dir);
+    if (resolved === root) return false;
+    if (resolved === home) return false;
+    // resolved is an ancestor of home (e.g. /home on POSIX).
+    if (home.startsWith(resolved + sep)) return false;
+    return true;
+  });
 }
 
 function ancestorChain(startDir: string): string[] {

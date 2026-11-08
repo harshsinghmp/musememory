@@ -29,6 +29,8 @@ const SKIP_DIRS = new Set([
   ".memory", // owned by the MuseMemory engine — never read or validated
   "dist",
   ".astro",
+  ".stversions", // Syncthing conflict/version copies, not repository content
+  ".commandcode", // local agent state
   ".agents/artifacts/archive",
 ]);
 
