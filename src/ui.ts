@@ -7,6 +7,7 @@ import { list, confirm, markStale, supersede, deleteEntry, propose, openStore } 
 import { join } from "node:path";
 import { getGlobalMemoryDir } from "./root.ts";
 import { writeWorkspaceTerrain } from "./vault/index.ts";
+import { discoverAgentHub } from "./agents/hub.ts";
 import {
   STUDIO_HTML_ASSET,
   STUDIO_CSS_ASSET,
@@ -533,6 +534,18 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           sessions,
           total_mutations: trail.length,
         }));
+        return;
+      }
+
+      if (pathname === "/api/agents" && req.method === "GET") {
+        const agents = discoverAgentHub();
+        const counts = {
+          wired: agents.filter((a) => a.status === "WIRED").length,
+          unwired: agents.filter((a) => a.status === "UNWIRED").length,
+          absent: agents.filter((a) => a.status === "ABSENT").length,
+        };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ agents, counts }));
         return;
       }
 

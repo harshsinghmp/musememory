@@ -281,6 +281,15 @@ export const STUDIO_CSS = `    :root {
     .session-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
     .session-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
     .activity-empty { font-size: 12px; color: var(--text-dim); }
+    /* T-460: agents hub */
+    .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .agent-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+    .agent-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .agent-status { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; padding: 2px 6px; border-radius: var(--radius-full); }
+    .agent-status.wired { color: var(--green); background: rgba(16,185,129,0.15); }
+    .agent-status.unwired { color: var(--yellow); background: rgba(245,158,11,0.15); }
+    .agent-status.absent { color: var(--text-dim); background: rgba(255,255,255,0.05); }
+    .agent-meta { font-size: 11px; color: var(--text-dim); word-break: break-all; }
     /* T-458: terrain vault split-pane */
     .terrain-split { display: flex; flex: 1; min-height: 0; overflow: hidden; }
     .terrain-tree { width: 220px; min-width: 180px; border-right: 1px solid var(--panel-border); padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; background: rgba(0,0,0,0.15); }
@@ -538,6 +547,7 @@ export const STUDIO_JS = `    let allMemories = [];
             loadAudit(),
             fetchActivity(),
             fetchTerrain(),
+            fetchAgents(),
           ]);
           const loaded = await memRes.json();
           if (requestedScope !== studioScope || requestGen !== scopeGeneration) return;
@@ -1225,6 +1235,40 @@ export const STUDIO_JS = `    let allMemories = [];
     let terrainFiles = [];
     let terrainSelected = null;
 
+    let hubAgents = [];
+
+    async function fetchAgents() {
+      try {
+        const res = await fetch('/api/agents');
+        const data = await res.json();
+        hubAgents = data.agents || [];
+        renderAgents(data.counts || {});
+      } catch (err) {
+        console.error('Failed to load agents:', err);
+      }
+    }
+
+    function renderAgents(counts) {
+      const grid = document.getElementById('agentsGrid');
+      const badge = document.getElementById('agentsCounts');
+      if (!grid) return;
+      if (badge) badge.textContent = (counts.wired || 0) + ' wired · ' + (counts.unwired || 0) + ' unwired';
+      grid.innerHTML = '';
+      hubAgents.forEach(function (agent) {
+        const card = document.createElement('div');
+        card.className = 'agent-card';
+        card.dataset.agent = agent.id;
+        const cls = agent.status === 'WIRED' ? 'wired' : agent.status === 'UNWIRED' ? 'unwired' : 'absent';
+        const detail = agent.configPath
+          ? '<div class="agent-meta mono">' + escapeHtml(agent.configPath) + '</div>'
+          : agent.binaryPath ? '<div class="agent-meta mono">' + escapeHtml(agent.binaryPath) + '</div>' : '';
+        card.innerHTML = '<div class="agent-card-head"><strong>' + escapeHtml(agent.name) + '</strong>' +
+          '<span class="agent-status ' + cls + '">' + escapeHtml(agent.status) + '</span></div>' +
+          '<div class="agent-meta">' + escapeHtml(agent.description) + '</div>' + detail;
+        grid.appendChild(card);
+      });
+    }
+
     async function fetchTerrain() {
       try {
         const res = await fetch('/api/terrain');
@@ -1793,6 +1837,7 @@ export const STUDIO_JS = `    let allMemories = [];
         if (currentTab === 'mesh') { fetchMeshStatus(); fetchMeshAudit(); }
         if (currentTab === 'activity') fetchActivity();
         if (currentTab === 'terrain') fetchTerrain();
+        if (currentTab === 'agents') fetchAgents();
       });
     });
 
@@ -1910,6 +1955,7 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
       <button type="button" class="rail-tool nav-tab" data-view="audit">Audit</button>
       <button type="button" class="rail-tool nav-tab" data-view="activity">Activity</button>
       <button type="button" class="rail-tool nav-tab" data-view="terrain">Terrain</button>
+      <button type="button" class="rail-tool nav-tab" data-view="agents">Agents</button>
     </div>
   </nav>
 
@@ -2420,6 +2466,19 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
           <div class="terrain-content" id="terrainContent"><p class="activity-empty">Compile the terrain maps to inspect them.</p></div>
           <div class="terrain-scanline" id="terrainScanline" aria-hidden="true"></div>
         </section>
+      </div>
+    </div>
+
+    <!-- View 16: Universal agents hub (T-460) -->
+    <div class="view-panel" id="panel-agents">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Universal Agents Hub</span>
+            <span class="brand-tag" id="agentsCounts">0 wired</span>
+          </div>
+          <div class="agents-grid" id="agentsGrid"></div>
+        </div>
       </div>
     </div>
 
