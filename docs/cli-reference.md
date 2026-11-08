@@ -98,7 +98,7 @@ Ecosystem, Migration & Connectivity:
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
   scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
-  terrain [--out file.md]       Collect machine hardware, toolchain & agent ecosystem map
+  terrain [--workspace] [--out]  Machine terrain, or --workspace for the six workspace maps
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms

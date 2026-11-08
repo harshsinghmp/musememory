@@ -573,7 +573,7 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 - [x] T-456 · LANDED 2026-11-08 — PR #341 (`436d198`): Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
 
 ## PR 3 / Issue #3: Workspace Terrain Vault: Auto-Generated Context Maps & Split Markdown Reader
-- [ ] T-457 · Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
+- [x] T-457 · LANDED 2026-11-08 — PR #342 (`8006427`): Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
 - [ ] T-458 · Terrain Vault Split-Pane UI: Left file tree with `GEN` badges and right rendered markdown viewer with scanline animation on `REINDEX` · src/ui.ts · F
 - [ ] T-459 · Terrain Token-Efficiency Test & Benchmark: Test suite verifying deterministic generation, zero secret leaks, and token savings · test/vault_terrain.test.ts · F
 
