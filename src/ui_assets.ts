@@ -281,6 +281,17 @@ export const STUDIO_CSS = `    :root {
     .session-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
     .session-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
     .activity-empty { font-size: 12px; color: var(--text-dim); }
+    /* T-463: poster-style About panel */
+    .about-poster { padding: 34px 38px; background: linear-gradient(160deg, rgba(245,158,11,0.10) 0%, rgba(0,0,0,0.25) 55%); }
+    .about-kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.22em; color: var(--accent); margin-bottom: 8px; }
+    .about-title { font-size: clamp(24px, 4vw, 40px); line-height: 1.05; color: #fff; margin: 0 0 14px; max-width: 16ch; }
+    .about-lede { font-size: 14px; line-height: 1.7; color: var(--text-muted); max-width: 62ch; margin-bottom: 24px; }
+    .about-lede code { color: #fcd34d; }
+    .about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+    .about-fact { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+    .about-fact span { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+    .about-fact strong { font-size: 16px; color: #fff; }
+    .about-privacy { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--panel-border); font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
     /* T-460: agents hub */
     .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
     .agent-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -578,11 +589,25 @@ export const STUDIO_JS = `    let allMemories = [];
         document.getElementById('statConfirmed').textContent = Math.round((parseFloat(s.confirmedRatio) || 0) * 100) + '%';
         document.getElementById('statConstraints').textContent = s.constraints || 0;
         document.getElementById('statLinks').textContent = s.links || 0;
+        renderAbout(s);
         if (studioScope === 'global' && s.available === false) {
           var absent = document.getElementById('scopeBanner');
           if (absent) { absent.textContent = 'No global store found at ~/.memory. Nothing to show in global scope.'; absent.hidden = false; }
         }
       } catch {}
+    }
+
+    function renderAbout(stats) {
+      const scopeLabel = studioScope === 'global' ? '~/.memory' : studioScope === 'mesh' ? 'mesh' : './.memory';
+      const set = function (id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      };
+      set('aboutScope', scopeLabel);
+      set('aboutTotal', stats.total || 0);
+      set('aboutConstraints', stats.constraints || 0);
+      set('aboutWiki', stats.wikiPages || 0);
+      set('aboutAudit', stats.auditEvents || 0);
     }
 
     async function fetchCurrentState() {
@@ -2475,21 +2500,25 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
       </div>
     </div>
     
-    <!-- View 12: About (T-451 anchor; full poster panel lands in T-463) -->
+    <!-- View 12: About poster (T-463) -->
     <div class="view-panel" id="panel-about">
       <div class="content-view-wrap">
-        <div class="view-card">
-          <div class="card-title-lg">Muse Memory — Autonomous Persistent Cognitive Memory</div>
-          <p style="font-size:13px; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
-            Local-first memory for coding agents. Every memory lives in your own <code>.memory/</code> directory,
-            served by an in-process SQLite + FTS5 engine. No cloud, no telemetry, no background daemon.
+        <div class="view-card about-poster">
+          <div class="about-kicker">MUSE MEMORY</div>
+          <h2 class="about-title">Autonomous persistent cognitive memory</h2>
+          <p class="about-lede">
+            Local-first memory for coding agents. Every memory lives in your own <code>.memory/</code>
+            directory, served by an in-process SQLite + FTS5 engine.
           </p>
-          <div class="handoff-grid">
-            <div class="handoff-cell"><div class="handoff-lbl">Engine</div><div class="handoff-val">SQLite + FTS5 (in-process)</div></div>
-            <div class="handoff-cell"><div class="handoff-lbl">Scopes</div><div class="handoff-val">Project &middot; Global &middot; Mesh</div></div>
-            <div class="handoff-cell"><div class="handoff-lbl">Storage</div><div class="handoff-val">Local files only</div></div>
-            <div class="handoff-cell"><div class="handoff-lbl">Cloud</div><div class="handoff-val">None — zero telemetry</div></div>
+          <div class="about-grid">
+            <div class="about-fact"><span>Engine</span><strong>SQLite + FTS5</strong></div>
+            <div class="about-fact"><span>Scope</span><strong id="aboutScope">./.memory</strong></div>
+            <div class="about-fact"><span>Memories</span><strong id="aboutTotal">0</strong></div>
+            <div class="about-fact"><span>Constraints</span><strong id="aboutConstraints">0</strong></div>
+            <div class="about-fact"><span>Wiki pages</span><strong id="aboutWiki">0</strong></div>
+            <div class="about-fact"><span>Audit events</span><strong id="aboutAudit">0</strong></div>
           </div>
+          <div class="about-privacy">PRIVACY — local files only. No cloud, no telemetry, no background daemon.</div>
         </div>
       </div>
     </div>
