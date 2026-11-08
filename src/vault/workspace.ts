@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { extname, join, relative } from "node:path";
+import { redactSecrets } from "../secrets.ts";
 
 /**
  * T-457: deterministic workspace terrain maps.
@@ -328,7 +329,9 @@ export function generateWorkspaceTerrain(root: string): WorkspaceTerrain {
   };
   return {
     root,
-    files: TERRAIN_FILES.map((name) => ({ name, content: maps[name]() })),
+    // T-459: a terrain map is injected into prompts, so credential-shaped
+    // strings are redacted at generation time rather than trusted to callers.
+    files: TERRAIN_FILES.map((name) => ({ name, content: redactSecrets(maps[name]()) })),
   };
 }
 
