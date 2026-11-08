@@ -5,6 +5,26 @@
 
 ---
 
+## 🧾 Session — Ticket Ledger Renumber & Remainder Audit (2026-11-08)
+
+Wave 23's `T-405`–`T-422` collided with the already-landed `T-405` (conflicted injection) and `T-406` (project casing), so that block is now `T-451`–`T-468` across the plan, roadmap and this file. The historical blueprint keeps its original IDs with a translation note; `HANDOFF.md`'s `T-405`/`T-406` are the unrelated landed fixes and were left untouched. Every unchecked ticket was then verified against source: 4 were already implemented (`T-150`, `T-151`, `T-153`, `T-384`) and are now marked done, 15 are partial, 86 are genuinely unbuilt, `T-163` is dropped by principal decision D3, and `T-449`/`T-450` remain filed/deferred. Full evidence table: `.agents/context/ticket-plan.md` → v15. Doc-claim gate re-run green (20/20).
+
+### Wave 23 PR 1 implemented (local, not landed)
+
+`T-451`–`T-453` are implemented in the new `src/ui_assets.ts` module and wired through `src/ui.ts`:
+
+- **T-451** — the studio now renders a fixed 76px left rail with six numbered sections (`01 OVERVIEW` … `06 ABOUT`), a tools group for the pre-existing views, a warm `#0c0a09` palette, and Archivo Black / JetBrains Mono typography. The rail uses words and numbers, not emoji.
+- **T-452** — the header carries a project / global / mesh segmented switcher that refetches live. `/api/memories`, `/api/stats`, `/api/current`, `/api/wiki`, `/api/user-profile` and `/api/audit` resolve the scope; the global store (`~/.memory`) opens lazily and is never created by a read; mesh results carry `origin_project`. Mutations stay project-scoped and the studio shows a scope banner whenever it is not viewing the project store.
+- **T-453** — CSS, markup and client JS are split out of the old 2,700-line template literal and served from `/assets/studio.css` and `/assets/studio.js` with strong ETags, pre-gzipped buffers, `Vary: Accept-Encoding` and 304 fast paths. The standalone export inlines the same modules.
+
+Gate: `bun test` **1450 pass / 0 fail** across 217 files, `tsc --noEmit` clean, `bun run build` 434 modules. Delivered on `feat/wave-23-pr1-studio-shell` as [PR #337](https://github.com/harshsinghmp/musememory/pull/337) against `dev` — **not landed** until it merges.
+
+### Gauntlet run — CAPPED at the 5-round ceiling (2026-11-08)
+
+Ran the bounded gauntlet loop against this PR (contract + ledger + packet in `.agents/artifacts/gauntlet-wave23-pr1/`). Five rounds: Fresh Critic scores **5.95 → 7.63 → 7.90 → 8.85 → 7.99**. Both R5 blockers were confirmed closed (mesh-link cache invalidation; scope-generation guards on every scoped fetch); the final critic left only small markup/ARIA/banner defects, which were fixed in the post-ceiling Integrator delta and verified by the gate but not re-critiqued. The packet is explicitly **CAPPED, not a PASS**. Final gate: **1450/0**, tsc clean, build 434 modules, zero overflow at 375/768/1280, 44×44 targets at 375/768, headers 4/4 (HSTS N/A), per-encoding ETags + wildcard 304 + 406 negotiation, secret scan clean. Residual debt (scope-race test, CSP `unsafe-inline`, mesh read-only store minting, duplicated `escapeHtml`, standalone export zeros) is in `TECHNICAL_DEBT.md`.
+
+---
+
 ## 🔧 Session — Sync Recovery (2026-11-03)
 
 Restored `AGENTS.md` byte-exact from HEAD after an `updateagents` run from the umbrella directory replaced it (and persona files in sibling repos) with three-line adapters. Added `.commandcode/` and `.stversions/` to `.gitignore`, made the Syncthing ignore rules canonical in `~/.dotfiles/syncthing/`, and recorded the workspace-isolation invariant. The engine fix now stops at nested repository roots and refuses umbrella directories; the global install was refreshed. Repo-local recovery for `muse-agents` and `muse-skills` is owned by their respective agents.
@@ -145,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-405`–`T-422`)**:
+- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — renumbered 2026-11-08 from the colliding `T-405`–`T-422`; verified unimplemented end-to-end:
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.

@@ -95,7 +95,8 @@ export function resolveMeshMemories(
       storeToUse = currentStore;
     } else {
       try {
-        storeToUse = openStore(node.memoryDir);
+        // Read-only traversal: never rewrite a sibling's CURRENT.md or wiki.
+        storeToUse = openStore(node.memoryDir, { skipSyncConstraints: true, skipAutoWiki: true });
         needsClose = true;
       } catch {
         continue;

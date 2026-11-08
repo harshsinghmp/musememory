@@ -158,10 +158,10 @@
 
 ## Wave E — P2 TEAM / SERVER / UI
 
-- [ ] T-150 · MCP Streamable HTTP transport (2025-06-18 spec) · mcp.ts · new · F
-- [ ] T-151 · Origin validation + session id + protocol version headers · mcp.ts · new · F
+- [x] T-150 · landed Wave 7 (PR #84) — verified 2026-11-08: `startHttpMcpServer` + `StreamableHTTPServerTransport` (`src/mcp.ts:3353-3494`), covered by `test/mcp_http_transport.test.ts` · mcp.ts · F
+- [x] T-151 · landed Wave 7 (PR #86) — verified 2026-11-08: protocol-version allowlist/echo (`src/mcp.ts:3199,3406-3426`), Origin 403 (`:3428-3445`), Host/DNS-rebind 403 (`:3447-3464`), session id (`:3360`); `test/mcp_http_transport.test.ts:129-365` · mcp.ts · F
 - [ ] T-152 · SSE resumability for long polls · mcp.ts · new · F
-- [ ] T-153 · per-tenant SQLite DB files (team mode) · store, root · new · F
+- [x] T-153 · landed Wave 7 (PR #90) — verified 2026-11-08: `resolveDbFilename` team/tenant DBs (`src/store.ts:138-158`), tenant dirs + `tenant_<id>.db` (`src/root.ts:153-175`), covered by `test/tenant_isolation.test.ts` · store, root · F
 - [ ] T-154 · extend `sync/pool.ts` to HTTP transport · sync · new · F
 - [ ] T-155 · git/YAML-mirror distribution path for team sync · sync · new · F
 - [ ] T-156 · Litestream sidecar backup docs+compose · docs, scripts · new · N
@@ -430,7 +430,7 @@ Two independent senior reviews of the plan (strategic + implementation-executabi
 - [x] T-381 · landed Wave 6 — embeddings spike: validate llama-cpp local embeddings E2E on the spec branch before ANY of T-071/136/137/138/139 ships · branch: feat/wave-6-embeddings-eval-harness · F
 - [ ] T-382 · deprecation policy: `deprecated: true` metadata + alias retention + "removed in vX"; prerequisite for T-201/T-202/T-203 · N
 - [x] T-383 · landed #71 — R1 red test: legacy store + added column throws before YAML write, passes after runMigrations · test/migrate.test.ts · F
-- [ ] T-384 · R2 fixture: 120 memories / 3 projects / 30 superseded / 30 expired → assert `hybridSearch` returns only matching-project non-superseded rows. Baselines T-303 + T-308 + T-140 at once · F
+- [x] T-384 · R2 fixture — verified 2026-11-08: `test/retrieval_engine.test.ts:53-91` builds 3 projects × 40 = 120 entries (20 live / 10 superseded / 10 expired per project) and asserts project isolation at scale through the hybrid path. Variance: 60 expired rows, not 30; driven via `RetrievalEngine.search` rather than `hybridSearch()` directly · F
 - [ ] T-385 · R3 baseline: 40 must-return queries from the principal's own `.memory/` + recall-set grading — gate Wave 2 on the number before T-070 ships · F
 
 **Principal decisions — all resolved 2026-10-14:**
@@ -552,7 +552,7 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 21. **Wave 20: Quality Telemetry, Honesty Gates & Retrieval Fault Signals** (`T-127`–`T-135`) — [x] Landed on dev
 22. **Wave 21: Invariant Mutation Safety & Constitutional Immunity** (`T-050`, `T-313`) — [x] Landed on dev
 23. **Wave 22: Failure Attribution & Negative Mining** (`T-144`, `T-314`, `T-315`) — [x] Landed on dev
-24. **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub** (`T-405`–`T-422`) — [ ] Active Roadmap
+24. **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub** (`T-451`–`T-468`) — [ ] Active Roadmap
 
 ---
 
@@ -560,35 +560,37 @@ Canonical detailed artifact: `.agents/artifacts/audit-and-realigned-roadmap-2026
 
 Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) and architectural design blueprint (`.agents/artifacts/2026-10-26-dashboard-rehaul-rashin-research-and-wave-23-tickets.md`).
 
+> **Renumbered 2026-11-08.** This wave originally used `T-405`–`T-422`, which collided with the already-landed `T-405` (conflicted-memory injection, PR #321) and `T-406` (project-casing, PR #322). The block is now `T-451`–`T-468`; ticket text is unchanged. **PR 1 (`T-451`–`T-453`) implemented locally 2026-11-08** — see the annotations below and v15; not committed/pushed, so not landed.
+
 ## PR 1 / Issue #1: Left-Rail Cyber-Minimalist Shell, Typography & Dual-Scope Switcher
-- [ ] T-405 · UI Shell: Fixed 76px vertical left rail with clean brand mark, numbered sections (`01 OVERVIEW`..`06 ABOUT`), warm-dark aesthetic, JetBrains Mono & Archivo Black typography (English-only, zero kanji) · src/ui.ts · F
-- [ ] T-406 · Dual-Scope Memory Switcher: Header segment toggle `[ Local Project Scope (./.memory) | Global User Scope (~/.memory) | Cross-Project Mesh ]` with instant live refetch · src/ui.ts, src/store.ts, src/root.ts · F
-- [ ] T-407 · Sub-10ms UI Route Architecture: Split single embedded HTML into modular static cached templates with ETag headers and pre-compressed buffers · src/ui.ts · F
+- [ ] T-451 · UI Shell: Fixed 76px vertical left rail with clean brand mark, numbered sections (`01 OVERVIEW`..`06 ABOUT`), warm-dark aesthetic, JetBrains Mono & Archivo Black typography (English-only, zero kanji) · src/ui.ts · F — **LOCAL 2026-11-08**: implemented in `src/ui_assets.ts` (rail with six numbered sections + tools group, warm `#0c0a09` palette, Archivo Black / JetBrains Mono, zero emoji in the rail, About anchor); `test/ui.test.ts` T-451; gate 1449/0, tsc clean, build 434 modules; gauntlet CAPPED at the 5-round ceiling (last critic 7.99 — see `.agents/artifacts/gauntlet-wave23-pr1/`); branch `feat/wave-23-pr1-studio-shell`, PR #337.
+- [ ] T-452 · Dual-Scope Memory Switcher: Header segment toggle `[ Local Project Scope (./.memory) | Global User Scope (~/.memory) | Cross-Project Mesh ]` with instant live refetch · src/ui.ts, src/store.ts, src/root.ts · F — **LOCAL 2026-11-08**: segmented switcher wired to `?scope=`; `/api/memories`, `/api/stats`, `/api/current`, `/api/wiki`, `/api/user-profile` and `/api/audit` resolve project / lazy global `~/.memory` / mesh aggregation (`origin_project`, first 200); global and mesh reads open with `skipSyncConstraints`/`skipAutoWiki` and never re-sync a store; mutations stay project-scoped behind a visible scope banner and `requireProjectScope()`; `test/ui.test.ts` T-452 + `test/mesh.test.ts` read-only test; branch `feat/wave-23-pr1-studio-shell`, PR #337.
+- [ ] T-453 · Sub-10ms UI Route Architecture: Split single embedded HTML into modular static cached templates with ETag headers and pre-compressed buffers · src/ui.ts · F — **LOCAL 2026-11-08**: `src/ui_assets.ts` splits CSS / markup / client JS; `/assets/studio.css` + `/assets/studio.js` serve strong ETags, pre-gzipped buffers, `Vary: Accept-Encoding` and 304 fast paths; standalone export inlines the same modules; `test/ui.test.ts` T-453; branch `feat/wave-23-pr1-studio-shell`, PR #337.
 
 ## PR 2 / Issue #2: Memory Studio 2.0: Instant Graph/List View Toggle, Physics Settling & Activity Heatmap
-- [ ] T-408 · Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
-- [ ] T-409 · Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
-- [ ] T-410 · Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
+- [ ] T-454 · Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
+- [ ] T-455 · Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
+- [ ] T-456 · Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
 
 ## PR 3 / Issue #3: Workspace Terrain Vault: Auto-Generated Context Maps & Split Markdown Reader
-- [ ] T-411 · Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
-- [ ] T-412 · Terrain Vault Split-Pane UI: Left file tree with `GEN` badges and right rendered markdown viewer with scanline animation on `REINDEX` · src/ui.ts · F
-- [ ] T-413 · Terrain Token-Efficiency Test & Benchmark: Test suite verifying deterministic generation, zero secret leaks, and token savings · test/vault_terrain.test.ts · F
+- [ ] T-457 · Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
+- [ ] T-458 · Terrain Vault Split-Pane UI: Left file tree with `GEN` badges and right rendered markdown viewer with scanline animation on `REINDEX` · src/ui.ts · F
+- [ ] T-459 · Terrain Token-Efficiency Test & Benchmark: Test suite verifying deterministic generation, zero secret leaks, and token savings · test/vault_terrain.test.ts · F
 
 ## PR 4 / Issue #4: Universal Agents Hub: Detection, 1-Click MCP Wiring & Prompt Snippets
-- [ ] T-414 · Coding Agent Auto-Discovery: Detect installed agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot CLI, Hermes, Crush, Goose, Aider, Codex) with `WIRED`/`UNWIRED`/`ABSENT` status · src/connect.ts, src/ui.ts · F
-- [ ] T-415 · 1-Click Wire / Unwire API: `POST /api/agents/wire` and `POST /api/agents/unwire` writing safe native MCP configs with backup protection · src/ui.ts, src/connect.ts · F
-- [ ] T-416 · "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
+- [ ] T-460 · Coding Agent Auto-Discovery: Detect installed agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot CLI, Hermes, Crush, Goose, Aider, Codex) with `WIRED`/`UNWIRED`/`ABSENT` status · src/connect.ts, src/ui.ts · F
+- [ ] T-461 · 1-Click Wire / Unwire API: `POST /api/agents/wire` and `POST /api/agents/unwire` writing safe native MCP configs with backup protection · src/ui.ts, src/connect.ts · F
+- [ ] T-462 · "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
 
 ## PR 5 / Issue #5: About & Cognitive Mission Control: Architecture Specs, Quick Start & CLI Cheatsheet
-- [ ] T-417 · Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
-- [ ] T-418 · Quick-Start Interactive Onboarding: Multi-step interactive setup cards for leading agents (Antigravity, OpenCode, Claude Code, Cursor) with copyable commands · src/ui.ts · F
-- [ ] T-419 · "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
+- [ ] T-463 · Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
+- [ ] T-464 · Quick-Start Interactive Onboarding: Multi-step interactive setup cards for leading agents (Antigravity, OpenCode, Claude Code, Cursor) with copyable commands · src/ui.ts · F
+- [ ] T-465 · "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
 
 ## PR 6 / Issue #6: System Speed, In-Memory Caching & Performance Hardening
-- [ ] T-420 · In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
-- [ ] T-421 · Fast-Exit & Visibility Sensors: Document `visibilitychange` listeners to stop all background polling intervals and animation frames when browser tab is inactive · src/ui.ts · F
-- [ ] T-422 · Automated UI Performance Benchmark Suite: Headless benchmark asserting sub-10ms UI responses, 60fps graph rendering, and zero memory leaks · test/ui_performance.test.ts · F
+- [ ] T-466 · In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
+- [ ] T-467 · Fast-Exit & Visibility Sensors: Document `visibilitychange` listeners to stop all background polling intervals and animation frames when browser tab is inactive · src/ui.ts · F
+- [ ] T-468 · Automated UI Performance Benchmark Suite: Headless benchmark asserting sub-10ms UI responses, 60fps graph rendering, and zero memory leaks · test/ui_performance.test.ts · F
 
 ---
 
@@ -648,8 +650,97 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 ## Late additions (post-v3.2.0)
 
 - [ ] T-449 · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake (stateful `g`-flag `RegExp` + definition counted as caller). Dry-run only; no code changed. Branch: `new` · F
-
-## Late additions (post-v3.2.0)
-
-- [ ] T-449 · triage filed as GitHub issue #336 — test hermeticity: 9 local failures from `~/.memory` / `~/.agents` ancestor leakage (8 env-contamination) + 1 intelligence regex flake. Dry-run only; no code changed. Branch: `new` · F
 - [ ] T-450 · DEFERRED: scope which `.agents/` subpaths should be gitignored (e.g. artifacts, plans, context/current.md) vs. kept tracked (standards, skills). Audit consumer impact (collaborators, DOX, skills) before removing any. No execution until user scopes. Branch: `new` · N
+
+---
+
+# v15 — VERIFIED REMAINDER AUDIT (2026-11-08)
+
+Source: per-ticket verification of **every unchecked ticket in this plan** against the live tree (`src/`, `test/`, `apps/website/`, `Dockerfile`, `.gitignore`). Evidence rules: a ticket-number comment alone was **not** accepted; a module path only counted if the behaviour exists; a test file only counted if it asserts behaviour. Four tickets were found already implemented and are now marked done; the rest are classified below so no future pass re-litigates them.
+
+## Renumber applied in this pass
+
+Wave 23 (v13) originally used `T-405`–`T-422`, colliding with the landed `T-405` (conflicted injection, PR #321) and `T-406` (project casing, PR #322). The block is now:
+
+| old | new | old | new |
+|---|---|---|---|
+| T-405 | T-451 | T-414 | T-460 |
+| T-406 | T-452 | T-415 | T-461 |
+| T-407 | T-453 | T-416 | T-462 |
+| T-408 | T-454 | T-417 | T-463 |
+| T-409 | T-455 | T-418 | T-464 |
+| T-410 | T-456 | T-419 | T-465 |
+| T-411 | T-457 | T-420 | T-466 |
+| T-412 | T-458 | T-421 | T-467 |
+| T-413 | T-459 | T-422 | T-468 |
+
+References updated: this file, `.agents/context/roadmap.md`, `.agents/context/current.md`. The historical blueprint artifact keeps its original IDs plus a pointer note; `HANDOFF.md`'s `T-405`/`T-406` mentions are the *unrelated landed fixes* and were deliberately left untouched.
+
+## Status summary
+
+| Outcome | Count | Tickets |
+|---|---|---|
+| Implemented → marked done | 4 | `T-150`, `T-151`, `T-153`, `T-384` |
+| Partial (real code, incomplete scope) | 15 | below |
+| Not implemented | 86 | 83 remain; `T-451`–`T-453` implemented locally on 2026-11-08 |
+| Dropped by principal decision | 1 | `T-163` (D3: dashboard keeps writes) |
+| Filed / deferred | 2 | `T-449` (issue #336), `T-450` (needs scoping) |
+| **Unique open at audit start** | **108** | **104 remain unchecked after this pass** |
+
+## Implemented (now marked `[x]`)
+
+| ID | Evidence |
+|---|---|
+| T-150 | `src/mcp.ts:3353-3494` (`startHttpMcpServer`, `StreamableHTTPServerTransport`); `test/mcp_http_transport.test.ts` |
+| T-151 | `src/mcp.ts:3199,3360,3406-3464` (protocol allowlist, session id, Origin/Host guards); `test/mcp_http_transport.test.ts:129-365` |
+| T-153 | `src/store.ts:138-158`, `src/root.ts:153-175`; `test/tenant_isolation.test.ts` |
+| T-384 | `test/retrieval_engine.test.ts:53-91` (3 projects × 40 entries; 20 live / 10 superseded / 10 expired per project) |
+
+## Partial
+
+| ID | Evidence | Remaining gap |
+|---|---|---|
+| T-033 | `src/optimize.ts:297-305` prunes via `deleteEntry`; `src/store.ts:1867-1926` tombstones | no optimize-side tombstone/restore call or test |
+| T-203 | CLI `handleRecallCommand` delegates to `queryContext` (`src/cli/retrieval.ts:155`); MCP `memory_recall` separate (`src/mcp.ts:1956`) | no deprecation notice / formal alias |
+| T-176 | `src/cli/versioning.ts:53-121` branch refs + checkout | no store-level fork/merge of entry state |
+| T-178 | RRF A/B weight presets (`src/retrieval/rrf.ts:22-37`) | no graph-on/off gate in the eval harness |
+| T-179 | wikilink expansion (`src/retrieval.ts:1374-1460`) | no HRR half, no T-178 gating |
+| T-316 | write-time `linked_memory_ids` (`src/store.ts:1131-1176`) | scores session/tag/lexical overlap only; `store.ts` never imports `plasticity.ts` |
+| T-323 | anchored entries re-sorted by truncation rank (`src/orchestrator/context.ts:424`); freshness gate withholds orphaned anchors | `anchor.status` itself is never consulted |
+| T-369 | claims relabelled `[CLAIMED]` (`src/benchmark/suite.ts:210`) | assertions still `>= 0` (`test/benchmark.test.ts:50-71`) — no threshold gate |
+| T-378 | `LspProvider` now used (`test/intelligence.test.ts:175`) | 5 dead imports remain (`quality`, `settings`, `orchestrator`) |
+| T-385 | recall-set + latency grading (`src/quality/eval.ts`, `test/recall-eval.test.ts`) | fixture is 20 synthetic queries, not 40 from the principal's store |
+| T-460 | detection engine (`src/agents/detect.ts:82-123`) | no `WIRED`/`UNWIRED`/`ABSENT` vocabulary, no hub UI |
+| T-423 | `apps/website/public/showreel.mp4`, `assets/muse-memory-demo.gif` | not a terminal recording; mp4 not under `assets/` |
+| T-425 | capability matrix (`apps/website/src/pages/compare.astro:37`) | no competitor rows, no measured latency/recall/token figures |
+| T-429 | `valid_from`/`valid_to` (`src/sqlite.ts:150,375`) | no `asserted_at` / `valid_until` split |
+| T-434 | blast-radius via `src/intelligence/adapters/*` + `memory_code_intel_blast_radius` (`src/mcp.ts:1236`) | not the AST cross-file risk module at the named path |
+
+## Not implemented (86)
+
+**Wave A/B/C/D leftovers (7).** `T-016` no dispatch-coverage matrix (only name parity in `test/connect_tools_alignment.test.ts:24`); `T-034` no `secure_delete` in `src/`; `T-048` no wake gate/actionable-keys allowlist; `T-051` no `memory_pressure` event; `T-201` all 30 detectors live (`src/migrator/detect.ts:15-374`); `T-202` 52 registry entries, none frozen (`src/agents/registry.ts`); `T-205` `Dockerfile:9-11` still runs `bun test` + `tsc --noEmit`.
+
+**Wave E team/server/interop (14).** `T-152` no `Last-Event-ID`/event store (`src/daemon.ts:27-40` is plain SSE); `T-154` `src/sync/pool.ts:12-85` filesystem-only; `T-155` no git/YAML distribution path; `T-156` no Litestream service (`docker-compose.yml:1-10`); `T-168` no Hermes provider; `T-169` no Muse-MCP adapter; `T-170` no catalog packaging; `T-171` no qdrant adapter (`src/store/` is only `sidecars.ts`); `T-172` checksum validation only (`src/sync/federation.ts:65-82`), no probes/lock scope; `T-173` no observer/observed relation; `T-174` no peer/namespace columns (`src/schema.ts`); `T-175` only USER.md reserved slots (`src/orchestrator/context.ts:386-390`); `T-180`/`T-181` no spec documents.
+
+**Dashboard (9).** `T-157`–`T-162` no route/panel for recall-debug, lineage, eval, lifecycle tower, config honesty, or team mesh (`src/ui.ts:156-778` routes, `:1103-1115` tabs); `T-164` consolidation is on-demand only (`src/consolidate.ts:51`); `T-165` cadence is N-day + inactivity, no turn trigger (`src/optimize.ts:98-131`); `T-166` `crontabLine` has no ownership token (`src/routines.ts:71-73`).
+
+**Quality/scale (14).** `T-317` no PPR/restart set; `T-318` telemetry exists (`src/quality/telemetry.ts:177-195`) but no auto-tuner; `T-319` no `is_inference`/`parent_ids`/review queue (`src/sqlite.ts:138-165`); `T-322` anchor audit re-reads per anchor (`src/anchors/resolver.ts:287`), no cache; `T-325` `rollupTemporal` has no period filter (`src/compounding/temporal.ts:171-181`); `T-326` tiers 0/1 call full `queryContext` (`src/retrieval/tiered.ts:49`); `T-327` `list()` has no paging (`src/store.ts:638-641`); `T-328` clock is `length + Date.now()` (`src/sync/engine.ts:118-120`); `T-329` no episode table / retrieval unit; `T-330` no `absent` type or role scoping; `T-332` no packet signature/peer allowlist (`src/sync/packet.ts:72-103`); `T-333` `confirm()` never extends expiry (`src/store.ts:1356-1387`); `T-334` no `write_origin`; `T-335` no `visible_until` window (`src/store.ts:224-266`).
+
+**Test integrity (8).** `T-371` (lying security tests, `test/security_hardening.test.ts:88-100,127`), `T-372` (tautological doctor test, `test/doctor.test.ts:11-16`), `T-373` (grep-only UI asserts, `test/ui.test.ts:52-218`), `T-374` (`toBeDefined`/`>= 0`, `test/health.test.ts:221-228`, `test/benchmark.test.ts:47-72`), `T-375` (`Array.isArray`-only, `test/ui.test.ts`, `test/mcp.test.ts:72-131`, `test/mesh.test.ts:349`), `T-376` (duplicate suites, `graph*`, `panda_loader`/`upgrade`, `retrieval*`, `sqlite_primary`/`store`), `T-377` (`markStale` imported never called, `test/sqlite_primary.test.ts:4,47-90`), and `T-382` (no `deprecated` metadata anywhere in `src/`). All seven T-371–T-377 defects are still present, not fixed.
+
+**Wave 23 (14 remaining; new IDs).** `T-451`–`T-453` are implemented locally (rail, dual-scope switcher, modular ETag/gzip assets — see the v13 annotations and `current.md`). `T-454`–`T-459` and `T-461`–`T-468` remain: no graph/list toggle, no kinetic-settling loop, no activity heatmap, no terrain pane, no agents-hub wire/unwire routes, no About poster / quick-start / command deck, no UI projection cache, no `visibilitychange` idling, and no `test/ui_performance.test.ts`. `src/vault/` still writes only `system.md` — none of the six terrain maps exist.
+
+**Wave 24–29 (17).** `T-424` no playground/WASM page; `T-426` no agent-switcher demo; `T-427` no `src/cognition/playbooks.ts`; `T-428` no `src/cognition/episodes.ts`; `T-430` no `src/quality/decay.ts`; `T-431` no `src/cli/playbook.ts` or playbook MCP tools; `T-432` no `WITH RECURSIVE` in `src/`; `T-433` no `src/hooks/preflight.ts`; `T-435` no `src/retrieval/anchors.ts`; `T-436` no `src/store/branch.ts`; `T-437` no `src/store/enclaves.ts`; `T-438` no `src/sync/attestation.ts`; `T-439` no `src/quality/branch_merge.ts`; `T-440` no `src/quality/test_feedback.ts`; `T-441` no `src/cognition/sentry.ts`; `T-442` no flaky-test detector (`src/doctor` is a flat module); `T-443` no `src/cognition/remediation.ts`.
+
+## Dropped by decision
+
+- `T-163` — read-only dashboard invariant. Principal decision **D3**: the dashboard keeps its 12 write endpoints; the invariant was dropped. The ticket text is stale; no code should be written for it.
+
+## Filed / deferred
+
+- `T-449` — **OPEN**, GitHub issue #336. Triage only so far (9 local failures: 8 env-contamination from `~/.memory`/`~/.agents` ancestors, 1 intelligence regex flake). No fix landed.
+- `T-450` — **DEFERRED** pending principal scoping of `.agents/` gitignore vs tracked paths. `.gitignore:80-81` still tracks all of `.agents/`.
+
+## What this changes about "next"
+
+Wave 23 **PR 1 is now implemented locally** (`T-451`–`T-453`: rail, dual-scope switcher, modular cached assets), so the next build is **PR 2 — `T-454`–`T-456`** (graph/list toggle, kinetic-settling loop, activity heatmap). `T-316` remains the only already-unblocked quality ticket (partial: Hebbian half missing) and `T-318` is missing. The only open filed defect is `T-449`. The 86 "not implemented" tickets are accurate backlog, not stale checkboxes.

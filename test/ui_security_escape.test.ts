@@ -41,25 +41,26 @@ describe("Wave 5 - Task 1: UI XSS Escaping & Unit Test Suite (T-380, T-002, T-00
 
       const res = await fetch(`http://localhost:${srv.port}/`);
       expect(res.status).toBe(200);
-      const html = await res.text();
+      // T-453: markup lives in the shell, escaping logic in the cached JS asset.
+      const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
 
       // T-002: Wiki title and slug must be wrapped with escapeHtml
-      expect(html).toContain("escapeHtml(p.title)");
-      expect(html).toContain("escapeHtml(p.slug)");
-      expect(html).not.toContain("📖 ' + p.title + '</div>");
+      expect(js).toContain("escapeHtml(p.title)");
+      expect(js).toContain("escapeHtml(p.slug)");
+      expect(js).not.toContain("📖 ' + p.title + '</div>");
 
       // T-003: Audit log rows must escape entry_id and actor
-      expect(html).toContain("escapeHtml(r.entry_id)");
-      expect(html).toContain("escapeHtml(r.actor");
+      expect(js).toContain("escapeHtml(r.entry_id)");
+      expect(js).toContain("escapeHtml(r.actor");
 
       // Handoff progress checkpoints must be escaped
-      expect(html).toContain("escapeHtml(p)");
+      expect(js).toContain("escapeHtml(p)");
 
       // T-361: Health checklist remediation items must sanitize priority class and escape priority label
-      expect(html).toContain("const safePriority = escapeHtml(rawPriority);");
-      expect(html).toContain("replace(/[^a-z0-9_-]/g, '')");
-      expect(html).toContain("[${safePriority}]");
-      expect(html).not.toContain("[${item.priority}]");
+      expect(js).toContain("const safePriority = escapeHtml(rawPriority);");
+      expect(js).toContain("replace(/[^a-z0-9_-]/g, '')");
+      expect(js).toContain("[${safePriority}]");
+      expect(js).not.toContain("[${item.priority}]");
 
       srv.close();
       cleanup(root);

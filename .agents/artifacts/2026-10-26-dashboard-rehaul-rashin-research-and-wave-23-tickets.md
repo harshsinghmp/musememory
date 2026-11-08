@@ -94,6 +94,8 @@ The vault is a curated, pre-indexed set of markdown files representing ground tr
 
 Below is the complete 18-ticket specification (T-405 through T-422), grouped into 6 production pull requests / GitHub issues for Muse Memory.
 
+> **Historical spec — IDs renumbered 2026-11-08.** These `T-405`–`T-422` IDs collided with the already-landed `T-405` (conflicted-memory injection, PR #321) and `T-406` (project casing, PR #322). The live ledger (`.agents/context/ticket-plan.md`, v13/v15) now uses `T-451`–`T-468` in the same order: `T-405→T-451`, `T-406→T-452`, … `T-422→T-468`. Ticket text below is unchanged; translate IDs by adding 46 before filing.
+
 ```
 Wave 23 (v3.1.0): Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub
 ├── PR 1: Left-Rail Cyber-Minimalist Shell, Typography & Dual-Scope Switcher [T-405, T-406, T-407]

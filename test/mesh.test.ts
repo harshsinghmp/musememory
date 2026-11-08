@@ -462,3 +462,44 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
     }
   });
 });
+
+describe("T-452: mesh scope reads do not re-sync sibling stores", () => {
+  test("resolveMeshMemories leaves a sibling CURRENT.md unchanged", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "muse-mesh-readonly-"));
+    try {
+      const currentDir = path.join(root, "current", ".memory");
+      const siblingDir = path.join(root, "sibling", ".memory");
+      const currentStore = openStore(currentDir);
+      const siblingStore = openStore(siblingDir);
+      propose(siblingStore, {
+        title: "sibling fact",
+        content: "sibling content",
+        project: "sibling",
+        confirmed: true,
+      });
+      siblingStore.db?.close();
+
+      const currentMd = path.join(siblingDir, "CURRENT.md");
+      fs.writeFileSync(currentMd, "# Sibling Constraints\n- sibling-immutable\n", "utf-8");
+      const before = fs.readFileSync(currentMd, "utf-8");
+
+      const topology = {
+        rootPath: root,
+        isMonorepo: false,
+        workspaceType: "multi_repo" as const,
+        nodes: [
+          { id: "current", name: "current", path: path.join(root, "current"), nodeType: "standalone" as const, memoryDir: currentDir, hasStore: true, dependencies: [], isCurrent: true },
+          { id: "sibling", name: "sibling", path: path.join(root, "sibling"), nodeType: "standalone" as const, memoryDir: siblingDir, hasStore: true, dependencies: [], isCurrent: false },
+        ],
+        linkedPaths: [],
+        updatedAt: new Date().toISOString(),
+      };
+
+      const results = resolveMeshMemories(currentStore, topology, { query: "" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(fs.readFileSync(currentMd, "utf-8")).toBe(before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
