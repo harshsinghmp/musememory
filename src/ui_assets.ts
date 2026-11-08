@@ -290,6 +290,7 @@ export const STUDIO_CSS = `    :root {
     .agent-status.unwired { color: var(--yellow); background: rgba(245,158,11,0.15); }
     .agent-status.absent { color: var(--text-dim); background: rgba(255,255,255,0.05); }
     .agent-meta { font-size: 11px; color: var(--text-dim); word-break: break-all; }
+    .agent-actions { display: flex; gap: 6px; margin-top: 6px; }
     /* T-458: terrain vault split-pane */
     .terrain-split { display: flex; flex: 1; min-height: 0; overflow: hidden; }
     .terrain-tree { width: 220px; min-width: 180px; border-right: 1px solid var(--panel-border); padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; background: rgba(0,0,0,0.15); }
@@ -1262,11 +1263,48 @@ export const STUDIO_JS = `    let allMemories = [];
         const detail = agent.configPath
           ? '<div class="agent-meta mono">' + escapeHtml(agent.configPath) + '</div>'
           : agent.binaryPath ? '<div class="agent-meta mono">' + escapeHtml(agent.binaryPath) + '</div>' : '';
+        var actions = '';
+        if (agent.status === 'UNWIRED') actions = '<div class="agent-actions"><button type="button" class="btn btn-green" data-wire="' + escapeHtml(agent.id) + '">Wire</button></div>';
+        else if (agent.status === 'WIRED') actions = '<div class="agent-actions"><button type="button" class="btn btn-red" data-unwire="' + escapeHtml(agent.id) + '">Unwire</button></div>';
         card.innerHTML = '<div class="agent-card-head"><strong>' + escapeHtml(agent.name) + '</strong>' +
           '<span class="agent-status ' + cls + '">' + escapeHtml(agent.status) + '</span></div>' +
-          '<div class="agent-meta">' + escapeHtml(agent.description) + '</div>' + detail;
+          '<div class="agent-meta">' + escapeHtml(agent.description) + '</div>' + detail + actions;
+        card.querySelectorAll('[data-wire]').forEach(function (btn) {
+          btn.addEventListener('click', function () { wireAgent(btn.dataset.wire); });
+        });
+        card.querySelectorAll('[data-unwire]').forEach(function (btn) {
+          btn.addEventListener('click', function () { unwireAgent(btn.dataset.unwire); });
+        });
         grid.appendChild(card);
       });
+    }
+
+    async function wireAgent(id) {
+      try {
+        const res = await fetch('/api/agents/wire', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, harness: id })
+        });
+        const data = await res.json();
+        if (!res.ok) { flash('Wire failed: ' + (data.error || res.status), true); return; }
+        flash('Wired ' + id + '.');
+        fetchAgents();
+      } catch (err) { flash('Wire failed: ' + String(err), true); }
+    }
+
+    async function unwireAgent(id) {
+      try {
+        const res = await fetch('/api/agents/unwire', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, harness: id })
+        });
+        const data = await res.json();
+        if (!res.ok) { flash('Unwire failed: ' + (data.error || res.status), true); return; }
+        flash('Unwired ' + id + '.');
+        fetchAgents();
+      } catch (err) { flash('Unwire failed: ' + String(err), true); }
     }
 
     async function fetchTerrain() {
