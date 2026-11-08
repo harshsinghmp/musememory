@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { detectAgents } from "../agents/detect.ts";
 import { findOrCreateProjectRoot } from "../root.ts";
 import type { ParsedArgs } from "../cli/shared.ts";
+import { writeWorkspaceTerrain } from "./workspace.ts";
 
 export interface SystemTerrainHost {
   platform: string;
@@ -230,6 +231,22 @@ export async function handleTerrainCommand(args: ParsedArgs): Promise<number> {
   const outFile = args.flags.out;
   const projectRootInfo = findOrCreateProjectRoot(process.cwd());
   const defaultVaultDir = join(projectRootInfo.memoryDir, "vault");
+
+  // T-457: deterministic workspace maps instead of machine hardware.
+  if (Boolean(args.flags.workspace)) {
+    const outDir = outFile ? String(outFile) : join(projectRootInfo.memoryDir, "terrain");
+    try {
+      const result = writeWorkspaceTerrain(projectRootInfo.root, outDir);
+      if (!silent) {
+        console.log(`\n🗺️ Workspace terrain written to: ${result.outDir}`);
+        for (const file of result.files) console.log(`  - ${file}`);
+      }
+      return 0;
+    } catch (err: any) {
+      if (!silent) console.error(`\n❌ Failed to write workspace terrain: ${err.message}`);
+      return 1;
+    }
+  }
 
   const terrain = await collectSystemTerrain();
   const markdown = formatSystemTerrainMarkdown(terrain);
