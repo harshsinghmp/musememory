@@ -551,6 +551,26 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      if (pathname === "/api/agents/manifest" && req.method === "GET") {
+        const database = opts.store.layout?.dbPath || join(opts.memoryDir, "memory.db");
+        const snippet = [
+          "You have access to Muse Memory over MCP (stdio).",
+          "Server: memory mcp",
+          `Memory directory: ${opts.memoryDir}`,
+          `Database: ${database}`,
+          "Call memory_search before starting work, and memory_capture after decisions, fixes, or discoveries.",
+        ].join("\n");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          memoryDir: opts.memoryDir,
+          database,
+          mcpCommand: "memory mcp",
+          files: [opts.memoryDir, database],
+          snippet,
+        }));
+        return;
+      }
+
       if (pathname === "/api/agents/wire" && req.method === "POST") {
         try {
           const body = await parseJsonBody(req);
