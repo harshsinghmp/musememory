@@ -111,6 +111,7 @@ import {
   analyzeTechnicalDebt,
   runDistillRouter,
 } from "./cognition/index.ts";
+import { episodesFromObservations } from "./cognition/episodes.ts";
 import {
   formatPlaybook,
   getPlaybook,
@@ -1671,6 +1672,18 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "muse_episodes",
+        description: "Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations",
+        inputSchema: {
+          type: "object",
+          properties: {
+            limit: { type: "number", description: "Maximum episodes to return (default 5)" },
+            session_id: { type: "string", description: "Optional session filter" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+      {
         name: "muse_playbook_recall",
         description: "Recall procedural playbooks: list by tag, or fetch one by id/title",
         inputSchema: {
@@ -3120,6 +3133,21 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: canonicalProject,
         });
         return toolResult(report);
+      }
+      case "muse_episodes": {
+        const episodeDir = String(activeStore.memoryDir || activeRoot || process.cwd());
+        const limit = a.limit !== undefined ? clampLimit(a.limit, 5, 50, 1) : 5;
+        const sessionFilter = a.session_id ? String(a.session_id) : undefined;
+        let episodes;
+        try {
+          episodes = episodesFromObservations(listObservations(activeStore), { gapMinutes: 90 })
+            .filter((episode) => !sessionFilter || episode.session_id === sessionFilter)
+            .slice(-limit)
+            .reverse();
+        } catch (err) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+        return toolResult({ episodes, dir: episodeDir });
       }
       case "muse_playbook_recall": {
         const playbookDir = String(activeStore.memoryDir || activeRoot || process.cwd());

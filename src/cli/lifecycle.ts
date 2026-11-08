@@ -14,7 +14,7 @@ import {
 } from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
 import { listObservations } from "../learning/observation.ts";
-import { buildEpisodes } from "../cognition/episodes.ts";
+import { episodesFromObservations } from "../cognition/episodes.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { optimizeStore } from "../optimize.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
@@ -333,17 +333,15 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
     for (const e of staleByPolicy) printEntry(e, true);
   }
   const observations = listObservations(ctx.store);
-  const episodes = buildEpisodes(
+  const episodes = episodesFromObservations(
     observations.map((observation) => ({
       id: observation.id,
-      session_id:
-        typeof (observation.metadata as Record<string, unknown> | undefined)?.session_id === "string"
-          ? String((observation.metadata as Record<string, unknown>).session_id)
-          : observation.project,
-      kind: observation.source,
-      title: observation.summary,
-      text: observation.raw,
-      created_at: observation.timestamp,
+      timestamp: observation.timestamp,
+      source: observation.source,
+      project: observation.project,
+      summary: observation.summary,
+      raw: observation.raw,
+      metadata: observation.metadata as Record<string, unknown> | undefined,
     })),
     { gapMinutes: 90 },
   ).slice(-3);
