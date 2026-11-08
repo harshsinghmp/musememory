@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23 PR 3 / `T-459`** (2026-11-08) — PR #344 merged; generation-time redaction plus a token-savings and leak test (`test/vault_terrain.test.ts`).
 - [x] **Wave 23 PR 3 / `T-458`** (2026-11-08) — PR #343 merged at `65113af`; terrain vault split-pane (tree, GEN badges, markdown viewer, REINDEX scanline).
 - [x] **Wave 23 PR 3 / `T-457`** (2026-11-08) — PR #342 merged at `8006427`; deterministic workspace terrain generator and `terrain --workspace` CLI.
 - [x] **Wave 23 PR 2 / `T-455`** (2026-11-08) — PR #340 merged at `05b4fdf`; energy-settling loop with wake hooks, deterministic ring seed, pointer capture.
