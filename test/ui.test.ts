@@ -893,6 +893,32 @@ describe("Wave 23 PR 5: T-464 quick-start onboarding", () => {
   });
 });
 
+describe("Wave 23 PR 5: T-465 command deck", () => {
+  test("serves a searchable, copyable CLI palette", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('id="commandDeck"');
+      expect(html).toContain('id="commandDeckSearch"');
+      expect(js).toContain("const COMMAND_DECK");
+      expect(js).toContain("function renderCommandDeck");
+      expect(js).toContain("memory recall");
+      expect(js).toContain("memory doctor");
+      expect(css).toContain(".command-row");
+      expect(css).toContain(".command-desc");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
