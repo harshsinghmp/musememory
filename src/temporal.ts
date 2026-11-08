@@ -23,10 +23,9 @@ export function isBiTemporallyVisible(entry: MemoryEntry, query: BiTemporalQuery
     if (fromValue && epoch(fromValue, "valid_from") > at) return false;
     if (entry.valid_to && epoch(entry.valid_to, "valid_to") <= at) return false;
   }
-  if (query.assertedAt) {
+  if (query.assertedAt && entry.asserted_at) {
     const at = epoch(query.assertedAt, "assertedAt");
-    const asserted = entry.asserted_at ?? entry.created_at;
-    if (asserted && epoch(asserted, "asserted_at") > at) return false;
+    if (epoch(entry.asserted_at, "asserted_at") > at) return false;
   }
   return true;
 }

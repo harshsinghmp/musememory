@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Site build + scaffolding wiring** (2026-11-08) — PR #367 (Node Astro launcher; site:qa 17/17 SHIP) and #368 (briefing episodes, explicit `asserted_at` belief clock in `as_of`, duplicate decay removed).
 - [x] **Wave 24–25 review hardening** (2026-11-08) — PR #366 merged at `a485875`; playbook rail preservation, fail-loud corrupt store, id-keyed updates, unique episode ids, goal-first phases, epoch timestamps, CLI flags, doc honesty. Gauntlet: REJECT → fixed, CAPPED; website visual gate blocked by pre-existing Astro/cookie prerender error.
 - [x] **Wave 24 (`T-423`–`T-426`)** (2026-11-08) — terminal demo script/recipe, vendored sql.js playground, capability-only benchmark matrix, accessible agent demos. PRs #362–#365. Site prerender has a pre-existing Astro/cookie CJS blocker (entrypoints compile).
 - [x] **Wave 25 (`T-427`–`T-431`)** (2026-11-08) — playbooks, episodes, bi-temporal belief windows, reinforced decay, and playbook CLI/MCP commands. PRs #356–#361.

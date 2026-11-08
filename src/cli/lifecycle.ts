@@ -332,7 +332,7 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
     console.log(`stale by policy:`);
     for (const e of staleByPolicy) printEntry(e, true);
   }
-  const observations = listObservations(ctx.store).slice(-200);
+  const observations = listObservations(ctx.store);
   const episodes = buildEpisodes(
     observations.map((observation) => ({
       id: observation.id,

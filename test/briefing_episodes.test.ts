@@ -16,9 +16,9 @@ describe("T-428: briefing surfaces recent episodes", () => {
     mkdirSync(memoryDir, { recursive: true });
     const store = openStore(memoryDir);
     const lines = [
-      observation("o1", "2026-01-01T10:00:00Z", "goal", "Goal: fix login", "auth breaks"),
-      observation("o2", "2026-01-01T10:01:00Z", "verification", "tests green", "bun test passes"),
-      observation("o3", "2026-01-01T10:02:00Z", "retrospective", "add regression", "lesson"),
+      observation("o1", "2026-01-01T10:00:00Z", "manual", "Goal: fix login", "auth breaks"),
+      observation("o2", "2026-01-01T10:01:00Z", "test", "verification: tests green", "bun test passes"),
+      observation("o3", "2026-01-01T10:02:00Z", "manual", "Retrospective: add regression", "lesson"),
     ];
     writeFileSync(join(memoryDir, "observations.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n", "utf8");
 

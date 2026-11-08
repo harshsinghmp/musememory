@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs dev",
-    "build": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs build && bun run scripts/build-llms-txt.ts",
-    "preview": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs preview",
+    "dev": "node scripts/astro.mjs dev",
+    "build": "node scripts/astro.mjs build && bun run scripts/build-llms-txt.ts",
+    "preview": "node scripts/astro.mjs preview",
     "astro": "node scripts/astro.mjs",
     "brand": "bun run scripts/build-brand-assets.ts",
     "llms": "bun run scripts/build-llms-txt.ts"

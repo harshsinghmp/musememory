@@ -919,6 +919,9 @@ export function propose(
     valid_from?: string;
     valid_to?: string;
     valid_to_exact?: boolean;
+    /** T-429: belief time; when omitted the memory has no separate belief clock. */
+    assertedAt?: string;
+    asserted_at?: string;
     /** T-090: Original timestamp of underlying evidence or source document. */
     src_ts?: string;
     srcTs?: string;
@@ -1190,6 +1193,7 @@ export function propose(
     salience: typeof opts.salience === "number" ? opts.salience : undefined,
     valid_from: opts.validFrom ?? opts.valid_from,
     valid_to: opts.validTo ?? opts.valid_to,
+    asserted_at: opts.assertedAt ?? opts.asserted_at,
     valid_to_exact:
       opts.validToExact !== undefined
         ? opts.validToExact

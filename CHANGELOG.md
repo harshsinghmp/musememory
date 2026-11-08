@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Activity heatmap and sessions (`T-456`)**: scope-aware `GET /api/activity` returns 52 weeks of daily mutation counts plus agent session cards; the studio gains an Activity view with a 53x7 heatmap, legend, mutation badge and session log.
 
 ### Fixed
+- **Site build and scaffolding wiring**: Astro builds through a Node launcher (QA 17/17), `memory briefing` prints causal episodes, `asserted_at` is a caller-settable belief clock used by `as_of`, and the duplicate decay module is removed.
 - **Wave 24–25 review hardening**: playbook safety rails survive MCP step-only updates, corrupt stores fail loud and stay byte-identical, id-keyed playbook updates, unique episode ids, goal-first phase classification, epoch-based bi-temporal comparison, CLI `--dir`/`--global`/`--run`, and honest benchmark/playground copy.
 - **Agents hub debt sweep**: 5s discovery cache (invalidated on wire/unwire), newest-3 `.bak` retention, memory tool grants removed on unwire, and a 2s mesh freshness bucket.
 - **Agents hub and projection cache hardening**: complete XDG-aware timestamped config backups with fail-loud errors, unknown-agent 404s on wire/unwire, honest success reporting, WAL/layout-aware cache freshness (read-only POSTs stay HIT), and 44px phone controls.
