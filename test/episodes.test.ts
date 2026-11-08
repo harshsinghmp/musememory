@@ -1,0 +1,41 @@
+import { describe, test, expect } from "bun:test";
+import { buildEpisodes, classifyPhase, formatEpisode } from "../src/cognition/episodes.ts";
+
+describe("T-428: episodic causal narratives", () => {
+  test("classifies observations into causal phases", () => {
+    expect(classifyPhase({ title: "Goal: fix login" })).toBe("goal");
+    expect(classifyPhase({ text: "hypothesis: token expires early" })).toBe("hypothesis");
+    expect(classifyPhase({ kind: "verification", text: "tests green" })).toBe("verification");
+    expect(classifyPhase({ text: "retrospective: add a regression test" })).toBe("retrospective");
+    expect(classifyPhase({ text: "edited auth.ts" })).toBe("trajectory");
+  });
+
+  test("groups per session and splits on a new goal or a long gap", () => {
+    const episodes = buildEpisodes([
+      { session_id: "s1", created_at: "2026-01-01T10:00:00Z", title: "Goal: fix login" },
+      { session_id: "s1", created_at: "2026-01-01T10:01:00Z", text: "hypothesis: token expires early" },
+      { session_id: "s1", created_at: "2026-01-01T10:02:00Z", text: "edited auth.ts" },
+      { session_id: "s1", created_at: "2026-01-01T10:03:00Z", text: "verification: tests green" },
+      { session_id: "s1", created_at: "2026-01-01T10:04:00Z", text: "retrospective: add regression" },
+      { session_id: "s1", created_at: "2026-01-01T12:30:00Z", title: "Goal: fix logout" },
+      { session_id: "s2", created_at: "2026-01-01T10:00:00Z", title: "Goal: other session" },
+    ]);
+
+    expect(episodes.length).toBe(3);
+    const login = episodes.find((episode) => episode.goal === "Goal: fix login")!;
+    const logout = episodes.find((episode) => episode.goal === "Goal: fix logout")!;
+    const other = episodes.find((episode) => episode.session_id === "s2")!;
+    expect(login.hypothesis).toContain("token expires");
+    expect(login.trajectory).toContain("edited auth.ts");
+    expect(login.verification).toContain("verification: tests green");
+    expect(login.retrospective).toContain("retrospective: add regression");
+    expect(logout.session_id).toBe("s1");
+    expect(other.goal).toBe("Goal: other session");
+    expect(formatEpisode(login)).toContain("## Goal: fix login");
+  });
+
+  test("returns nothing for an empty or undated stream", () => {
+    expect(buildEpisodes([])).toEqual([]);
+    expect(buildEpisodes([{ title: "no timestamp" }])).toEqual([]);
+  });
+});
