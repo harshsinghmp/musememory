@@ -165,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1, PR 2, `T-457` and `T-458` landed; **next is `T-459` (terrain token benchmark)**, then PR 4 (`T-460`–`T-462`, agents hub):
+- **Wave 23 is complete (`T-451`–`T-468`)** — all six PR groups landed. Next wave: **Wave 24–29** (`T-423`–`T-443`): showreel/playground/DX (`T-423`–`T-426`), tri-cognitive playbooks/episodes (`T-427`–`T-431`), AST associative retrieval (`T-432`–`T-435`), branchable/enclave memory (`T-436`–`T-439`), test-driven reinforcement (`T-440`–`T-443`):
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23 gauntlet hardening** (2026-11-08) — PR #354 merged at `d2ea59c`; complete config backups (XDG-aware, timestamped, fail-loud), unknown-agent 404s, honest wire reporting, WAL/layout cache freshness, 44px phone controls. Gauntlet: 7.35 critic → REQUEST-CHANGES review → fixed; **CAPPED, not a PASS**. Evidence: `.agents/artifacts/gauntlet-wave23-pr456/`.
 - [x] **Wave 23 PR 6 (`T-466`–`T-468`)** (2026-11-08) — projection cache, hidden-tab pause and the UI performance benchmark. **Wave 23 complete.** PRs #351–#353.
 - [x] **Wave 23 PR 5 (`T-463`–`T-465`)** (2026-11-08) — poster About panel, quick-start cards and searchable command deck. PRs #348–#350.
 - [x] **Wave 23 PR 4 (`T-460`–`T-462`)** (2026-11-08) — agents hub: discovery statuses, one-click wire/unwire with `.bak` backups and harness opt-in, point-any-agent manifest. PRs #345–#347.

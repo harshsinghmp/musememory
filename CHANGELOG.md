@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Activity heatmap and sessions (`T-456`)**: scope-aware `GET /api/activity` returns 52 weeks of daily mutation counts plus agent session cards; the studio gains an Activity view with a 53x7 heatmap, legend, mutation badge and session log.
 
 ### Fixed
+- **Agents hub and projection cache hardening**: complete XDG-aware timestamped config backups with fail-loud errors, unknown-agent 404s on wire/unwire, honest success reporting, WAL/layout-aware cache freshness (read-only POSTs stay HIT), and 44px phone controls.
 - **Caller scan (`T-449`)**: `HeuristicFallbackProvider.getCallers` no longer reuses a stateful `g`-flag regex, no longer counts declarations as callers, and scans directories in sorted order; regression test added.
 - **Test hermeticity (`T-449`)**: `findProjectRoot` no longer treats `$HOME`, its ancestors or `/` as project roots, so temp workspaces below home cannot adopt the global `~/.memory`; the doc-link scan also skips `.stversions` and `.commandcode`.
 
