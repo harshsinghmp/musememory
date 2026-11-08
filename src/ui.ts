@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
 import type { MemoryEntry } from "./types.ts";
 import { list, confirm, markStale, supersede, deleteEntry, propose, openStore } from "./store.ts";
+import { join } from "node:path";
 import { getGlobalMemoryDir } from "./root.ts";
+import { writeWorkspaceTerrain } from "./vault/index.ts";
 import {
   STUDIO_HTML_ASSET,
   STUDIO_CSS_ASSET,
@@ -531,6 +533,38 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           sessions,
           total_mutations: trail.length,
         }));
+        return;
+      }
+
+      if (pathname === "/api/terrain" && req.method === "GET") {
+        const terrainDir = join(opts.memoryDir, "terrain");
+        const names = ["repo.md", "stack.md", "habits.md", "ownership.md", "packages.md", "logs.md"];
+        const files = names.map((name) => {
+          const filePath = join(terrainDir, name);
+          const generated = existsSync(filePath);
+          let content = "";
+          try {
+            content = generated ? readFileSync(filePath, "utf8") : "";
+          } catch {
+            content = "";
+          }
+          return { name, generated, content };
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ files, available: files.some((file) => file.generated) }));
+        return;
+      }
+
+      if (pathname === "/api/terrain/reindex" && req.method === "POST") {
+        try {
+          const terrainRoot = opts.store.layout?.root || getStorageLayout(opts.memoryDir).root;
+          const result = writeWorkspaceTerrain(terrainRoot, join(opts.memoryDir, "terrain"));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, files: result.files }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
         return;
       }
 

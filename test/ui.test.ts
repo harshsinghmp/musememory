@@ -670,6 +670,58 @@ describe("Wave 23 PR 2: T-456 activity heatmap", () => {
   });
 });
 
+describe("Wave 23 PR 3: T-458 terrain vault UI", () => {
+  test("serves the split-pane, lists six maps and reindexes them", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="terrain"');
+      expect(html).toContain('id="panel-terrain"');
+      expect(html).toContain('id="terrainTree"');
+      expect(html).toContain('id="terrainContent"');
+      expect(html).toContain('id="terrainScanline"');
+      expect(html).toContain("reindexTerrain()");
+      expect(js).toContain("function fetchTerrain");
+      expect(js).toContain("function renderTerrainMarkdown");
+      expect(js).toContain("terrainScanline");
+      expect(js).toContain("}, 900)");
+      expect(css).toContain(".terrain-split");
+      expect(css).toContain(".gen-badge");
+      expect(css).toContain("@keyframes terrain-scan");
+
+      const before = await (await fetch(`${base}/api/terrain`)).json();
+      expect(before.files.map((f: { name: string }) => f.name)).toEqual([
+        "repo.md", "stack.md", "habits.md", "ownership.md", "packages.md", "logs.md",
+      ]);
+      expect(before.available).toBe(false);
+
+      const reindex = await fetch(`${base}/api/terrain/reindex`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(reindex.status).toBe(200);
+      const reindexed = await reindex.json();
+      expect(reindexed.success).toBe(true);
+      expect(reindexed.files.length).toBe(6);
+
+      const after = await (await fetch(`${base}/api/terrain`)).json();
+      expect(after.available).toBe(true);
+      expect(after.files.every((f: { generated: boolean }) => f.generated)).toBe(true);
+      const repoMap = after.files.find((f: { name: string }) => f.name === "repo.md");
+      expect(repoMap.content).toContain("Repository Terrain");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
