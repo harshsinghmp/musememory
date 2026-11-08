@@ -1,16 +1,28 @@
 # TECHNICAL_DEBT — Wave 23 PR 1 run (2026-11-08)
 
-Findings the gauntlet loop knowingly left open. Root cause → file → one-line fix. These are candidates for ticket rows, not silently accepted risk.
+Findings the gauntlet loop knowingly left open after five rounds. Root cause → file → one-line fix. Closed items are listed at the bottom for the record.
 
 | # | Root cause | Location | One-line fix | Severity |
 | :--- | :--- | :--- | :--- | :--- |
-| D1 | Mesh topology is discovered twice per scope switch (`/api/memories` + `/api/stats`), each walking the workspace and opening sibling stores | `src/ui.ts:196-205` (`meshMemories`), `:303-304` | Cache the topology per request (or per server tick) and pass it to both handlers | P2 |
-| D2 | CSP must keep `script-src 'unsafe-inline'` because the studio markup uses inline `onclick=` handlers | `src/ui_assets.ts` (markup), `src/ui.ts:232-239` | Move handlers to `addEventListener` in the JS module, then drop `'unsafe-inline'` | P2 |
-| D3 | `.chip` filter pills and `.archetype-card` tiles are clickable `div`s with no keyboard path | `src/ui_assets.ts` (filter bar, archetype grid) | Convert to `<button>` (or add `role`/`tabindex`/key handlers) | P2 |
-| D4 | `escapeHtml` exists twice (server module + client string); only the server copy is unit-tested | `src/ui.ts:96-103`, `src/ui_assets.ts` client block | Move the server copy to a shared util imported by both build targets, or add a parity test over the two strings | P3 |
-| D5 | Persona panel reads `data.profile.raw` / `.archetype` but `/api/user-profile` returns a string | `src/user.ts:119,187`; client `fetchUserProfile` | Branch on `typeof profile === "string"` in the client (or return an object from the API) | P2 (pre-existing) |
-| D6 | `Accept-Encoding` parsing returns on the first coding token; `identity;q=0` is served identity instead of 406 | `src/ui.ts:105-117` | Parse all codings, take max q for gzip, honour `identity;q=0` | P3 |
-| D7 | CSS-text assertions in the T-451 test (e.g. `toContain("min-height: 44px")`) cannot fail on a real sizing defect | `test/ui.test.ts` T-451 | Rely on the Playwright viewport gate as the authoritative target-size proof; keep text checks as documentation only | P3 |
-| D8 | Flat 200-entry mesh cap is a latency guard, not a product decision; the stats counter can disagree with a future paged list | `src/ui.ts:284`, `:303-304` | Add explicit "showing first N" pagination or raise the cap once the graph joins are bounded | P3 |
-| D9 | The mobile chrome (199px header + 126px rail at 375) consumes ~53% of a 667px viewport before content | `src/ui_assets.ts` ≤640 media query | Collapse the tools group behind a "More" control and reduce the rail to one scrollable row | P2 |
-| D10 | `.refresh-icon` / `.optimize-icon` are now CSS glyphs (`↻`, `◇`); their spinning state rotates a pseudo-element | `src/ui_assets.ts:76-78` | Confirm the animation reads correctly across browsers, or replace with a progress bar | P3 |
+| T1 | The browser scope-race guard has no behavioural test; only a source-string assertion pins it | `test/ui.test.ts` (scopeGeneration count) | Add a Playwright check that delays the first `/api/memories` response, switches scope, and asserts the stale payload is never painted | P2 |
+| T2 | The mesh cache-invalidation test only fails inside the 2s TTL window | `test/ui.test.ts` ("linking a mesh store…") | Expose the invalidation epoch (or a discovery counter) so the test is deterministic, and add a "two reads inside the window do not re-discover" case | P2 |
+| T3 | CSP must keep `script-src 'unsafe-inline'` because the studio markup uses inline `onclick=` handlers | `src/ui_assets.ts` markup, `src/ui.ts` CSP | Move handlers to `addEventListener` in the client module, then drop `'unsafe-inline'` | P2 |
+| T4 | `.chip` is 24px tall at 768 (44px only at ≤640); WCAG 2.2 AA passes but the AAA/44 target does not | `src/ui_assets.ts` chip rules | Raise chips to 44px at ≤900 or accept AA explicitly in the gate contract | P3 |
+| T5 | Memory list cards are clickable `div`s with no keyboard path | `src/ui_assets.ts` `renderList` | Render cards as `<button>` (or add role/tabindex/key handlers) | P2 |
+| T6 | Standalone export sets `STANDALONE_DATA` and skips every API fetch, so stats/wiki/audit render empty | `src/ui_assets.ts` `renderStandaloneHtml` | Serialize the auxiliary payloads into the export or hide those panels in standalone mode | P3 |
+| T7 | Mesh reads still call `openStore` on a sibling, which can mint `memories/` and the DB if absent | `src/mesh/resolver.ts:98` | Skip nodes without an existing `memories/` + DB, or add a read-only store opener | P2 |
+| T8 | `escapeHtml` exists twice (server module + client string); only the server copy is unit-tested | `src/ui.ts`, `src/ui_assets.ts` | Add a parity test over both implementations, or generate the client copy from the server one | P3 |
+| T9 | CSS-text assertions (`toContain("min-height: 44px")`) cannot fail on a real sizing defect | `test/ui.test.ts` T-451 | Treat the Playwright viewport gate as authoritative; keep text checks as documentation | P3 |
+| T10 | Flat 200-entry mesh cap is a latency guard, not a product decision | `src/ui.ts` mesh scope | Add explicit "showing first N" paging or raise the cap once joins are bounded | P3 |
+
+## Closed during the run
+
+- Topology discovered twice per scope switch → topology + aggregate memoized (2s), invalidated on link.
+- Mesh scope rewrote sibling `CURRENT.md`/wiki → resolver opens read-only; regression test proves byte-identical.
+- Global scope rewrote/re-created the store → requires an existing DB, opens with `skipSyncConstraints`/`skipAutoWiki`.
+- Non-keyboard filter/persona/wiki cards → real `<button type="button">` with valid children.
+- Persona panel read `.raw` off a string profile → string handled.
+- `gzip;q=0`, `identity;q=0`, spaced q-values, no header → full negotiation with 406.
+- 375px overflow, three-row mobile rail, 641–900px drawer clipping → fixed.
+- Overclaiming banner → enumerates the exact scoped panels.
+- Underivable `aria-pressed` on archetype cards → removed; `.active` remains the visual state.
