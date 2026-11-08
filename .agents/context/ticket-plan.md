@@ -578,9 +578,9 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 - [x] T-459 · LANDED 2026-11-08 — PR #344: Terrain Token-Efficiency Test & Benchmark: Test suite verifying deterministic generation, zero secret leaks, and token savings · test/vault_terrain.test.ts · F
 
 ## PR 4 / Issue #4: Universal Agents Hub: Detection, 1-Click MCP Wiring & Prompt Snippets
-- [ ] T-460 · Coding Agent Auto-Discovery: Detect installed agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot CLI, Hermes, Crush, Goose, Aider, Codex) with `WIRED`/`UNWIRED`/`ABSENT` status · src/connect.ts, src/ui.ts · F
-- [ ] T-461 · 1-Click Wire / Unwire API: `POST /api/agents/wire` and `POST /api/agents/unwire` writing safe native MCP configs with backup protection · src/ui.ts, src/connect.ts · F
-- [ ] T-462 · "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
+- [x] T-460 · LANDED 2026-11-08 — PR #345: Coding Agent Auto-Discovery: Detect installed agents (Antigravity, OpenCode, Claude Code, Cursor, Copilot CLI, Hermes, Crush, Goose, Aider, Codex) with `WIRED`/`UNWIRED`/`ABSENT` status · src/connect.ts, src/ui.ts · F
+- [x] T-461 · LANDED 2026-11-08 — PR #346: 1-Click Wire / Unwire API: `POST /api/agents/wire` and `POST /api/agents/unwire` writing safe native MCP configs with backup protection · src/ui.ts, src/connect.ts · F
+- [x] T-462 · LANDED 2026-11-08 — PR #347: "Point Any Agent" Manifest & One-Click Copy Snippet: Display exposed filesystem paths, MCP endpoints, and one-click copyable system prompt snippet for custom LLMs · src/ui.ts · F
 
 ## PR 5 / Issue #5: About & Cognitive Mission Control: Architecture Specs, Quick Start & CLI Cheatsheet
 - [ ] T-463 · Poster-Style About Panel: Architectural poster with WHAT (mission), THE PIECES live facts table (SQLite, Scope, Constraints, Tools, Wiki, Audit), and PRIVACY zero-cloud guarantee · src/ui.ts · F
