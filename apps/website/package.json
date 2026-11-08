@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build && bun run scripts/build-llms-txt.ts",
-    "preview": "astro preview",
-    "astro": "astro",
+    "dev": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs dev",
+    "build": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs build && bun run scripts/build-llms-txt.ts",
+    "preview": "node scripts/patch-astro-cookie.mjs && node scripts/astro.mjs preview",
+    "astro": "node scripts/astro.mjs",
     "brand": "bun run scripts/build-brand-assets.ts",
     "llms": "bun run scripts/build-llms-txt.ts"
   },
   "dependencies": {
-    "astro": "^7.3.5",
+    "astro": "7.4.7",
     "sql.js": "1.13.0"
   },
   "devDependencies": {
