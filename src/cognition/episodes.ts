@@ -30,14 +30,19 @@ export interface Episode {
 }
 
 const PHASE_PATTERNS: Array<[EpisodePhase, RegExp]> = [
-  ["retrospective", /\b(retro\w*|lesson\w*|takeaway\w*|postmortem\w*)/i],
-  ["verification", /\b(test\w*|verif\w*|assert\w*|result\w*|green|red)\b/i],
-  ["hypothesis", /\b(hypothes\w*|assum\w*|expect\w*|suspect\w*)/i],
-  ["goal", /\b(goal\w*|objective\w*|intend\w*|plan\w*|task\w*)/i],
+  ["goal", /^\s*(goal|objective)\b/i],
+  ["hypothesis", /^\s*(hypothes\w*|assum\w*|expect\w*|suspect\w*)/i],
+  ["retrospective", /^\s*(retro\w*|lesson\w*|takeaway\w*|postmortem\w*)/i],
+  ["verification", /^\s*(verif\w*|assert\w*|test\w*|result\w*)/i],
 ];
 
 export function classifyPhase(observation: EpisodeObservation): EpisodePhase {
-  const haystack = `${observation.kind ?? ""} ${observation.title ?? ""} ${observation.text ?? ""}`;
+  const kind = String(observation.kind ?? "").toLowerCase();
+  if (/verif|test|assert|result/.test(kind)) return "verification";
+  if (/goal|objective|plan/.test(kind)) return "goal";
+  if (/retro|lesson|postmortem/.test(kind)) return "retrospective";
+  if (/hypothes|assum/.test(kind)) return "hypothesis";
+  const haystack = `${observation.title ?? ""} ${observation.text ?? ""}`;
   for (const [phase, pattern] of PHASE_PATTERNS) {
     if (pattern.test(haystack)) return phase;
   }
@@ -68,6 +73,7 @@ export function buildEpisodes(
 
   const episodes: Episode[] = [];
   for (const [session, bucket] of bySession) {
+    let sequence = 0;
     const ordered = [...bucket].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     let current: Episode | null = null;
     let lastTime = 0;
@@ -82,7 +88,7 @@ export function buildEpisodes(
 
       if (boundary) {
         current = {
-          id: `ep_${session}_${String(observation.created_at).replace(/[^0-9]/g, "").slice(0, 14)}`,
+          id: `ep_${session}_${++sequence}`,
           session_id: session,
           trajectory: [],
           verification: [],

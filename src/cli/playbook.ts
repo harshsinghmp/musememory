@@ -8,10 +8,12 @@ import {
 import type { ParsedArgs } from "./shared.ts";
 
 export async function handlePlaybookCommand(args: ParsedArgs): Promise<number> {
-  const { memoryDir } = findOrCreateProjectRoot(process.cwd());
-  const id = args.flags.id || args.positional[0];
+  const startDir = args.flags.dir || process.cwd();
+  const { memoryDir } = findOrCreateProjectRoot(startDir, { global: Boolean(args.flags.global) });
+  const id = args.flags.id || args.flags.run || args.flags.show || args.positional[0];
   const wantsList = Boolean(args.flags.list) || !id;
 
+  try {
   if (wantsList) {
     const playbooks = listPlaybooks(memoryDir, args.flags.tag);
     if (playbooks.length === 0) {
@@ -30,6 +32,7 @@ export async function handlePlaybookCommand(args: ParsedArgs): Promise<number> {
     return 1;
   }
 
+  let shown = playbook;
   const recordSuccess = args.flags.success !== undefined;
   const recordFailure = args.flags.fail !== undefined || args.flags.failure !== undefined;
   if (recordSuccess || recordFailure) {
@@ -39,8 +42,13 @@ export async function handlePlaybookCommand(args: ParsedArgs): Promise<number> {
       return 1;
     }
     console.log(`Recorded ${recordSuccess ? "success" : "failure"} for '${updated.title}'.`);
+    shown = updated;
   }
 
-  console.log(formatPlaybook(playbook));
+  console.log(formatPlaybook(shown));
   return 0;
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 1;
+  }
 }

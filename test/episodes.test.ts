@@ -4,6 +4,7 @@ import { buildEpisodes, classifyPhase, formatEpisode } from "../src/cognition/ep
 describe("T-428: episodic causal narratives", () => {
   test("classifies observations into causal phases", () => {
     expect(classifyPhase({ title: "Goal: fix login" })).toBe("goal");
+    expect(classifyPhase({ title: "Goal: test the login flow" })).toBe("goal");
     expect(classifyPhase({ text: "hypothesis: token expires early" })).toBe("hypothesis");
     expect(classifyPhase({ kind: "verification", text: "tests green" })).toBe("verification");
     expect(classifyPhase({ text: "retrospective: add a regression test" })).toBe("retrospective");
@@ -32,6 +33,18 @@ describe("T-428: episodic causal narratives", () => {
     expect(logout.session_id).toBe("s1");
     expect(other.goal).toBe("Goal: other session");
     expect(formatEpisode(login)).toContain("## Goal: fix login");
+  });
+
+  test("episode ids are unique within a session", () => {
+    const episodes = buildEpisodes(
+      [
+        { session_id: "s1", created_at: "2026-01-01T10:00:00Z", title: "Goal: one" },
+        { session_id: "s1", created_at: "2026-01-01T10:00:00Z", title: "Goal: two" },
+      ],
+      { gapMinutes: 0 },
+    );
+    expect(episodes.length).toBe(2);
+    expect(new Set(episodes.map((episode) => episode.id)).size).toBe(2);
   });
 
   test("returns nothing for an empty or undated stream", () => {

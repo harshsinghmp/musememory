@@ -8,11 +8,16 @@ does **not** name or rank other products. Numbers are only quoted from
 
 | Metric | Source | Method |
 |---|---|---|
-| L0 hot-cache lookup | `claims.json` → `latency` | in-process map read, p50/p95/p99 |
-| FTS5 BM25 recall | `claims.json` → `latency` | SQLite FTS5 over the fixture corpus |
-| Context assembly | `claims.json` → `latency` | token-budgeted pack build |
+| L0 hot-cache lookup | `claims.json` → `latency.hotCacheMicros` | in-process map read; single measured value, no percentiles published |
+| FTS5 BM25 recall | `claims.json` → `latency.recallMillis` | SQLite FTS5 over the fixture corpus |
+| Context assembly | `claims.json` → `latency.semanticMillis` | token-budgeted pack build |
 | Recall quality | `test/recall-eval.test.ts` | must-return, must-not-return, abstention |
 | Token efficiency | `test/vault_terrain.test.ts` | terrain maps vs raw corpus |
+
+## Scope note
+
+The comparative matrix against named products was deliberately descoped by
+policy: this page compares capabilities within this repository only.
 
 ## Capability matrix
 
@@ -32,10 +37,10 @@ does **not** name or rank other products. Numbers are only quoted from
 ## Reproduce
 
 ```bash
-bun run benchmark            # latency + quality scoreboard
+bun bin/musememory.ts benchmark --iterations 50
 bun test test/recall-eval.test.ts
 bun test test/vault_terrain.test.ts
-bun run claims:generate --check
+bun run claims:check
 ```
 
 ## Honesty rules

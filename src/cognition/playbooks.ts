@@ -28,7 +28,10 @@ export interface Playbook {
   failureCount: number;
 }
 
+export class PlaybookStoreError extends Error {}
+
 export interface PlaybookInput {
+  id?: string;
   title: string;
   goal: string;
   steps: PlaybookStep[];
@@ -51,12 +54,17 @@ function writeAtomic(path: string, body: string): void {
 export function loadPlaybooks(memoryDir: string): Playbook[] {
   const path = playbookFile(memoryDir);
   if (!existsSync(path)) return [];
+  const raw = readFileSync(path, "utf8");
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8"));
-    return Array.isArray(parsed) ? (parsed as Playbook[]) : [];
-  } catch {
-    return [];
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new PlaybookStoreError(`playbooks.json is not valid JSON at ${path}: ${err instanceof Error ? err.message : String(err)}`);
   }
+  if (!Array.isArray(parsed)) {
+    throw new PlaybookStoreError(`playbooks.json is not a playbook array at ${path}`);
+  }
+  return parsed as Playbook[];
 }
 
 export function listPlaybooks(memoryDir: string, tag?: string): Playbook[] {
@@ -72,12 +80,19 @@ export function getPlaybook(memoryDir: string, id: string): Playbook | null {
 
 export function savePlaybook(memoryDir: string, input: PlaybookInput): Playbook {
   if (!input.title.trim()) throw new Error("Playbook title is required");
+  if (!input.goal.trim()) throw new Error("Playbook goal is required");
   if (!Array.isArray(input.steps) || input.steps.length === 0) {
     throw new Error("Playbook needs at least one step");
   }
+  input.steps.forEach((step, index) => {
+    if (!step || typeof step.action !== "string" || !step.action.trim()) {
+      throw new Error(`Playbook step ${index + 1} needs a non-empty action`);
+    }
+  });
   const now = new Date().toISOString();
   const existing = loadPlaybooks(memoryDir);
-  const match = existing.find((playbook) => playbook.title === input.title);
+  const match = input.id ? existing.find((playbook) => playbook.id === input.id) : undefined;
+  if (input.id && !match) throw new Error(`Playbook '${input.id}' not found`);
   const playbook: Playbook = {
     id: match?.id ?? `pb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: input.title,

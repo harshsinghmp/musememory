@@ -3124,11 +3124,20 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const id = a.id ? String(a.id) : undefined;
         const tag = a.tag ? String(a.tag) : undefined;
         if (id) {
-          const playbook = getPlaybook(playbookDir, id);
-          if (!playbook) return toolError(`Playbook '${id}' not found`);
-          return toolResult(formatPlaybook(playbook));
+          try {
+            const playbook = getPlaybook(playbookDir, id);
+            if (!playbook) return toolError(`Playbook '${id}' not found`);
+            return toolResult(formatPlaybook(playbook));
+          } catch (err) {
+            return toolError(err instanceof Error ? err.message : String(err));
+          }
         }
-        const playbooks = listPlaybooks(playbookDir, tag);
+        let playbooks;
+        try {
+          playbooks = listPlaybooks(playbookDir, tag);
+        } catch (err) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
         if (playbooks.length === 0) return toolResult({ playbooks: [], message: "No playbooks recorded." });
         return toolResult({
           playbooks: playbooks.map((playbook) => ({
@@ -3144,19 +3153,27 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const playbookDir = String(activeStore.memoryDir || activeRoot || process.cwd());
         const id = a.id ? String(a.id) : undefined;
         if (id && typeof a.success === "boolean") {
-          const updated = recordPlaybookOutcome(playbookDir, id, a.success);
+          let updated;
+          try {
+            updated = recordPlaybookOutcome(playbookDir, id, a.success);
+          } catch (err) {
+            return toolError(err instanceof Error ? err.message : String(err));
+          }
           if (!updated) return toolError(`Playbook '${id}' not found`);
           return toolResult(formatPlaybook(updated));
         }
         try {
+          const existing = id ? getPlaybook(playbookDir, id) : null;
+          if (id && !existing) return toolError(`Playbook '${id}' not found`);
           const playbook = savePlaybook(playbookDir, {
+            ...(existing ? { id: existing.id } : {}),
             title: String(a.title ?? ""),
             goal: String(a.goal ?? ""),
             steps: Array.isArray(a.steps) ? (a.steps as { action: string }[]) : [],
-            preconditions: Array.isArray(a.preconditions) ? a.preconditions.map(String) : [],
-            verification: Array.isArray(a.verification) ? a.verification.map(String) : [],
-            rollback: Array.isArray(a.rollback) ? a.rollback.map(String) : [],
-            tags: Array.isArray(a.tags) ? a.tags.map(String) : [],
+            ...(Array.isArray(a.preconditions) ? { preconditions: a.preconditions.map(String) } : {}),
+            ...(Array.isArray(a.verification) ? { verification: a.verification.map(String) } : {}),
+            ...(Array.isArray(a.rollback) ? { rollback: a.rollback.map(String) } : {}),
+            ...(Array.isArray(a.tags) ? { tags: a.tags.map(String) } : {}),
           });
           return toolResult(formatPlaybook(playbook));
         } catch (err) {

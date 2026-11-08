@@ -10,16 +10,23 @@ export interface BiTemporalQuery {
   assertedAt?: string;
 }
 
+function epoch(value: string, label: string): number {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) throw new Error(`Invalid ${label} timestamp: ${value}`);
+  return parsed;
+}
+
 export function isBiTemporallyVisible(entry: MemoryEntry, query: BiTemporalQuery): boolean {
   if (query.validAt) {
-    const from = entry.valid_from ?? entry.created_at;
-    if (from && from > query.validAt) return false;
-    const to = entry.valid_to ?? entry.ended_at;
-    if (to && to <= query.validAt) return false;
+    const at = epoch(query.validAt, "validAt");
+    const fromValue = entry.valid_from ?? entry.created_at;
+    if (fromValue && epoch(fromValue, "valid_from") > at) return false;
+    if (entry.valid_to && epoch(entry.valid_to, "valid_to") <= at) return false;
   }
   if (query.assertedAt) {
+    const at = epoch(query.assertedAt, "assertedAt");
     const asserted = entry.asserted_at ?? entry.created_at;
-    if (asserted && asserted > query.assertedAt) return false;
+    if (asserted && epoch(asserted, "asserted_at") > at) return false;
   }
   return true;
 }
