@@ -606,9 +606,9 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 
 ## Wave 25: R17 Tri-Cognitive Playbooks & Episodic Narrative Horizon
 - [x] T-427 · LANDED 2026-11-08 — PR #356: Procedural Playbook Engine (`ProceduralMemory`): Model and persist executable step trajectories, pre-conditions, verification assertions, and rollback recipes · src/cognition/playbooks.ts · F
-- [x] T-428 · LANDED 2026-11-08 (pure module; production wiring tracked in TECHNICAL_DEBT-wave24-25.md) — PR #357: Episodic Causal Narrative Horizon: Group linear observations into causal episodes (`Goal ➔ Hypothesis ➔ Trajectory ➔ Verification ➔ Retrospective`) · src/cognition/episodes.ts · F
-- [x] T-429 · LANDED 2026-11-08 (pure module; production wiring tracked in TECHNICAL_DEBT-wave24-25.md) — PR #359: Bi-Temporal Validity Windows: Stored dual timestamps (`asserted_at` vs `valid_from`/`valid_until`) allowing historical queries without clobbering active state · src/schema.ts, src/store.ts · F
-- [x] T-430 · LANDED 2026-11-08 (pure module; production wiring tracked in TECHNICAL_DEBT-wave24-25.md) — PR #358: Ebbinghaus Utility-Reinforced Cognitive Forgetting Curve: Exponential decay for unverified candidate notes; reinforcement for green test executions · src/quality/decay.ts · F
+- [x] T-428 · LANDED 2026-11-08 (wired: brief episodes / as_of belief time / retention decay) — PR #357: Episodic Causal Narrative Horizon: Group linear observations into causal episodes (`Goal ➔ Hypothesis ➔ Trajectory ➔ Verification ➔ Retrospective`) · src/cognition/episodes.ts · F
+- [x] T-429 · LANDED 2026-11-08 (wired: brief episodes / as_of belief time / retention decay) — PR #359: Bi-Temporal Validity Windows: Stored dual timestamps (`asserted_at` vs `valid_from`/`valid_until`) allowing historical queries without clobbering active state · src/schema.ts, src/store.ts · F
+- [x] T-430 · LANDED 2026-11-08 (wired: brief episodes / as_of belief time / retention decay) — PR #358: Ebbinghaus Utility-Reinforced Cognitive Forgetting Curve: Exponential decay for unverified candidate notes; reinforcement for green test executions · src/quality/decay.ts · F
 - [x] T-431 · LANDED 2026-11-08 — PR #360 + #361: CLI & MCP Playbook Commands: Wire `memory playbook --run <id>`, `memory playbook --list`, and `muse_playbook_recall` / `muse_playbook_record` MCP tools · src/cli/playbook.ts, src/mcp.ts · F
 
 ## Wave 26: R18 AST Associative Callgraph Retrieval & Speculative Pre-Flight

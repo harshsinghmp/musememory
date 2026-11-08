@@ -1602,6 +1602,15 @@ export function evaluateAsOf(entry: MemoryEntry, asOfTime: string | number): AsO
     return { status: "invalid", reason: "not_yet_valid" };
   }
 
+  // T-429: when belief time is recorded, a memory cannot be recalled for a
+  // time before the system knew it. Unstamped legacy entries stay visible.
+  if (entry.asserted_at) {
+    const assertedMs = Date.parse(entry.asserted_at);
+    if (!isNaN(assertedMs) && targetMs < assertedMs) {
+      return { status: "undetermined", reason: "asserted_after_target" };
+    }
+  }
+
   if (!entry.valid_to) {
     return { status: "valid", reason: "active_no_cessation" };
   }
