@@ -12,7 +12,8 @@
     "llms": "bun run scripts/build-llms-txt.ts"
   },
   "dependencies": {
-    "astro": "^7.3.5"
+    "astro": "^7.3.5",
+    "sql.js": "1.13.0"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
