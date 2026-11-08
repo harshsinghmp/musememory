@@ -549,6 +549,7 @@ export const STUDIO_JS = `    let allMemories = [];
             fetchActivity(),
             fetchTerrain(),
             fetchAgents(),
+            fetchAgentManifest(),
           ]);
           const loaded = await memRes.json();
           if (requestedScope !== studioScope || requestGen !== scopeGeneration) return;
@@ -1237,6 +1238,7 @@ export const STUDIO_JS = `    let allMemories = [];
     let terrainSelected = null;
 
     let hubAgents = [];
+    let agentManifest = null;
 
     async function fetchAgents() {
       try {
@@ -1277,6 +1279,31 @@ export const STUDIO_JS = `    let allMemories = [];
         });
         grid.appendChild(card);
       });
+    }
+
+    async function fetchAgentManifest() {
+      try {
+        const res = await fetch('/api/agents/manifest');
+        agentManifest = await res.json();
+        const paths = document.getElementById('agentManifestPaths');
+        const snippet = document.getElementById('agentManifestSnippet');
+        if (paths) paths.textContent = 'Memory: ' + agentManifest.memoryDir + '  ·  DB: ' + agentManifest.database;
+        if (snippet) snippet.textContent = agentManifest.snippet;
+      } catch (err) {
+        console.error('Failed to load agent manifest:', err);
+      }
+    }
+
+    function copyAgentSnippet() {
+      if (!agentManifest) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(agentManifest.snippet).then(
+          function () { flash('Manifest snippet copied.'); },
+          function () { flash('Copy failed.', true); }
+        );
+      } else {
+        flash('Clipboard unavailable in this browser.', true);
+      }
     }
 
     async function wireAgent(id) {
@@ -1875,7 +1902,7 @@ export const STUDIO_JS = `    let allMemories = [];
         if (currentTab === 'mesh') { fetchMeshStatus(); fetchMeshAudit(); }
         if (currentTab === 'activity') fetchActivity();
         if (currentTab === 'terrain') fetchTerrain();
-        if (currentTab === 'agents') fetchAgents();
+        if (currentTab === 'agents') { fetchAgents(); fetchAgentManifest(); }
       });
     });
 
@@ -2516,6 +2543,15 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             <span class="brand-tag" id="agentsCounts">0 wired</span>
           </div>
           <div class="agents-grid" id="agentsGrid"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>"Point Any Agent" Manifest</span>
+            <button type="button" class="btn-icon" onclick="copyAgentSnippet()">Copy snippet</button>
+          </div>
+          <p class="agent-meta">Point any MCP-capable agent at the server below. Paths are local to this machine.</p>
+          <div class="agent-meta mono" id="agentManifestPaths">Loading...</div>
+          <pre class="code-preview" id="agentManifestSnippet">Loading...</pre>
         </div>
       </div>
     </div>

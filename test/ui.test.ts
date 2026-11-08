@@ -812,6 +812,35 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
   });
 });
 
+describe("Wave 23 PR 4: T-462 point-any-agent manifest", () => {
+  test("serves local paths and a copyable MCP snippet", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+
+      expect(html).toContain('id="agentManifestSnippet"');
+      expect(html).toContain("copyAgentSnippet()");
+      expect(js).toContain("function fetchAgentManifest");
+      expect(js).toContain("function copyAgentSnippet");
+
+      const manifest = await (await fetch(`${base}/api/agents/manifest`)).json();
+      expect(manifest.mcpCommand).toBe("memory mcp");
+      expect(manifest.memoryDir).toBe(memoryDir);
+      expect(manifest.database).toContain("memory.db");
+      expect(manifest.files).toContain(memoryDir);
+      expect(manifest.snippet).toContain("memory_search");
+      expect(manifest.snippet).toContain(memoryDir);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
