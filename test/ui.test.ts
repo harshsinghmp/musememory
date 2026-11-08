@@ -722,6 +722,40 @@ describe("Wave 23 PR 3: T-458 terrain vault UI", () => {
   });
 });
 
+describe("Wave 23 PR 4: T-460 agent discovery", () => {
+  test("serves the agents hub and three-state statuses", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="agents"');
+      expect(html).toContain('id="panel-agents"');
+      expect(html).toContain('id="agentsGrid"');
+      expect(js).toContain("function fetchAgents");
+      expect(js).toContain("function renderAgents");
+      expect(css).toContain(".agent-card");
+      expect(css).toContain(".agent-status");
+
+      const data = await (await fetch(`${base}/api/agents`)).json();
+      expect(Array.isArray(data.agents)).toBe(true);
+      expect(data.counts).toHaveProperty("wired");
+      expect(data.counts).toHaveProperty("unwired");
+      expect(data.counts).toHaveProperty("absent");
+      for (const agent of data.agents) {
+        expect(["WIRED", "UNWIRED", "ABSENT"]).toContain(agent.status);
+      }
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
