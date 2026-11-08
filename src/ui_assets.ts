@@ -141,6 +141,23 @@ export const STUDIO_CSS = `    :root {
     
     .graph-hud { position: absolute; bottom: 16px; left: 16px; background: rgba(23, 19, 15, 0.92); backdrop-filter: blur(10px); border: 1px solid var(--panel-border); padding: 8px 14px; border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted); pointer-events: none; }
     .graph-hud-key { display: inline-block; background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-weight: 600; color: #fff; margin-right: 4px; }
+    /* T-454: instant graph/list toggle + sortable table */
+    .studio-view-switch { display: inline-flex; gap: 2px; background: rgba(0,0,0,0.35); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 3px; }
+    .view-btn { font: inherit; padding: 5px 12px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+    .view-btn:hover { color: var(--text); background: rgba(255,235,210,0.05); }
+    .view-btn.active { color: #1a1206; background: var(--accent); border-color: var(--accent); }
+    .studio-list-view { flex: 1; overflow: auto; padding: 16px 20px; }
+    .studio-list-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .studio-list-toolbar input { background: #0a0806; border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 8px 12px; color: #fff; font: inherit; font-size: 12px; min-width: 240px; }
+    .studio-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .studio-table th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--panel-border); color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; user-select: none; }
+    .studio-table th:hover { color: var(--text); }
+    .studio-table th[aria-sort="ascending"]::after { content: " ^"; color: var(--accent); }
+    .studio-table th[aria-sort="descending"]::after { content: " v"; color: var(--accent); }
+    .studio-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-muted); }
+    .studio-table tbody tr { cursor: pointer; }
+    .studio-table tbody tr:hover td { background: rgba(255,235,210,0.04); color: var(--text); }
+    .studio-table .mono { font-size: 11px; }
     
     /* Detail Drawer */
     .detail-pane { width: 440px; min-width: 360px; background: var(--panel); border-left: 1px solid var(--panel-border); padding: 24px; overflow-y: auto; display: none; z-index: 30; }
@@ -297,6 +314,10 @@ export const STUDIO_CSS = `    :root {
 export const STUDIO_JS = `    let allMemories = [];
     let studioScope = 'project';
     let scopeGeneration = 0;
+    let studioView = 'graph';
+    let listSort = { key: 'created_at', dir: 'desc' };
+    let listQuery = '';
+    let listDebounce = null;
     function apiUrl(path) {
       if (studioScope === 'project') return path;
       return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'scope=' + encodeURIComponent(studioScope);
@@ -686,6 +707,68 @@ export const STUDIO_JS = `    let allMemories = [];
 
       container.innerHTML = '';
       container.appendChild(fragment);
+      if (studioView === 'list') renderStudioTable();
+    }
+
+    function setStudioView(view) {
+      studioView = view === 'list' ? 'list' : 'graph';
+      document.querySelectorAll('.view-btn').forEach(b => {
+        var active = b.dataset.studioView === studioView;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      var graphOnly = document.getElementById('graphOnlyControls');
+      if (graphOnly) graphOnly.style.display = studioView === 'graph' ? 'flex' : 'none';
+      var graphBox = document.getElementById('graphContainer');
+      if (graphBox) graphBox.hidden = studioView !== 'graph';
+      var listBox = document.getElementById('studioListView');
+      if (listBox) listBox.hidden = studioView !== 'list';
+      var label = document.getElementById('studioViewLabel');
+      if (label) label.textContent = studioView === 'graph' ? 'Canvas graph' : 'Filterable table';
+      if (studioView === 'list') renderStudioTable();
+      else needsRedraw = true;
+    }
+
+    function studioRows() {
+      var q = listQuery.toLowerCase();
+      var rows = allMemories.filter(function (m) {
+        if (currentFilter !== 'all' && m.type !== currentFilter) return false;
+        if (!q) return true;
+        var text = (m.title + ' ' + (m.content || '') + ' ' + (m.tags || []).join(' ')).toLowerCase();
+        return text.indexOf(q) >= 0;
+      });
+      var dir = listSort.dir === 'asc' ? 1 : -1;
+      rows.sort(function (a, b) {
+        var av = String(a[listSort.key] == null ? '' : a[listSort.key]);
+        var bv = String(b[listSort.key] == null ? '' : b[listSort.key]);
+        return av.localeCompare(bv) * dir;
+      });
+      return rows;
+    }
+
+    function renderStudioTable() {
+      var body = document.getElementById('studioTableBody');
+      if (!body) return;
+      var rows = studioRows();
+      var fragment = document.createDocumentFragment();
+      rows.forEach(function (m) {
+        var tr = document.createElement('tr');
+        tr.dataset.id = m.id;
+        tr.innerHTML = '<td><strong>' + escapeHtml(m.title) + '</strong></td>' +
+          '<td>' + escapeHtml(m.type || 'discovery') + '</td>' +
+          '<td>' + escapeHtml(m.status || '') + '</td>' +
+          '<td>' + escapeHtml(m.project || '—') + '</td>' +
+          '<td class="mono">' + escapeHtml(String(m.created_at || '').slice(0, 10)) + '</td>';
+        tr.onclick = function () { selectMemory(m); };
+        fragment.appendChild(tr);
+      });
+      body.innerHTML = '';
+      body.appendChild(fragment);
+      var count = document.getElementById('studioListCount');
+      if (count) count.textContent = rows.length + ' rows';
+      document.querySelectorAll('.studio-table th[data-sort]').forEach(function (th) {
+        th.setAttribute('aria-sort', th.dataset.sort === listSort.key ? (listSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      });
     }
 
     function selectMemory(m) {
@@ -1524,6 +1607,28 @@ export const STUDIO_JS = `    let allMemories = [];
       });
     }
 
+    document.querySelectorAll('.view-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { setStudioView(btn.dataset.studioView); });
+    });
+
+    var listSearch = document.getElementById('studioListSearch');
+    if (listSearch) {
+      listSearch.addEventListener('input', function (e) {
+        var value = e.target.value;
+        if (listDebounce) clearTimeout(listDebounce);
+        listDebounce = setTimeout(function () { listQuery = value; renderStudioTable(); }, 100);
+      });
+    }
+
+    document.querySelectorAll('.studio-table th[data-sort]').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var key = th.dataset.sort;
+        if (listSort.key === key) listSort.dir = listSort.dir === 'asc' ? 'desc' : 'asc';
+        else { listSort.key = key; listSort.dir = 'asc'; }
+        renderStudioTable();
+      });
+    });
+
     let searchDebounceTimer = null;
     document.getElementById('searchInput').addEventListener('input', (e) => {
       searchQuery = e.target.value;
@@ -1651,19 +1756,46 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
     <div class="view-panel active" id="panel-graph">
       <div class="graph-controls" id="graphControls">
         <div class="control-row">
-          <span class="control-label">Timeline</span>
-          <input type="range" id="timelineSlider" min="0" max="1000" value="1000" />
-          <span class="control-label" id="timelineLabel">all</span>
+          <div class="studio-view-switch" id="studioViewSwitch" role="group" aria-label="Studio view">
+            <button type="button" class="view-btn active" data-studio-view="graph" aria-pressed="true">Graph</button>
+            <button type="button" class="view-btn" data-studio-view="list" aria-pressed="false">List</button>
+          </div>
+          <span class="control-label" id="studioViewLabel">Canvas graph</span>
         </div>
-        <div class="control-row" id="clusterFilters"><span class="control-label">Clusters</span></div>
+        <div id="graphOnlyControls" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="control-row">
+            <span class="control-label">Timeline</span>
+            <input type="range" id="timelineSlider" min="0" max="1000" value="1000" />
+            <span class="control-label" id="timelineLabel">all</span>
+          </div>
+          <div class="control-row" id="clusterFilters"><span class="control-label">Clusters</span></div>
+        </div>
       </div>
-      <div class="graph-container">
+      <div class="graph-container" id="graphContainer">
         <canvas id="graphCanvas"></canvas>
         <div class="graph-hud">
           <span class="graph-hud-key">Drag</span> Rotate 3D &bull;
           <span class="graph-hud-key">Scroll</span> Zoom &bull;
           <span class="graph-hud-key">Click</span> Inspect
         </div>
+      </div>
+      <div class="studio-list-view" id="studioListView" hidden>
+        <div class="studio-list-toolbar">
+          <input type="text" id="studioListSearch" placeholder="Filter by title, content or tag..." autocomplete="off" spellcheck="false" />
+          <span class="control-label" id="studioListCount">0 rows</span>
+        </div>
+        <table class="studio-table">
+          <thead>
+            <tr>
+              <th data-sort="title">Title</th>
+              <th data-sort="type">Type</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="project">Project</th>
+              <th data-sort="created_at" aria-sort="descending">Created</th>
+            </tr>
+          </thead>
+          <tbody id="studioTableBody"></tbody>
+        </table>
       </div>
     </div>
 
