@@ -78,6 +78,7 @@ import {
   handleCodeImpactCommand,
   handlePrContextCommand,
 } from "./cli/health.ts";
+import { handlePlaybookCommand } from "./cli/playbook.ts";
 import { handleConflictsCommand } from "./cli/conflicts.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
@@ -174,6 +175,7 @@ Ecosystem, Migration & Connectivity:
   conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
+  playbook [--list|--tag T|<id>] [--success|--fail] Procedural playbooks: list, inspect or record an outcome
   scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
   terrain [--workspace] [--out]  Machine terrain, or --workspace for the six workspace maps
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
@@ -371,6 +373,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleReconcileCommand(parsed);
     case "benchmark":
       return handleBenchmarkCommand(parsed);
+    case "playbook":
+      return handlePlaybookCommand(parsed);
     case "scan-secrets":
     case "secrets-scan":
     case "vibe-scan":
