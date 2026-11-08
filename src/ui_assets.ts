@@ -281,6 +281,27 @@ export const STUDIO_CSS = `    :root {
     .session-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
     .session-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
     .activity-empty { font-size: 12px; color: var(--text-dim); }
+    /* T-458: terrain vault split-pane */
+    .terrain-split { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+    .terrain-tree { width: 220px; min-width: 180px; border-right: 1px solid var(--panel-border); padding: 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; background: rgba(0,0,0,0.15); }
+    .terrain-tree-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; font: inherit; font-size: 12px; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 8px 10px; cursor: pointer; text-align: left; }
+    .terrain-tree-item:hover { color: var(--text); background: rgba(255,235,210,0.05); }
+    .terrain-tree-item.active { color: #1a1206; background: var(--accent); border-color: var(--accent); }
+    .terrain-tree-item.active .gen-badge { color: #1a1206; border-color: rgba(26,18,6,0.4); }
+    .gen-badge { font-size: 8px; font-weight: 800; letter-spacing: 0.06em; padding: 1px 5px; border-radius: var(--radius-full); border: 1px solid var(--panel-border-glow); color: var(--accent); }
+    .gen-badge.missing { color: var(--text-dim); border-color: var(--panel-border); }
+    .terrain-viewer { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+    .terrain-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--panel-border); font-size: 12px; color: var(--text-muted); }
+    .terrain-content { flex: 1; overflow: auto; padding: 18px 22px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+    .terrain-content h2 { font-size: 16px; color: #fff; margin: 4px 0 10px; }
+    .terrain-content h3 { font-size: 13px; color: var(--text); margin: 16px 0 6px; }
+    .terrain-content h4 { font-size: 12px; color: var(--text); margin: 12px 0 4px; }
+    .terrain-content ul { margin: 4px 0 10px 18px; }
+    .terrain-content code { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #fcd34d; }
+    .terrain-content .terrain-row { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 0; }
+    .terrain-scanline { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: linear-gradient(180deg, transparent 0%, rgba(245,158,11,0.28) 50%, transparent 100%); background-size: 100% 30%; }
+    .terrain-scanline.active { opacity: 1; animation: terrain-scan 0.9s linear; }
+    @keyframes terrain-scan { from { background-position: 0 -30%; } to { background-position: 0 130%; } }
     /* ---- Wave 23 / T-451: fixed 76px cyber-minimalist left rail ---- */
     header, .layout { margin-left: 76px; }
     header { flex-wrap: wrap; gap: 10px; }
@@ -516,6 +537,7 @@ export const STUDIO_JS = `    let allMemories = [];
             fetchUserProfile(),
             loadAudit(),
             fetchActivity(),
+            fetchTerrain(),
           ]);
           const loaded = await memRes.json();
           if (requestedScope !== studioScope || requestGen !== scopeGeneration) return;
@@ -1200,6 +1222,95 @@ export const STUDIO_JS = `    let allMemories = [];
       });
     }
 
+    let terrainFiles = [];
+    let terrainSelected = null;
+
+    async function fetchTerrain() {
+      try {
+        const res = await fetch('/api/terrain');
+        const data = await res.json();
+        terrainFiles = data.files || [];
+        renderTerrainTree();
+      } catch (err) {
+        console.error('Failed to load terrain:', err);
+      }
+    }
+
+    function renderTerrainTree() {
+      const tree = document.getElementById('terrainTree');
+      if (!tree) return;
+      tree.innerHTML = '';
+      terrainFiles.forEach(function (file) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'terrain-tree-item' + (terrainSelected === file.name ? ' active' : '');
+        btn.dataset.terrain = file.name;
+        btn.innerHTML = '<span>' + escapeHtml(file.name) + '</span><span class="gen-badge' + (file.generated ? '' : ' missing') + '">' + (file.generated ? 'GEN' : 'MISSING') + '</span>';
+        btn.onclick = function () { selectTerrainFile(file.name); };
+        tree.appendChild(btn);
+      });
+      if (!terrainSelected && terrainFiles.length > 0) selectTerrainFile(terrainFiles[0].name);
+      else if (terrainSelected) selectTerrainFile(terrainSelected);
+    }
+
+    function terrainInline(text) {
+      return text.replace(/\`([^\`]+)\`/g, '<code>$1</code>').replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+    }
+
+    function renderTerrainMarkdown(markdown) {
+      const lines = escapeHtml(markdown).split('\\n');
+      let html = '', inList = false;
+      const closeList = function () { if (inList) { html += '</ul>'; inList = false; } };
+      lines.forEach(function (line) {
+        if (/^### /.test(line)) { closeList(); html += '<h4>' + terrainInline(line.slice(4)) + '</h4>'; }
+        else if (/^## /.test(line)) { closeList(); html += '<h3>' + terrainInline(line.slice(3)) + '</h3>'; }
+        else if (/^# /.test(line)) { closeList(); html += '<h2>' + terrainInline(line.slice(2)) + '</h2>'; }
+        else if (/^- /.test(line)) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + terrainInline(line.slice(2)) + '</li>'; }
+        else if (/^\\|/.test(line)) { closeList(); html += '<div class="terrain-row">' + terrainInline(line) + '</div>'; }
+        else if (line.trim() === '') { closeList(); }
+        else { closeList(); html += '<p>' + terrainInline(line) + '</p>'; }
+      });
+      closeList();
+      return html || '<p class="activity-empty">Map is empty.</p>';
+    }
+
+    function selectTerrainFile(name) {
+      terrainSelected = name;
+      const file = terrainFiles.find(function (item) { return item.name === name; });
+      const label = document.getElementById('terrainFileName');
+      const content = document.getElementById('terrainContent');
+      if (label) label.textContent = name;
+      if (content) {
+        content.innerHTML = file && file.generated
+          ? renderTerrainMarkdown(file.content)
+          : '<p class="activity-empty">This map has not been compiled yet. Press REINDEX.</p>';
+      }
+      document.querySelectorAll('.terrain-tree-item').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.terrain === name);
+      });
+    }
+
+    async function reindexTerrain() {
+      const button = document.getElementById('terrainReindex');
+      if (button) button.disabled = true;
+      try {
+        await fetch('/api/terrain/reindex', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        await fetchTerrain();
+        const scan = document.getElementById('terrainScanline');
+        if (scan) {
+          scan.classList.remove('active');
+          void scan.offsetWidth;
+          scan.classList.add('active');
+          setTimeout(function () { scan.classList.remove('active'); }, 900);
+        }
+        flash('Terrain maps recompiled.');
+      } catch (err) {
+        flash('Terrain reindex failed: ' + String(err), true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    }
+
     async function fetchActivity() {
       const requestGen = scopeGeneration;
       try {
@@ -1681,6 +1792,7 @@ export const STUDIO_JS = `    let allMemories = [];
         if (currentTab === 'sync') fetchSyncStatus();
         if (currentTab === 'mesh') { fetchMeshStatus(); fetchMeshAudit(); }
         if (currentTab === 'activity') fetchActivity();
+        if (currentTab === 'terrain') fetchTerrain();
       });
     });
 
@@ -1797,6 +1909,7 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
       <button type="button" class="rail-tool nav-tab" data-view="sandbox">Sandbox</button>
       <button type="button" class="rail-tool nav-tab" data-view="audit">Audit</button>
       <button type="button" class="rail-tool nav-tab" data-view="activity">Activity</button>
+      <button type="button" class="rail-tool nav-tab" data-view="terrain">Terrain</button>
     </div>
   </nav>
 
@@ -2292,6 +2405,21 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
           </div>
           <div class="session-grid" id="activitySessions"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- View 15: Workspace terrain vault (T-458) -->
+    <div class="view-panel" id="panel-terrain">
+      <div class="terrain-split">
+        <aside class="terrain-tree" id="terrainTree" aria-label="Terrain maps"></aside>
+        <section class="terrain-viewer">
+          <div class="terrain-toolbar">
+            <span class="mono" id="terrainFileName">Select a map</span>
+            <button type="button" class="btn-icon" id="terrainReindex" onclick="reindexTerrain()">REINDEX</button>
+          </div>
+          <div class="terrain-content" id="terrainContent"><p class="activity-empty">Compile the terrain maps to inspect them.</p></div>
+          <div class="terrain-scanline" id="terrainScanline" aria-hidden="true"></div>
+        </section>
       </div>
     </div>
 
