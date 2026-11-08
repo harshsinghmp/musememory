@@ -7,10 +7,14 @@
 
 export type EpisodePhase = "goal" | "hypothesis" | "trajectory" | "verification" | "retrospective";
 
+export const EPISODE_PHASES: EpisodePhase[] = ["goal", "hypothesis", "trajectory", "verification", "retrospective"];
+
 export interface EpisodeObservation {
   id?: string;
   session_id?: string;
   kind?: string;
+  /** Explicit semantic phase from the producer; wins over text inference. */
+  phase?: EpisodePhase;
   title?: string;
   text?: string;
   created_at?: string;
@@ -37,8 +41,13 @@ const PHASE_PATTERNS: Array<[EpisodePhase, RegExp]> = [
 ];
 
 export function classifyPhase(observation: EpisodeObservation): EpisodePhase {
+  if (observation.phase && EPISODE_PHASES.includes(observation.phase)) {
+    return observation.phase;
+  }
   const kind = String(observation.kind ?? "").toLowerCase();
-  if (/verif|test|assert|result/.test(kind)) return "verification";
+  // Provenance kinds are not outcomes: `test` can be a failure. Only explicit
+  // goal/retro/hypothesis kinds are semantic; verification comes from text or
+  // an explicit phase so failed commands never become verifications.
   if (/goal|objective|plan/.test(kind)) return "goal";
   if (/retro|lesson|postmortem/.test(kind)) return "retrospective";
   if (/hypothes|assum/.test(kind)) return "hypothesis";
@@ -123,4 +132,39 @@ export function formatEpisode(episode: Episode): string {
   if (episode.verification.length) lines.push("Verification:", ...episode.verification.map((item) => `- ${item}`));
   if (episode.retrospective.length) lines.push("Retrospective:", ...episode.retrospective.map((item) => `- ${item}`));
   return lines.join("\n");
+}
+
+export interface EpisodeSourceObservation {
+  id?: string;
+  timestamp?: string;
+  source?: string;
+  project?: string;
+  summary?: string;
+  raw?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Map persisted observations into episode inputs, honouring explicit phases. */
+export function episodesFromObservations(
+  observations: EpisodeSourceObservation[],
+  options: BuildEpisodesOptions = {},
+): Episode[] {
+  return buildEpisodes(
+    observations.map((observation) => {
+      const metadata = observation.metadata ?? {};
+      const phase = EPISODE_PHASES.includes(metadata.phase as EpisodePhase)
+        ? (metadata.phase as EpisodePhase)
+        : undefined;
+      return {
+        id: observation.id,
+        session_id: typeof metadata.session_id === "string" ? metadata.session_id : observation.project,
+        kind: observation.source,
+        phase,
+        title: observation.summary,
+        text: observation.raw,
+        created_at: observation.timestamp,
+      };
+    }),
+    options,
+  );
 }

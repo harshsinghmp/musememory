@@ -113,7 +113,7 @@ Version Control (R23):
 
 ## MCP tools
 
-**117 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
+**118 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
 
 Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_profile_list` for the live mapping.
 
@@ -225,7 +225,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `memory_drift_audit` | `target` | Run bidirectional documentation <-> code drift audit: verifies if documented decisions are implemented in code and flags missing/stale/conflicting code or docs |
 | `muse_why` | `target` | Autonomous Engineering Cognition: Explain WHY code was designed or modified the way it is by tracing historical bug fixes, ADRs, trade-offs, and invariants |
 | `muse_bug_clusters` | — | Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses |
-| `muse_tech_debt` | `packet` | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
+| `muse_tech_debt` | — | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
 | `muse_health` | `packet` | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
 | `muse_code_impact` | `file_path` | Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level |
 | `muse_pr_context` | — | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
@@ -266,9 +266,10 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 
 | Tool | Required parameters | Description |
 | --- | --- | --- |
+| `muse_episodes` | `packet` | Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations |
 | `muse_playbook_recall` | `packet` | Recall procedural playbooks: list by tag, or fetch one by id/title |
 | `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
 
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 117 tools, 7 profiles, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 118 tools, 7 profiles, 30 import formats, 8 credential rule families.

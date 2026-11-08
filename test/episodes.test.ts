@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildEpisodes, classifyPhase, formatEpisode } from "../src/cognition/episodes.ts";
+import { buildEpisodes, classifyPhase, formatEpisode, episodesFromObservations } from "../src/cognition/episodes.ts";
 
 describe("T-428: episodic causal narratives", () => {
   test("classifies observations into causal phases", () => {
@@ -9,6 +9,9 @@ describe("T-428: episodic causal narratives", () => {
     expect(classifyPhase({ kind: "verification", text: "tests green" })).toBe("verification");
     expect(classifyPhase({ text: "retrospective: add a regression test" })).toBe("retrospective");
     expect(classifyPhase({ text: "edited auth.ts" })).toBe("trajectory");
+    // Provenance is not an outcome: a failed test command is not a verification.
+    expect(classifyPhase({ kind: "test", title: "Command failure: bun test" })).toBe("trajectory");
+    expect(classifyPhase({ kind: "test", phase: "verification", title: "ignored text" })).toBe("verification");
   });
 
   test("groups per session and splits on a new goal or a long gap", () => {
@@ -45,6 +48,16 @@ describe("T-428: episodic causal narratives", () => {
     );
     expect(episodes.length).toBe(2);
     expect(new Set(episodes.map((episode) => episode.id)).size).toBe(2);
+  });
+
+  test("maps persisted observations and honours metadata phases", () => {
+    const episodes = episodesFromObservations([
+      { id: "o1", timestamp: "2026-01-01T10:00:00Z", source: "manual", project: "p", summary: "Goal: fix login", raw: "auth", metadata: { session_id: "s1" } },
+      { id: "o2", timestamp: "2026-01-01T10:01:00Z", source: "test", project: "p", summary: "Command failure: bun test", raw: "red", metadata: { session_id: "s1", phase: "verification" } },
+    ]);
+    expect(episodes.length).toBe(1);
+    expect(episodes[0].goal).toBe("Goal: fix login");
+    expect(episodes[0].verification).toContain("Command failure: bun test");
   });
 
   test("returns nothing for an empty or undated stream", () => {
