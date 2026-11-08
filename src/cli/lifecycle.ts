@@ -13,6 +13,8 @@ import {
   replayFromAudit,
 } from "../store.ts";
 import { stalePolicyDays } from "../retrieval.ts";
+import { listObservations } from "../learning/observation.ts";
+import { buildEpisodes } from "../cognition/episodes.ts";
 import { consolidateScenes } from "../consolidate.ts";
 import { optimizeStore } from "../optimize.ts";
 import { traceGraph, renderTrace } from "../trace.ts";
@@ -329,6 +331,27 @@ export async function handleBriefingCommand({ flags }: ParsedArgs): Promise<numb
   if (staleByPolicy.length > 0) {
     console.log(`stale by policy:`);
     for (const e of staleByPolicy) printEntry(e, true);
+  }
+  const observations = listObservations(ctx.store).slice(-200);
+  const episodes = buildEpisodes(
+    observations.map((observation) => ({
+      id: observation.id,
+      session_id:
+        typeof (observation.metadata as Record<string, unknown> | undefined)?.session_id === "string"
+          ? String((observation.metadata as Record<string, unknown>).session_id)
+          : observation.project,
+      kind: observation.source,
+      title: observation.summary,
+      text: observation.raw,
+      created_at: observation.timestamp,
+    })),
+    { gapMinutes: 90 },
+  ).slice(-3);
+  if (episodes.length > 0) {
+    console.log("recent episodes:");
+    for (const episode of episodes) {
+      console.log(`  ${episode.id} ${episode.goal ?? "(no goal)"} — ${episode.observations} observation(s)`);
+    }
   }
   const due = dueEntries(entries);
   if (due.length > 0) {
