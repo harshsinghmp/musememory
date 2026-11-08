@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
 import type { MemoryEntry } from "./types.ts";
@@ -8,6 +9,7 @@ import { join } from "node:path";
 import { getGlobalMemoryDir } from "./root.ts";
 import { writeWorkspaceTerrain } from "./vault/index.ts";
 import { discoverAgentHub } from "./agents/hub.ts";
+import { connectAgent, disconnectSingleAgent } from "./connect.ts";
 import {
   STUDIO_HTML_ASSET,
   STUDIO_CSS_ASSET,
@@ -546,6 +548,63 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         };
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ agents, counts }));
+        return;
+      }
+
+      if (pathname === "/api/agents/wire" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const id = typeof body.id === "string" ? body.id.trim() : "";
+          if (!id) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Missing required 'id' field" }));
+            return;
+          }
+          const dryRun = body.dryRun === true;
+          const home = process.env.HOME || homedir();
+          const detected = discoverAgentHub(home).find(
+            (agent) => agent.id === id || agent.id.replace(/-cli$/, "") === id,
+          );
+          if (!dryRun && detected?.configPath && existsSync(detected.configPath)) {
+            try {
+              copyFileSync(detected.configPath, `${detected.configPath}.bak`);
+            } catch {
+              // A failed backup must not stop an explicit wire request.
+            }
+          }
+          const harness = typeof body.harness === "string" ? body.harness : undefined;
+          const reports = connectAgent(id, home, { dryRun, harness });
+          if (reports.length === 1 && /^Unknown agent/.test(reports[0].message)) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: reports[0].message }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: reports.some((report) => report.updated || report.installed), reports }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+        return;
+      }
+
+      if (pathname === "/api/agents/unwire" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const id = typeof body.id === "string" ? body.id.trim() : "";
+          if (!id) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Missing required 'id' field" }));
+            return;
+          }
+          const home = process.env.HOME || homedir();
+          const report = disconnectSingleAgent(id, home, { dryRun: body.dryRun === true });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: report.updated, report }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
         return;
       }
 

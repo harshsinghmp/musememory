@@ -756,6 +756,62 @@ describe("Wave 23 PR 4: T-460 agent discovery", () => {
   });
 });
 
+describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
+  test("wires an agent with a backup and unwires it again", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const home = makeTempRoot();
+    const previous = process.env.HOME;
+    process.env.HOME = home;
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const configPath = join(home, ".claude.json");
+      writeFileSync(configPath, JSON.stringify({}), "utf8");
+
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      expect(js).toContain("function wireAgent");
+      expect(js).toContain("function unwireAgent");
+      expect(js).toContain("data-wire");
+
+      const wireRes = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+      });
+      expect(wireRes.status).toBe(200);
+      const wired = await wireRes.json();
+      expect(wired.success).toBe(true);
+      expect(existsSync(`${configPath}.bak`)).toBe(true);
+      const afterWire = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterWire.mcpServers?.memory).toBeDefined();
+
+      const unwireRes = await fetch(`${base}/api/agents/unwire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "claude-code" }),
+      });
+      expect(unwireRes.status).toBe(200);
+      const afterUnwire = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterUnwire.mcpServers?.memory).toBeUndefined();
+
+      const unknown = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "does-not-exist" }),
+      });
+      expect(unknown.status).toBe(404);
+    } finally {
+      srv.close();
+      if (previous === undefined) delete process.env.HOME;
+      else process.env.HOME = previous;
+      cleanup(root);
+      cleanup(home);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
