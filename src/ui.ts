@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
@@ -203,7 +203,29 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     let globalStoreCache: { dir: string; store: Store } | undefined;
     // T-466: read projections are cached per scope and invalidated by writes.
     let projectionVersion = 0;
-    const projectionCache = new Map<string, { version: number; body: string }>();
+    const projectionCache = new Map<string, { version: number; token: string; body: string }>();
+    // Safer inversion: only these POSTs are read-only; everything else evicts,
+    // so a forgotten route can only cause a MISS, never a stale HIT.
+    // `/api/search` records retrieval telemetry, so it is not read-only.
+    const READ_ONLY_POST_ROUTES = new Set(["/api/cognition/why"]);
+    let backupSeq = 0;
+    const freshnessToken = (scope: StudioScope): string => {
+      const dir = scope === "global" ? getGlobalMemoryDir() : opts.memoryDir;
+      const layout = getStorageLayout(dir);
+      // WAL commits land in dbPath-wal; the YAML mirror lands in memoriesDir.
+      // Probe every path a writer can touch, and use "-" (never a fake zero)
+      // when a path does not exist yet.
+      const probed = [dir, layout.memoriesDir, layout.dbPath, `${layout.dbPath}-wal`, `${layout.dbPath}-journal`];
+      return probed
+        .map((candidate) => {
+          try {
+            return String(statSync(candidate).mtimeMs);
+          } catch {
+            return "-";
+          }
+        })
+        .join(":");
+    };
     const parseScope = (u: URL): StudioScope => {
       const raw = u.searchParams.get("scope");
       return raw === "global" || raw === "mesh" ? raw : "project";
@@ -317,8 +339,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
-      // Any UI mutation bumps the projection version; the next read misses.
-      if (req.method === "POST") projectionVersion += 1;
+      // Only real mutations invalidate the projection cache; read-only POSTs
+      // (search, why) must not throw the whole projection away.
+      if (req.method === "POST" && !READ_ONLY_POST_ROUTES.has(pathname)) projectionVersion += 1;
 
       // Wave 23 / T-453: modular static assets, cached by ETag and shipped
       // pre-compressed so repeat loads are a 304 or one cached body.
@@ -335,8 +358,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // API Routes
       if (pathname === "/api/memories" && req.method === "GET") {
         const scope = parseScope(url);
+        const token = freshnessToken(scope);
         const cached = projectionCache.get(scope);
-        if (cached && cached.version === projectionVersion) {
+        if (cached && cached.version === projectionVersion && cached.token === token) {
           res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
           res.end(cached.body);
           return;
@@ -354,7 +378,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           projected = list(opts.store).map(projectMemoryForUi);
         }
         const body = JSON.stringify(projected);
-        projectionCache.set(scope, { version: projectionVersion, body });
+        projectionCache.set(scope, { version: projectionVersion, token, body });
         res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
         res.end(body);
         return;
@@ -363,8 +387,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/stats" && req.method === "GET") {
         const scope = parseScope(url);
         const statsKey = `stats:${scope}`;
+        const statsToken = freshnessToken(scope);
         const cachedStats = projectionCache.get(statsKey);
-        if (cachedStats && cachedStats.version === projectionVersion) {
+        if (cachedStats && cachedStats.version === projectionVersion && cachedStats.token === statsToken) {
           res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
           res.end(cachedStats.body);
           return;
@@ -400,7 +425,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           typeCounts,
           handoff: activeState ? activeState.handoff : null,
         });
-        projectionCache.set(statsKey, { version: projectionVersion, body: statsBody });
+        projectionCache.set(statsKey, { version: projectionVersion, token: statsToken, body: statsBody });
         res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
         res.end(statsBody);
         return;
@@ -603,16 +628,40 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             res.end(JSON.stringify({ error: "Missing required 'id' field" }));
             return;
           }
+          if (id === "all") {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "A specific agent id is required (not 'all')" }));
+            return;
+          }
           const dryRun = body.dryRun === true;
           const home = process.env.HOME || homedir();
           const detected = discoverAgentHub(home).find(
             (agent) => agent.id === id || agent.id.replace(/-cli$/, "") === id,
           );
-          if (!dryRun && detected?.configPath && existsSync(detected.configPath)) {
-            try {
-              copyFileSync(detected.configPath, `${detected.configPath}.bak`);
-            } catch {
-              // A failed backup must not stop an explicit wire request.
+          if (!detected) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `Unknown agent '${id}'` }));
+            return;
+          }
+          const backups: string[] = [];
+          if (!dryRun) {
+            const targets = new Set<string>();
+            if (detected.configPath) targets.add(detected.configPath);
+            if (detected.id === "claude-code") {
+              targets.add(join(home, ".claude.json"));
+              targets.add(join(home, ".claude", "settings.json"));
+            }
+            for (const target of targets) {
+              if (!existsSync(target)) continue;
+              const backup = `${target}.${Date.now()}.${++backupSeq}.bak`;
+              try {
+                copyFileSync(target, backup);
+                backups.push(backup);
+              } catch (err: unknown) {
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: `Backup failed for ${target}: ${err instanceof Error ? err.message : String(err)}` }));
+                return;
+              }
             }
           }
           const harness = typeof body.harness === "string" ? body.harness : undefined;
@@ -623,7 +672,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             return;
           }
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: reports.some((report) => report.updated || report.installed), reports }));
+          res.end(JSON.stringify({ success: reports.some((report) => report.updated || report.installed), backups, reports }));
         } catch (err: unknown) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
@@ -641,6 +690,14 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             return;
           }
           const home = process.env.HOME || homedir();
+          const known = discoverAgentHub(home).some(
+            (agent) => agent.id === id || agent.id.replace(/-cli$/, "") === id,
+          );
+          if (!known) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `Unknown agent '${id}'` }));
+            return;
+          }
           const report = disconnectSingleAgent(id, home, { dryRun: body.dryRun === true });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: report.updated, report }));

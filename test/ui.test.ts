@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { openStore, save } from "../src/store.ts";
+import { openStore, propose, save } from "../src/store.ts";
 import { startUiServer, exportStandaloneHtml } from "../src/ui.ts";
 import { setupFixtureRoot, cleanup, makeTempRoot } from "./helpers.ts";
 
@@ -767,7 +767,10 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
     try {
       const base = `http://localhost:${srv.port}`;
       const configPath = join(home, ".claude.json");
+      const settingsPath = join(home, ".claude", "settings.json");
+      mkdirSync(join(home, ".claude"), { recursive: true });
       writeFileSync(configPath, JSON.stringify({}), "utf8");
+      writeFileSync(settingsPath, JSON.stringify({ allowedTools: ["Read"] }), "utf8");
 
       const html = await (await fetch(`${base}/`)).text();
       const js = await (await fetch(`${base}/assets/studio.js`)).text();
@@ -783,7 +786,13 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
       expect(wireRes.status).toBe(200);
       const wired = await wireRes.json();
       expect(wired.success).toBe(true);
-      expect(existsSync(`${configPath}.bak`)).toBe(true);
+      expect(wired.backups.length).toBeGreaterThanOrEqual(2);
+      const configBackups = readdirSync(home).filter((f) => f.startsWith(".claude.json.") && f.endsWith(".bak"));
+      const settingsBackups = readdirSync(join(home, ".claude")).filter((f) => f.startsWith("settings.json.") && f.endsWith(".bak"));
+      expect(configBackups.length).toBe(1);
+      expect(settingsBackups.length).toBe(1);
+      expect(JSON.parse(readFileSync(join(home, configBackups[0]), "utf8"))).toEqual({});
+      expect(JSON.parse(readFileSync(join(home, ".claude", settingsBackups[0]), "utf8"))).toEqual({ allowedTools: ["Read"] });
       const afterWire = JSON.parse(readFileSync(configPath, "utf8"));
       expect(afterWire.mcpServers?.memory).toBeDefined();
 
@@ -802,6 +811,35 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
         body: JSON.stringify({ id: "does-not-exist" }),
       });
       expect(unknown.status).toBe(404);
+
+      const unknownUnwire = await fetch(`${base}/api/agents/unwire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "does-not-exist" }),
+      });
+      expect(unknownUnwire.status).toBe(404);
+
+      const all = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "all", harness: "claude-code" }),
+      });
+      expect(all.status).toBe(400);
+
+      // A backup that cannot be written must abort before touching the config.
+      chmodSync(join(home, ".claude"), 0o500);
+      try {
+        const blocked = await fetch(`${base}/api/agents/wire`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+        });
+        expect(blocked.status).toBe(500);
+        const blockedConfig = JSON.parse(readFileSync(configPath, "utf8"));
+        expect(blockedConfig.mcpServers?.memory).toBeUndefined();
+      } finally {
+        chmodSync(join(home, ".claude"), 0o700);
+      }
     } finally {
       srv.close();
       if (previous === undefined) delete process.env.HOME;
@@ -949,6 +987,22 @@ describe("Wave 23 PR 6: T-466 projection cache", () => {
       expect(after.headers.get("x-cache")).toBe("MISS");
       const afterBody = await after.json();
       expect(afterBody.some((m: { content: string }) => m.content.includes("cache invalidation probe"))).toBe(true);
+
+      // A genuinely read-only POST must not evict the projection.
+      await fetch(`${base}/api/cognition/why`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "cache" }),
+      });
+      const afterSearch = await fetch(`${base}/api/memories`);
+      expect(afterSearch.headers.get("x-cache")).toBe("HIT");
+
+      // An external writer must make the projection miss (WAL mtime is probed).
+      const external = openStore(memoryDir);
+      propose(external, { content: "external cache probe", project: "t466" });
+      const externalRead = await fetch(`${base}/api/memories`);
+      expect(externalRead.headers.get("x-cache")).toBe("MISS");
+      expect((await externalRead.json()).some((m: { content: string }) => m.content.includes("external cache probe"))).toBe(true);
     } finally {
       srv.close();
       cleanup(root);
