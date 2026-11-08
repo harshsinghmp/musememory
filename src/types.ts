@@ -211,6 +211,8 @@ export interface MemoryEntry {
   /** T-128: Draft flag marking preliminary memory, kept isolated from confident answers. */
   draft?: boolean;
   /** Valid-time (event time) start; decay uses this when set (bi-temporal). */
+  /** T-429: belief time — when the system recorded this assertion. */
+  asserted_at?: string;
   valid_from?: string;
   /** Valid-time end, set when an entry leaves active knowledge (stale/rejected/superseded). */
   valid_to?: string;
