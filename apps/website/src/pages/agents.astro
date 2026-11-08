@@ -1,0 +1,142 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const agents = [
+  {
+    id: "antigravity",
+    name: "Antigravity",
+    command: "npx musememory connect antigravity",
+    note: "Wires the memory MCP server into the workspace agent and seeds the first brief from your constraints.",
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    command: "npx musememory connect opencode",
+    note: "Adds the memory server to OpenCode's MCP config; recall happens before edits, capture after decisions.",
+  },
+  {
+    id: "claude-code",
+    name: "Claude Code",
+    command: "npx musememory connect claude-code --with-hooks",
+    note: "Wires MCP and installs the lifecycle hook pack: constraints on start, observations on tool use, distillation on stop.",
+  },
+  {
+    id: "cursor",
+    name: "Cursor",
+    command: "npx musememory connect cursor",
+    note: "Adds the memory server and auto-approves the memory tools so recall is not blocked by a prompt.",
+  },
+];
+---
+
+<Base
+  title="Agent demos — Muse Memory"
+  description="The same memory surface across Antigravity, OpenCode, Claude Code and Cursor: one MCP server, one store, identical recall."
+>
+  <Nav />
+  <main id="main">
+    <section class="section">
+      <div class="container">
+        <p class="kicker">Multi-agent demos</p>
+        <h1>One memory, every agent</h1>
+        <p class="lede">
+          The server and the store are identical across agents. Pick an agent to see
+          the wiring command and what it changes. Nothing here is a mock: each command
+          is the one the CLI actually runs.
+        </p>
+
+        <div class="agent-switcher" role="tablist" aria-label="Coding agents">
+          {agents.map((agent, index) => (
+            <button
+              type="button"
+              role="tab"
+              id={`tab-${agent.id}`}
+              data-agent={agent.id}
+              aria-selected={index === 0 ? "true" : "false"}
+              aria-controls={`panel-${agent.id}`}
+              tabindex={index === 0 ? 0 : -1}
+              class:list={["agent-tab", { active: index === 0 }]}
+            >
+              {agent.name}
+            </button>
+          ))}
+        </div>
+
+        <div class="agent-panels">
+          {agents.map((agent, index) => (
+            <div
+              role="tabpanel"
+              id={`panel-${agent.id}`}
+              aria-labelledby={`tab-${agent.id}`}
+              data-panel={agent.id}
+              hidden={index !== 0}
+              class="agent-panel"
+            >
+              <p class="agent-note">{agent.note}</p>
+              <pre class="term"><code>{`$ ${agent.command}`}</code></pre>
+              <p class="agent-after">
+                Then ask the agent to recall: <code>memory recall "auth token invariant"</code>
+                returns the same ranked memories in every agent.
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <noscript>
+          <div class="agent-fallback">
+            {agents.map((agent) => (
+              <p><strong>{agent.name}</strong>: <code>{agent.command}</code></p>
+            ))}
+          </div>
+        </noscript>
+      </div>
+    </section>
+  </main>
+  <Footer />
+
+  <style>
+    .kicker { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+    h1 { margin: 0.4rem 0 0.8rem; }
+    .lede { max-width: 62ch; color: var(--text-secondary); line-height: 1.7; margin-bottom: 2rem; }
+    .agent-switcher { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .agent-tab { font: inherit; padding: 0.55rem 1rem; border-radius: 999px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-secondary); cursor: pointer; }
+    .agent-tab:hover { color: var(--text-primary); border-color: var(--accent); }
+    .agent-tab.active { background: var(--accent); border-color: var(--accent); color: #1a1206; font-weight: 700; }
+    .agent-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .agent-panel { border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 1.2rem 1.4rem; }
+    .agent-note { color: var(--text-secondary); line-height: 1.65; margin: 0 0 0.9rem; }
+    .term { background: #0a0806; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 0.9rem 1rem; margin: 0 0 0.9rem; }
+    .term code { background: none; border: none; padding: 0; color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .agent-after { color: var(--text-secondary); line-height: 1.6; margin: 0; }
+    .agent-fallback { margin-top: 1.2rem; color: var(--text-secondary); }
+  </style>
+
+  <script is:inline>
+    const tabs = Array.from(document.querySelectorAll('.agent-tab'));
+    const panels = Array.from(document.querySelectorAll('.agent-panel'));
+    function select(id) {
+      tabs.forEach((tab) => {
+        const active = tab.dataset.agent === id;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+      });
+      panels.forEach((panel) => {
+        panel.hidden = panel.dataset.panel !== id;
+      });
+    }
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => select(tab.dataset.agent));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        const index = tabs.indexOf(tab);
+        const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        next.focus();
+        select(next.dataset.agent);
+      });
+    });
+  </script>
+</Base>
