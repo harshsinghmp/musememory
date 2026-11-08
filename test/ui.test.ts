@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openStore, save } from "../src/store.ts";
 import { startUiServer, exportStandaloneHtml } from "../src/ui.ts";
@@ -48,16 +48,17 @@ describe("embedded web UI server", () => {
     const srv = await startUiServer({ port: 0, memoryDir, store });
 
     const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
-    // v2 markers
+    // v2 markup markers stay in the shell; behaviour markers moved to the JS asset (T-453).
     expect(html).toContain("timelineSlider");
     expect(html).toContain("clusterFilters");
-    expect(html).toContain("simulateStep");
-    expect(html).toContain("project(");      // perspective projection
-    expect(html).toContain("rotY");          // drag-to-rotate state
-    expect(html).toContain("wheel");         // zoom
-    expect(html).toContain("TYPE_COLORS");   // color by type
-    expect(html).toContain("degree");        // size by degree
-    expect(html).toContain("nodeVisible");   // filter gating
+    const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+    expect(js).toContain("simulateStep");
+    expect(js).toContain("project(");      // perspective projection
+    expect(js).toContain("rotY");          // drag-to-rotate state
+    expect(js).toContain("wheel");         // zoom
+    expect(js).toContain("TYPE_COLORS");   // color by type
+    expect(js).toContain("degree");        // size by degree
+    expect(js).toContain("nodeVisible");   // filter gating
     // data endpoint shape unchanged (array of raw entries)
     const mems = await (await fetch(`http://localhost:${srv.port}/api/memories`)).json();
     expect(Array.isArray(mems)).toBe(true);
@@ -76,7 +77,9 @@ describe("embedded web UI server", () => {
     const srv = await startUiServer({ port: 0, memoryDir, store });
 
     const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
-    expect(html).toContain("No memories yet"); // empty-graph guard message
+    expect(html).toContain("panel-graph");
+    const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+    expect(js).toContain("No memories yet"); // empty-graph guard message
     const mems = await (await fetch(`http://localhost:${srv.port}/api/memories`)).json();
     expect(Array.isArray(mems)).toBe(true);
     expect(mems.length).toBe(0);
@@ -235,6 +238,247 @@ describe("embedded web UI server", () => {
 
     srv.close();
     cleanup(root);
+  });
+});
+
+describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
+  test("T-451: serves a 76px numbered left rail with warm-dark typography", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
+      expect(html).toContain('class="rail"');
+      for (const n of ["01", "02", "03", "04", "05", "06"]) {
+        expect(html).toContain(`<span class="rail-num">${n}</span>`);
+      }
+      for (const view of ["graph", "health", "wiki", "cognition", "current", "about"]) {
+        expect(html).toContain(`data-view="${view}"`);
+      }
+      // The six numbered sections do not orphan the pre-existing views.
+      for (const view of ["adrs", "sync", "mesh", "persona", "sandbox", "audit"]) {
+        expect(html).toContain(`data-view="${view}"`);
+      }
+      // Rail uses words + numbers, never emoji glyphs.
+      const rail = html.slice(html.indexOf('class="rail"'), html.indexOf("</nav>"));
+      expect(rail).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+
+      const css = await (await fetch(`http://localhost:${srv.port}/assets/studio.css`)).text();
+      expect(css).toContain("width: 76px");
+      expect(css).toContain("margin-left: 76px");
+      expect(css).toContain("Archivo Black");
+      expect(css).toContain("#0c0a09");
+      expect(css).toContain("@media (max-width: 640px)");
+      expect(css).toContain("min-height: 44px");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+
+  test("T-452: project, global and mesh scopes resolve independently", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const globalDir = join(globalRoot, ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = globalDir;
+    let srv: Awaited<ReturnType<typeof startUiServer>> | undefined;
+    try {
+      const globalStore = openStore(globalDir);
+      save(globalStore, {
+        id: "m_1700000099999_global",
+        title: "global scope marker",
+        content: "only present in the global store",
+        project: "global",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      globalStore.db?.close();
+      writeFileSync(join(globalDir, "CURRENT.md"), "# Global Constraints\n- global-only-rule\n");
+
+      srv = await startUiServer({ port: 0, memoryDir, store });
+      const base = `http://localhost:${srv.port}`;
+
+      const html = await (await fetch(`${base}/`)).text();
+      for (const scope of ["project", "global", "mesh"]) {
+        expect(html).toContain(`data-scope="${scope}"`);
+      }
+      expect(html).toContain('id="scopeSwitch"');
+      expect(html).toContain('id="scopeBanner"');
+
+      // A server that resolves ?scope= is only useful if the client sends it.
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      for (const route of ["/api/current", "/api/wiki", "/api/user-profile", "/api/audit"]) {
+        expect(js).toContain(`fetch(apiUrl('${route}')`);
+      }
+      expect(js).toContain("apiUrl('/api/wiki?page='");
+      expect(js).toContain("origin_project");
+      expect(js).toContain("Health, ADRs, Cognition, Sync and Mesh stay project-scoped");
+      expect(js).toContain("first 200 entries");
+      // Writes stay project-scoped and the UI must say so / enforce it.
+      expect(js).toContain("requireProjectScope");
+      expect(js).toContain("document.body.dataset.scope");
+
+      const project = await (await fetch(`${base}/api/memories`)).json();
+      const global = await (await fetch(`${base}/api/memories?scope=global`)).json();
+      const mesh = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(Array.isArray(project)).toBe(true);
+      expect(Array.isArray(global)).toBe(true);
+      expect(Array.isArray(mesh)).toBe(true);
+      expect(global.some((m: { id: string }) => m.id === "m_1700000099999_global")).toBe(true);
+      expect(project.some((m: { id: string }) => m.id === "m_1700000099999_global")).toBe(false);
+
+      const stats = await (await fetch(`${base}/api/stats?scope=global`)).json();
+      expect(stats.scope).toBe("global");
+      expect(stats.available).toBe(true);
+      expect(stats.total).toBeGreaterThan(0);
+
+      // Panels with a global counterpart follow the scope; the project view does not.
+      const globalCurrent = await (await fetch(`${base}/api/current?scope=global`)).json();
+      const projectCurrent = await (await fetch(`${base}/api/current`)).json();
+      expect(globalCurrent.lines.join("\n")).toContain("global-only-rule");
+      expect(projectCurrent.lines.join("\n")).not.toContain("global-only-rule");
+    } finally {
+      srv?.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-452: a missing global store stays empty and is not created by a read", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const absentDir = join(globalRoot, "absent", ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = absentDir;
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const global = await (await fetch(`http://localhost:${srv.port}/api/memories?scope=global`)).json();
+      expect(global).toEqual([]);
+      const stats = await (await fetch(`http://localhost:${srv.port}/api/stats?scope=global`)).json();
+      expect(stats.scope).toBe("global");
+      expect(stats.available).toBe(false);
+      expect(existsSync(absentDir)).toBe(false);
+    } finally {
+      srv.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-452: reading an existing global store does not re-sync it", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const globalDir = join(globalRoot, ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = globalDir;
+    let srv: Awaited<ReturnType<typeof startUiServer>> | undefined;
+    try {
+      const globalStore = openStore(globalDir);
+      save(globalStore, {
+        id: "m_1700000088888_global",
+        title: "existing global entry",
+        content: "already present before the read",
+        project: "global",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      globalStore.db?.close();
+
+      writeFileSync(join(globalDir, "CURRENT.md"), "# Global Constraints\n- immutable-rule\n");
+      const currentBefore = readFileSync(join(globalDir, "CURRENT.md"), "utf8");
+      const wikiDir = join(globalDir, "wiki");
+      const wikiBefore = existsSync(wikiDir)
+        ? (readdirSync(wikiDir, { recursive: true }) as string[]).sort()
+        : [];
+
+      srv = await startUiServer({ port: 0, memoryDir, store });
+      const memories = await (await fetch(`http://localhost:${srv.port}/api/memories?scope=global`)).json();
+      expect(memories.some((m: { id: string }) => m.id === "m_1700000088888_global")).toBe(true);
+
+      // The read must not rewrite CURRENT.md or compile the wiki.
+      expect(readFileSync(join(globalDir, "CURRENT.md"), "utf8")).toBe(currentBefore);
+      const wikiAfter = existsSync(wikiDir)
+        ? (readdirSync(wikiDir, { recursive: true }) as string[]).sort()
+        : [];
+      expect(wikiAfter).toEqual(wikiBefore);
+    } finally {
+      srv?.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-453: shell and assets are served with ETag, gzip and a 304 fast path", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+
+      const cssRes = await fetch(`${base}/assets/studio.css`, { headers: { "Accept-Encoding": "identity" } });
+      expect(cssRes.status).toBe(200);
+      expect(cssRes.headers.get("content-type")).toContain("text/css");
+      expect(cssRes.headers.get("cache-control")).toContain("no-cache");
+      const cssEtag = cssRes.headers.get("etag");
+      expect(cssEtag).toBeTruthy();
+      expect(await cssRes.text()).toContain(".rail");
+
+      const jsRes = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "gzip" } });
+      expect(jsRes.status).toBe(200);
+      expect(jsRes.headers.get("content-encoding")).toBe("gzip");
+      expect(jsRes.headers.get("vary")).toContain("Accept-Encoding");
+      expect(await jsRes.text()).toContain("simulateStep");
+      const jsIdentity = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity" } });
+      expect(jsIdentity.headers.get("etag")).not.toBe(jsRes.headers.get("etag"));
+
+      const notModified = await fetch(`${base}/assets/studio.css`, {
+        // Validators are per-representation, so pin the encoding being revalidated.
+        headers: { "If-None-Match": cssEtag as string, "Accept-Encoding": "identity" },
+      });
+      expect(notModified.status).toBe(304);
+      expect(await notModified.text()).toBe("");
+
+      const wildcard = await fetch(`${base}/assets/studio.css`, { headers: { "If-None-Match": "*" } });
+      expect(wildcard.status).toBe(304);
+
+      // Monitoring/prefetch probes use HEAD; it must not 404.
+      const headRes = await fetch(`${base}/assets/studio.css`, { method: "HEAD" });
+      expect(headRes.status).toBe(200);
+      expect(headRes.headers.get("etag")).toBeTruthy();
+      expect(await headRes.text()).toBe("");
+
+      // q=0 means the client refused gzip — do not send it.
+      const refused = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "gzip;q=0" } });
+      expect(refused.headers.get("content-encoding")).toBeNull();
+      expect(await refused.text()).toContain("simulateStep");
+
+      const htmlRes = await fetch(`${base}/`);
+      expect(htmlRes.status).toBe(200);
+      expect(htmlRes.headers.get("etag")).toBeTruthy();
+      const html = await htmlRes.text();
+      expect(html).toContain('href="/assets/studio.css"');
+      expect(html).toContain('src="/assets/studio.js"');
+      // The shell must not carry the old inline monolith.
+      expect(html).not.toContain("TYPE_COLORS");
+      expect(html.length).toBeLessThan(80_000);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
   });
 });
 
