@@ -475,6 +475,65 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         return;
       }
 
+      if (pathname === "/api/activity" && req.method === "GET") {
+        const activityScope = parseScope(url);
+        const view = scopedView(activityScope);
+        if (!view) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ scope: activityScope, available: false, days: [], sessions: [], total_mutations: 0 }));
+          return;
+        }
+        const trail = getAuditTrail(view.memoryDir, { limit: 5000 });
+        const counts = new Map<string, number>();
+        for (const event of trail) {
+          const date = String(event.timestamp || "").slice(0, 10);
+          if (date) counts.set(date, (counts.get(date) || 0) + 1);
+        }
+        const days: Array<{ date: string; count: number }> = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        for (let offset = 370; offset >= 0; offset--) {
+          const day = new Date(today);
+          day.setDate(day.getDate() - offset);
+          const key = day.toISOString().slice(0, 10);
+          days.push({ date: key, count: counts.get(key) || 0 });
+        }
+        const entries = list(view.store);
+        const bySession = new Map<string, MemoryEntry[]>();
+        for (const entry of entries) {
+          if (!entry.session_id) continue;
+          const bucket = bySession.get(entry.session_id) || [];
+          bucket.push(entry);
+          bySession.set(entry.session_id, bucket);
+        }
+        const sessions = [...bySession.entries()]
+          .map(([sessionId, bucket]) => {
+            const ordered = [...bucket].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+            const start = ordered.find((e) => e.type === "session" && /start/i.test(e.title)) || ordered[0];
+            const end = ordered.find((e) => e.type === "session" && /(end|complete)/i.test(e.title));
+            return {
+              session_id: sessionId,
+              title: start.title,
+              started_at: start.created_at,
+              ended_at: end ? end.created_at : undefined,
+              status: end ? "completed" : "active",
+              messages: ordered.filter((e) => e.type !== "session").length,
+              tags: start.tags || [],
+            };
+          })
+          .sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)))
+          .slice(0, 24);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          scope: activityScope,
+          available: true,
+          days,
+          sessions,
+          total_mutations: trail.length,
+        }));
+        return;
+      }
+
       if (pathname === "/api/audit" && req.method === "GET") {
         const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
         const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(1000, rawLimit) : 50;
