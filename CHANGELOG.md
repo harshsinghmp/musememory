@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Graph/list toggle (`T-454`)**: instant switch between the canvas graph and a sortable table (title, type, status, project, created) with a 100ms debounced filter and `aria-sort` headers.
+- **Kinetic-settling graph (`T-455`)**: the canvas now measures per-step kinetic energy and stops its `requestAnimationFrame` loop once the layout settles (or the panel is hidden), waking on pointer, wheel, timeline, filter, search, tab and view changes; deterministic ring seeding and pointer capture.
+- **Activity heatmap and sessions (`T-456`)**: scope-aware `GET /api/activity` returns 52 weeks of daily mutation counts plus agent session cards; the studio gains an Activity view with a 53x7 heatmap, legend, mutation badge and session log.
 
 ### Fixed
 - **Caller scan (`T-449`)**: `HeuristicFallbackProvider.getCallers` no longer reuses a stateful `g`-flag regex, no longer counts declarations as callers, and scans directories in sorted order; regression test added.

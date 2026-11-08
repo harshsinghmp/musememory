@@ -569,8 +569,8 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 
 ## PR 2 / Issue #2: Memory Studio 2.0: Instant Graph/List View Toggle, Physics Settling & Activity Heatmap
 - [x] T-454 · LANDED 2026-11-08 — PR #339 (`3e621fa`): Graph vs List Toggle Switch: Instant segment toggle between interactive Canvas Graph and filterable/sortable data table with live 100ms debounced search · src/ui.ts · F
-- [ ] T-455 · Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
-- [ ] T-456 · Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
+- [x] T-455 · LANDED 2026-11-08 — PR #340 (`05b4fdf`): Energy-Settling Canvas Physics Engine: Ring-seeded 60fps force-directed graph with auto-settling kinetic loop (`energy < SETTLE` halts rAF) and pointer capture · src/ui.ts · F
+- [x] T-456 · LANDED 2026-11-08 — PR #341 (`436d198`): Activity Calendar Heatmap & Agent Sessions Card: 52-week activity commit-style calendar for memory mutations + agent session log cards with model tags, timestamps, message counts · src/ui.ts, src/audit.ts · F
 
 ## PR 3 / Issue #3: Workspace Terrain Vault: Auto-Generated Context Maps & Split Markdown Reader
 - [ ] T-457 · Workspace Terrain Generator Engine: Compile deterministic workspace maps: `stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md` · src/vault/index.ts, src/cli.ts · F
