@@ -542,6 +542,41 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
   });
 });
 
+describe("Wave 23 PR 2: T-454 graph/list toggle", () => {
+  test("serves an instant toggle, a sortable table and a 100ms table filter", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-studio-view="graph"');
+      expect(html).toContain('data-studio-view="list"');
+      expect(html).toContain('id="studioListView"');
+      expect(html).toContain('id="studioTableBody"');
+      for (const key of ["title", "type", "status", "project", "created_at"]) {
+        expect(html).toContain(`data-sort="${key}"`);
+      }
+
+      expect(js).toContain("function setStudioView");
+      expect(js).toContain("function renderStudioTable");
+      expect(js).toContain("studioListSearch");
+      expect(js).toContain("listQuery = value; renderStudioTable(); }, 100)");
+      expect(js).toContain("aria-sort");
+
+      expect(css).toContain(".studio-view-switch");
+      expect(css).toContain(".studio-table");
+      expect(css).toContain(".studio-list-view");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
