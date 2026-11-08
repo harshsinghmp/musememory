@@ -270,6 +270,11 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       expect(css).toContain("#0c0a09");
       expect(css).toContain("@media (max-width: 640px)");
       expect(css).toContain("min-height: 44px");
+      expect(css).toContain("overflow-x: auto");
+      // Clickable filters/cards must be real buttons with pressed state.
+      expect(html).toContain('<button type="button" class="chip');
+      expect(html).toContain('aria-pressed="true">All</button>');
+      expect(html).toContain('<button type="button" class="archetype-card"');
     } finally {
       srv.close();
       cleanup(root);
@@ -321,6 +326,7 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       // Writes stay project-scoped and the UI must say so / enforce it.
       expect(js).toContain("requireProjectScope");
       expect(js).toContain("document.body.dataset.scope");
+      expect(js).toContain("typeof profile === 'string'");
 
       const project = await (await fetch(`${base}/api/memories`)).json();
       const global = await (await fetch(`${base}/api/memories?scope=global`)).json();
@@ -465,6 +471,11 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       const refused = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "gzip;q=0" } });
       expect(refused.headers.get("content-encoding")).toBeNull();
       expect(await refused.text()).toContain("simulateStep");
+
+      const gzipOnly = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity;q=0, gzip" } });
+      expect(gzipOnly.headers.get("content-encoding")).toBe("gzip");
+      const unacceptable = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity;q=0" } });
+      expect(unacceptable.status).toBe(406);
 
       const htmlRes = await fetch(`${base}/`);
       expect(htmlRes.status).toBe(200);

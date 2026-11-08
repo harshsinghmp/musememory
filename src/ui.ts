@@ -102,18 +102,32 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Parse Accept-Encoding, honouring q-values (q=0 means "do not use"). */
-function acceptsGzipEncoding(header: string): boolean {
-  for (const part of header.split(",")) {
+/** Full Accept-Encoding negotiation: q-values, `identity`, and `*` fallbacks. */
+interface EncodingPreference {
+  gzipQ: number;
+  identityQ: number;
+}
+
+function negotiateEncoding(header: string): EncodingPreference {
+  const raw = header.trim();
+  if (!raw) return { gzipQ: 1, identityQ: 1 };
+  let gzipQ: number | undefined;
+  let identityQ: number | undefined;
+  let starQ: number | undefined;
+  for (const part of raw.split(",")) {
     const [codingRaw, ...params] = part.split(";").map((p) => p.trim());
     const coding = codingRaw.toLowerCase();
-    if (coding !== "gzip" && coding !== "*") continue;
+    if (coding !== "gzip" && coding !== "identity" && coding !== "*") continue;
     const qParam = params.find((p) => p.toLowerCase().startsWith("q="));
-    if (!qParam) return true;
-    const q = Number.parseFloat(qParam.slice(2));
-    return Number.isFinite(q) && q > 0;
+    const parsed = qParam ? Number.parseFloat(qParam.slice(2)) : 1;
+    const q = Number.isFinite(parsed) ? parsed : 0;
+    if (coding === "gzip") gzipQ = q;
+    else if (coding === "identity") identityQ = q;
+    else starQ = q;
   }
-  return false;
+  // gzip is acceptable only when listed or covered by `*`; identity is
+  // acceptable by default unless explicitly refused.
+  return { gzipQ: gzipQ ?? starQ ?? 0, identityQ: identityQ ?? starQ ?? 1 };
 }
 
 /**
@@ -126,8 +140,14 @@ function sendAsset(
   asset: StudioAsset,
   cacheControl = "no-cache",
 ): void {
-  const acceptsGzip = acceptsGzipEncoding(String(req.headers["accept-encoding"] ?? ""));
-  const activeEtag = acceptsGzip ? asset.gzipEtag : asset.etag;
+  const encoding = negotiateEncoding(String(req.headers["accept-encoding"] ?? ""));
+  if (encoding.gzipQ <= 0 && encoding.identityQ <= 0) {
+    res.writeHead(406, { "Content-Type": "text/plain" });
+    res.end("Not Acceptable: no supported content encoding");
+    return;
+  }
+  const useGzip = encoding.gzipQ > 0 && encoding.gzipQ >= encoding.identityQ;
+  const activeEtag = useGzip ? asset.gzipEtag : asset.etag;
   const ifNoneMatch = req.headers["if-none-match"];
   const normalize = (value: string) => value.trim().replace(/^W\//, "");
   const candidates = typeof ifNoneMatch === "string"
@@ -138,7 +158,7 @@ function sendAsset(
     res.end();
     return;
   }
-  if (acceptsGzip) {
+  if (useGzip) {
     res.writeHead(200, {
       "Content-Type": asset.contentType,
       "Content-Encoding": "gzip",
@@ -193,10 +213,18 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
       return globalStoreCache.store;
     };
-    const meshMemories = (limit: number): Array<{ entry: MemoryEntry; origin: string }> => {
+    let topologyCache: { key: string; at: number; topology: ReturnType<typeof discoverWorkspaceMesh> } | undefined;
+    const meshTopology = (): ReturnType<typeof discoverWorkspaceMesh> => {
       const workspaceRoot = opts.store.layout?.root || getStorageLayout(opts.memoryDir).root;
-      const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
-      return resolveMeshMemories(opts.store, topology, { query: "", limit }).map((r) => ({
+      const key = `${workspaceRoot}|${opts.memoryDir}`;
+      const now = Date.now();
+      if (!topologyCache || topologyCache.key !== key || now - topologyCache.at > 2000) {
+        topologyCache = { key, at: now, topology: discoverWorkspaceMesh(workspaceRoot, opts.memoryDir) };
+      }
+      return topologyCache.topology;
+    };
+    const meshMemories = (limit: number): Array<{ entry: MemoryEntry; origin: string }> => {
+      return resolveMeshMemories(opts.store, meshTopology(), { query: "", limit }).map((r) => ({
         entry: r.memory,
         origin: r.originProject,
       }));
@@ -853,7 +881,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R16: Mesh Topology Status Endpoint
       if (pathname === "/api/mesh/status" && req.method === "GET") {
         try {
-          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          const topology = meshTopology();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(topology));
         } catch (err: unknown) {
@@ -867,7 +895,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       if (pathname === "/api/mesh/query" && req.method === "GET") {
         try {
           const q = url.searchParams.get("q") || "";
-          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          const topology = meshTopology();
           const results = resolveMeshMemories(opts.store, topology, { query: q });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(results));
@@ -881,7 +909,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       // R16: Mesh Contract Audit Endpoint
       if (pathname === "/api/mesh/audit" && req.method === "GET") {
         try {
-          const topology = discoverWorkspaceMesh(workspaceRoot, opts.memoryDir);
+          const topology = meshTopology();
           const audit = auditMeshContracts(topology, opts.store);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(audit));

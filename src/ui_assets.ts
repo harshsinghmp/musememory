@@ -92,7 +92,7 @@ export const STUDIO_CSS = `    :root {
     .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-dim); display: flex; align-items: center; pointer-events: none; }
     
     .filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--panel-border); font-size: 12px; background: rgba(0,0,0,0.15); }
-    .chip { padding: 4px 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--panel-border); border-radius: var(--radius-full); cursor: pointer; white-space: nowrap; color: var(--text-muted); font-size: 11px; font-weight: 600; transition: var(--transition); }
+    .chip { font: inherit; color: inherit; padding: 4px 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--panel-border); border-radius: var(--radius-full); cursor: pointer; white-space: nowrap; color: var(--text-muted); font-size: 11px; font-weight: 600; transition: var(--transition); }
     .chip:hover { color: #fff; background: rgba(255,255,255,0.08); }
     .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px var(--accent-glow); }
     
@@ -180,7 +180,7 @@ export const STUDIO_CSS = `    :root {
     
     /* Archetype cards */
     .archetype-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-    .archetype-card { background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px; cursor: pointer; transition: var(--transition); text-align: center; }
+    .archetype-card { font: inherit; color: inherit; background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px; cursor: pointer; transition: var(--transition); text-align: center; }
     .archetype-card:hover { border-color: var(--accent); background: rgba(99,102,241,0.05); transform: translateY(-2px); }
     .archetype-card.active { border-color: var(--accent); background: rgba(99,102,241,0.12); box-shadow: 0 0 16px var(--accent-glow); }
     .archetype-icon { font-size: 24px; margin-bottom: 8px; }
@@ -274,6 +274,9 @@ export const STUDIO_CSS = `    :root {
     @media (max-width: 900px) { header, .layout { margin-left: 0; } .rail { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--panel-border); } .rail-tools { margin-top: 0; border-top: none; flex-direction: row; flex-wrap: wrap; } .rail-brand { margin: 0 8px 0 0; } .rail-section, .rail-tool, .scope-btn { min-height: 44px; min-width: 44px; } .scope-banner { margin-left: 0; } }
     @media (max-width: 640px) {
       .layout { flex-direction: column; }
+      .rail { flex-wrap: nowrap; overflow-x: auto; }
+      .rail-tools { flex-wrap: nowrap; }
+      .rail-section, .rail-tool { flex: 0 0 auto; }
       .sidebar { width: 100%; flex: 0 0 auto; max-height: 46vh; border-right: none; border-bottom: 1px solid var(--panel-border); }
       .scope-badge, .status-badge, .header .brand-tag { display: none; }
       .scope-filter-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -539,7 +542,8 @@ export const STUDIO_JS = `    let allMemories = [];
         grid.innerHTML = '';
         document.getElementById('wikiCountBadge').textContent = (data.pages?.length || 0) + ' Pages';
         (data.pages || []).forEach(p => {
-          const card = document.createElement('div');
+          const card = document.createElement('button');
+          card.type = 'button';
           card.className = 'archetype-card';
           card.style.textAlign = 'left';
           card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + escapeHtml(p.title) + '</div><div style="font-size:11px; color:var(--text-dim);">' + escapeHtml(p.slug) + '</div>';
@@ -560,10 +564,15 @@ export const STUDIO_JS = `    let allMemories = [];
         const res = await fetch(apiUrl('/api/user-profile'));
         const data = await res.json();
         if (data.profile) {
-          document.getElementById('userProfileText').value = data.profile.raw || '';
+          const profile = data.profile;
+          const text = typeof profile === 'string' ? profile : (profile.raw || '');
+          const archetype = typeof profile === 'object' ? profile.archetype : '';
+          document.getElementById('userProfileText').value = text;
           document.querySelectorAll('.archetype-card').forEach(c => {
-            if (c.dataset.arch === data.profile.archetype) c.classList.add('active');
+            const active = c.dataset.arch === archetype;
+            if (active) c.classList.add('active');
             else c.classList.remove('active');
+            c.setAttribute('aria-pressed', active ? 'true' : 'false');
           });
         }
       } catch {}
@@ -1474,8 +1483,9 @@ export const STUDIO_JS = `    let allMemories = [];
         if (!requireProjectScope()) return;
         const arch = card.dataset.arch;
         if (!arch) return;
-        document.querySelectorAll('.archetype-card').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.archetype-card').forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
         card.classList.add('active');
+        card.setAttribute('aria-pressed', 'true');
         await fetch('/api/user-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1511,8 +1521,9 @@ export const STUDIO_JS = `    let allMemories = [];
 
     document.querySelectorAll('#filterBar .chip').forEach(chip => {
       chip.addEventListener('click', () => {
-        document.querySelectorAll('#filterBar .chip').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('#filterBar .chip').forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
         chip.classList.add('active');
+        chip.setAttribute('aria-pressed', 'true');
         currentFilter = chip.dataset.type;
         renderList();
         needsRedraw = true;
@@ -1604,13 +1615,13 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
         </div>
       </div>
       <div class="filters" id="filterBar">
-        <div class="chip active" data-type="all">All</div>
-        <div class="chip" data-type="fix">Fixes</div>
-        <div class="chip" data-type="decision">Decisions</div>
-        <div class="chip" data-type="constraint">Constraints</div>
-        <div class="chip" data-type="failure">Failures</div>
-        <div class="chip" data-type="architecture">Architecture</div>
-        <div class="chip" data-type="operation">Operations</div>
+        <button type="button" class="chip active" data-type="all" aria-pressed="true">All</button>
+        <button type="button" class="chip" data-type="fix" aria-pressed="false">Fixes</button>
+        <button type="button" class="chip" data-type="decision" aria-pressed="false">Decisions</button>
+        <button type="button" class="chip" data-type="constraint" aria-pressed="false">Constraints</button>
+        <button type="button" class="chip" data-type="failure" aria-pressed="false">Failures</button>
+        <button type="button" class="chip" data-type="architecture" aria-pressed="false">Architecture</button>
+        <button type="button" class="chip" data-type="operation" aria-pressed="false">Operations</button>
       </div>
       <div class="stats-strip" id="statsStrip">
         <div class="stat-item"><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">Memories</div></div>
@@ -1694,11 +1705,11 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             Switch active agent archetypes to steer communication tone, coding depth, and design rules across all connected platforms.
           </p>
           <div class="archetype-grid" id="archetypeGrid">
-            <div class="archetype-card" data-arch="developer"><div class="archetype-icon">💻</div><div class="archetype-title">Developer</div></div>
-            <div class="archetype-card" data-arch="designer"><div class="archetype-icon">🎨</div><div class="archetype-title">Designer</div></div>
-            <div class="archetype-card" data-arch="marketer"><div class="archetype-icon">🚀</div><div class="archetype-title">Marketer</div></div>
-            <div class="archetype-card" data-arch="casual"><div class="archetype-icon">☕</div><div class="archetype-title">Casual</div></div>
-            <div class="archetype-card" data-arch="custom"><div class="archetype-icon">⚙️</div><div class="archetype-title">Custom</div></div>
+            <button type="button" class="archetype-card" data-arch="developer" aria-pressed="false"><div class="archetype-icon">💻</div><div class="archetype-title">Developer</div></button>
+            <button type="button" class="archetype-card" data-arch="designer" aria-pressed="false"><div class="archetype-icon">🎨</div><div class="archetype-title">Designer</div></button>
+            <button type="button" class="archetype-card" data-arch="marketer" aria-pressed="false"><div class="archetype-icon">🚀</div><div class="archetype-title">Marketer</div></button>
+            <button type="button" class="archetype-card" data-arch="casual" aria-pressed="false"><div class="archetype-icon">☕</div><div class="archetype-title">Casual</div></button>
+            <button type="button" class="archetype-card" data-arch="custom" aria-pressed="false"><div class="archetype-icon">⚙️</div><div class="archetype-title">Custom</div></button>
           </div>
           <div style="margin-top:20px;">
             <div class="card-title-lg">Active USER.md Instructions</div>
