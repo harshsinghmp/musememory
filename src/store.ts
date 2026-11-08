@@ -782,6 +782,11 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       }
     }
 
+    // T-429: dual clock — belief time defaults to creation time.
+    if (entry.asserted_at === undefined) {
+      entry.asserted_at = entry.created_at;
+    }
+
     // T-074: Ensure decay_score is calculated via importance-gated half-life
     if (entry.decay_score === undefined) {
       entry.decay_score = computeDecayScore(entry);
