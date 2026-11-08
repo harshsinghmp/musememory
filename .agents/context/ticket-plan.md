@@ -588,9 +588,9 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 - [x] T-465 · LANDED 2026-11-08 — PR #350: "Go Deeper" Interactive Command Deck: Searchable CLI command palette with copyable one-liners (`muse recall`, `muse capture`, `muse current`, `muse brief`, `muse doctor`, `muse adr`, `muse sync`) · src/ui.ts · F
 
 ## PR 6 / Issue #6: System Speed, In-Memory Caching & Performance Hardening
-- [ ] T-466 · In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
-- [ ] T-467 · Fast-Exit & Visibility Sensors: Document `visibilitychange` listeners to stop all background polling intervals and animation frames when browser tab is inactive · src/ui.ts · F
-- [ ] T-468 · Automated UI Performance Benchmark Suite: Headless benchmark asserting sub-10ms UI responses, 60fps graph rendering, and zero memory leaks · test/ui_performance.test.ts · F
+- [x] T-466 · LANDED 2026-11-08 — PR #351: In-Memory SQLite Read Projection Cache: Cache UI list and graph responses in memory, invalidated automatically on write transactions · src/ui.ts, src/cache.ts · F
+- [x] T-467 · LANDED 2026-11-08 — PR #352: Fast-Exit & Visibility Sensors: Document `visibilitychange` listeners to stop all background polling intervals and animation frames when browser tab is inactive · src/ui.ts · F
+- [x] T-468 · LANDED 2026-11-08 — PR #353: Automated UI Performance Benchmark Suite: Headless benchmark asserting sub-10ms UI responses, 60fps graph rendering, and zero memory leaks · test/ui_performance.test.ts · F
 
 ---
 
