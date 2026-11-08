@@ -296,12 +296,14 @@ export const STUDIO_CSS = `    :root {
 
 export const STUDIO_JS = `    let allMemories = [];
     let studioScope = 'project';
+    let scopeGeneration = 0;
     function apiUrl(path) {
       if (studioScope === 'project') return path;
       return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'scope=' + encodeURIComponent(studioScope);
     }
     function setScope(scope, options) {
       studioScope = scope === 'global' || scope === 'mesh' ? scope : 'project';
+      scopeGeneration += 1;
       document.querySelectorAll('.scope-btn').forEach(function (b) {
         var active = b.dataset.scope === studioScope;
         b.classList.toggle('active', active);
@@ -460,6 +462,7 @@ export const STUDIO_JS = `    let allMemories = [];
 
     async function loadData() {
       const requestedScope = studioScope;
+      const requestGen = scopeGeneration;
       try {
         if (window.STANDALONE_DATA) {
           allMemories = window.STANDALONE_DATA;
@@ -473,7 +476,7 @@ export const STUDIO_JS = `    let allMemories = [];
             loadAudit(),
           ]);
           const loaded = await memRes.json();
-          if (requestedScope !== studioScope) return;
+          if (requestedScope !== studioScope || requestGen !== scopeGeneration) return;
           allMemories = loaded;
         }
         renderList();
@@ -486,9 +489,11 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function fetchStats() {
+      const requestGen = scopeGeneration;
       try {
         const res = await fetch(apiUrl('/api/stats'));
         const s = await res.json();
+        if (requestGen !== scopeGeneration) return;
         document.getElementById('statTotal').textContent = s.total || 0;
         document.getElementById('statConfirmed').textContent = Math.round((parseFloat(s.confirmedRatio) || 0) * 100) + '%';
         document.getElementById('statConstraints').textContent = s.constraints || 0;
@@ -501,9 +506,11 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function fetchCurrentState() {
+      const requestGen = scopeGeneration;
       try {
         const res = await fetch(apiUrl('/api/current'));
         const data = await res.json();
+        if (requestGen !== scopeGeneration) return;
         const h = data.handoff;
         if (h) {
           document.getElementById('handoffStatus').textContent = '[' + (h.status || 'IN-PROGRESS') + ']';
@@ -535,9 +542,11 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function fetchWikiPages() {
+      const requestGen = scopeGeneration;
       try {
         const res = await fetch(apiUrl('/api/wiki'));
         const data = await res.json();
+        if (requestGen !== scopeGeneration) return;
         const grid = document.getElementById('wikiPagesGrid');
         grid.innerHTML = '';
         document.getElementById('wikiCountBadge').textContent = (data.pages?.length || 0) + ' Pages';
@@ -546,7 +555,7 @@ export const STUDIO_JS = `    let allMemories = [];
           card.type = 'button';
           card.className = 'archetype-card';
           card.style.textAlign = 'left';
-          card.innerHTML = '<div style="font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + escapeHtml(p.title) + '</div><div style="font-size:11px; color:var(--text-dim);">' + escapeHtml(p.slug) + '</div>';
+          card.innerHTML = '<span style="display:block; font-weight:700; color:#fff; font-size:14px; margin-bottom:4px;">📖 ' + escapeHtml(p.title) + '</span><span style="display:block; font-size:11px; color:var(--text-dim);">' + escapeHtml(p.slug) + '</span>';
           card.onclick = async () => {
             const pageRes = await fetch(apiUrl('/api/wiki?page=' + encodeURIComponent(p.slug)));
             const pageData = await pageRes.json();
@@ -560,15 +569,17 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function fetchUserProfile() {
+      const requestGen = scopeGeneration;
       try {
         const res = await fetch(apiUrl('/api/user-profile'));
         const data = await res.json();
+        if (requestGen !== scopeGeneration) return;
         if (data.profile) {
           const profile = data.profile;
           const text = typeof profile === 'string' ? profile : (profile.raw || '');
           const archetype = typeof profile === 'object' ? profile.archetype : '';
           document.getElementById('userProfileText').value = text;
-          document.querySelectorAll('.archetype-card').forEach(c => {
+          document.querySelectorAll('.archetype-card[data-arch]').forEach(c => {
             const active = c.dataset.arch === archetype;
             if (active) c.classList.add('active');
             else c.classList.remove('active');
@@ -586,9 +597,11 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function loadAudit() {
+      const requestGen = scopeGeneration;
       try {
         const res = await fetch(apiUrl('/api/audit'));
         const data = await res.json();
+        if (requestGen !== scopeGeneration) return;
         const tbody = document.getElementById('auditTableBody');
         tbody.innerHTML = '';
         (data.trail || []).slice(0, 30).forEach(r => {
@@ -1483,7 +1496,7 @@ export const STUDIO_JS = `    let allMemories = [];
         if (!requireProjectScope()) return;
         const arch = card.dataset.arch;
         if (!arch) return;
-        document.querySelectorAll('.archetype-card').forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
+        document.querySelectorAll('.archetype-card[data-arch]').forEach(c => { c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
         card.classList.add('active');
         card.setAttribute('aria-pressed', 'true');
         await fetch('/api/user-profile', {
@@ -1555,19 +1568,19 @@ export const STUDIO_JS = `    let allMemories = [];
 
 export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
     <div class="rail-brand" aria-hidden="true">M</div>
-    <button class="rail-section nav-tab active" data-view="graph" aria-current="page"><span class="rail-num">01</span><span class="rail-name">Overview</span></button>
-    <button class="rail-section nav-tab" data-view="health"><span class="rail-num">02</span><span class="rail-name">Health</span></button>
-    <button class="rail-section nav-tab" data-view="wiki"><span class="rail-num">03</span><span class="rail-name">Knowledge</span></button>
-    <button class="rail-section nav-tab" data-view="cognition"><span class="rail-num">04</span><span class="rail-name">Cognition</span></button>
-    <button class="rail-section nav-tab" data-view="current"><span class="rail-num">05</span><span class="rail-name">Governance</span></button>
-    <button class="rail-section nav-tab" data-view="about"><span class="rail-num">06</span><span class="rail-name">About</span></button>
-    <div class="rail-tools" aria-label="Tools">
-      <button class="rail-tool nav-tab" data-view="adrs">ADRs</button>
-      <button class="rail-tool nav-tab" data-view="sync">P2P</button>
-      <button class="rail-tool nav-tab" data-view="mesh">Mesh</button>
-      <button class="rail-tool nav-tab" data-view="persona">Persona</button>
-      <button class="rail-tool nav-tab" data-view="sandbox">Sandbox</button>
-      <button class="rail-tool nav-tab" data-view="audit">Audit</button>
+    <button type="button" class="rail-section nav-tab active" data-view="graph" aria-current="page"><span class="rail-num">01</span><span class="rail-name">Overview</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="health"><span class="rail-num">02</span><span class="rail-name">Health</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="wiki"><span class="rail-num">03</span><span class="rail-name">Knowledge</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="cognition"><span class="rail-num">04</span><span class="rail-name">Cognition</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="current"><span class="rail-num">05</span><span class="rail-name">Governance</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="about"><span class="rail-num">06</span><span class="rail-name">About</span></button>
+    <div class="rail-tools" role="group" aria-label="Tools">
+      <button type="button" class="rail-tool nav-tab" data-view="adrs">ADRs</button>
+      <button type="button" class="rail-tool nav-tab" data-view="sync">P2P</button>
+      <button type="button" class="rail-tool nav-tab" data-view="mesh">Mesh</button>
+      <button type="button" class="rail-tool nav-tab" data-view="persona">Persona</button>
+      <button type="button" class="rail-tool nav-tab" data-view="sandbox">Sandbox</button>
+      <button type="button" class="rail-tool nav-tab" data-view="audit">Audit</button>
     </div>
   </nav>
 
@@ -1580,9 +1593,9 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
     </div>
 
     <div class="scope-switch" id="scopeSwitch" role="group" aria-label="Memory scope">
-      <button class="scope-btn active" data-scope="project" aria-pressed="true" title="Local project scope: ./.memory">Local Project</button>
-      <button class="scope-btn" data-scope="global" aria-pressed="false" title="Global user scope: ~/.memory">Global User</button>
-      <button class="scope-btn" data-scope="mesh" aria-pressed="false" title="Cross-project mesh">Mesh</button>
+      <button type="button" class="scope-btn active" data-scope="project" aria-pressed="true" title="Local project scope: ./.memory">Local Project</button>
+      <button type="button" class="scope-btn" data-scope="global" aria-pressed="false" title="Global user scope: ~/.memory">Global User</button>
+      <button type="button" class="scope-btn" data-scope="mesh" aria-pressed="false" title="Cross-project mesh">Mesh</button>
     </div>
     <span class="scope-badge" id="scopeBadge">./.memory</span>
 
@@ -1705,11 +1718,11 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             Switch active agent archetypes to steer communication tone, coding depth, and design rules across all connected platforms.
           </p>
           <div class="archetype-grid" id="archetypeGrid">
-            <button type="button" class="archetype-card" data-arch="developer" aria-pressed="false"><div class="archetype-icon">💻</div><div class="archetype-title">Developer</div></button>
-            <button type="button" class="archetype-card" data-arch="designer" aria-pressed="false"><div class="archetype-icon">🎨</div><div class="archetype-title">Designer</div></button>
-            <button type="button" class="archetype-card" data-arch="marketer" aria-pressed="false"><div class="archetype-icon">🚀</div><div class="archetype-title">Marketer</div></button>
-            <button type="button" class="archetype-card" data-arch="casual" aria-pressed="false"><div class="archetype-icon">☕</div><div class="archetype-title">Casual</div></button>
-            <button type="button" class="archetype-card" data-arch="custom" aria-pressed="false"><div class="archetype-icon">⚙️</div><div class="archetype-title">Custom</div></button>
+            <button type="button" class="archetype-card" data-arch="developer" aria-pressed="false"><span class="archetype-icon">💻</div><span class="archetype-title">Developer</span></button>
+            <button type="button" class="archetype-card" data-arch="designer" aria-pressed="false"><span class="archetype-icon">🎨</div><span class="archetype-title">Designer</span></button>
+            <button type="button" class="archetype-card" data-arch="marketer" aria-pressed="false"><span class="archetype-icon">🚀</div><span class="archetype-title">Marketer</span></button>
+            <button type="button" class="archetype-card" data-arch="casual" aria-pressed="false"><span class="archetype-icon">☕</div><span class="archetype-title">Casual</span></button>
+            <button type="button" class="archetype-card" data-arch="custom" aria-pressed="false"><span class="archetype-icon">⚙️</div><span class="archetype-title">Custom</span></button>
           </div>
           <div style="margin-top:20px;">
             <div class="card-title-lg">Active USER.md Instructions</div>

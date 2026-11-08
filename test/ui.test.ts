@@ -275,6 +275,7 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       expect(html).toContain('<button type="button" class="chip');
       expect(html).toContain('aria-pressed="true">All</button>');
       expect(html).toContain('<button type="button" class="archetype-card"');
+      expect(html).toContain('<span class="archetype-icon">');
     } finally {
       srv.close();
       cleanup(root);
@@ -327,6 +328,8 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       expect(js).toContain("requireProjectScope");
       expect(js).toContain("document.body.dataset.scope");
       expect(js).toContain("typeof profile === 'string'");
+      expect(js).toContain("scopeGeneration");
+      expect((js.match(/requestGen !== scopeGeneration/g) || []).length).toBeGreaterThanOrEqual(5);
 
       const project = await (await fetch(`${base}/api/memories`)).json();
       const global = await (await fetch(`${base}/api/memories?scope=global`)).json();
@@ -377,6 +380,50 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
       cleanup(root);
       cleanup(globalRoot);
+    }
+  });
+
+  test("T-452: linking a mesh store invalidates the cached topology", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const linkedRoot = makeTempRoot();
+
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+
+      // Populate the 2s topology cache before the linked store exists.
+      const before = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(before.some((m: { id: string }) => m.id === "m_1700000077777_linked")).toBe(false);
+
+      const linkedMemory = join(linkedRoot, ".memory");
+      const linkedStore = openStore(linkedMemory);
+      save(linkedStore, {
+        id: "m_1700000077777_linked",
+        title: "linked mesh marker",
+        content: "only present after linking the store",
+        project: "linked",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      linkedStore.db?.close();
+
+      const linkRes = await fetch(`${base}/api/mesh/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: linkedRoot }),
+      });
+      expect(linkRes.status).toBe(200);
+
+      // The next read must not serve the pre-link cache.
+      const after = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(after.some((m: { id: string }) => m.id === "m_1700000077777_linked")).toBe(true);
+    } finally {
+      srv.close();
+      cleanup(root);
+      cleanup(linkedRoot);
     }
   });
 

@@ -110,7 +110,9 @@ interface EncodingPreference {
 
 function negotiateEncoding(header: string): EncodingPreference {
   const raw = header.trim();
-  if (!raw) return { gzipQ: 1, identityQ: 1 };
+  // No advertisement means the client did not ask for compression. Serving
+  // gzip to a plain curl would hand it bytes it cannot decode.
+  if (!raw) return { gzipQ: 0, identityQ: 1 };
   let gzipQ: number | undefined;
   let identityQ: number | undefined;
   let starQ: number | undefined;
@@ -118,9 +120,9 @@ function negotiateEncoding(header: string): EncodingPreference {
     const [codingRaw, ...params] = part.split(";").map((p) => p.trim());
     const coding = codingRaw.toLowerCase();
     if (coding !== "gzip" && coding !== "identity" && coding !== "*") continue;
-    const qParam = params.find((p) => p.toLowerCase().startsWith("q="));
-    const parsed = qParam ? Number.parseFloat(qParam.slice(2)) : 1;
-    const q = Number.isFinite(parsed) ? parsed : 0;
+    const qParam = params.find((p) => /^q\s*=/i.test(p));
+    const parsed = qParam ? Number.parseFloat(qParam.replace(/^q\s*=\s*/i, "")) : 1;
+    const q = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 0;
     if (coding === "gzip") gzipQ = q;
     else if (coding === "identity") identityQ = q;
     else starQ = q;
@@ -222,6 +224,9 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         topologyCache = { key, at: now, topology: discoverWorkspaceMesh(workspaceRoot, opts.memoryDir) };
       }
       return topologyCache.topology;
+    };
+    const invalidateMeshTopology = (): void => {
+      topologyCache = undefined;
     };
     const meshMemories = (limit: number): Array<{ entry: MemoryEntry; origin: string }> => {
       return resolveMeshMemories(opts.store, meshTopology(), { query: "", limit }).map((r) => ({
@@ -931,6 +936,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             return;
           }
           addMeshLink(opts.memoryDir, targetPath);
+          invalidateMeshTopology();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, linked: targetPath }));
         } catch (err: unknown) {
