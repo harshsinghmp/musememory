@@ -1423,7 +1423,7 @@ export const STUDIO_JS = `    let allMemories = [];
           flash('Wire failed: ' + message, true);
           return;
         }
-        flash('Wired ' + id + '. Backup: ' + ((data.backups && data.backups[0]) || 'none'));
+        flash('Wired ' + id + '. Backups: ' + ((data.backups && data.backups.length) ? data.backups.join(', ') : 'none'));
         fetchAgents();
       } catch (err) { flash('Wire failed: ' + String(err), true); }
     }

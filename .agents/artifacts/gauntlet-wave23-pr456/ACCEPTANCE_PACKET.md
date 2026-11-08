@@ -17,4 +17,6 @@
 | 9 benchmark | PASS — median cached memories/stats < 10ms |
 | 10 bar | PASS — no new skips/only, secret scan clean |
 
-Residual: agents detection runs on every load; perf test is wall-clock; scope/why source-grep tests are not behavioral. See the critic's non-blocking list.
+Code review (diff mode) returned REQUEST-CHANGES; both blockers were fixed (WAL/layout freshness probe; cache and backup-failure tests) and the doc claims were aligned. See `ITERATION_LEDGER.md` § Code review.
+
+Residual: agents detection runs on every load; perf test is wall-clock; the visibility/count checks are source-level; unwire leaves `allowedTools` grants; `.bak` files accumulate.

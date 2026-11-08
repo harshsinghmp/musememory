@@ -22,3 +22,15 @@
 **Verification**: `bun test` **1471 pass / 0 fail**, tsc clean, build 434 modules, secret scan clean, cache MISS→HIT, 375/768 targets 44×44.
 
 Status: **CAPPED** — fixed after the only critic round (budget 2); no second critic. Code review follows.
+
+## Code review — diff mode (Linus style)
+
+Verdict: **REQUEST-CHANGES** on the gauntlet fix commit. Findings and resolution:
+
+- **CR1 (blocking)** `freshnessToken` probed only `<memoryDir>` and a hardcoded `memory.db`, so WAL commits (`memory.db-wal`) and the `memories/` mirror were invisible; a failed stat collapsed to `0`. Fixed: probe `dir`, `getStorageLayout(dir).memoriesDir`, `dbPath`, `dbPath-wal`, `dbPath-journal`; a missing path contributes `"-"`, never a fake zero.
+- **CR2 (blocking)** neither new cache behavior had a test, and the fail-loud backup path was unverified. Added: read-only POST (`/api/cognition/why`) stays `HIT`; an external `propose` through a second open store yields `MISS` and the new memory; an unwritable backup directory returns 500 and leaves the config without a memory server.
+- **Doc drift** the contract said "any UI POST" while the packet scored a mutation allowlist. Both now say: mutating POST or external WAL/dir change → `MISS`; read-only POSTs stay `HIT`. The harness row now names the confirm dialog as the consent surface.
+- **Accepted nitpicks**: invalidation inverted to a read-only set (forgotten routes miss, never stale), backup names carry a monotonic counter, all backup paths are surfaced to the user.
+- Noted, not changed in this branch: unwire leaves `allowedTools` grants; `.bak` files accumulate; mesh projections have no freshness signal.
+
+**Post-review gate**: `bun test` 1471/0, tsc clean, build 434 modules, secret scan clean.

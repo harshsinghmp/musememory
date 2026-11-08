@@ -204,26 +204,27 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     // T-466: read projections are cached per scope and invalidated by writes.
     let projectionVersion = 0;
     const projectionCache = new Map<string, { version: number; token: string; body: string }>();
-    const MUTATING_UI_ROUTES = new Set([
-      "/api/propose", "/api/confirm", "/api/mark-stale", "/api/supersede", "/api/delete",
-      "/api/refresh", "/api/optimize", "/api/current", "/api/user-profile",
-      "/api/sync/pool", "/api/sync/broadcast", "/api/mesh/link",
-      "/api/terrain/reindex", "/api/agents/wire", "/api/agents/unwire",
-    ]);
+    // Safer inversion: only these POSTs are read-only; everything else evicts,
+    // so a forgotten route can only cause a MISS, never a stale HIT.
+    // `/api/search` records retrieval telemetry, so it is not read-only.
+    const READ_ONLY_POST_ROUTES = new Set(["/api/cognition/why"]);
+    let backupSeq = 0;
     const freshnessToken = (scope: StudioScope): string => {
       const dir = scope === "global" ? getGlobalMemoryDir() : opts.memoryDir;
-      try {
-        const dirStat = statSync(dir);
-        let dbMtime = 0;
-        try {
-          dbMtime = statSync(join(dir, "memory.db")).mtimeMs;
-        } catch {
-          dbMtime = 0;
-        }
-        return `${dirStat.mtimeMs}:${dbMtime}`;
-      } catch {
-        return "0";
-      }
+      const layout = getStorageLayout(dir);
+      // WAL commits land in dbPath-wal; the YAML mirror lands in memoriesDir.
+      // Probe every path a writer can touch, and use "-" (never a fake zero)
+      // when a path does not exist yet.
+      const probed = [dir, layout.memoriesDir, layout.dbPath, `${layout.dbPath}-wal`, `${layout.dbPath}-journal`];
+      return probed
+        .map((candidate) => {
+          try {
+            return String(statSync(candidate).mtimeMs);
+          } catch {
+            return "-";
+          }
+        })
+        .join(":");
     };
     const parseScope = (u: URL): StudioScope => {
       const raw = u.searchParams.get("scope");
@@ -340,7 +341,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
 
       // Only real mutations invalidate the projection cache; read-only POSTs
       // (search, why) must not throw the whole projection away.
-      if (req.method === "POST" && MUTATING_UI_ROUTES.has(pathname)) projectionVersion += 1;
+      if (req.method === "POST" && !READ_ONLY_POST_ROUTES.has(pathname)) projectionVersion += 1;
 
       // Wave 23 / T-453: modular static assets, cached by ETag and shipped
       // pre-compressed so repeat loads are a 304 or one cached body.
@@ -652,7 +653,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             }
             for (const target of targets) {
               if (!existsSync(target)) continue;
-              const backup = `${target}.${Date.now()}.bak`;
+              const backup = `${target}.${Date.now()}.${++backupSeq}.bak`;
               try {
                 copyFileSync(target, backup);
                 backups.push(backup);

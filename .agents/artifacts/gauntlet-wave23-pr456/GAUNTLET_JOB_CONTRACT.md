@@ -17,10 +17,10 @@ Verify the Wave 23 PR 4–6 surfaces are correct, secure, responsive and honestl
 1. `bun test` 0 failures; `tsc --noEmit` exit 0; `bun run build` exit 0.
 2. Headers: CSP (no wildcard), XFO DENY, nosniff, Referrer-Policy; HSTS N/A on localhost HTTP.
 3. 375 / 768 / 1280: `scrollWidth <= innerWidth`; no clipped primary controls.
-4. Agents: statuses are exactly WIRED/UNWIRED/ABSENT; wire requires explicit harness opt-in; an existing config is backed up before writing; unwire removes the memory server; unknown agent fails loud.
+4. Agents: statuses are exactly WIRED/UNWIRED/ABSENT; the UI shows an explicit confirm before wiring and sends a harness opt-in; every config file the writer touches is backed up (timestamped) before writing; backup failure aborts; unwire removes the memory server; unknown agents fail loud on both routes.
 5. Manifest: returns the memory directory, DB path, `memory mcp`, and a snippet containing `memory_search`; no secret-shaped content.
 6. About/onboarding/deck: live facts render; four quick-start commands; seven deck commands filtered by input; every copy action is wired.
-7. Cache: second read is `X-Cache: HIT`; any UI POST makes the next read `MISS`; cached bodies match.
+7. Cache: second read is `X-Cache: HIT`; any mutating UI POST (or external WAL/dir change) makes the next read `MISS`; read-only POSTs stay HIT; cached bodies match.
 8. Visibility: hidden tab stops the loop; visible tab wakes it; no `setInterval`.
 9. Benchmark: median cached `/api/memories` and `/api/stats` < 10ms.
 10. No lowered bar (no skips/only/weakened assertions); `scan-secrets src` clean.
