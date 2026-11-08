@@ -531,6 +531,18 @@ export function disconnectSingleAgent(
   }
 
   try {
+    // Harness-specific Claude settings may also grant every memory tool.
+    if (id === "claude-code" || id === "claude") {
+      const settingsPath = join(home, ".claude", "settings.json");
+      if (existsSync(settingsPath)) {
+        const settings = safeReadJson(settingsPath);
+        if (Array.isArray(settings.allowedTools)) {
+          settings.allowedTools = settings.allowedTools.filter((tool: string) => !ALL_MEMORY_TOOLS.includes(tool));
+          safeWriteJson(settingsPath, settings, options.dryRun);
+        }
+      }
+    }
+
     if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
       const doc = safeReadYaml(configPath);
       if (doc.mcp_servers && doc.mcp_servers.memory) delete doc.mcp_servers.memory;

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { Socket } from "node:net";
 import type { Store } from "./store.ts";
@@ -209,8 +210,28 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
     // `/api/search` records retrieval telemetry, so it is not read-only.
     const READ_ONLY_POST_ROUTES = new Set(["/api/cognition/why"]);
     let backupSeq = 0;
+    let agentHubCache: { at: number; body: string } | undefined;
+    const pruneBackups = (target: string, keep = 3): void => {
+      try {
+        const dir = dirname(target);
+        const prefix = `${basename(target)}.`;
+        const backups = readdirSync(dir)
+          .filter((name) => name.startsWith(prefix) && name.endsWith(".bak"))
+          .sort();
+        for (const stale of backups.slice(0, Math.max(0, backups.length - keep))) {
+          try {
+            unlinkSync(join(dir, stale));
+          } catch {
+            // retention is best-effort; never fail a wire over it
+          }
+        }
+      } catch {
+        // missing directory is not an error for retention
+      }
+    };
     const freshnessToken = (scope: StudioScope): string => {
       const dir = scope === "global" ? getGlobalMemoryDir() : opts.memoryDir;
+      if (scope === "mesh") return `mesh:${Math.floor(Date.now() / 2000)}`;
       const layout = getStorageLayout(dir);
       // WAL commits land in dbPath-wal; the YAML mirror lands in memoriesDir.
       // Probe every path a writer can touch, and use "-" (never a fake zero)
@@ -588,14 +609,21 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
       }
 
       if (pathname === "/api/agents" && req.method === "GET") {
+        if (agentHubCache && Date.now() - agentHubCache.at < 5000) {
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
+          res.end(agentHubCache.body);
+          return;
+        }
         const agents = discoverAgentHub();
         const counts = {
           wired: agents.filter((a) => a.status === "WIRED").length,
           unwired: agents.filter((a) => a.status === "UNWIRED").length,
           absent: agents.filter((a) => a.status === "ABSENT").length,
         };
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ agents, counts }));
+        const body = JSON.stringify({ agents, counts });
+        agentHubCache = { at: Date.now(), body };
+        res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
+        res.end(body);
         return;
       }
 
@@ -656,6 +684,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
               const backup = `${target}.${Date.now()}.${++backupSeq}.bak`;
               try {
                 copyFileSync(target, backup);
+                pruneBackups(target);
                 backups.push(backup);
               } catch (err: unknown) {
                 res.writeHead(500, { "Content-Type": "application/json" });
@@ -665,6 +694,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             }
           }
           const harness = typeof body.harness === "string" ? body.harness : undefined;
+          agentHubCache = undefined;
           const reports = connectAgent(id, home, { dryRun, harness });
           if (reports.length === 1 && /^Unknown agent/.test(reports[0].message)) {
             res.writeHead(404, { "Content-Type": "application/json" });
@@ -699,6 +729,7 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
             return;
           }
           const report = disconnectSingleAgent(id, home, { dryRun: body.dryRun === true });
+          agentHubCache = undefined;
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: report.updated, report }));
         } catch (err: unknown) {

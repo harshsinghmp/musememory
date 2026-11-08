@@ -741,7 +741,11 @@ describe("Wave 23 PR 4: T-460 agent discovery", () => {
       expect(css).toContain(".agent-card");
       expect(css).toContain(".agent-status");
 
-      const data = await (await fetch(`${base}/api/agents`)).json();
+      const firstAgents = await fetch(`${base}/api/agents`);
+      expect(firstAgents.headers.get("x-cache")).toBe("MISS");
+      const secondAgents = await fetch(`${base}/api/agents`);
+      expect(secondAgents.headers.get("x-cache")).toBe("HIT");
+      const data = await firstAgents.json();
       expect(Array.isArray(data.agents)).toBe(true);
       expect(data.counts).toHaveProperty("wired");
       expect(data.counts).toHaveProperty("unwired");
@@ -804,6 +808,20 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
       expect(unwireRes.status).toBe(200);
       const afterUnwire = JSON.parse(readFileSync(configPath, "utf8"));
       expect(afterUnwire.mcpServers?.memory).toBeUndefined();
+      const settingsAfter = JSON.parse(readFileSync(settingsPath, "utf8"));
+      expect((settingsAfter.allowedTools || []).some((tool: string) => String(tool).toLowerCase().includes("memory"))).toBe(false);
+
+      // Repeated wires must not accumulate unlimited backups.
+      for (let i = 0; i < 4; i++) {
+        const again = await fetch(`${base}/api/agents/wire`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+        });
+        expect(again.status).toBe(200);
+      }
+      const retained = readdirSync(home).filter((f) => f.startsWith(".claude.json.") && f.endsWith(".bak"));
+      expect(retained.length).toBeLessThanOrEqual(3);
 
       const unknown = await fetch(`${base}/api/agents/wire`, {
         method: "POST",
@@ -827,6 +845,7 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
       expect(all.status).toBe(400);
 
       // A backup that cannot be written must abort before touching the config.
+      const beforeBlocked = readFileSync(configPath, "utf8");
       chmodSync(join(home, ".claude"), 0o500);
       try {
         const blocked = await fetch(`${base}/api/agents/wire`, {
@@ -835,8 +854,7 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
           body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
         });
         expect(blocked.status).toBe(500);
-        const blockedConfig = JSON.parse(readFileSync(configPath, "utf8"));
-        expect(blockedConfig.mcpServers?.memory).toBeUndefined();
+        expect(readFileSync(configPath, "utf8")).toBe(beforeBlocked);
       } finally {
         chmodSync(join(home, ".claude"), 0o700);
       }
