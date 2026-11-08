@@ -264,6 +264,23 @@ export const STUDIO_CSS = `    :root {
     .badge-low { background: rgba(255,255,255,0.05); color: var(--text-muted); }
 
     .cluster-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; }
+    /* T-456: activity heatmap + agent session cards */
+    .heatmap { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 11px); gap: 3px; overflow-x: auto; padding-bottom: 6px; }
+    .hm-cell { width: 11px; height: 11px; border-radius: 2px; background: rgba(255,255,255,0.05); }
+    .hm-cell.level-1 { background: rgba(245,158,11,0.25); }
+    .hm-cell.level-2 { background: rgba(245,158,11,0.45); }
+    .hm-cell.level-3 { background: rgba(245,158,11,0.7); }
+    .hm-cell.level-4 { background: var(--accent); }
+    .heatmap-legend { display: flex; gap: 4px; align-items: center; font-size: 10px; color: var(--text-dim); margin: 4px 0 10px; font-family: 'JetBrains Mono', monospace; }
+    .session-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .session-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; }
+    .session-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .session-status { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: var(--radius-full); }
+    .session-status.active { color: var(--green); background: rgba(16,185,129,0.15); }
+    .session-status.done { color: var(--text-muted); background: rgba(255,255,255,0.05); }
+    .session-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .session-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+    .activity-empty { font-size: 12px; color: var(--text-dim); }
     /* ---- Wave 23 / T-451: fixed 76px cyber-minimalist left rail ---- */
     header, .layout { margin-left: 76px; }
     header { flex-wrap: wrap; gap: 10px; }
@@ -498,6 +515,7 @@ export const STUDIO_JS = `    let allMemories = [];
             fetchWikiPages(),
             fetchUserProfile(),
             loadAudit(),
+            fetchActivity(),
           ]);
           const loaded = await memRes.json();
           if (requestedScope !== studioScope || requestGen !== scopeGeneration) return;
@@ -1182,6 +1200,60 @@ export const STUDIO_JS = `    let allMemories = [];
       });
     }
 
+    async function fetchActivity() {
+      const requestGen = scopeGeneration;
+      try {
+        const res = await fetch(apiUrl('/api/activity'));
+        const data = await res.json();
+        if (requestGen !== scopeGeneration) return;
+        renderActivity(data);
+      } catch (err) {
+        console.error('Failed to load activity:', err);
+      }
+    }
+
+    function renderActivity(data) {
+      const grid = document.getElementById('activityHeatmap');
+      const sessions = document.getElementById('activitySessions');
+      const badge = document.getElementById('activityMutations');
+      if (!grid || !sessions) return;
+
+      const days = data.days || [];
+      grid.innerHTML = '';
+      const cells = document.createDocumentFragment();
+      days.forEach(function (day) {
+        const cell = document.createElement('div');
+        const level = day.count === 0 ? 0 : day.count < 3 ? 1 : day.count < 6 ? 2 : day.count < 10 ? 3 : 4;
+        cell.className = 'hm-cell level-' + level;
+        cell.title = day.date + ': ' + day.count + ' mutations';
+        cells.appendChild(cell);
+      });
+      grid.appendChild(cells);
+      if (badge) badge.textContent = (data.total_mutations || 0) + ' mutations';
+
+      sessions.innerHTML = '';
+      const list = data.sessions || [];
+      if (list.length === 0) {
+        sessions.innerHTML = '<div class="activity-empty">No agent sessions recorded yet. Sessions appear when an agent starts one.</div>';
+        return;
+      }
+      list.forEach(function (session) {
+        const card = document.createElement('div');
+        card.className = 'session-card';
+        const tags = (session.tags || []).map(function (tag) {
+          return '<span class="card-tag">#' + escapeHtml(tag) + '</span>';
+        }).join('');
+        const started = String(session.started_at || '').slice(0, 16).replace('T', ' ');
+        const ended = session.ended_at ? ' · ended ' + escapeHtml(String(session.ended_at).slice(0, 16).replace('T', ' ')) : '';
+        card.innerHTML = '<div class="session-card-head"><strong>' + escapeHtml(session.title) + '</strong>' +
+          '<span class="session-status ' + (session.status === 'active' ? 'active' : 'done') + '">' + escapeHtml(session.status) + '</span></div>' +
+          '<div class="session-meta mono">' + escapeHtml(session.session_id) + '</div>' +
+          '<div class="session-meta">Started ' + escapeHtml(started) + ended + '</div>' +
+          '<div class="session-card-foot"><span>' + (session.messages || 0) + ' messages</span><div class="card-tags">' + tags + '</div></div>';
+        sessions.appendChild(card);
+      });
+    }
+
     function exportDataHtml() {
       window.open('/api/export-html', '_blank');
     }
@@ -1608,6 +1680,7 @@ export const STUDIO_JS = `    let allMemories = [];
         if (currentTab === 'cognition') fetchCognition();
         if (currentTab === 'sync') fetchSyncStatus();
         if (currentTab === 'mesh') { fetchMeshStatus(); fetchMeshAudit(); }
+        if (currentTab === 'activity') fetchActivity();
       });
     });
 
@@ -1723,6 +1796,7 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
       <button type="button" class="rail-tool nav-tab" data-view="persona">Persona</button>
       <button type="button" class="rail-tool nav-tab" data-view="sandbox">Sandbox</button>
       <button type="button" class="rail-tool nav-tab" data-view="audit">Audit</button>
+      <button type="button" class="rail-tool nav-tab" data-view="activity">Activity</button>
     </div>
   </nav>
 
@@ -2192,6 +2266,31 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             <div class="handoff-cell"><div class="handoff-lbl">Storage</div><div class="handoff-val">Local files only</div></div>
             <div class="handoff-cell"><div class="handoff-lbl">Cloud</div><div class="handoff-val">None — zero telemetry</div></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 13: Activity heatmap + agent sessions (T-456) -->
+    <div class="view-panel" id="panel-activity">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Memory Activity — 52 Weeks</span>
+            <span class="brand-tag" id="activityMutations">0 mutations</span>
+          </div>
+          <div class="heatmap-legend">
+            <span>Less</span>
+            <span class="hm-cell level-0"></span><span class="hm-cell level-1"></span><span class="hm-cell level-2"></span><span class="hm-cell level-3"></span><span class="hm-cell level-4"></span>
+            <span>More</span>
+          </div>
+          <div class="heatmap" id="activityHeatmap"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Agent Session Log</span>
+            <button type="button" class="btn-icon" onclick="fetchActivity()">Refresh</button>
+          </div>
+          <div class="session-grid" id="activitySessions"></div>
         </div>
       </div>
     </div>

@@ -609,6 +609,67 @@ describe("Wave 23 PR 2: T-455 kinetic settling", () => {
   });
 });
 
+describe("Wave 23 PR 2: T-456 activity heatmap", () => {
+  test("serves 52 weeks of mutations and agent session cards", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    save(store, {
+      id: "m_1700000066666_session",
+      title: "Session s_test start",
+      content: "started",
+      project: "t456",
+      status: "confirmed",
+      type: "session",
+      session_id: "s_test",
+      tags: ["session", "timeline"],
+      created_at: "2026-08-12T10:00:00Z",
+      updated_at: "2026-08-12T10:00:00Z",
+    });
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="activity"');
+      expect(html).toContain('id="panel-activity"');
+      expect(html).toContain('id="activityHeatmap"');
+      expect(html).toContain('id="activitySessions"');
+      expect(js).toContain("function fetchActivity");
+      expect(js).toContain("function renderActivity");
+      expect(js).toContain("apiUrl('/api/activity')");
+      expect(css).toContain(".hm-cell");
+      expect(css).toContain(".session-card");
+
+      const activity = await (await fetch(`${base}/api/activity`)).json();
+      expect(activity.scope).toBe("project");
+      expect(activity.available).toBe(true);
+      expect(activity.days.length).toBe(371);
+      expect(Array.isArray(activity.sessions)).toBe(true);
+      expect(activity.sessions.some((x: { session_id: string }) => x.session_id === "s_test")).toBe(true);
+      expect(activity.sessions[0]).toHaveProperty("messages");
+      expect(activity.sessions[0]).toHaveProperty("status");
+
+      const globalRoot = makeTempRoot();
+      const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+      process.env.MUSEMEMORY_GLOBAL_DIR = join(globalRoot, "absent", ".memory");
+      try {
+        const globalActivity = await (await fetch(`${base}/api/activity?scope=global`)).json();
+        expect(globalActivity.available).toBe(false);
+        expect(globalActivity.days).toEqual([]);
+      } finally {
+        if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+        else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+        cleanup(globalRoot);
+      }
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
