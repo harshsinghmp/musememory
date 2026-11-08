@@ -297,6 +297,11 @@ export const STUDIO_CSS = `    :root {
     .quickstart-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
     .quickstart-step { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
     .quickstart-cmd { display: block; background: #0a0806; border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #fcd34d; word-break: break-all; }
+    /* T-465: searchable command deck */
+    .command-deck { display: flex; flex-direction: column; gap: 8px; }
+    .command-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 10px 12px; }
+    .command-row code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #fcd34d; word-break: break-all; }
+    .command-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
     /* T-460: agents hub */
     .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
     .agent-card { background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -618,6 +623,35 @@ export const STUDIO_JS = `    let allMemories = [];
       } else {
         flash('Clipboard unavailable in this browser.', true);
       }
+    }
+
+    const COMMAND_DECK = [
+      { command: 'memory recall "<query>"', description: 'Retrieve ranked memories for a task' },
+      { command: 'memory capture "<fact>"', description: 'Capture a durable fact or decision' },
+      { command: 'memory current', description: 'Show active constraints and handoff state' },
+      { command: 'memory brief', description: 'Compile a session brief' },
+      { command: 'memory doctor', description: 'Validate the installation and store' },
+      { command: 'memory adr create --title "<title>"', description: 'Record an architecture decision' },
+      { command: 'memory sync --agent <id>', description: 'Exchange knowledge with peers' },
+    ];
+
+    function renderCommandDeck(filter) {
+      const deck = document.getElementById('commandDeck');
+      if (!deck) return;
+      const needle = String(filter || '').toLowerCase();
+      deck.innerHTML = '';
+      COMMAND_DECK.filter(function (item) {
+        return !needle || item.command.toLowerCase().indexOf(needle) >= 0 || item.description.toLowerCase().indexOf(needle) >= 0;
+      }).forEach(function (item) {
+        const row = document.createElement('div');
+        row.className = 'command-row';
+        row.innerHTML = '<div><code>' + escapeHtml(item.command) + '</code><div class="command-desc">' + escapeHtml(item.description) + '</div></div>' +
+          '<button type="button" class="btn-icon" data-copy-command="' + escapeHtml(item.command) + '">Copy</button>';
+        row.querySelector('[data-copy-command]').addEventListener('click', function () {
+          copyText(item.command, 'Command');
+        });
+        deck.appendChild(row);
+      });
     }
 
     function renderQuickStart() {
@@ -1990,6 +2024,11 @@ export const STUDIO_JS = `    let allMemories = [];
     });
 
     renderQuickStart();
+    renderCommandDeck('');
+    var commandSearch = document.getElementById('commandDeckSearch');
+    if (commandSearch) {
+      commandSearch.addEventListener('input', function (event) { renderCommandDeck(event.target.value); });
+    }
     setupCanvasInteractions();
     setupTimeline();
 
@@ -2567,6 +2606,14 @@ export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
             <span class="brand-tag">wire an agent in one command</span>
           </div>
           <div class="quickstart-grid" id="quickStartGrid"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Command Deck</span>
+            <span class="brand-tag">copy any one-liner</span>
+          </div>
+          <input type="text" id="commandDeckSearch" placeholder="Filter commands..." autocomplete="off" spellcheck="false" style="width:100%; max-width:420px; background:#0a0806; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:9px 12px; color:#fff; font:inherit; font-size:12px; margin-bottom:12px;" />
+          <div class="command-deck" id="commandDeck"></div>
         </div>
       </div>
     </div>
