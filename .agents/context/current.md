@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Post-Wave-23 debt sweep** (2026-11-08) — PR #355 merged at `432cf01`: agents discovery cache, backup retention, unwire tool-grant cleanup, mesh freshness bucket.
 - [x] **Wave 23 gauntlet hardening** (2026-11-08) — PR #354 merged at `d2ea59c`; complete config backups (XDG-aware, timestamped, fail-loud), unknown-agent 404s, honest wire reporting, WAL/layout cache freshness, 44px phone controls. Gauntlet: 7.35 critic → REQUEST-CHANGES review → fixed; **CAPPED, not a PASS**. Evidence: `.agents/artifacts/gauntlet-wave23-pr456/`.
 - [x] **Wave 23 PR 6 (`T-466`–`T-468`)** (2026-11-08) — projection cache, hidden-tab pause and the UI performance benchmark. **Wave 23 complete.** PRs #351–#353.
 - [x] **Wave 23 PR 5 (`T-463`–`T-465`)** (2026-11-08) — poster About panel, quick-start cards and searchable command deck. PRs #348–#350.
