@@ -767,7 +767,10 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
     try {
       const base = `http://localhost:${srv.port}`;
       const configPath = join(home, ".claude.json");
+      const settingsPath = join(home, ".claude", "settings.json");
+      mkdirSync(join(home, ".claude"), { recursive: true });
       writeFileSync(configPath, JSON.stringify({}), "utf8");
+      writeFileSync(settingsPath, JSON.stringify({ allowedTools: ["Read"] }), "utf8");
 
       const html = await (await fetch(`${base}/`)).text();
       const js = await (await fetch(`${base}/assets/studio.js`)).text();
@@ -783,7 +786,13 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
       expect(wireRes.status).toBe(200);
       const wired = await wireRes.json();
       expect(wired.success).toBe(true);
-      expect(existsSync(`${configPath}.bak`)).toBe(true);
+      expect(wired.backups.length).toBeGreaterThanOrEqual(2);
+      const configBackups = readdirSync(home).filter((f) => f.startsWith(".claude.json.") && f.endsWith(".bak"));
+      const settingsBackups = readdirSync(join(home, ".claude")).filter((f) => f.startsWith("settings.json.") && f.endsWith(".bak"));
+      expect(configBackups.length).toBe(1);
+      expect(settingsBackups.length).toBe(1);
+      expect(JSON.parse(readFileSync(join(home, configBackups[0]), "utf8"))).toEqual({});
+      expect(JSON.parse(readFileSync(join(home, ".claude", settingsBackups[0]), "utf8"))).toEqual({ allowedTools: ["Read"] });
       const afterWire = JSON.parse(readFileSync(configPath, "utf8"));
       expect(afterWire.mcpServers?.memory).toBeDefined();
 
@@ -802,6 +811,20 @@ describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
         body: JSON.stringify({ id: "does-not-exist" }),
       });
       expect(unknown.status).toBe(404);
+
+      const unknownUnwire = await fetch(`${base}/api/agents/unwire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "does-not-exist" }),
+      });
+      expect(unknownUnwire.status).toBe(404);
+
+      const all = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "all", harness: "claude-code" }),
+      });
+      expect(all.status).toBe(400);
     } finally {
       srv.close();
       if (previous === undefined) delete process.env.HOME;

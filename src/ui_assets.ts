@@ -369,11 +369,10 @@ export const STUDIO_CSS = `    :root {
       .header-actions { width: 100%; }
       .scope-filter { flex: 1 1 100%; }
       .scope-filter-input { width: 100%; }
-      .header-actions .btn-icon, .scope-btn, .rail-section, .rail-tool, .btn, .chip, .close-btn, .search-input-wrap input { min-height: 44px; min-width: 44px; }
+      .btn-icon, .scope-btn, .rail-section, .rail-tool, .btn, .chip, .close-btn, .search-input-wrap input { min-height: 44px; min-width: 44px; }
       .view-panel { min-height: 0; }
       .detail-pane { width: 100%; min-width: 0; }
       .close-btn { min-width: 44px; min-height: 44px; }
-      .chip { min-height: 24px; display: inline-flex; align-items: center; }
       .graph-controls .control-row { flex-wrap: wrap; }
       #timelineSlider { width: 100%; max-width: 100%; }
       .sandbox-input-grid { grid-template-columns: 1fr; }
@@ -1411,6 +1410,7 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     async function wireAgent(id) {
+      if (!confirm('Wire ' + id + '? This may update its config; a timestamped .bak backup is created first.')) return;
       try {
         const res = await fetch('/api/agents/wire', {
           method: 'POST',
@@ -1418,8 +1418,12 @@ export const STUDIO_JS = `    let allMemories = [];
           body: JSON.stringify({ id: id, harness: id })
         });
         const data = await res.json();
-        if (!res.ok) { flash('Wire failed: ' + (data.error || res.status), true); return; }
-        flash('Wired ' + id + '.');
+        if (!res.ok || data.success !== true) {
+          const message = data.error || (data.reports && data.reports[0] ? data.reports[0].message : res.status);
+          flash('Wire failed: ' + message, true);
+          return;
+        }
+        flash('Wired ' + id + '. Backup: ' + ((data.backups && data.backups[0]) || 'none'));
         fetchAgents();
       } catch (err) { flash('Wire failed: ' + String(err), true); }
     }
@@ -1432,7 +1436,11 @@ export const STUDIO_JS = `    let allMemories = [];
           body: JSON.stringify({ id: id, harness: id })
         });
         const data = await res.json();
-        if (!res.ok) { flash('Unwire failed: ' + (data.error || res.status), true); return; }
+        if (!res.ok || data.success !== true) {
+          const message = data.error || (data.report && data.report.message) || res.status;
+          flash('Unwire failed: ' + message, true);
+          return;
+        }
         flash('Unwired ' + id + '.');
         fetchAgents();
       } catch (err) { flash('Unwire failed: ' + String(err), true); }
