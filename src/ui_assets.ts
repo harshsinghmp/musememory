@@ -476,6 +476,7 @@ export const STUDIO_JS = `    let allMemories = [];
     // T-455: the loop stops once the layout stops moving; input wakes it.
     const SETTLE_ENERGY = 0.05;
     let graphEnergy = Infinity;
+    let documentHidden = false;
 
     async function refreshMemories() {
       const icon = document.getElementById('refreshIcon');
@@ -1190,6 +1191,10 @@ export const STUDIO_JS = `    let allMemories = [];
     }
 
     function tick() {
+      if (documentHidden) {
+        graphLoopStarted = false;
+        return;
+      }
       if (currentTab === 'graph') {
         const canvas = document.getElementById('graphCanvas');
         if (canvas) {
@@ -2041,6 +2046,15 @@ export const STUDIO_JS = `    let allMemories = [];
         applyProjectScope(projectFilterInput.value);
       });
     }
+
+    document.addEventListener('visibilitychange', function () {
+      documentHidden = document.hidden;
+      if (documentHidden) {
+        graphLoopStarted = false;
+      } else {
+        wakeGraph();
+      }
+    });
 
     document.querySelectorAll('.view-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { setStudioView(btn.dataset.studioView); });

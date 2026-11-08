@@ -956,6 +956,24 @@ describe("Wave 23 PR 6: T-466 projection cache", () => {
   });
 });
 
+describe("Wave 23 PR 6: T-467 visibility sensors", () => {
+  test("stops the animation loop while the tab is hidden", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+      expect(js).toContain("visibilitychange");
+      expect(js).toContain("document.hidden");
+      expect(js).toContain("documentHidden = document.hidden");
+      expect(js).toContain("graphLoopStarted = false");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
 describe("standalone HTML export", () => {
   function embeddedPayload(html: string): unknown {
     const m = html.match(/window\.STANDALONE_DATA = ([\s\S]*?);<\/script>/);
