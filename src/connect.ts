@@ -111,6 +111,8 @@ export const ALL_MEMORY_TOOLS = [
   "muse_bug_clusters",
   "muse_tech_debt",
   "muse_health",
+  "muse_playbook_recall",
+  "muse_playbook_record",
   "muse_sync_broadcast",
   "muse_sync_ingest",
   "muse_sync_status",

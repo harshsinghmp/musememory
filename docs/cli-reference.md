@@ -97,6 +97,7 @@ Ecosystem, Migration & Connectivity:
   conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
+  playbook [--list|--tag T|<id>] [--success|--fail] Procedural playbooks: list, inspect or record an outcome
   scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
   terrain [--workspace] [--out]  Machine terrain, or --workspace for the six workspace maps
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
@@ -112,7 +113,7 @@ Version Control (R23):
 
 ## MCP tools
 
-**115 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
+**117 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
 
 Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_profile_list` for the live mapping.
 
@@ -223,7 +224,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `memory_adr_list` | `target` | List all Architecture Decision Records (ADRs) recorded in the memory store, optionally filtered by status |
 | `memory_drift_audit` | `target` | Run bidirectional documentation <-> code drift audit: verifies if documented decisions are implemented in code and flags missing/stale/conflicting code or docs |
 | `muse_why` | `target` | Autonomous Engineering Cognition: Explain WHY code was designed or modified the way it is by tracing historical bug fixes, ADRs, trade-offs, and invariants |
-| `muse_bug_clusters` | `packet` | Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses |
+| `muse_bug_clusters` | — | Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses |
 | `muse_tech_debt` | `packet` | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
 | `muse_health` | `packet` | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
 | `muse_code_impact` | `file_path` | Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level |
@@ -261,6 +262,13 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `graph_index` | `query` | Index AST symbols from the project's CodeGraph/Graphify provider and cache in .memory/ |
 | `muse_profile_list` | `title`, `context_and_drivers`, `decision`, `consequences` | List all available task-focused MCP profiles (core, coding, debugging, review, architecture, maintenance, full) and their exposed tools |
 
+### Other
+
+| Tool | Required parameters | Description |
+| --- | --- | --- |
+| `muse_playbook_recall` | `packet` | Recall procedural playbooks: list by tag, or fetch one by id/title |
+| `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
+
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 115 tools, 7 profiles, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 117 tools, 7 profiles, 30 import formats, 8 credential rule families.
