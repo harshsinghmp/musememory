@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Studio left rail (`T-451`)**: fixed 76px numbered navigation (`01 OVERVIEW`–`06 ABOUT`), warm-dark palette, Archivo Black + JetBrains Mono, and an About anchor; all prior views remain reachable from a tools group.
+- **Dual-scope memory switcher (`T-452`)**: project / global / cross-project-mesh selector with live refetch; global and mesh reads open stores read-only, writes stay project-scoped behind a visible banner.
+- **Modular cached studio assets (`T-453`)**: CSS, markup and client JS split into `src/ui_assets.ts`; `/assets/studio.css` and `/assets/studio.js` serve per-encoding strong ETags, gzip, 304 and HEAD; standalone export inlines the same modules.
+- **CI Bun fallback**: when GitHub release assets return 504, CI installs Bun from the npm registry instead of failing the job.
+
+### Fixed
+- **Caller scan (`T-449`)**: `HeuristicFallbackProvider.getCallers` no longer reuses a stateful `g`-flag regex, no longer counts declarations as callers, and scans directories in sorted order; regression test added.
+
 ## [3.2.0] - 2026-10-26
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.3...v3.2.0

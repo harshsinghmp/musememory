@@ -17,7 +17,7 @@ Wave 23's `T-405`–`T-422` collided with the already-landed `T-405` (conflicted
 - **T-452** — the header carries a project / global / mesh segmented switcher that refetches live. `/api/memories`, `/api/stats`, `/api/current`, `/api/wiki`, `/api/user-profile` and `/api/audit` resolve the scope; the global store (`~/.memory`) opens lazily and is never created by a read; mesh results carry `origin_project`. Mutations stay project-scoped and the studio shows a scope banner whenever it is not viewing the project store.
 - **T-453** — CSS, markup and client JS are split out of the old 2,700-line template literal and served from `/assets/studio.css` and `/assets/studio.js` with strong ETags, pre-gzipped buffers, `Vary: Accept-Encoding` and 304 fast paths. The standalone export inlines the same modules.
 
-Gate: `bun test` **1450 pass / 0 fail** across 217 files, `tsc --noEmit` clean, `bun run build` 434 modules. Delivered on `feat/wave-23-pr1-studio-shell` as [PR #337](https://github.com/harshsinghmp/musememory/pull/337) against `dev` — **not landed** until it merges.
+Gate at merge: `bun test` **1451 pass / 0 fail** across 217 files, `tsc --noEmit` clean, `bun run build` 434 modules. **Landed in [PR #337](https://github.com/harshsinghmp/musememory/pull/337) at `d0c9600`** (2026-11-08); `check:landed` → `RESULT: LANDED`.
 
 ### Gauntlet run — CAPPED at the 5-round ceiling (2026-11-08)
 
@@ -165,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — renumbered 2026-11-08 from the colliding `T-405`–`T-422`; verified unimplemented end-to-end:
+- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-451`–`T-468`)** — PR 1 landed (`T-451`–`T-453`, PR #337); **next is PR 2 (`T-454`–`T-456`)** on its own branch/PRs:
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 23 PR 1 (`T-451`–`T-453`)** (2026-11-08) — merged in PR #337 at `d0c9600`; `check:landed` → **LANDED**. Left rail, dual-scope switcher, modular ETag/gzip assets, read-only global/mesh reads, 375/768/1280 verified, 1451/0 at merge. Follow-ups in PR #337's thread: stateful-regex flake fixed (`c0f7aef`), npm Bun CI fallback (`b298beb`). Gauntlet verdict: CAPPED at 7.99 (not a 9.0 PASS) — evidence in `.agents/artifacts/gauntlet-wave23-pr1/`.
 - [x] **Released: v3.1.2** (2026-10-25) — completes the silent-casing fan-out:
   - PR #330 merged at `d7e875b` (*"Release: v3.1.2"*); annotated tag
     [`v3.1.2`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.2)
