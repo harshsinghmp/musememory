@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Unified code resolver** (2026-11-09) — `resolveMemoriesForCode` is the single matcher; pre-flight and PR context adapt it.
 - [x] **Pre-flight surfaces** (2026-11-09) — PreToolUse hook + read-only `muse_preflight` MCP tool; 119 tools.
 - [x] **Wave 26 (`T-432`–`T-435`)** (2026-11-09) — recursive-CTE associative expansion (`T-432`, direct `dev`), pre-flight context (`T-433`, #370), blast-radius risk (`T-434`, #371), anchor-matched auto-recall (`T-435`, #372). Tests 1495/0.
 - [x] **Site build + scaffolding wiring** (2026-11-08) — PR #367 (Node Astro launcher; site:qa 17/17 SHIP) and #368 (briefing episodes, explicit `asserted_at` belief clock in `as_of`, duplicate decay removed).
