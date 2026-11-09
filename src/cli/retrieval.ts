@@ -1,3 +1,4 @@
+import { preflightContext } from "../hooks/preflight.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
@@ -325,5 +326,21 @@ export async function handleHarvestAutoCommand({ flags }: ParsedArgs): Promise<n
     console.error(`  warning: ${err}`);
   }
   console.log(res.message);
+  return 0;
+}
+
+export async function handlePreflightCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const files = flags["files"] ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean) : positional;
+  const tokenBudget = flags["budget"] ? parseInt(flags["budget"], 10) : undefined;
+  const { query, files: changed, context } = preflightContext(ctx.store, {
+    files: files.length > 0 ? files : undefined,
+    branch: flags["branch"],
+    tokenBudget,
+    project: flags["project"],
+  });
+  console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens`);
+  console.log(context.markdown);
   return 0;
 }
