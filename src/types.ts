@@ -394,6 +394,7 @@ export type AuditOperation =
   | "enclave_put"
   | "enclave_read"
   | "enclave_rotate"
+  | "enclave_prune"
   | "attest_keygen"
   | "attest_sign"
   | "conflict_detected"

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
 import {
   chmodSync,
+  rmSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -26,6 +27,19 @@ export interface EnclaveEnvelope {
   iv: string;
   tag: string;
   ciphertext: string;
+}
+
+export interface EnclaveKeyInfo {
+  key_id: string;
+  active: boolean;
+  referenced: boolean;
+  path: string;
+}
+
+export interface EnclavePruneResult {
+  removed: string[];
+  kept: string[];
+  dryRun: boolean;
 }
 
 export interface EnclaveRotation {
@@ -126,6 +140,66 @@ function activeKey(memoryDir: string): { key: Buffer; id: string } {
   mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   setActive(memoryDir, id);
   return { key, id };
+}
+
+function currentKeyId(memoryDir: string): string | null {
+  const env = envKey();
+  if (env) return keyId(env);
+  const active = activePath(memoryDir);
+  if (existsSync(active)) return readFileSync(active, "utf8").trim();
+  const legacy = join(memoryDir, "enclave.key");
+  if (existsSync(legacy)) return keyId(readKeyFile(legacy));
+  return null;
+}
+
+export function listEnclaveKeys(memoryDir: string): EnclaveKeyInfo[] {
+  const active = currentKeyId(memoryDir);
+  const referenced = new Set(vaultFiles(join(memoryDir, "enclaves")).map((path) => {
+    const envelope = JSON.parse(readFileSync(path, "utf8")) as EnclaveEnvelope;
+    return envelope.key_id;
+  }));
+  const keys: EnclaveKeyInfo[] = [];
+  const dir = keysDir(memoryDir);
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir, { withFileTypes: true })) {
+      if (!file.isFile() || !file.name.endsWith(".key")) continue;
+      const id = file.name.slice(0, -".key".length);
+      keys.push({ key_id: id, active: id === active, referenced: referenced.has(id), path: join(dir, file.name) });
+    }
+  }
+  const legacy = join(memoryDir, "enclave.key");
+  if (existsSync(legacy)) {
+    const id = keyId(readKeyFile(legacy));
+    if (!keys.some((key) => key.key_id === id)) {
+      keys.push({ key_id: id, active: id === active, referenced: referenced.has(id), path: legacy });
+    }
+  }
+  return keys.sort((a, b) => a.key_id.localeCompare(b.key_id));
+}
+
+/** Remove keys that are neither active nor referenced by any vault. */
+export function pruneEnclaveKeys(memoryDir: string, options: { dryRun?: boolean } = {}): EnclavePruneResult {
+  if (envKey()) throw new Error("Cannot prune keys while MUSE_ENCLAVE_KEY is set");
+  const removed: string[] = [];
+  const kept: string[] = [];
+  for (const key of listEnclaveKeys(memoryDir)) {
+    if (key.active || key.referenced) {
+      kept.push(key.key_id);
+      continue;
+    }
+    if (!options.dryRun) rmSync(key.path, { force: true });
+    removed.push(key.key_id);
+  }
+  if (!options.dryRun && removed.length > 0) {
+    recordAuditEvent(memoryDir, {
+      operation: "enclave_prune",
+      entry_id: "enclave",
+      actor: "cli",
+      reason: "enclave_key_prune",
+      details: { removed, kept },
+    });
+  }
+  return { removed, kept, dryRun: options.dryRun === true };
 }
 
 function deriveKey(master: Buffer, salt: Buffer): Buffer {
