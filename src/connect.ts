@@ -129,6 +129,8 @@ export const ALL_MEMORY_TOOLS = [
   "muse_enclave_recall",
   "muse_overlay_status",
   "muse_attestation_verify",
+  "memory_test_feedback",
+  "muse_regression_sentry",
 ];
 
 export { ConnectOptions, ConnectReport };

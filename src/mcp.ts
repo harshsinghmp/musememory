@@ -65,7 +65,10 @@ import {
   resolveConflict,
   computeMemoryRoi,
   recordRetrievals,
+  recordTestFeedback,
+  parseTestRun,
 } from "./quality/index.ts";
+import { runRegressionSentry, type SentryFailure } from "./cognition/sentry.ts";
 import {
   recordObservation,
   listObservations,
@@ -1875,6 +1878,42 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "memory_test_feedback",
+        description: "Bind a real test run to the memories that were applied: green runs reinforce them, red runs record a failed application and a regression strike for anchor-relevant memories. Returns the parsed run plus regression-sentry matches.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            command: { type: "string", description: "The test command that ran (e.g. 'bun test')" },
+            exit_code: { type: "number", description: "The real process exit code" },
+            stdout: { type: "string", description: "Captured stdout (optional; helps failure matching)" },
+            stderr: { type: "string", description: "Captured stderr (optional)" },
+            memory_ids: { type: "array", items: { type: "string" }, description: "Memories that were applied during the work" },
+            project: { type: "string", description: "Optional project scope" },
+            session_id: { type: "string", description: "Optional session id (deduplicates regression strikes)" },
+            actor: { type: "string", description: "Optional actor label" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+          required: ["command", "exit_code"],
+        },
+      },
+      {
+        name: "muse_regression_sentry",
+        description: "Read-only: match failing tests against recorded BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories and return remediation playbooks",
+        inputSchema: {
+          type: "object",
+          properties: {
+            command: { type: "string", description: "Optional test command for anchor/reproduction matching" },
+            exit_code: { type: "number", description: "Exit code (default 1 when failures are supplied)" },
+            stdout: { type: "string", description: "Captured test output to parse when failures are not supplied" },
+            stderr: { type: "string", description: "Captured test error output" },
+            failures: { type: "array", items: { type: "object" }, description: "Optional explicit failures: [{name, message?, file?}]" },
+            project: { type: "string", description: "Optional project scope" },
+            limit: { type: "number", description: "Maximum matches (default 20)" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+      {
         name: "muse_enclave_recall",
         description: "Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged.",
         inputSchema: {
@@ -3402,6 +3441,68 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           updateHashes,
           dryRun,
           workspaceRoot: activeRoot,
+        });
+        return toolResult(report);
+      }
+      case "memory_test_feedback": {
+        // T-440: bind a real test run to the memories applied during the work.
+        const command = typeof a.command === "string" ? a.command.trim() : "";
+        if (!command) return toolError("memory_test_feedback requires command");
+        const exitCode = typeof a.exit_code === "number" ? Math.trunc(a.exit_code) : Number.NaN;
+        if (!Number.isInteger(exitCode)) return toolError("memory_test_feedback requires an integer exit_code");
+        const project = a.project ? String(a.project) : undefined;
+        const feedback = recordTestFeedback(
+          activeStore,
+          {
+            command,
+            exitCode,
+            stdout: typeof a.stdout === "string" ? a.stdout : undefined,
+            stderr: typeof a.stderr === "string" ? a.stderr : undefined,
+          },
+          {
+            project,
+            memoryIds: Array.isArray(a.memory_ids) ? a.memory_ids.map(String) : [],
+            actor: a.actor ? String(a.actor) : "mcp",
+            sessionId: a.session_id ? String(a.session_id) : undefined,
+          },
+        );
+        const sentry = runRegressionSentry(activeStore, feedback.run.failures, { project, command });
+        return toolResult({
+          run: feedback.run,
+          feedback: { updated: feedback.updated, skipped: feedback.skipped },
+          sentry,
+        });
+      }
+      case "muse_regression_sentry": {
+        // T-441: read-only matching of failures against negative memories.
+        const command = a.command ? String(a.command) : "";
+        const exitCode = a.exit_code !== undefined ? Number(a.exit_code) : 1;
+        if (!Number.isInteger(exitCode)) return toolError("muse_regression_sentry exit_code must be an integer");
+        let failures: SentryFailure[];
+        if (Array.isArray(a.failures)) {
+          failures = a.failures
+            .map((raw) => {
+              const failure = (raw ?? {}) as Record<string, unknown>;
+              return {
+                name: String(failure.name ?? ""),
+                message: failure.message ? String(failure.message) : undefined,
+                file: failure.file ? String(failure.file) : undefined,
+              };
+            })
+            .filter((failure) => failure.name.length > 0);
+        } else {
+          const run = parseTestRun({
+            command: command || "test",
+            exitCode,
+            stdout: typeof a.stdout === "string" ? a.stdout : undefined,
+            stderr: typeof a.stderr === "string" ? a.stderr : undefined,
+          });
+          failures = run.failures;
+        }
+        const report = runRegressionSentry(activeStore, failures, {
+          project: a.project ? String(a.project) : undefined,
+          command,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 20, 100, 1) : 20,
         });
         return toolResult(report);
       }

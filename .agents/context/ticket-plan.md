@@ -624,8 +624,8 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 - [x] T-439 · LANDED 2026-11-09 — PR #380: Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
 
 ## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry
-- [ ] T-440 · Automated CI / Test Harness Integration: Bind memory utility directly to real test outcomes (`bun test`, `vitest`, `cargo test`); increment ROI on green, decay on red · src/quality/test_feedback.ts · F
-- [ ] T-441 · Negative Anti-Pattern Regression Sentry: Proactive watchdog matching test failures against `BUG_PRONE_PATTERN` and `DO_NOT_USE` records · src/cognition/sentry.ts · F
+- [x] T-440 · LANDED 2026-11-09 — Automated CI / Test Harness Integration: `src/quality/test_feedback.ts` parses bun/vitest/jest/cargo/pytest/go output and binds ROI to real outcomes; CLI `test-feedback` + MCP `memory_test_feedback` · F
+- [x] T-441 · LANDED 2026-11-09 — Negative Anti-Pattern Regression Sentry: read-only matching against BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories with remediation playbooks; CLI `sentry` + MCP `muse_regression_sentry` · src/cognition/sentry.ts · F
 - [ ] T-442 · Flaky Test & Environment Drift Detector: Correlate test flakiness and failure bursts with dependency updates and environmental churn · src/doctor/flaky.ts · F
 - [ ] T-443 · Autonomous Remediation Playbook Generator: Automatically synthesize recurring test fix sequences into verified reusable playbooks · src/cognition/remediation.ts · F
 

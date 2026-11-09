@@ -36,6 +36,7 @@ import { handleAttestCommand } from "./cli/attest.ts";
 import { handleMerge3Command } from "./cli/merge3.ts";
 import { handleProjectCommand } from "./cli/project.ts";
 import { handleIoCommand } from "./cli/io.ts";
+import { handleSentryCommand, handleTestFeedbackCommand } from "./cli/test_feedback.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import { handleEmbedCommand } from "./cli/embed.ts";
 import { handleWikiCommand } from "./cli/wiki.ts";
@@ -130,6 +131,8 @@ Core Memory Lifecycle Commands:
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
   verify <id> [--timeout S] [--strict] Execute test_command or run full strict integrity gate
   briefing [--limit N]          Executive summary of active and stale memories
+  test-feedback --command C --exit-code N [--memory ID,...]  Reinforce/penalize applied memories from a real test run
+  sentry --command C --exit-code N [--input F|-]  Read-only regression sentry against negative memories
 
 Evidence, Provenance & Cognitive Governance:
   source [add|list|show]        Manage external documentation and URLs in provenance Source Ledger
@@ -333,6 +336,10 @@ export async function main(argv: string[]): Promise<number> {
       return handleStatsCommand(parsed);
     case "io":
       return handleIoCommand(parsed);
+    case "test-feedback":
+      return handleTestFeedbackCommand(parsed);
+    case "sentry":
+      return handleSentryCommand(parsed);
     case "stale":
       return handleStaleCommand(parsed);
     case "consolidate":

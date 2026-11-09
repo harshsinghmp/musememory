@@ -42,6 +42,17 @@ async batching: the YAML mirror can be skipped with `MUSE_YAML_MIRROR=0` /
 `openStore({ yamlMirror: false })` (SQLite stays authoritative), and the WAL is
 bounded by `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB`.
 
+**Wave 28 partial (`T-440`/`T-441`).** The outcome loop is now wired both ways:
+`test_feedback.ts` parses bun/vitest/jest/cargo/pytest/go output, binds a real run
+to the applied memory IDs, and reinforces green runs or records a failed
+application plus a T-313 regression strike only for anchor-relevant memories.
+`cognition/sentry.ts` matches failures against BUG_PRONE_PATTERN / DO_NOT_USE /
+failed-approach memories and returns reproduction/avoidance/recommendation
+playbooks without mutating anything. Surfaces: `memory test-feedback`,
+`memory sentry`, `memory_test_feedback`, `muse_regression_sentry` (124 tools).
+`T-442` (flaky/env drift) and `T-443` (autonomous remediation playbook
+generator) remain.
+
 ---
 
 ## 🧾 Session — Ticket Ledger Renumber & Remainder Audit (2026-11-08)

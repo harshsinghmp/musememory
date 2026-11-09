@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Test-outcome feedback (`T-440`)**: `src/quality/test_feedback.ts` parses bun, vitest, jest, cargo, pytest and go output and binds a real run to the memories applied during the work. Green runs reinforce every linked memory; red runs record a failed application and a regression strike only for anchor/symbol/reproduction-relevant memories (the T-313 rule). Surfaces: `memory test-feedback` and `memory_test_feedback`.
+- **Regression sentry (`T-441`)**: `src/cognition/sentry.ts` matches failing tests against `BUG_PRONE_PATTERN` / `DO_NOT_USE` / failed-approach memories and returns remediation playbooks. Read-only: it never mutates the store or ledger. Surfaces: `memory sentry` and `muse_regression_sentry`. Tool count 122 → 124.
 - **`memory io` (R29)**: process read/write counters from `/proc/self/io` plus on-disk SQLite, WAL, audit and observation bytes; `--json` for machines, and a clear "unavailable" line on platforms without procfs.
 - **Audit ledger rotation (R29)**: `audit.jsonl` rolls over at 5 MiB into `audit-archive/`, retains five segments by default (`MUSE_AUDIT_MAX_BYTES` / `MUSE_AUDIT_MAX_SEGMENTS`), and records a chain anchor when pruning so `getAuditTrail`, `getLastAuditHash` and `verifyAuditChain` keep working across the retained window.
 - **Ten-task outcome study (EVD-008)**: a condition-blind with/without study — both arms told to consult memory, only the seeding varied — measured **10/10 vs 6/10** on convention-sensitive tasks, with four discriminating tasks and no regressions. EVD-005 is no longer quarantined; its statement was narrowed to convention recall rather than an unqualified productivity claim.
