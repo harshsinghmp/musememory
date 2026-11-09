@@ -12,7 +12,7 @@ import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 import { buildSafeFtsQuery } from "./sqlite.ts";
-import { expandAssociative, type AssociativeNode } from "./associative.ts";
+import { expandAssociativeDetailed, type AssociativeNode } from "./associative.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
 import { isDraftMemory } from "./drafts.ts";
@@ -256,6 +256,10 @@ export interface ContextQueryOptions extends SearchOptions {
   /** T-432: Recursive-CTE associative expansion from the top results (opt-in). */
   associative?: boolean;
   max_associative_depth?: number;
+  /** Read-only retrieval: skip access-count writes (pre-flight/prefetch). */
+  recordAccess?: boolean;
+  /** Skip syncing CURRENT.md from constraints (speculative reads). */
+  syncConstraints?: boolean;
   /** T-098: Progressive wikilink expansion after fusion (resolves [[target]] and linked_memory_ids). */
   expand_wikilinks?: boolean;
   expandWikilinks?: boolean;
@@ -1871,7 +1875,7 @@ export function queryContext(
           results.push(item);
           packedIds.add(item.entry.id);
           totalTokensUsed += tokens;
-          recordAccessFor(store, item.entry);
+          if (options.recordAccess !== false) recordAccessFor(store, item.entry);
         }
       }
 
@@ -1883,7 +1887,7 @@ export function queryContext(
         if (totalTokensUsed + tokens <= options.tokenBudget) {
           results.push(item);
           totalTokensUsed += tokens;
-          recordAccessFor(store, item.entry);
+          if (options.recordAccess !== false) recordAccessFor(store, item.entry);
         }
       }
     }
@@ -1891,7 +1895,7 @@ export function queryContext(
     for (const item of dedupedCandidates.slice(0, limit)) {
       results.push(item);
       totalTokensUsed += estimateEntryTokens(item.entry);
-      recordAccessFor(store, item.entry);
+      if (options.recordAccess !== false) recordAccessFor(store, item.entry);
     }
   }
 
@@ -1927,16 +1931,20 @@ export function queryContext(
     }
   }
 
-  const associated = options.associative
-    ? expandAssociative(
+  const associativeExpansion = options.associative
+    ? expandAssociativeDetailed(
         store,
         results.slice(0, 5).map((item) => item.entry.id),
-        { maxDepth: options.max_associative_depth },
+        { maxDepth: options.max_associative_depth, project: options.project, includeSuperseded: options.includeSuperseded },
       )
     : undefined;
+  const associated = associativeExpansion?.nodes;
 
   const circuitDegraded = store.circuit?.isDegraded() ?? false;
   const collectedFaultNotes: string[] = [];
+  if (associativeExpansion?.degraded) {
+    collectedFaultNotes.push(`associative_expansion_degraded: ${associativeExpansion.error ?? "CTE failed"}`);
+  }
   if (options.degraded_notes) {
     collectedFaultNotes.push(...options.degraded_notes);
   }
@@ -2157,7 +2165,7 @@ export function formatPromptContext(
   }
 
   const result = queryContext(store, query, options);
-  const constraints = memoryDir ? syncConstraints(memoryDir, store) : [];
+  const constraints = memoryDir && options.syncConstraints !== false ? syncConstraints(memoryDir, store) : [];
   const userProfile = getUserProfile(memoryDir, { query });
   const coreBlock = formatCoreBlock(memoryDir);
 

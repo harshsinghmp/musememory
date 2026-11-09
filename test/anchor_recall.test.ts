@@ -22,6 +22,13 @@ describe("T-435: AST-anchored invariant auto-recall", () => {
       const bySymbol = recallAnchoredMemories(store, { symbols: ["hashToken"] });
       expect(bySymbol.map((item) => item.entry.id)).toEqual([discovery.id]);
       expect(recallAnchoredMemories(store, { files: ["src/none.ts"] })).toEqual([]);
+
+      const foreign = propose(store, { content: "foreign constraint", project: "other", type: "constraint", confirmed: true });
+      save(store, { ...get(store, foreign.id)!, anchors: [{ id: "a3", kind: "file", file_path: "src/auth.ts" }] });
+      expect(recallAnchoredMemories(store, { files: ["src/auth.ts"], project: "p" }).map((i) => i.entry.id)).toEqual([constraint.id]);
+
+      save(store, { ...get(store, constraint.id)!, anchors: [{ id: "a1", kind: "file", file_path: "src/auth.ts", status: "orphaned" }] });
+      expect(recallAnchoredMemories(store, { files: ["src/auth.ts"], project: "p" })).toEqual([]);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }

@@ -167,7 +167,7 @@ export async function handleRecallCommand({ positional, flags }: ParsedArgs): Pr
     type: flags["type"],
     status: flags["status"],
     verified: flags["verified"] === "true",
-    associative: flags["associative"] !== undefined,
+    associative: flags["associative"] === "true",
   });
   for (const r of res.results) printEntry(r.entry);
   if (res.associated && res.associated.length > 0) {
@@ -332,13 +332,28 @@ export async function handleHarvestAutoCommand({ flags }: ParsedArgs): Promise<n
 export async function handlePreflightCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
-  const files = flags["files"] ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean) : positional;
-  const tokenBudget = flags["budget"] ? parseInt(flags["budget"], 10) : undefined;
+  const budgetRaw = flags["budget"];
+  const tokenBudget = budgetRaw !== undefined ? parseInt(budgetRaw, 10) : undefined;
+  if (budgetRaw !== undefined && (!Number.isFinite(tokenBudget) || (tokenBudget as number) <= 0)) {
+    return usageError("--budget requires a positive integer");
+  }
+  const linesRaw = flags["lines"];
+  const changedLines = linesRaw !== undefined ? parseInt(linesRaw, 10) : undefined;
+  if (linesRaw !== undefined && !Number.isFinite(changedLines)) {
+    return usageError("--lines requires a non-negative integer");
+  }
+  const files = flags["files"]
+    ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean)
+    : positional;
+  const symbols = flags["symbols"] ? String(flags["symbols"]).split(",").map((s) => s.trim()).filter(Boolean) : undefined;
   const { query, files: changed, context, risk, anchors } = preflightContext(ctx.store, {
     files: files.length > 0 ? files : undefined,
     branch: flags["branch"],
     tokenBudget,
     project: flags["project"],
+    symbols,
+    changedLines,
+    cwd: ctx.root,
   });
   console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens · risk ${risk.level} (${risk.score}/100)`);
   if (anchors.length > 0) {

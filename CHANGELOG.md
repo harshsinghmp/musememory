@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Wave 26 associative retrieval**: recursive-CTE associative expansion (`memory recall --associative`), speculative pre-flight context (`memory preflight`) with blast-radius risk scoring, and AST-anchored invariant auto-recall.
+- **Wave 26 associative retrieval**: recursive-CTE associative expansion (`memory recall --associative`), speculative pre-flight context (`memory preflight`) with blast-radius risk scoring, and anchor-matched invariant auto-recall.
 - **Episode fidelity and `muse_episodes`**: observation provenance no longer classifies failed test commands as verifications; explicit metadata phases win; recent causal episodes are available over MCP.
 - **Studio left rail (`T-451`)**: fixed 76px numbered navigation (`01 OVERVIEW`–`06 ABOUT`), warm-dark palette, Archivo Black + JetBrains Mono, and an About anchor; all prior views remain reachable from a tools group.
 - **Dual-scope memory switcher (`T-452`)**: project / global / cross-project-mesh selector with live refetch; global and mesh reads open stores read-only, writes stay project-scoped behind a visible banner.

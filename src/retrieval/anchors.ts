@@ -5,6 +5,8 @@ import type { ScoredEntry } from "../retrieval.ts";
 export interface AnchorRecallInput {
   files?: string[];
   symbols?: string[];
+  project?: string;
+  includeUntrusted?: boolean;
   limit?: number;
 }
 
@@ -16,9 +18,13 @@ const PRIORITY: Record<string, number> = {
   negative: 0.85,
 };
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.?\//, "");
+}
+
 function fileMatches(anchorPath: string, queryPath: string): boolean {
-  const a = anchorPath.replace(/^\.\//, "");
-  const b = queryPath.replace(/^\.\//, "");
+  const a = normalizePath(anchorPath);
+  const b = normalizePath(queryPath);
   return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
 }
 
@@ -35,10 +41,15 @@ export function recallAnchoredMemories(store: Store, input: AnchorRecallInput): 
   const matches: ScoredEntry[] = [];
   for (const entry of list(store)) {
     if (entry.status !== "active" && entry.status !== "confirmed") continue;
+    if (input.project && entry.project !== input.project) continue;
+    if (!input.includeUntrusted && entry.trust === "untrusted") continue;
+    if (entry.valid_to && Date.parse(entry.valid_to) <= Date.now()) continue;
+    if (entry.expires_at && Date.parse(entry.expires_at) <= Date.now()) continue;
     const hit = entry.anchors?.find((anchor) => {
+      if (anchor.status === "orphaned" || anchor.status === "drifted") return false;
       if (anchor.file_path && files.some((file) => fileMatches(anchor.file_path, file))) return true;
       const name = anchor.symbol_name ?? anchor.qualified_name;
-      return Boolean(name && symbols.includes(name));
+      return Boolean(name && symbols.some((symbol) => symbol.toLowerCase() === name.toLowerCase()));
     });
     if (!hit) continue;
     const base = entry.type ? PRIORITY[entry.type] ?? 0.7 : 0.7;
@@ -51,6 +62,12 @@ export function recallAnchoredMemories(store: Store, input: AnchorRecallInput): 
   }
 
   return matches
-    .sort((a, b) => b.score - a.score || Date.parse(b.entry.updated_at) - Date.parse(a.entry.updated_at))
+    .sort((a, b) => {
+      const byScore = b.score - a.score;
+      if (byScore !== 0) return byScore;
+      const at = Date.parse(a.entry.updated_at);
+      const bt = Date.parse(b.entry.updated_at);
+      return (Number.isNaN(bt) ? 0 : bt) - (Number.isNaN(at) ? 0 : at);
+    })
     .slice(0, Math.min(Math.max(input.limit ?? 10, 1), 50));
 }

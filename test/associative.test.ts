@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, propose, save, get } from "../src/store.ts";
-import { expandAssociative } from "../src/associative.ts";
+import { expandAssociative, expandAssociativeDetailed } from "../src/associative.ts";
 import { queryContext } from "../src/retrieval.ts";
 
 function link(store: ReturnType<typeof openStore>, from: string, to: string) {
@@ -30,6 +30,16 @@ describe("T-432: recursive CTE associative expansion", () => {
 
       const result = queryContext(store, "alpha", { associative: true, limit: 1 });
       expect(result.associated?.some((node) => node.id === b.id && node.depth === 1)).toBe(true);
+
+      const other = propose(store, { content: "other project", project: "other", confirmed: true });
+      const scoped = propose(store, { content: "scoped alpha", project: "p", confirmed: true });
+      link(store, scoped.id, other.id);
+      expect(expandAssociative(store, [scoped.id], { project: "p" }).some((n) => n.id === other.id)).toBe(false);
+
+      const broken = { db: { query: () => { throw new Error("no such table"); } } } as any;
+      const degraded = expandAssociativeDetailed(broken, ["m_1_x"]);
+      expect(degraded.degraded).toBe(true);
+      expect(degraded.error).toContain("no such table");
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }

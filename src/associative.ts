@@ -1,14 +1,25 @@
 import type { Store } from "./store.ts";
+import { list } from "./store.ts";
 
 export interface AssociativeOptions {
   maxDepth?: number;
   maxNodes?: number;
+  project?: string;
+  includeSuperseded?: boolean;
 }
 
 export interface AssociativeNode {
   id: string;
   depth: number;
 }
+
+export interface AssociativeExpansion {
+  nodes: AssociativeNode[];
+  degraded: boolean;
+  error?: string;
+}
+
+const HIDDEN_STATUSES = new Set(["superseded", "rejected", "conflicted"]);
 
 /**
  * T-432: cycle-safe transitive closure over `linked_memory_ids` using a
@@ -20,14 +31,22 @@ export function expandAssociative(
   seedIds: string[],
   options: AssociativeOptions = {},
 ): AssociativeNode[] {
-  if (!store.db || seedIds.length === 0) return [];
+  return expandAssociativeDetailed(store, seedIds, options).nodes;
+}
+
+export function expandAssociativeDetailed(
+  store: Store,
+  seedIds: string[],
+  options: AssociativeOptions = {},
+): AssociativeExpansion {
+  if (!store.db || seedIds.length === 0) return { nodes: [], degraded: false };
   const maxDepth = Math.min(Math.max(options.maxDepth ?? 2, 1), 5);
   const maxNodes = Math.min(Math.max(options.maxNodes ?? 100, 1), 1000);
   const seeds = JSON.stringify([...new Set(seedIds.filter(Boolean))]);
 
   try {
     const seedSet = new Set(seedIds);
-    return store.db
+    const rows = store.db
       .query<AssociativeNode>(
         `WITH RECURSIVE assoc(id, depth) AS (
            SELECT value, 0 FROM json_each(?)
@@ -46,9 +65,21 @@ export function expandAssociative(
          ORDER BY depth ASC, a.id ASC
          LIMIT ?`,
       )
-      .all([seeds, maxDepth, maxNodes])
-      .filter((node) => !seedSet.has(node.id));
-  } catch {
-    return [];
+      .all([seeds, maxDepth, maxNodes]);
+
+    // Gate the output through the same lifecycle/scope view as normal reads.
+    const visible = new Map(list(store).map((entry) => [entry.id, entry]));
+    const nodes = rows.filter((node) => {
+      if (seedSet.has(node.id)) return false;
+      const entry = visible.get(node.id);
+      if (!entry) return false;
+      if (options.project && entry.project !== options.project) return false;
+      if (!options.includeSuperseded && HIDDEN_STATUSES.has(entry.status)) return false;
+      if (entry.trust === "untrusted") return false;
+      return true;
+    });
+    return { nodes, degraded: false };
+  } catch (err) {
+    return { nodes: [], degraded: true, error: err instanceof Error ? err.message : String(err) };
   }
 }

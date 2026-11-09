@@ -612,10 +612,10 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 - [x] T-431 · LANDED 2026-11-08 — PR #360 + #361: CLI & MCP Playbook Commands: Wire `memory playbook --run <id>`, `memory playbook --list`, and `muse_playbook_recall` / `muse_playbook_record` MCP tools · src/cli/playbook.ts, src/mcp.ts · F
 
 ## Wave 26: R18 AST Associative Callgraph Retrieval & Speculative Pre-Flight
-- [x] T-432 · LANDED 2026-11-09 — direct dev 2389985: Recursive SQLite CTE Associative Expansion (Zero-Daemon HippoRAG): 2-hop associative graph traversal using in-process SQLite recursive CTEs (`WITH RECURSIVE call_tree AS (...)`) · src/sqlite.ts, src/retrieval/ · F
-- [x] T-433 · LANDED 2026-11-09 — PR #370: Speculative Pre-Flight Context Push: Git and editor hooks pre-calculating token-budgeted memory knapsacks on file opening or branch switching · src/hooks/preflight.ts · F
-- [x] T-434 · LANDED 2026-11-09 — PR #371: Cross-File Symbol Blast-Radius Risk Scoring: AST identifier cross-reference scoring to rate modification risk for proposed code changes · src/anchors/blast_radius.ts · F
-- [x] T-435 · LANDED 2026-11-09 — PR #372: AST-Anchored Invariant Auto-Recall: Bind exported symbols and route interfaces directly to governing ADRs and architectural invariants · src/retrieval/anchors.ts · F
+- [x] T-432 · LANDED 2026-11-09 — direct dev 2389985: Recursive SQLite CTE Associative Expansion (Zero-Daemon HippoRAG): 2-hop associative graph traversal using in-process SQLite recursive CTEs (`WITH RECURSIVE call_tree AS (...)`) · src/associative.ts, src/retrieval.ts · F
+- [x] T-433 · LANDED 2026-11-09 — PR #370: Speculative Pre-Flight Context Push: Pre-flight context builder (CLI; hook wiring deferred) on file opening or branch switching · src/hooks/preflight.ts · F
+- [x] T-434 · LANDED 2026-11-09 — PR #371: Cross-File Symbol Blast-Radius Risk Scoring: File/symbol blast-radius heuristic (registry AST integration deferred) to rate modification risk for proposed code changes · src/intelligence/blast_risk.ts · F
+- [x] T-435 · LANDED 2026-11-09 — PR #372: Anchor-Matched Invariant Auto-Recall: Bind exported symbols and route interfaces directly to governing ADRs and architectural invariants · src/retrieval/anchors.ts · F
 
 ## Wave 27: R19 Git-Branchable Memories & Multi-Tenant Agency Enclaves
 - [ ] T-436 · Branchable Memory Overlays (`memory branch` / `branch-merge`): Branch-isolated memory layers tracking git feature branch lifecycles · src/store/branch.ts · F
