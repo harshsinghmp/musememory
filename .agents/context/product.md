@@ -46,6 +46,8 @@ across sessions — without an external database daemon, an account, or a cloud 
 | `muse_reconcile_anchors` | **Anchor Repair** | Prunes dead references and refreshes structural hashes across the store. |
 | `memory_test_feedback` | **Outcome Loop** | Binds a real test run to the applied memories: green reinforces, red penalizes (regression only for relevant anchors). |
 | `muse_regression_sentry` | **Regression Sentry** | Matches failing tests to `BUG_PRONE_PATTERN` / `DO_NOT_USE` memories and returns remediation playbooks (read-only). |
+| `muse_flaky_tests` | **Flakiness & Drift** | Flaky tests, failure bursts and dependency-file drift before a burst, derived from recorded runs (read-only). |
+| `muse_remediation_playbooks` | **Remediation** | Turns recurring failures into playbook candidates with sentry-derived steps (read-only; persistence is CLI `--apply`). |
 | `muse_profile_list` | **Tool Management** | Lists the task-focused profiles and the tools each one exposes. |
 | `memory_adr_record` / `memory_adr_list` | **Architecture Decisions** | Records and lists living ADRs with drivers, consequences, options considered and native code anchors. |
 | `memory_drift_audit` | **Drift Detection** | Bi-directional documentation ↔ code drift engine across 6 alignment states. |

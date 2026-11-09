@@ -3,6 +3,8 @@ import { requireRoot, usageError } from "./shared.ts";
 import type { ParsedArgs } from "./shared.ts";
 import { parseTestRun, recordTestFeedback } from "../quality/test_feedback.ts";
 import { runRegressionSentry } from "../cognition/sentry.ts";
+import { analyzeTestFlakiness } from "../doctor/flaky.ts";
+import { applyRemediationPlaybooks, synthesizeRemediationPlaybooks } from "../cognition/remediation.ts";
 
 function readLogs(flags: Record<string, string>): string {
   const input = flags["input"];
@@ -102,6 +104,86 @@ export async function handleSentryCommand({ flags }: ParsedArgs): Promise<number
   for (const playbook of report.playbooks) {
     console.log(`  playbook: ${playbook.title}`);
     for (const step of playbook.steps) console.log(`    - ${step}`);
+  }
+  console.log(report.notice);
+  return 0;
+}
+
+function numericFlag(flags: Record<string, string>, name: string): number | undefined {
+  const raw = flags[name];
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+export async function handleFlakyCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+
+  const report = analyzeTestFlakiness(ctx.memoryDir, {
+    project: flags["project"],
+    root: ctx.root,
+    windowHours: numericFlag(flags, "window-hours"),
+    gapMinutes: numericFlag(flags, "gap-minutes"),
+    minFailures: numericFlag(flags, "min-failures"),
+  });
+
+  if (flags["json"] !== undefined) {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+
+  console.log(`recorded test runs: ${report.runs}`);
+  console.log(`flaky tests: ${report.flaky.length}`);
+  for (const test of report.flaky) {
+    console.log(`  ${test.name} [${test.command}] ${test.appearances}/${test.runs} failed, ${test.episodes} episode(s), last ${test.last_failed_at}`);
+  }
+  console.log(`failure bursts: ${report.bursts.length}`);
+  for (const burst of report.bursts) {
+    console.log(`  ${burst.start} → ${burst.end}: ${burst.failing_runs} failing run(s)${burst.tests.length ? ` (${burst.tests.slice(0, 5).join(", ")})` : ""}`);
+  }
+  console.log(`dependency drift: ${report.drift.length}`);
+  for (const change of report.drift) {
+    console.log(`  ${change.artifact} changed ${change.hours_before_burst}h before burst ${change.burst_start}`);
+  }
+  console.log(report.notice);
+  return 0;
+}
+
+export async function handleRemediationCommand({ flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+
+  const report = synthesizeRemediationPlaybooks(ctx.memoryDir, ctx.store, {
+    project: flags["project"],
+    minRecurrences: numericFlag(flags, "min-recurrences"),
+    limit: numericFlag(flags, "limit"),
+  });
+
+  let applied: ReturnType<typeof applyRemediationPlaybooks> | undefined;
+  if (flags["apply"] !== undefined) {
+    applied = applyRemediationPlaybooks(ctx.memoryDir, report, {
+      includeUnresolved: flags["include-unresolved"] !== undefined,
+    });
+  }
+
+  if (flags["json"] !== undefined) {
+    console.log(JSON.stringify({ report, applied }, null, 2));
+    return 0;
+  }
+
+  console.log(`recorded test runs: ${report.runs}`);
+  console.log(`candidates: ${report.candidates.length} (${report.candidates.filter((candidate) => candidate.resolved).length} resolved)`);
+  for (const candidate of report.candidates) {
+    const state = candidate.resolved ? "resolved" : "unresolved";
+    const matched = candidate.matched_memory_id ? ` matched ${candidate.matched_memory_id}` : " no negative match";
+    console.log(`  [${state}] ${candidate.signature} — ${candidate.occurrences} failure(s), ${candidate.episodes} episode(s)${matched}`);
+  }
+  if (applied) {
+    console.log(`applied: ${applied.created.length} playbook(s) written, ${applied.skipped.length} skipped`);
+    for (const playbook of applied.created) console.log(`  + ${playbook.title}`);
+  } else {
+    console.log("dry run: pass --apply to persist resolved candidates");
   }
   console.log(report.notice);
   return 0;

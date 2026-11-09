@@ -131,6 +131,8 @@ export const ALL_MEMORY_TOOLS = [
   "muse_attestation_verify",
   "memory_test_feedback",
   "muse_regression_sentry",
+  "muse_flaky_tests",
+  "muse_remediation_playbooks",
 ];
 
 export { ConnectOptions, ConnectReport };

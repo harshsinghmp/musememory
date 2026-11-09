@@ -36,7 +36,7 @@ import { handleAttestCommand } from "./cli/attest.ts";
 import { handleMerge3Command } from "./cli/merge3.ts";
 import { handleProjectCommand } from "./cli/project.ts";
 import { handleIoCommand } from "./cli/io.ts";
-import { handleSentryCommand, handleTestFeedbackCommand } from "./cli/test_feedback.ts";
+import { handleSentryCommand, handleTestFeedbackCommand, handleFlakyCommand, handleRemediationCommand } from "./cli/test_feedback.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import { handleEmbedCommand } from "./cli/embed.ts";
 import { handleWikiCommand } from "./cli/wiki.ts";
@@ -133,6 +133,8 @@ Core Memory Lifecycle Commands:
   briefing [--limit N]          Executive summary of active and stale memories
   test-feedback --command C --exit-code N [--memory ID,...]  Reinforce/penalize applied memories from a real test run
   sentry --command C --exit-code N [--input F|-]  Read-only regression sentry against negative memories
+  flaky [--json]                Flaky tests, failure bursts and dependency-file drift from recorded runs
+  remediation [--apply]         Synthesize reusable playbooks from recurring, resolved test failures
 
 Evidence, Provenance & Cognitive Governance:
   source [add|list|show]        Manage external documentation and URLs in provenance Source Ledger
@@ -340,6 +342,10 @@ export async function main(argv: string[]): Promise<number> {
       return handleTestFeedbackCommand(parsed);
     case "sentry":
       return handleSentryCommand(parsed);
+    case "flaky":
+      return handleFlakyCommand(parsed);
+    case "remediation":
+      return handleRemediationCommand(parsed);
     case "stale":
       return handleStaleCommand(parsed);
     case "consolidate":

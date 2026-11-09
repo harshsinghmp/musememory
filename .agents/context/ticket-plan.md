@@ -626,8 +626,8 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 ## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry
 - [x] T-440 · LANDED 2026-11-09 — Automated CI / Test Harness Integration: `src/quality/test_feedback.ts` parses bun/vitest/jest/cargo/pytest/go output and binds ROI to real outcomes; CLI `test-feedback` + MCP `memory_test_feedback` · F
 - [x] T-441 · LANDED 2026-11-09 — Negative Anti-Pattern Regression Sentry: read-only matching against BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories with remediation playbooks; CLI `sentry` + MCP `muse_regression_sentry` · src/cognition/sentry.ts · F
-- [ ] T-442 · Flaky Test & Environment Drift Detector: Correlate test flakiness and failure bursts with dependency updates and environmental churn · src/doctor/flaky.ts · F
-- [ ] T-443 · Autonomous Remediation Playbook Generator: Automatically synthesize recurring test fix sequences into verified reusable playbooks · src/cognition/remediation.ts · F
+- [x] T-442 · LANDED 2026-11-09 — Flaky Test & Environment Drift Detector: `src/doctor/flaky.ts` derives flaky tests (per command), failure bursts and dependency-file drift from the `test_feedback` ledger; CLI `flaky` + MCP `muse_flaky_tests` · F
+- [x] T-443 · LANDED 2026-11-09 — Autonomous Remediation Playbook Generator: `src/cognition/remediation.ts` synthesizes playbook candidates from recurring failures using sentry guidance; applies resolved candidates only; CLI `remediation` + MCP `muse_remediation_playbooks` · F
 
 ## Wave 29: Sovereign Ecosystem Migration & Decommissioning
 - [x] T-444 · Sovereign Persona & Memory Ingestion: Synthesize user persona into `~/.memory/USER.md` and SQLite memory store; legacy import tool permanently removed from source · F

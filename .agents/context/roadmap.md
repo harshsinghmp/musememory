@@ -62,13 +62,15 @@
 ---
 
 ### 4. **R20: Test-Driven Memory Reinforcement & Autonomous Regression Sentry**
-- **Automated CI / Test Harness Integration Loop**:
+- **Automated CI / Test Harness Integration Loop**: **Landed 2026-11-09** (`T-440`, `src/quality/test_feedback.ts`; `memory test-feedback` / `memory_test_feedback`).
   - Binds memory utility ROI directly to test outcomes (`bun test`, `vitest`, `jest`, `cargo test`).
   - Passing tests increment memory confidence and `successful_applications`; failing tests trigger automated dispute and regression tracking.
-- **Negative Anti-Pattern Regression Sentry**:
+- **Negative Anti-Pattern Regression Sentry**: **Landed 2026-11-09** (`T-441`, `src/cognition/sentry.ts`; `memory sentry` / `muse_regression_sentry`).
   - Proactive watchdog matching test failure signatures and stack traces against known `BUG_PRONE_PATTERN` and `DO_NOT_USE` entries, generating immediate remediation playbooks.
-- **Flaky Test & Environment Drift Detector**:
+- **Flaky Test & Environment Drift Detector**: **Landed 2026-11-09** (`T-442`, `src/doctor/flaky.ts`; `memory flaky` / `muse_flaky_tests`).
   - Correlates test intermittency with past dependency upgrades, node runtime versions, and environmental invariants.
+- **Autonomous Remediation Playbooks**: **Landed 2026-11-09** (`T-443`, `src/cognition/remediation.ts`; `memory remediation` / `muse_remediation_playbooks`).
+  - Synthesizes reusable playbooks from recurring failures and persists only resolved signatures by default.
 
 ---
 

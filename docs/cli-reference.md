@@ -47,6 +47,8 @@ Core Memory Lifecycle Commands:
   briefing [--limit N]          Executive summary of active and stale memories
   test-feedback --command C --exit-code N [--memory ID,...]  Reinforce/penalize applied memories from a real test run
   sentry --command C --exit-code N [--input F|-]  Read-only regression sentry against negative memories
+  flaky [--json]                Flaky tests, failure bursts and dependency-file drift from recorded runs
+  remediation [--apply]         Synthesize reusable playbooks from recurring, resolved test failures
 
 Evidence, Provenance & Cognitive Governance:
   source [add|list|show]        Manage external documentation and URLs in provenance Source Ledger
@@ -118,7 +120,7 @@ Version Control (R23):
 
 ## MCP tools
 
-**124 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
+**126 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
 
 Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_profile_list` for the live mapping.
 
@@ -277,10 +279,12 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
 | `memory_test_feedback` | `command`, `exit_code` | Bind a real test run to the memories that were applied: green runs reinforce them, red runs record a failed application and a regression strike for anchor-relevant memories. Returns the parsed run plus regression-sentry matches. |
 | `muse_regression_sentry` | `client` | Read-only: match failing tests against recorded BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories and return remediation playbooks |
+| `muse_flaky_tests` | `client` | Read-only: flaky tests, failure bursts and dependency-file drift derived from recorded test_feedback runs |
+| `muse_remediation_playbooks` | `client` | Read-only: synthesize remediation playbook candidates from recurring, resolved test failures (nothing is persisted) |
 | `muse_enclave_recall` | `client` | Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged. |
 | `muse_overlay_status` | `public_key` | Read-only: list branch memory overlays and their entry counts, or inspect one branch overlay's entries |
 | `muse_attestation_verify` | `public_key` | Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key |
 
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 124 tools, 7 profiles, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 126 tools, 7 profiles, 30 import formats, 8 credential rule families.

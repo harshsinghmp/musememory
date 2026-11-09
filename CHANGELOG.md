@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Flaky test and environment-drift detector (`T-442`)**: `src/doctor/flaky.ts` reconstructs runs from the `test_feedback` ledger and reports flaky tests (fail → pass → fail, analysed per command), failure bursts, and dependency-file changes shortly before a burst. Surfaces: `memory flaky` and `muse_flaky_tests`.
+- **Remediation playbook generator (`T-443`)**: `src/cognition/remediation.ts` synthesizes playbook candidates from recurring failures, reusing regression-sentry guidance for steps and verification, and persists resolved candidates only (`--apply`). Surfaces: `memory remediation` and `muse_remediation_playbooks`. Tool count 124 → 126.
 - **Test-outcome feedback (`T-440`)**: `src/quality/test_feedback.ts` parses bun, vitest, jest, cargo, pytest and go output and binds a real run to the memories applied during the work. Green runs reinforce every linked memory; red runs record a failed application and a regression strike only for anchor/symbol/reproduction-relevant memories (the T-313 rule). Surfaces: `memory test-feedback` and `memory_test_feedback`.
 - **Regression sentry (`T-441`)**: `src/cognition/sentry.ts` matches failing tests against `BUG_PRONE_PATTERN` / `DO_NOT_USE` / failed-approach memories and returns remediation playbooks. Read-only: it never mutates the store or ledger. Surfaces: `memory sentry` and `muse_regression_sentry`. Tool count 122 → 124.
 - **`memory io` (R29)**: process read/write counters from `/proc/self/io` plus on-disk SQLite, WAL, audit and observation bytes; `--json` for machines, and a clear "unavailable" line on platforms without procfs.

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, propose, get } from "../src/store.ts";
 import { recordNegativeLesson } from "../src/learning/index.ts";
+import { recordTestFeedback } from "../src/quality/test_feedback.ts";
 import { createServer } from "../src/mcp.ts";
 
 function fixture() {
@@ -87,6 +88,40 @@ describe("T-440/T-441: MCP test-feedback and regression-sentry surfaces", () => 
       expect(missingCommand.isError).toBe(true);
       const missingCode = await invoke("memory_test_feedback", { command: "bun test" });
       expect(missingCode.isError).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("muse_flaky_tests and muse_remediation_playbooks read recorded history", async () => {
+    const { root, store, invoke } = fixture();
+    try {
+      const record = (passed: boolean, failures: string[]) =>
+        recordTestFeedback(
+          store,
+          {
+            command: "bun test src/math.test.ts",
+            exitCode: passed ? 0 : 1,
+            stdout: failures.map((name) => `(fail) ${name}`).join("\n"),
+          },
+          { project: "p" },
+        );
+      record(false, ["divides"]);
+      record(true, []);
+      record(false, ["divides"]);
+
+      const flaky = await invoke("muse_flaky_tests", { project: "p" });
+      expect(flaky.isError).toBeFalsy();
+      const flakyReport = JSON.parse(flaky.content[0].text);
+      expect(flakyReport.runs).toBe(3);
+      expect(flakyReport.flaky[0].name).toBe("divides");
+
+      const remediation = await invoke("muse_remediation_playbooks", { project: "p" });
+      expect(remediation.isError).toBeFalsy();
+      const remediationReport = JSON.parse(remediation.content[0].text);
+      expect(remediationReport.candidates.length).toBeGreaterThan(0);
+      expect(remediationReport.candidates[0].signature).toBe("divides");
+      expect(remediationReport.notice).toContain("Read-only");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

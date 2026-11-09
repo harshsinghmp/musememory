@@ -69,6 +69,8 @@ import {
   parseTestRun,
 } from "./quality/index.ts";
 import { runRegressionSentry, type SentryFailure } from "./cognition/sentry.ts";
+import { synthesizeRemediationPlaybooks } from "./cognition/remediation.ts";
+import { analyzeTestFlakiness } from "./doctor/flaky.ts";
 import {
   recordObservation,
   listObservations,
@@ -1914,6 +1916,33 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "muse_flaky_tests",
+        description: "Read-only: flaky tests, failure bursts and dependency-file drift derived from recorded test_feedback runs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Optional project scope" },
+            window_hours: { type: "number", description: "Dependency-drift lookback in hours (default 24)" },
+            gap_minutes: { type: "number", description: "Max gap between failures in one burst (default 45)" },
+            min_failures: { type: "number", description: "Minimum failing runs per burst (default 3)" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+      {
+        name: "muse_remediation_playbooks",
+        description: "Read-only: synthesize remediation playbook candidates from recurring, resolved test failures (nothing is persisted)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "Optional project scope" },
+            min_recurrences: { type: "number", description: "Minimum recorded failures (default 2)" },
+            limit: { type: "number", description: "Maximum audit events to inspect" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+      {
         name: "muse_enclave_recall",
         description: "Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged.",
         inputSchema: {
@@ -3503,6 +3532,24 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: a.project ? String(a.project) : undefined,
           command,
           limit: a.limit !== undefined ? clampLimit(a.limit, 20, 100, 1) : 20,
+        });
+        return toolResult(report);
+      }
+      case "muse_flaky_tests": {
+        const report = analyzeTestFlakiness(activeMemoryDir, {
+          project: a.project ? String(a.project) : undefined,
+          root: activeRoot,
+          windowHours: a.window_hours !== undefined ? clampLimit(a.window_hours, 24, 720, 1) : undefined,
+          gapMinutes: a.gap_minutes !== undefined ? clampLimit(a.gap_minutes, 45, 1440, 1) : undefined,
+          minFailures: a.min_failures !== undefined ? clampLimit(a.min_failures, 3, 100, 2) : undefined,
+        });
+        return toolResult(report);
+      }
+      case "muse_remediation_playbooks": {
+        const report = synthesizeRemediationPlaybooks(activeMemoryDir, activeStore, {
+          project: a.project ? String(a.project) : undefined,
+          minRecurrences: a.min_recurrences !== undefined ? clampLimit(a.min_recurrences, 2, 100, 2) : undefined,
+          limit: a.limit !== undefined ? clampLimit(a.limit, 1000, 10000, 10) : undefined,
         });
         return toolResult(report);
       }
