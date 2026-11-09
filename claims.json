@@ -14,8 +14,8 @@
     "networkMillis": 300
   },
   "tests": {
-    "count": 1507,
-    "assertions": 7226,
-    "files": 237
+    "count": 1510,
+    "assertions": 7234,
+    "files": 238
   }
 }
