@@ -12,6 +12,7 @@ import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
 import { buildSafeFtsQuery } from "./sqlite.ts";
+import { expandAssociative, type AssociativeNode } from "./associative.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
 import { isDraftMemory } from "./drafts.ts";
@@ -252,6 +253,9 @@ export interface ContextQueryOptions extends SearchOptions {
   /** T-097: Hindsight recall-time deduplication favoring concrete observations over abstract inferences (scoped to top-2x limit). */
   prefer_observations?: boolean;
   preferObservations?: boolean;
+  /** T-432: Recursive-CTE associative expansion from the top results (opt-in). */
+  associative?: boolean;
+  max_associative_depth?: number;
   /** T-098: Progressive wikilink expansion after fusion (resolves [[target]] and linked_memory_ids). */
   expand_wikilinks?: boolean;
   expandWikilinks?: boolean;
@@ -283,6 +287,8 @@ export interface SearchResult {
   stale: boolean;
   fromCache?: boolean;
   totalTokensUsed?: number;
+  /** T-432: Associated memory ids discovered by the recursive CTE. */
+  associated?: AssociativeNode[];
   /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
   degraded?: boolean;
   /** T-133: Diagnostic fault notes explaining why retrieval degraded. */
@@ -1921,6 +1927,14 @@ export function queryContext(
     }
   }
 
+  const associated = options.associative
+    ? expandAssociative(
+        store,
+        results.slice(0, 5).map((item) => item.entry.id),
+        { maxDepth: options.max_associative_depth },
+      )
+    : undefined;
+
   const circuitDegraded = store.circuit?.isDegraded() ?? false;
   const collectedFaultNotes: string[] = [];
   if (options.degraded_notes) {
@@ -1989,6 +2003,7 @@ export function queryContext(
     fault_notes: faultSignal.fault_notes,
     fromCache: false,
     totalTokensUsed,
+    associated,
     withheld: withheld.length > 0 ? withheld : undefined,
     watermark: getStoreWatermark(store),
     mode: hasConfidentMatch ? "confident_match" : "no_confident_match",

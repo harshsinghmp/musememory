@@ -166,8 +166,13 @@ export async function handleRecallCommand({ positional, flags }: ParsedArgs): Pr
     type: flags["type"],
     status: flags["status"],
     verified: flags["verified"] === "true",
+    associative: flags["associative"] !== undefined,
   });
   for (const r of res.results) printEntry(r.entry);
+  if (res.associated && res.associated.length > 0) {
+    console.log("associated:");
+    for (const node of res.associated) console.log(`  ${node.id} (depth ${node.depth})`);
+  }
   return 0;
 }
 
