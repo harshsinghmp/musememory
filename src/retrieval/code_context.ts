@@ -1,5 +1,8 @@
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
+import { recordAuditEvent } from "../audit.ts";
 import type { ScoredEntry } from "../retrieval.ts";
 import type { MemoryEntry } from "../types.ts";
 
@@ -48,18 +51,85 @@ function isExpired(entry: MemoryEntry, now: number): boolean {
   return false;
 }
 
-/** Dominant project in the store; keeps unscoped callers fail-closed. */
-export function inferProject(store: Store): string {
+export interface ProjectIdentity {
+  project: string;
+  source: "env" | "config" | "inferred" | "directory" | "default";
+}
+
+function dominantProject(store: Store): string | undefined {
   const counts = new Map<string, number>();
   for (const entry of list(store)) {
     if (entry.project) counts.set(entry.project, (counts.get(entry.project) ?? 0) + 1);
   }
   const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  if (ranked.length === 0) return "default";
+  if (ranked.length === 0) return undefined;
   if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) {
-    throw new Error("Ambiguous project scope: pass an explicit project");
+    throw new Error("Ambiguous project scope: pass an explicit project or configure one");
   }
   return ranked[0][0];
+}
+
+/**
+ * Explicit project identity for CLI/MCP defaults:
+ * env override → .memory/config.json project → unambiguous store project →
+ * workspace directory name → "default".
+ */
+export function resolveProjectIdentity(store: Store): ProjectIdentity {
+  const env = process.env.MUSE_PROJECT?.trim();
+  if (env) return { project: env, source: "env" };
+
+  const memoryDir = store.memoryDir ?? store.dir;
+  const configPath = join(memoryDir, "config.json");
+  if (existsSync(configPath)) {
+    try {
+      const config = JSON.parse(readFileSync(configPath, "utf8")) as { project?: unknown };
+      if (typeof config.project === "string" && config.project.trim()) {
+        return { project: config.project.trim(), source: "config" };
+      }
+    } catch {
+      // invalid config must not block reads; fall through to inference
+    }
+  }
+
+  const inferred = dominantProject(store);
+  if (inferred) return { project: inferred, source: "inferred" };
+
+  const directory = basename(dirname(memoryDir));
+  if (directory && directory !== "." && directory !== "/") {
+    return { project: directory, source: "directory" };
+  }
+  return { project: "default", source: "default" };
+}
+
+export function inferProject(store: Store): string {
+  return resolveProjectIdentity(store).project;
+}
+
+function auditSensitiveRead(
+  store: Store,
+  input: CodeContextInput,
+  project: string | undefined,
+  matches: number,
+): void {
+  if (input.scope !== "all" && input.includeUntrusted !== true) return;
+  try {
+    recordAuditEvent(store.memoryDir ?? store.dir, {
+      operation: "read",
+      entry_id: "code_context",
+      project,
+      actor: "retrieval",
+      reason: input.scope === "all" ? "cross_project_read" : "untrusted_read",
+      details: {
+        scope: input.scope ?? "project",
+        includeUntrusted: input.includeUntrusted === true,
+        files: (input.files ?? []).slice(0, 15),
+        symbols: (input.symbols ?? []).slice(0, 50),
+        matches,
+      },
+    });
+  } catch {
+    // audit must never break a read
+  }
 }
 
 /**
@@ -107,7 +177,7 @@ export function resolveMemoriesForCode(store: Store, input: CodeContextInput): S
     matched.push({ entry, score: Math.min(1, base + anchorBoost + verified), why_retrieved: [reason] });
   }
 
-  return matched
+  const result = matched
     .sort((a, b) => {
       const byScore = b.score - a.score;
       if (byScore !== 0) return byScore;
@@ -116,4 +186,6 @@ export function resolveMemoriesForCode(store: Store, input: CodeContextInput): S
       return (Number.isNaN(bt) ? 0 : bt) - (Number.isNaN(at) ? 0 : at);
     })
     .slice(0, Math.min(Math.max(input.limit ?? 10, 1), 50));
+  auditSensitiveRead(store, input, project, result.length);
+  return result;
 }
