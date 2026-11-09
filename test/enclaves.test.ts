@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry } from "../src/store/enclaves.ts";
+import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName } from "../src/store/enclaves.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
 function entry(id: string, content: string): MemoryEntry {
@@ -26,6 +26,27 @@ describe("T-437: encrypted client enclaves", () => {
       putEnclaveEntry(memoryDir, "client-b", entry("m_2_other", "client b only"));
       expect(listEnclaveEntries(memoryDir, "client-a").map((e) => e.id)).toEqual(["m_1_secret"]);
       expect(listEnclaveEntries(memoryDir, "client-b").map((e) => e.id)).toEqual(["m_2_other"]);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects lossy names and detects vault relabeling", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-names-"));
+    try {
+      expect(() => validateEnclaveName("../acme", "client")).toThrow();
+      expect(() => validateEnclaveName("acme/alpha", "client")).toThrow();
+      expect(() => validateEnclaveName("acme alpha", "client")).toThrow();
+      expect(() => enclavePath(memoryDir, "..")).toThrow();
+
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "alpha only"));
+      const source = enclavePath(memoryDir, "client-a");
+      const target = enclavePath(memoryDir, "client-b");
+      const { mkdirSync } = require("node:fs") as typeof import("node:fs");
+      mkdirSync(join(memoryDir, "enclaves", "client-b"), { recursive: true });
+      writeFileSync(target, readFileSync(source));
+      expect(() => listEnclaveEntries(memoryDir, "client-b")).toThrow(/metadata/);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }
