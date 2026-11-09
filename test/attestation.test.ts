@@ -31,7 +31,17 @@ describe("T-438: zero-knowledge packet attestation", () => {
     expect(verifyAttestationChain([second, first, third], keys.publicKey)).toBe(false);
   });
 
-  test("canonical JSON is key-order independent", () => {
+  test("canonical JSON is key-order independent and rejects non-I-JSON", () => {
     expect(canonicalJson({ b: 1, a: { d: 2, c: 3 } })).toBe(canonicalJson({ a: { c: 3, d: 2 }, b: 1 }));
+    expect(canonicalJson({ a: undefined, b: 1 })).toBe('{"b":1}');
+    expect(() => canonicalJson(new Date(0))).toThrow();
+    expect(() => canonicalJson(Number.NaN)).toThrow();
+  });
+
+  test("rejects empty chains and tampered algorithm", () => {
+    const keys = generateAttestationKeypair();
+    expect(verifyAttestationChain([], keys.publicKey)).toBe(false);
+    const attestation = signPacket({ n: 1 }, keys.privateKey);
+    expect(verifyAttestationChain([{ ...attestation, algorithm: "rsa" as any }], keys.publicKey)).toBe(false);
   });
 });

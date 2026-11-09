@@ -17,11 +17,25 @@ export interface KeyPairPem {
 }
 
 export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === null) return "null";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("canonicalJson: non-finite number");
+    if (!Number.isSafeInteger(value) && Number.isInteger(value)) throw new Error("canonicalJson: unsafe integer");
+    return JSON.stringify(value);
+  }
+  if (typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
+  if (typeof value !== "object") throw new Error(`canonicalJson: unsupported ${typeof value}`);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error("canonicalJson: only plain objects are supported");
+  }
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+  const keys = Object.keys(record).filter((key) => record[key] !== undefined).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
 }
+
+const DOMAIN = "muse-attestation-v1\0";
 
 /** Content address of a packet; the attestation never needs the body again. */
 export function hashPacket(packet: unknown): string {
@@ -46,7 +60,15 @@ export function signPacket(
   const prev_hash = options.previous?.chain_hash;
   const chain_hash = createHash("sha256").update(`${prev_hash ?? "genesis"}:${packet_hash}`).digest("hex");
   const createdAt = new Date().toISOString();
-  const payload = canonicalJson({ packet_hash, prev_hash, chain_hash, created_at: createdAt, signer: options.signer ?? "musememory" });
+  const payload = DOMAIN + canonicalJson({
+    version: 1,
+    algorithm: "ed25519",
+    packet_hash,
+    prev_hash,
+    chain_hash,
+    created_at: createdAt,
+    signer: options.signer ?? "musememory",
+  });
   const signature = sign(null, Buffer.from(payload), privateKeyPem).toString("base64");
   return {
     version: 1,
@@ -61,7 +83,9 @@ export function signPacket(
 }
 
 function attestationPayload(attestation: Attestation): string {
-  return canonicalJson({
+  return DOMAIN + canonicalJson({
+    version: attestation.version,
+    algorithm: attestation.algorithm,
     packet_hash: attestation.packet_hash,
     prev_hash: attestation.prev_hash,
     chain_hash: attestation.chain_hash,
@@ -86,8 +110,10 @@ export function verifyAttestation(
 
 /** Verify order and linkage of an attestation chain. */
 export function verifyAttestationChain(chain: Attestation[], publicKeyPem: string): boolean {
+  if (!Array.isArray(chain) || chain.length === 0) return false;
   let previous: Attestation | undefined;
   for (const attestation of chain) {
+    if (attestation.version !== 1 || attestation.algorithm !== "ed25519") return false;
     if (attestation.prev_hash !== previous?.chain_hash) return false;
     const expected = createHash("sha256").update(`${attestation.prev_hash ?? "genesis"}:${attestation.packet_hash}`).digest("hex");
     if (attestation.chain_hash !== expected) return false;

@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Wave 27 hardening** (2026-11-09) — audit-REJECT fixes: strict names, GCM AAD/key id, audited overlay merge via T-439, fail-closed merge3, corrected claims. Gate 1521/0; CAPPED.
 - [x] **Wave 27 (`T-436`–`T-439`)** (2026-11-09) — branch overlays (#377), encrypted enclaves (#378), packet attestations (#379), three-way merge (#380). Tests 1514/0.
 - [x] **Sensitive-read audit + project identity** (2026-11-09) — `read` audit events for `scope: "all"`/untrusted; configured project via env/config/`memory project`.
 - [x] **Code-context security boundary** (2026-11-09) — project-scoped by default, untrusted opt-in, read-time redaction/sanitization, bounded inputs; `muse_memory_for_code` accepts project/include_untrusted.
