@@ -387,6 +387,7 @@ export type AuditOperation =
   | "verify"
   | "verify_refused"
   | "restore"
+  | "read"
   | "conflict_detected"
   | "conflict_detected_dry_run"
   | "conflict_resolved"

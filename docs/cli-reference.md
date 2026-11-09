@@ -60,6 +60,7 @@ Context & Retrieval Commands:
   embed [status|build|reindex]  Manage semantic embeddings (llama.cpp / OpenAI-compatible endpoint; opt-in)
   recall [query]                Search active/confirmed memories with filters
   preflight [files...]           Speculative context for the files being edited
+  project [name]                 Show or set the configured project identity
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
 Wiki & Entity Knowledge Compounding:
