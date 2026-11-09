@@ -334,13 +334,13 @@ export async function handlePreflightCommand({ positional, flags }: ParsedArgs):
   if (!ctx) return 1;
   const files = flags["files"] ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean) : positional;
   const tokenBudget = flags["budget"] ? parseInt(flags["budget"], 10) : undefined;
-  const { query, files: changed, context } = preflightContext(ctx.store, {
+  const { query, files: changed, context, risk } = preflightContext(ctx.store, {
     files: files.length > 0 ? files : undefined,
     branch: flags["branch"],
     tokenBudget,
     project: flags["project"],
   });
-  console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens`);
+  console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens · risk ${risk.level} (${risk.score}/100)`);
   console.log(context.markdown);
   return 0;
 }
