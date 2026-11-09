@@ -5,7 +5,7 @@
 | W27-1 | ~~Attestation chain truncatable/TOFU~~ **done**: signed seq + head, key-id pinning, `verify-chain` requires a head | `src/sync/attestation.ts` | — |
 | W27-2 | No enclave key rotation/migration; single store-wide key | `src/store/enclaves.ts` | `key_id` rotation with lazy re-encrypt (key_id already in AAD) |
 | W27-3 | ~~Semantic merge poisoning~~ **done**: untrusted/self-asserted supersession and content inflation rejected; protected constraints never auto-resolve | `src/quality/branch_merge.ts` | — |
-| W27-4 | T-437 `scope: client` is not wired into MemoryScope/schema | `src/types.ts`, `schema.json` | Add client scope or reword the ticket |
+| W27-4 | ~~`scope: client` not wired~~ **descoped** per ADR-007; ticket/docs corrected | — | — |
 | W27-5 | Overlay `.merged`/`.dropped` archives accumulate; no GC/listing | `src/store/branch.ts` | Retention sweep + `overlay archives` |
 | W27-6 | Branch identity can fall back to `store.dir` when CLI omits `--branch` | `src/store/branch.ts` | Thread `ctx.root` through store-layer creation |
 | W27-7 | No MCP surfaces for enclave/attest/overlay | `src/mcp.ts` | Read-only MCP tools with explicit project/client scope |

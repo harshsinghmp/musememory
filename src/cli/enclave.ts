@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { requireRoot, usageError } from "./shared.ts";
 import type { ParsedArgs } from "./shared.ts";
-import { createEnclave, listEnclaveEntries, putEnclaveEntry, validateEnclaveName } from "../store/enclaves.ts";
+import { createEnclave, listEnclaveEntries, putEnclaveEntry, rotateEnclaveKey, validateEnclaveName } from "../store/enclaves.ts";
 import { recordAuditEvent } from "../audit.ts";
 import type { MemoryEntry, MemoryType } from "../types.ts";
 
@@ -16,7 +16,8 @@ export async function handleEnclaveCommand({ positional, flags }: ParsedArgs): P
   if (!ctx) return 1;
   const sub = positional[0];
   const client = positional[1];
-  if (!sub || !client) return usageError("enclave requires <create|list|put> <client>");
+  if (!sub) return usageError("enclave requires <create|list|put|rotate> [client]");
+  if (sub !== "rotate" && !client) return usageError("enclave requires <create|list|put> <client>");
   let division: string;
   try {
     division = validateEnclaveName(flags["division"] ?? "default", "division");
@@ -26,6 +27,11 @@ export async function handleEnclaveCommand({ positional, flags }: ParsedArgs): P
 
   try {
   switch (sub) {
+    case "rotate": {
+      const rotation = rotateEnclaveKey(ctx.memoryDir, { reencrypt: flags["no-reencrypt"] === undefined });
+      console.log(`rotated enclave key ${rotation.old_key_id} -> ${rotation.new_key_id} (${rotation.reencrypted} vault(s) re-encrypted)`);
+      return 0;
+    }
     case "create":
       createEnclave(ctx.memoryDir, client, division);
       console.log(`enclave ready: ${client}/${division}`);
@@ -78,7 +84,7 @@ export async function handleEnclaveCommand({ positional, flags }: ParsedArgs): P
       return 0;
     }
     default:
-      return usageError(`unknown enclave subcommand '${sub}' (expected create | list | put)`);
+      return usageError(`unknown enclave subcommand '${sub}' (expected create | list | put | rotate)`);
   }
   } catch (err) {
     return usageError(err instanceof Error ? err.message : String(err));

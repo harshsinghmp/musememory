@@ -393,6 +393,7 @@ export type AuditOperation =
   | "overlay_set"
   | "enclave_put"
   | "enclave_read"
+  | "enclave_rotate"
   | "attest_keygen"
   | "attest_sign"
   | "conflict_detected"

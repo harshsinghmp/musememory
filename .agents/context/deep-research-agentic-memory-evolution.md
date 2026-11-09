@@ -181,7 +181,7 @@ Currently, Muse Memory excels at **Semantic Memory** (facts, rules, ADRs, prefer
 #### B. Multi-Tenant Agency Enclaves (`scope: client`)
 - Tailored for Harsh's agency model with 4 internal divisions: Sol, Jasper, Crew, Nexus.
 - **Isolation Rule**:
-  - `scope: client`: Enclave isolated per client ID (`client_id: "client-acme"`).
+  - `scope: client`: **Descoped** (ADR-007). Enclaves are explicit encrypted vaults; not a store scope.
   - Client A’s confidential database schemas and domain logic are never exposed to Client B.
   - Universal architectural principles (`scope: global`) propagate freely across all client workspaces.
 

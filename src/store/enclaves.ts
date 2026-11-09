@@ -1,10 +1,21 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import type { MemoryEntry } from "../types.ts";
+import { recordAuditEvent } from "../audit.ts";
 
 const VERSION = 1;
 const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 export interface EnclaveEnvelope {
   version: number;
@@ -17,7 +28,12 @@ export interface EnclaveEnvelope {
   ciphertext: string;
 }
 
-/** Validate a tenant component instead of lossy-rewriting it. */
+export interface EnclaveRotation {
+  old_key_id: string;
+  new_key_id: string;
+  reencrypted: number;
+}
+
 export function validateEnclaveName(value: string, label: string): string {
   if (!NAME_PATTERN.test(value) || value === "." || value === "..") {
     throw new Error(`Invalid ${label} '${value}': use [A-Za-z0-9._-], 1-64 chars`);
@@ -31,51 +47,96 @@ export function enclavePath(memoryDir: string, client: string, division: string 
   return join(memoryDir, "enclaves", client, `${division}.enc.json`);
 }
 
-function loadMasterKey(memoryDir: string): Buffer {
-  const env = process.env.MUSE_ENCLAVE_KEY;
-  if (env) {
-    if (!/^[0-9a-fA-F]{64}$/.test(env)) {
-      throw new Error("MUSE_ENCLAVE_KEY must be exactly 64 hex characters (raw 32-byte key)");
-    }
-    return Buffer.from(env, "hex");
-  }
-  const keyPath = join(memoryDir, "enclave.key");
-  if (existsSync(keyPath)) {
-    const stored = readFileSync(keyPath, "utf8").trim();
-    if (!/^[0-9a-fA-F]{64}$/.test(stored)) throw new Error(`Invalid enclave key at ${keyPath}`);
-    return Buffer.from(stored, "hex");
-  }
-  mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
-  const key = randomBytes(32);
+function keyId(master: Buffer): string {
+  return createHash("sha256").update(master).digest("hex").slice(0, 16);
+}
+
+function keysDir(memoryDir: string): string {
+  return join(memoryDir, "enclave.keys");
+}
+
+function activePath(memoryDir: string): string {
+  return join(memoryDir, "enclave.active");
+}
+
+function readKeyFile(path: string): Buffer {
+  const stored = readFileSync(path, "utf8").trim();
+  if (!KEY_PATTERN.test(stored)) throw new Error(`Invalid enclave key at ${path}`);
+  return Buffer.from(stored, "hex");
+}
+
+function writeKeyFile(path: string, key: Buffer): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   try {
-    writeFileSync(keyPath, key.toString("hex") + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
+    writeFileSync(path, key.toString("hex") + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
-      const stored = readFileSync(keyPath, "utf8").trim();
-      if (!/^[0-9a-fA-F]{64}$/.test(stored)) throw new Error(`Invalid enclave key at ${keyPath}`);
-      return Buffer.from(stored, "hex");
-    }
-    throw err;
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
   }
-  try { chmodSync(keyPath, 0o600); } catch {}
-  return key;
+  try { chmodSync(path, 0o600); } catch {}
+}
+
+function envKey(): Buffer | null {
+  const env = process.env.MUSE_ENCLAVE_KEY;
+  if (!env) return null;
+  if (!KEY_PATTERN.test(env)) throw new Error("MUSE_ENCLAVE_KEY must be exactly 64 hex characters (raw 32-byte key)");
+  return Buffer.from(env, "hex");
+}
+
+function keyForId(memoryDir: string, id: string): Buffer | null {
+  const env = envKey();
+  if (env) return keyId(env) === id ? env : null;
+  const candidate = join(keysDir(memoryDir), `${id}.key`);
+  if (existsSync(candidate)) return readKeyFile(candidate);
+  const legacy = join(memoryDir, "enclave.key");
+  if (existsSync(legacy)) {
+    const key = readKeyFile(legacy);
+    if (keyId(key) === id) return key;
+  }
+  return null;
+}
+
+function setActive(memoryDir: string, id: string): void {
+  const path = activePath(memoryDir);
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${id}\n`, { encoding: "utf8", mode: 0o600 });
+  renameSync(tmp, path);
+}
+
+function activeKey(memoryDir: string): { key: Buffer; id: string } {
+  const env = envKey();
+  if (env) return { key: env, id: keyId(env) };
+
+  const active = activePath(memoryDir);
+  if (existsSync(active)) {
+    const id = readFileSync(active, "utf8").trim();
+    const key = keyForId(memoryDir, id);
+    if (!key) throw new Error(`Active enclave key '${id}' is missing from ${keysDir(memoryDir)}`);
+    return { key, id };
+  }
+
+  const legacy = join(memoryDir, "enclave.key");
+  if (existsSync(legacy)) {
+    const key = readKeyFile(legacy);
+    return { key, id: keyId(key) };
+  }
+
+  const key = randomBytes(32);
+  const id = keyId(key);
+  writeKeyFile(join(keysDir(memoryDir), `${id}.key`), key);
+  mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
+  setActive(memoryDir, id);
+  return { key, id };
 }
 
 function deriveKey(master: Buffer, salt: Buffer): Buffer {
   return scryptSync(master, salt, 32);
 }
 
-function keyId(master: Buffer): string {
-  return createHash("sha256").update(master).digest("hex").slice(0, 16);
-}
-
 function aad(client: string, division: string, id: string): Buffer {
   return Buffer.from(JSON.stringify({ version: VERSION, key_id: id, client, division }));
 }
 
-function encrypt(memoryDir: string, client: string, division: string, entries: MemoryEntry[]): EnclaveEnvelope {
-  const master = loadMasterKey(memoryDir);
-  const id = keyId(master);
+function encryptWith(master: Buffer, id: string, client: string, division: string, entries: MemoryEntry[]): EnclaveEnvelope {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
   const key = deriveKey(master, salt);
@@ -94,14 +155,12 @@ function encrypt(memoryDir: string, client: string, division: string, entries: M
   };
 }
 
-function decrypt(memoryDir: string, client: string, division: string, envelope: EnclaveEnvelope): MemoryEntry[] {
+function decryptWith(master: Buffer, id: string, client: string, division: string, envelope: EnclaveEnvelope): MemoryEntry[] {
   if (envelope.version !== VERSION) throw new Error(`Unsupported enclave version ${envelope.version}`);
   if (envelope.client !== client || envelope.division !== division) {
     throw new Error("Enclave metadata does not match the requested client/division");
   }
-  const master = loadMasterKey(memoryDir);
-  const id = keyId(master);
-  if (envelope.key_id !== id) throw new Error("Enclave was encrypted with a different key");
+  if (envelope.key_id !== id) throw new Error("Enclave key id mismatch");
   const key = deriveKey(master, Buffer.from(envelope.salt, "base64"));
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(envelope.iv, "base64"));
   decipher.setAAD(aad(client, division, id));
@@ -110,9 +169,14 @@ function decrypt(memoryDir: string, client: string, division: string, envelope: 
   return JSON.parse(plaintext.toString("utf8")) as MemoryEntry[];
 }
 
+function decrypt(memoryDir: string, client: string, division: string, envelope: EnclaveEnvelope): MemoryEntry[] {
+  const key = keyForId(memoryDir, envelope.key_id);
+  if (!key) throw new Error(`Missing enclave key '${envelope.key_id}'`);
+  return decryptWith(key, envelope.key_id, client, division, envelope);
+}
+
 function writeEnvelope(path: string, envelope: EnclaveEnvelope): void {
-  const dir = path.slice(0, path.lastIndexOf("/"));
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(envelope, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
   renameSync(tmp, path);
@@ -121,7 +185,8 @@ function writeEnvelope(path: string, envelope: EnclaveEnvelope): void {
 export function createEnclave(memoryDir: string, client: string, division: string = "default"): void {
   const path = enclavePath(memoryDir, client, division);
   if (existsSync(path)) return;
-  writeEnvelope(path, encrypt(memoryDir, client, division, []));
+  const { key, id } = activeKey(memoryDir);
+  writeEnvelope(path, encryptWith(key, id, client, division, []));
 }
 
 export function listEnclaveEntries(memoryDir: string, client: string, division: string = "default"): MemoryEntry[] {
@@ -139,7 +204,8 @@ export function putEnclaveEntry(
 ): MemoryEntry[] {
   const entries = listEnclaveEntries(memoryDir, client, division).filter((candidate) => candidate.id !== entry.id);
   entries.push(entry);
-  writeEnvelope(enclavePath(memoryDir, client, division), encrypt(memoryDir, client, division, entries));
+  const { key, id } = activeKey(memoryDir);
+  writeEnvelope(enclavePath(memoryDir, client, division), encryptWith(key, id, client, division, entries));
   return entries;
 }
 
@@ -150,4 +216,47 @@ export function getEnclaveEntry(
   division: string = "default",
 ): MemoryEntry | null {
   return listEnclaveEntries(memoryDir, client, division).find((entry) => entry.id === id) ?? null;
+}
+
+function vaultFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...vaultFiles(path));
+    else if (entry.name.endsWith(".enc.json")) files.push(path);
+  }
+  return files;
+}
+
+/**
+ * Rotate the store-wide enclave key. Old keys stay on disk for rollback; with
+ * re-encryption enabled every vault moves to the new key id immediately.
+ */
+export function rotateEnclaveKey(memoryDir: string, options: { reencrypt?: boolean } = {}): EnclaveRotation {
+  if (envKey()) throw new Error("Cannot rotate keys while MUSE_ENCLAVE_KEY is set");
+  const current = activeKey(memoryDir);
+  const newKey = randomBytes(32);
+  const newId = keyId(newKey);
+  writeKeyFile(join(keysDir(memoryDir), `${newId}.key`), newKey);
+  setActive(memoryDir, newId);
+
+  let reencrypted = 0;
+  if (options.reencrypt !== false) {
+    for (const path of vaultFiles(join(memoryDir, "enclaves"))) {
+      const envelope = JSON.parse(readFileSync(path, "utf8")) as EnclaveEnvelope;
+      const entries = decrypt(memoryDir, envelope.client, envelope.division, envelope);
+      writeEnvelope(path, encryptWith(newKey, newId, envelope.client, envelope.division, entries));
+      reencrypted += 1;
+    }
+  }
+
+  recordAuditEvent(memoryDir, {
+    operation: "enclave_rotate",
+    entry_id: "enclave",
+    actor: "cli",
+    reason: "enclave_key_rotation",
+    details: { old_key_id: current.id, new_key_id: newId, reencrypted },
+  });
+  return { old_key_id: current.id, new_key_id: newId, reencrypted };
 }
