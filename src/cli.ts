@@ -33,6 +33,7 @@ import {
 import { handleEnclaveCommand } from "./cli/enclave.ts";
 import { handleOverlayCommand } from "./cli/branch.ts";
 import { handleAttestCommand } from "./cli/attest.ts";
+import { handleMerge3Command } from "./cli/merge3.ts";
 import { handleProjectCommand } from "./cli/project.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import { handleEmbedCommand } from "./cli/embed.ts";
@@ -412,6 +413,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleOverlayCommand(parsed);
     case "attest":
       return handleAttestCommand(parsed);
+    case "merge3":
+      return handleMerge3Command(parsed);
     case "checkout":
       return handleCheckoutCommand(parsed);
     case "blame":
