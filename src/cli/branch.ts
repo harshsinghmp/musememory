@@ -9,7 +9,7 @@ import {
   mergeBranchOverlay,
 } from "../store/branch.ts";
 
-export async function handleBranchCommand({ positional, flags }: ParsedArgs): Promise<number> {
+export async function handleOverlayCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const ctx = requireRoot(flags);
   if (!ctx) return 1;
   const sub = positional[0] ?? "show";
@@ -51,6 +51,6 @@ export async function handleBranchCommand({ positional, flags }: ParsedArgs): Pr
       return 0;
     }
     default:
-      return usageError(`unknown branch subcommand '${sub}' (expected list | create | show | entries | merge | drop)`);
+      return usageError(`unknown overlay subcommand '${sub}' (expected list | create | show | entries | merge | drop)`);
   }
 }

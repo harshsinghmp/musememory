@@ -30,6 +30,8 @@ import {
   handleHarvestAutoCommand,
   handleReindexCommand,
 } from "./cli/retrieval.ts";
+import { handleEnclaveCommand } from "./cli/enclave.ts";
+import { handleOverlayCommand } from "./cli/branch.ts";
 import { handleProjectCommand } from "./cli/project.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import { handleEmbedCommand } from "./cli/embed.ts";
@@ -403,6 +405,10 @@ export async function main(argv: string[]): Promise<number> {
     // R23 Versioning Commands
     case "branch":
       return handleBranchCommand(parsed);
+    case "enclave":
+      return handleEnclaveCommand(parsed);
+    case "overlay":
+      return handleOverlayCommand(parsed);
     case "checkout":
       return handleCheckoutCommand(parsed);
     case "blame":
