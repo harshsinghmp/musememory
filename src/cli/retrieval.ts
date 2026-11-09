@@ -334,13 +334,17 @@ export async function handlePreflightCommand({ positional, flags }: ParsedArgs):
   if (!ctx) return 1;
   const files = flags["files"] ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean) : positional;
   const tokenBudget = flags["budget"] ? parseInt(flags["budget"], 10) : undefined;
-  const { query, files: changed, context, risk } = preflightContext(ctx.store, {
+  const { query, files: changed, context, risk, anchors } = preflightContext(ctx.store, {
     files: files.length > 0 ? files : undefined,
     branch: flags["branch"],
     tokenBudget,
     project: flags["project"],
   });
   console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens · risk ${risk.level} (${risk.score}/100)`);
+  if (anchors.length > 0) {
+    console.log("anchored invariants:");
+    for (const anchor of anchors) printEntry(anchor.entry);
+  }
   console.log(context.markdown);
   return 0;
 }

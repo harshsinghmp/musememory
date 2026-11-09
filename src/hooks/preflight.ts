@@ -3,6 +3,8 @@ import { basename } from "node:path";
 import type { Store } from "../store.ts";
 import { formatPromptContext, type FormattedContext } from "../retrieval.ts";
 import { scoreBlastRadius, type BlastRisk } from "../intelligence/blast_risk.ts";
+import { recallAnchoredMemories } from "../retrieval/anchors.ts";
+import type { ScoredEntry } from "../retrieval.ts";
 
 export interface PreflightInput {
   files?: string[];
@@ -16,6 +18,7 @@ export interface PreflightResult {
   files: string[];
   context: FormattedContext;
   risk: BlastRisk;
+  anchors: ScoredEntry[];
 }
 
 /** T-433: changed files from git, empty when not in a repository. */
@@ -53,5 +56,6 @@ export function preflightContext(store: Store, input: PreflightInput = {}): Pref
     hasTests: files.length === 0 ? undefined : files.every((file) => /(^|\/)(test|tests|__tests__)\//.test(file) || /\.(test|spec)\.[^.]+$/.test(file)),
     crossModule: new Set(files.map((file) => file.split("/")[0])).size > 1,
   });
-  return { query, files, context, risk };
+  const anchors = recallAnchoredMemories(store, { files });
+  return { query, files, context, risk, anchors };
 }
