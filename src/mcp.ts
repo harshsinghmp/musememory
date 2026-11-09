@@ -112,6 +112,7 @@ import {
   runDistillRouter,
 } from "./cognition/index.ts";
 import { episodesFromObservations } from "./cognition/episodes.ts";
+import { preflightContext } from "./hooks/preflight.ts";
 import {
   formatPlaybook,
   getPlaybook,
@@ -1672,6 +1673,21 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         },
       },
       {
+        name: "muse_preflight",
+        description: "Read-only pre-flight: anchored invariants, blast-radius risk and a token-budgeted context pack for the files about to be edited",
+        inputSchema: {
+          type: "object",
+          properties: {
+            files: { type: "array", items: { type: "string" }, description: "Files about to be edited" },
+            symbols: { type: "array", items: { type: "string" }, description: "Symbols about to change" },
+            branch: { type: "string", description: "Current branch name" },
+            project: { type: "string", description: "Optional project scope" },
+            budget: { type: "number", description: "Entry token budget (default 800)" },
+            dir: { type: "string", description: "Optional workspace directory path" },
+          },
+        },
+      },
+      {
         name: "muse_episodes",
         description: "Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations",
         inputSchema: {
@@ -3133,6 +3149,36 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           project: canonicalProject,
         });
         return toolResult(report);
+      }
+      case "muse_preflight": {
+        const files = Array.isArray(a.files) ? a.files.map(String) : undefined;
+        const symbols = Array.isArray(a.symbols) ? a.symbols.map(String) : undefined;
+        const budget = a.budget !== undefined ? clampLimit(a.budget, 800, 8000, 100) : undefined;
+        try {
+          const result = preflightContext(activeStore, {
+            files,
+            symbols,
+            branch: a.branch ? String(a.branch) : undefined,
+            project: a.project ? String(a.project) : undefined,
+            tokenBudget: budget,
+            cwd: activeRoot,
+          });
+          return toolResult({
+            query: result.query,
+            files: result.files,
+            risk: result.risk,
+            anchors: result.anchors.map((anchor) => ({
+              id: anchor.entry.id,
+              title: anchor.entry.title,
+              type: anchor.entry.type,
+              score: anchor.score,
+              why: anchor.why_retrieved,
+            })),
+            markdown: result.context.markdown,
+          });
+        } catch (err) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
       }
       case "muse_episodes": {
         const episodeDir = String(activeStore.memoryDir || activeRoot || process.cwd());
