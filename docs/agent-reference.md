@@ -39,6 +39,13 @@ npm install -g musememory     # or: bun add -g musememory
 Both are plain files. There is no server, no port, and no service to keep
 alive. Delete the directory to delete the memory.
 
+The per-entry `memories/*.yaml` mirror is the export/rollback copy of SQLite. It
+is written eagerly by default; set `MUSE_YAML_MIRROR=0` (or pass
+`yamlMirror: false` to `openStore`) to skip it when the store is only read
+through this engine. SQLite stays authoritative either way. The WAL is bounded
+to a 2 MiB autocheckpoint interval and a 64 MiB journal size limit, and
+`memory io` reports the current footprint.
+
 ## 3. Mandatory session protocol
 
 An agent integrating Muse must follow this order.

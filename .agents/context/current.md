@@ -37,8 +37,10 @@ operations side, `audit.jsonl` rotates at 5 MiB into `audit-archive/` (five
 segments retained by default), pruning writes a chain anchor so
 `getAuditTrail`/`getLastAuditHash`/`verifyAuditChain` remain valid across the
 retained window, and `memory io [--json]` reports `/proc/self/io` counters plus
-SQLite/WAL/audit/observation bytes. R29 remains partial: YAML dual-write
-batching is still open.
+SQLite/WAL/audit/observation bytes. R29 is now complete except for optional
+async batching: the YAML mirror can be skipped with `MUSE_YAML_MIRROR=0` /
+`openStore({ yamlMirror: false })` (SQLite stays authoritative), and the WAL is
+bounded by `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB`.
 
 ---
 

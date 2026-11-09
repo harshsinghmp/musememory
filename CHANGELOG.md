@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Read-only MCP surfaces (W27-7)**: `muse_enclave_recall` (explicit client, audit-logged, credential-redacted), `muse_overlay_status` (list/inspect branch overlays, never mutates) and `muse_attestation_verify` (inline public key only). `listBranchOverlays` added; 119 → 122 tools with regenerated claims and CLI reference.
 
 ### Changed
+- **YAML mirror opt-out (R29)**: `openStore({ yamlMirror: false })` or `MUSE_YAML_MIRROR=0` skips the per-entry `memories/*.yaml` second copy. SQLite remains authoritative and reads/list/get are unchanged; the mirror stays the default for export and rollback.
+- **Bounded WAL (R29)**: `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB` cap WAL growth between checkpoints.
 - **Enclave vault layout (W27-8)**: each enclave entry is now its own AES-256-GCM file under `<client>/<division>/`, so a write no longer rewrites the whole vault and a corrupt record cannot take siblings down. Legacy single-file vaults remain readable and migrate on the next write; per-entry and per-vault size caps are enforced.
 - **Overlay storage caps (W27-9)**: branch overlays fail loud above 1000 entries or 2 MiB.
 - **Outcome pilot and RC blockers**: with/without memory pilot, T-450 ADR-008 tracking boundary, overlay archive prune, workspace-root branch identity, enclave put lock.

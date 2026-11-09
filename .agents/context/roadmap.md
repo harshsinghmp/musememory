@@ -186,8 +186,8 @@
 
 ### 13. **R29: I/O Budget & NVMe Telemetry**
 - **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical. **Landed 2026-11-09** (counters + on-disk SQLite/WAL/audit/observation bytes, `--json`).
-- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification). **Still open.**
-- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note. **Audit rotation landed 2026-11-09** (5 MiB segments, five retained, chain anchor on prune); observations already rotated; `wal_autocheckpoint` note remains.
+- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification). **Opt-out landed 2026-11-09** (`MUSE_YAML_MIRROR=0` / `openStore({ yamlMirror: false })`); async batching deliberately not implemented because the mirror is the rollback copy.
+- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note. **Landed 2026-11-09**: audit rotation (5 MiB segments, five retained, chain anchor on prune); observations already rotated; WAL bounded by `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB`.
 
 ### 14. **R30: Tombstones & Scoped Deletion (extends A7 suppress)**
 - **Content-hash tombstones on delete**: replayed events cannot resurrect deleted memories (qdrant-memory fence pattern; A7's suppress state already hides the bytes).

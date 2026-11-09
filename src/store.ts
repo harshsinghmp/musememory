@@ -195,6 +195,13 @@ export interface StoreOptions extends StorageLayoutOptions {
   skipSyncConstraints?: boolean;
   /** T-023: Skip automatic wiki re-compilation on open. */
   skipAutoWiki?: boolean;
+  /**
+   * R29: write the per-entry YAML mirror alongside SQLite (default true).
+   * Set false, or MUSE_YAML_MIRROR=0, to opt out of the second copy when the
+   * store is only read through this engine. SQLite remains authoritative
+   * either way; the mirror is the export/rollback surface.
+   */
+  yamlMirror?: boolean;
 }
 
 export interface Store {
@@ -205,6 +212,7 @@ export interface Store {
   cache?: MemoryStoreCache;
   circuit?: CircuitBreaker;
   tenantId?: string;
+  yamlMirror?: boolean;
 }
 
 export class IdempotencyConflictError extends Error {
@@ -394,6 +402,7 @@ export function openStore(memoryDir: string, options?: StoreOptions): Store {
     cache,
     circuit,
     tenantId: layout.tenantId,
+    yamlMirror: options?.yamlMirror ?? process.env.MUSE_YAML_MIRROR !== "0",
   };
 
   // R21: ensure the embedding vector + pipeline-fingerprint tables exist.
@@ -802,18 +811,20 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       }
     }
 
-    // 2. Dual write to YAML file for exportability
+    // 2. Dual write to YAML file for exportability (R29: opt-out, see StoreOptions)
     let mtimeMs: number | undefined;
-    try {
-      const file = fileForId(store, entry.id);
-      const tmp = `${file}.tmp`;
-      writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
-      renameSync(tmp, file);
+    if (store.yamlMirror !== false) {
       try {
-        mtimeMs = statSync(file).mtimeMs;
-      } catch {}
-    } catch (err: unknown) {
-      console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+        const file = fileForId(store, entry.id);
+        const tmp = `${file}.tmp`;
+        writeFileSync(tmp, yaml.dump(entry, { lineWidth: 120 }), "utf8");
+        renameSync(tmp, file);
+        try {
+          mtimeMs = statSync(file).mtimeMs;
+        } catch {}
+      } catch (err: unknown) {
+        console.warn(`[WARN] Dual-write YAML failed for memory '${entry.id}':`, err instanceof Error ? err.message : String(err));
+      }
     }
 
     // 3. L0 Cache update with mtime
