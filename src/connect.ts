@@ -126,6 +126,9 @@ export const ALL_MEMORY_TOOLS = [
   "muse_code_impact",
   "muse_pr_context",
   "muse_reconcile_anchors",
+  "muse_enclave_recall",
+  "muse_overlay_status",
+  "muse_attestation_verify",
 ];
 
 export { ConnectOptions, ConnectReport };

@@ -27,6 +27,15 @@ export interface BranchOverlay {
   deleted_ids: string[];
 }
 
+export interface BranchOverlaySummary {
+  branch: string;
+  base_branch?: string;
+  created_at: string;
+  updated_at: string;
+  entry_count: number;
+  deleted_count: number;
+}
+
 const MAX_BRANCH_LENGTH = 200;
 
 function validateBranch(branch: string): string {
@@ -92,6 +101,28 @@ export function loadBranchOverlay(memoryDir: string, branch: string): BranchOver
     entries: parsed.entries as MemoryEntry[],
     deleted_ids: Array.isArray(parsed.deleted_ids) ? parsed.deleted_ids.map(String) : [],
   };
+}
+
+/** Read-only inventory of every branch overlay present in the store. */
+export function listBranchOverlays(memoryDir: string): BranchOverlaySummary[] {
+  const dir = join(memoryDir, "overlays");
+  if (!existsSync(dir)) return [];
+  const summaries: BranchOverlaySummary[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const branch = Buffer.from(name.slice(0, -".json".length), "base64url").toString("utf8");
+    const overlay = loadBranchOverlay(memoryDir, branch);
+    if (!overlay) continue;
+    summaries.push({
+      branch: overlay.meta.branch,
+      base_branch: overlay.meta.base_branch,
+      created_at: overlay.meta.created_at,
+      updated_at: overlay.meta.updated_at,
+      entry_count: overlay.entries.length,
+      deleted_count: overlay.deleted_ids.length,
+    });
+  }
+  return summaries.sort((a, b) => a.branch.localeCompare(b.branch));
 }
 
 function writeOverlay(memoryDir: string, overlay: BranchOverlay): void {

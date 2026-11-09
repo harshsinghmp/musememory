@@ -115,7 +115,7 @@ Version Control (R23):
 
 ## MCP tools
 
-**119 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
+**122 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
 
 Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_profile_list` for the live mapping.
 
@@ -230,8 +230,8 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_tech_debt` | — | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
 | `muse_health` | — | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
 | `muse_code_impact` | `file_path` | Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level |
-| `muse_pr_context` | — | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
-| `muse_reconcile_anchors` | — | Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted |
+| `muse_pr_context` | `client` | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
+| `muse_reconcile_anchors` | `client` | Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted |
 
 ### Knowledge compounding
 
@@ -272,7 +272,10 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_episodes` | `packet` | Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations |
 | `muse_playbook_recall` | `packet` | Recall procedural playbooks: list by tag, or fetch one by id/title |
 | `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
+| `muse_enclave_recall` | `client` | Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged. |
+| `muse_overlay_status` | `public_key` | Read-only: list branch memory overlays and their entry counts, or inspect one branch overlay's entries |
+| `muse_attestation_verify` | `public_key` | Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key |
 
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 119 tools, 7 profiles, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 122 tools, 7 profiles, 30 import formats, 8 credential rule families.

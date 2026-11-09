@@ -5,16 +5,16 @@
 | Category | Count |
 |---|---|
 | DECISION | 1 |
-| CLAIM | 5 |
+| CLAIM | 6 |
 | STATUS | 1 |
 
 | Status | Count |
 |---|---|
-| VERIFIED | 4 |
-| QUARANTINED | 1 |
-| ACTIVE | 1 |
+| VERIFIED | 6 |
+| ACTIVE | 2 |
+| QUARANTINED | 0 |
 
-**Health score**: 5 / 6 verifiable entries (83%) — one claim is quarantined, not contradicted.
+**Health score**: 6 / 6 claims verified (100%) — the previous quarantine on EVD-005 is resolved by EVD-008; the remaining two entries are an active fix record and an active decision.
 
 ---
 
@@ -59,12 +59,12 @@
 ---
 
 ### EVD-005 | 2026-11-09 | CLAIM
-**Statement**: Muse Memory improves coding-agent task success.
+**Statement** *(revised)*: On convention-sensitive coding tasks, an agent that can recall the project's stored conventions produces more correct implementations than the same agent without them.
 **Category**: `CLAIM`
-**Confidence**: `[INFER]` — plausible from retrieval quality, but no with/without task-outcome study exists.
-**Epistemology**: `[SPECULATIVE]`
-**Evidence**: none yet; retrieval evidence only (EVD-002/003).
-**Status**: `QUARANTINED` — a 2-task pilot (EVD-007) is suggestive, not sufficient.
+**Confidence**: `[EMPIRICAL]` — a ten-task condition-blind study (EVD-008) measured 10/10 with memory against 6/10 without it; four tasks discriminated and none regressed.
+**Epistemology**: `[EMPIRICAL]`
+**Evidence**: `docs/evidence/2026-11-outcome-study.md`; task prompts and hidden graders in `.agents/artifacts/outcome-study-2026-11/`.
+**Status**: `VERIFIED` — scoped to convention recall in this study. The original unqualified sentence ("improves coding-agent task success") is too broad for n=10 and has been narrowed rather than marked proven.
 
 ---
 
@@ -86,4 +86,14 @@
 **Confidence**: `[RAW]` — hidden Bun tests run against both fixture implementations.
 **Epistemology**: `[EMPIRICAL]`
 **Evidence**: `docs/evidence/2026-11-outcome-pilot.md`.
-**Status**: `VERIFIED` — pilot only (n=2, single run).
+**Status**: `VERIFIED` — pilot only (n=2, single run). Superseded as primary evidence by EVD-008.
+
+---
+
+### EVD-008 | 2026-11-09 | CLAIM
+**Statement**: In a ten-task condition-blind study, an agent told to consult memory passed 10/10 hidden tests when the conventions were seeded and 6/10 when they were not; the four discriminating tasks were duration units, UTC dates, the slug length cap and CSV whitespace quoting.
+**Category**: `CLAIM`
+**Confidence**: `[RAW]` — hidden Bun tests graded all twenty solutions mechanically under a non-UTC timezone; Fisher's exact one-sided p = 0.043.
+**Epistemology**: `[EMPIRICAL]`
+**Evidence**: `docs/evidence/2026-11-outcome-study.md`; `.agents/artifacts/outcome-study-2026-11/`.
+**Status**: `VERIFIED` — n=10, one run per arm, one model. Supports EVD-005 within that scope only.

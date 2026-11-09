@@ -1,7 +1,31 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.1.3`  
+> **Version**: `v3.3.0` (post-release `dev`)  
 > **Status**: Wave 29 Landed — Sovereign LifeOS Migration & Complete Decommissioning (T-444 to T-448).
+
+---
+
+## 🧾 Session — Outcome Study & W27-7 Read-Only Surfaces (2026-11-09)
+
+**Outcome study (EVD-008).** Replaced the two-task pilot with a ten-task,
+condition-blind study. Both arms received identical instructions and were told
+to consult memory; the only variable was whether ten project conventions were
+seeded. Result: **10/10 with memory vs 6/10 without**, four discriminating tasks
+(duration units, UTC dates, slug length cap, CSV whitespace quoting), zero
+regressions, Fisher one-sided p = 0.043. EVD-005 is no longer quarantined — its
+statement was narrowed to convention recall rather than an unqualified
+productivity claim. Evidence: `docs/evidence/2026-11-outcome-study.md` and
+`.agents/artifacts/outcome-study-2026-11/`.
+
+**W27-7 read-only MCP surfaces.** Added three read-only tools with explicit
+scope: `muse_enclave_recall` (client required, every read audit-logged),
+`muse_overlay_status` (list or inspect branch overlays, never mutates), and
+`muse_attestation_verify` (inline public key only — no model-supplied file
+paths). `src/store/branch.ts` gained `listBranchOverlays`. Tool count 119 → 122;
+claims and CLI reference regenerated; `test/mcp_readonly_surfaces.test.ts`
+covers the happy paths, the fail-loud cases and the read-only guarantee.
+Still open from the Wave 27 debt table: W27-8 (whole-vault rewrite) and W27-9
+(overlay size caps).
 
 ---
 
