@@ -2,7 +2,8 @@ import { describe, test, expect } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName } from "../src/store/enclaves.ts";
+import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName, rotateEnclaveKey } from "../src/store/enclaves.ts";
+import { getAuditTrail } from "../src/audit.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
 function entry(id: string, content: string): MemoryEntry {
@@ -20,7 +21,8 @@ describe("T-437: encrypted client enclaves", () => {
 
       const file = join(memoryDir, "enclaves", "client-a", "default.enc.json");
       expect(readFileSync(file, "utf8")).not.toContain("super secret");
-      expect(statSync(join(memoryDir, "enclave.key")).mode & 0o077).toBe(0);
+      const activeId = readFileSync(join(memoryDir, "enclave.active"), "utf8").trim();
+      expect(statSync(join(memoryDir, "enclave.keys", `${activeId}.key`)).mode & 0o077).toBe(0);
 
       expect(listEnclaveEntries(memoryDir, "client-b")).toEqual([]);
       putEnclaveEntry(memoryDir, "client-b", entry("m_2_other", "client b only"));
@@ -47,6 +49,41 @@ describe("T-437: encrypted client enclaves", () => {
       mkdirSync(join(memoryDir, "enclaves", "client-b"), { recursive: true });
       writeFileSync(target, readFileSync(source));
       expect(() => listEnclaveEntries(memoryDir, "client-b")).toThrow(/metadata/);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rotates the key and re-encrypts vaults without data loss", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-rotate-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "rotate me"));
+      const oldId = readFileSync(join(memoryDir, "enclave.active"), "utf8").trim();
+      const rotation = rotateEnclaveKey(memoryDir);
+      expect(rotation.old_key_id).toBe(oldId);
+      expect(rotation.new_key_id).not.toBe(oldId);
+      expect(rotation.reencrypted).toBe(1);
+      expect(listEnclaveEntries(memoryDir, "client-a")[0].content).toBe("rotate me");
+      const envelope = JSON.parse(readFileSync(join(memoryDir, "enclaves", "client-a", "default.enc.json"), "utf8"));
+      expect(envelope.key_id).toBe(rotation.new_key_id);
+      expect(getAuditTrail(memoryDir, { operation: "enclave_rotate" })).toHaveLength(1);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rotation without re-encryption keeps old vaults readable until key removal", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-rotate-lazy-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "old key"));
+      const oldId = readFileSync(join(memoryDir, "enclave.active"), "utf8").trim();
+      const rotation = rotateEnclaveKey(memoryDir, { reencrypt: false });
+      expect(rotation.reencrypted).toBe(0);
+      expect(listEnclaveEntries(memoryDir, "client-a")[0].content).toBe("old key");
+      rmSync(join(memoryDir, "enclave.keys", `${oldId}.key`));
+      expect(() => listEnclaveEntries(memoryDir, "client-a")).toThrow(/Missing enclave key/);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }

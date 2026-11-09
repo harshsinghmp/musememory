@@ -53,7 +53,7 @@
 - **Git-Aware Branchable Memory Overlays (`memory branch`)**:
   - Branch-isolated working memory overlays that mirror git branch lifecycles (`feature/*`, `fix/*`).
   - Automated `memory branch-merge` command with interactive semantic contradiction resolution when merging feature branches into `main`.
-- **Agency Multi-Tenant Enclaves (`scope: client`)**:
+- **Agency Multi-Tenant Enclaves** (`scope: client` descoped — ADR-007; vaults are explicit):
   - Cryptographically isolated client memory vaults tailored for multi-client agency delivery (Sol, Jasper, Crew, Nexus).
   - Enforces zero cross-client knowledge contamination while allowing global engineering invariants (`scope: global`) to propagate safely.
 - **Zero-Knowledge Memory Attestation**:

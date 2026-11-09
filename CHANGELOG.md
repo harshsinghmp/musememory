@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enclave key rotation**: keyring under `.memory/enclave.keys/`, active key id, `memory enclave rotate` with optional lazy re-encryption and audit.
 - **Wave 27 multi-tenant memory**: branch-scoped overlays (`memory overlay`, three-way merge with base snapshots), authenticated AES-256-GCM client vaults, domain-separated Ed25519 packet attestations, and a three-way semantic memory merge (`merge3`).
 - **Unified file→memory resolver**: pre-flight anchored invariants and PR context now share one project/trust/freshness-aware matcher, ranking and reason tokens.
 - **Pre-flight surfaces**: a matcher-scoped `PreToolUse` hook and read-only `muse_preflight` MCP tool expose anchored invariants, blast-radius risk and a token-budgeted pack before edits.
@@ -54,6 +55,7 @@ Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secr
 - **Ecosystem Sovereignty Gate**: Automated test gate verifying zero external imports and sovereign operation (`test/sovereignty_gate.test.ts`).
 
 ### Changed
+- **Client scope descoped (ADR-007)**: enclaves stay explicit encrypted vaults.
 - **Code-context security boundary**: project-scoped resolver, untrusted opt-in, sanitized agent output, capped inputs.
 - Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.
 - Updated project documentation and re-generated all claims, CLI references, and MCP tool matrixes.
