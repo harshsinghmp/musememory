@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Code-context security boundary** (2026-11-09) — project-scoped by default, untrusted opt-in, read-time redaction/sanitization, bounded inputs; `muse_memory_for_code` accepts project/include_untrusted.
 - [x] **Unified code resolver** (2026-11-09) — `resolveMemoriesForCode` is the single matcher; pre-flight and PR context adapt it.
 - [x] **Pre-flight surfaces** (2026-11-09) — PreToolUse hook + read-only `muse_preflight` MCP tool; 119 tools.
 - [x] **Wave 26 (`T-432`–`T-435`)** (2026-11-09) — recursive-CTE associative expansion (`T-432`, direct `dev`), pre-flight context (`T-433`, #370), blast-radius risk (`T-434`, #371), anchor-matched auto-recall (`T-435`, #372). Tests 1495/0.

@@ -9,10 +9,18 @@ export interface CodeContextInput {
   project?: string;
   includeMentions?: boolean;
   includeUntrusted?: boolean;
-  /** Apply anchor freshness, validity and expiry gates (pre-flight default). */
+  /** Apply validity/expiry gates (pre-flight default). */
   enforceFreshness?: boolean;
+  /** Exclude orphaned/drifted anchors (default true). */
+  skipStaleAnchors?: boolean;
+  /** `all` is an explicit cross-project grant; the default is project scope. */
+  scope?: "project" | "all";
   limit?: number;
 }
+
+const MAX_FILES = 15;
+const MAX_SYMBOLS = 50;
+const MAX_MENTION_CHARS = 4000;
 
 const PRIORITY: Record<string, number> = {
   constraint: 1.0,
@@ -34,10 +42,24 @@ function fileMatches(anchorPath: string, queryPath: string): boolean {
   return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
 }
 
-function isUnfresh(entry: MemoryEntry, now: number): boolean {
+function isExpired(entry: MemoryEntry, now: number): boolean {
   if (entry.valid_to && Date.parse(entry.valid_to) <= now) return true;
   if (entry.expires_at && Date.parse(entry.expires_at) <= now) return true;
-  return (entry.anchors ?? []).some((anchor) => anchor.status === "orphaned" || anchor.status === "drifted");
+  return false;
+}
+
+/** Dominant project in the store; keeps unscoped callers fail-closed. */
+export function inferProject(store: Store): string {
+  const counts = new Map<string, number>();
+  for (const entry of list(store)) {
+    if (entry.project) counts.set(entry.project, (counts.get(entry.project) ?? 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  if (ranked.length === 0) return "default";
+  if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) {
+    throw new Error("Ambiguous project scope: pass an explicit project");
+  }
+  return ranked[0][0];
 }
 
 /**
@@ -46,22 +68,24 @@ function isUnfresh(entry: MemoryEntry, now: number): boolean {
  * this function, so matching, ranking and reason tokens cannot drift apart.
  */
 export function resolveMemoriesForCode(store: Store, input: CodeContextInput): ScoredEntry[] {
-  const files = input.files ?? [];
-  const symbols = input.symbols ?? [];
+  const files = (input.files ?? []).slice(0, MAX_FILES);
+  const symbols = (input.symbols ?? []).slice(0, MAX_SYMBOLS);
   if (files.length === 0 && symbols.length === 0) return [];
+  const scope = input.scope ?? "project";
+  const project = scope === "all" ? undefined : input.project ?? inferProject(store);
   const now = Date.now();
   const matched: ScoredEntry[] = [];
 
   for (const entry of list(store)) {
     if (entry.status === "archived") continue;
     if (HIDDEN_STATUSES.has(entry.status)) continue;
-    if (input.project && entry.project !== input.project) continue;
+    if (project && entry.project !== project) continue;
     if (!input.includeUntrusted && entry.trust === "untrusted") continue;
-    if (input.enforceFreshness !== false && isUnfresh(entry, now)) continue;
+    if (input.enforceFreshness !== false && isExpired(entry, now)) continue;
 
     let reason: string | undefined;
     const anchor = (entry.anchors ?? []).find((candidate) => {
-      if (candidate.status === "orphaned" || candidate.status === "drifted") return false;
+      if (input.skipStaleAnchors !== false && (candidate.status === "orphaned" || candidate.status === "drifted")) return false;
       if (candidate.file_path && files.some((file) => fileMatches(candidate.file_path, file))) return true;
       const name = candidate.symbol_name ?? candidate.qualified_name;
       return Boolean(name && symbols.some((symbol) => symbol.toLowerCase() === name.toLowerCase()));
@@ -69,7 +93,7 @@ export function resolveMemoriesForCode(store: Store, input: CodeContextInput): S
     if (anchor) {
       reason = `anchor:${anchor.kind}:${anchor.file_path || anchor.symbol_name || anchor.qualified_name || anchor.id}`;
     } else if (input.includeMentions) {
-      const haystack = `${entry.title} ${entry.content}`.toLowerCase();
+      const haystack = `${entry.title} ${entry.content.slice(0, MAX_MENTION_CHARS)}`.toLowerCase();
       const file = files.find((candidate) => haystack.includes(normalizeCodePath(candidate)));
       const symbol = symbols.find((candidate) => haystack.includes(candidate.toLowerCase()));
       if (file) reason = `mention:file:${file}`;

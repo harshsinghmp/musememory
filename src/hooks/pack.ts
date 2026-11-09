@@ -7,6 +7,7 @@ import { parseCurrentFile } from "../governor.ts";
 import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
 import { recordObservation, listObservations } from "../learning/observation.ts";
 import { preflightContext } from "./preflight.ts";
+import { sanitizeContextForAgent } from "../security/context_sanitizer.ts";
 import { distillObservationsToCandidates } from "../learning/distill.ts";
 import { recordAuditEvent } from "../audit.ts";
 
@@ -329,10 +330,10 @@ export function runPreToolUseHook(): void {
     if (result.anchors.length > 0) {
       lines.push("", "## Anchored invariants");
       for (const anchor of result.anchors.slice(0, 5)) {
-        lines.push(`- [${anchor.entry.type}] ${sanitizeHookContextBlock(anchor.entry.title)}: ${sanitizeHookContextBlock(anchor.entry.content.slice(0, 160))}`);
+        lines.push(`- [${anchor.entry.type}] ${sanitizeContextForAgent(anchor.entry.title, 200)}: ${sanitizeContextForAgent(anchor.entry.content.slice(0, 160), 400)}`);
       }
     }
-    if (result.context.markdown.trim()) lines.push("", sanitizeHookContextBlock(result.context.markdown));
+    if (result.context.markdown.trim()) lines.push("", sanitizeContextForAgent(result.context.markdown));
     lines.push("</muse-memory>", "");
 
     const output = {

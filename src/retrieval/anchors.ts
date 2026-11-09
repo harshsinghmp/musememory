@@ -1,6 +1,6 @@
 import type { Store } from "../store.ts";
 import type { ScoredEntry } from "../retrieval.ts";
-import { resolveMemoriesForCode } from "./code_context.ts";
+import { resolveMemoriesForCode, inferProject } from "./code_context.ts";
 
 export interface AnchorRecallInput {
   files?: string[];
@@ -18,9 +18,10 @@ export function recallAnchoredMemories(store: Store, input: AnchorRecallInput): 
   return resolveMemoriesForCode(store, {
     files: input.files,
     symbols: input.symbols,
-    project: input.project,
+    project: input.project ?? inferProject(store),
     includeUntrusted: input.includeUntrusted,
     enforceFreshness: true,
+    skipStaleAnchors: true,
     includeMentions: false,
     limit: input.limit,
   });

@@ -53,6 +53,7 @@ Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secr
 - **Ecosystem Sovereignty Gate**: Automated test gate verifying zero external imports and sovereign operation (`test/sovereignty_gate.test.ts`).
 
 ### Changed
+- **Code-context security boundary**: project-scoped resolver, untrusted opt-in, sanitized agent output, capped inputs.
 - Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.
 - Updated project documentation and re-generated all claims, CLI references, and MCP tool matrixes.
 

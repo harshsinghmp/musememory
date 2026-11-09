@@ -4,6 +4,7 @@ import type { Store } from "../store.ts";
 import { formatPromptContext, type FormattedContext, type ScoredEntry } from "../retrieval.ts";
 import { scoreBlastRadius, type BlastRisk } from "../intelligence/blast_risk.ts";
 import { recallAnchoredMemories } from "../retrieval/anchors.ts";
+import { inferProject } from "../retrieval/code_context.ts";
 
 const MAX_FILES = 15;
 
@@ -74,10 +75,11 @@ function isTestPath(file: string): boolean {
 export function preflightContext(store: Store, input: PreflightInput = {}): PreflightResult {
   const files = (input.files ?? detectChangedFiles(input.cwd)).slice(0, MAX_FILES);
   const query = buildPreflightQuery(files, input.branch) || "preflight";
+  const project = input.project ?? inferProject(store);
   const context = formatPromptContext(store, store.memoryDir, query, {
     limit: 8,
     tokenBudget: input.tokenBudget ?? 800,
-    project: input.project,
+    project,
     recordAccess: false,
     syncConstraints: false,
   });
@@ -94,7 +96,7 @@ export function preflightContext(store: Store, input: PreflightInput = {}): Pref
   const anchors = recallAnchoredMemories(store, {
     files,
     symbols: input.symbols,
-    project: input.project,
+    project,
   });
   return { query, files, context, risk, anchors };
 }

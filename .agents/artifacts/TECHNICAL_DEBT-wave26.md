@@ -7,3 +7,5 @@
 | W26-3 | ~~Pre-flight is CLI-only~~ **done**: PreToolUse hook + read-only `muse_preflight` MCP tool | `src/hooks/pack.ts`, `src/mcp.ts` | — |
 | W26-4 | `associated` is ids-only and not fused into ranking/token accounting | `src/retrieval.ts` | Fuse with `why_retrieved` vocabulary or document the consumer contract |
 | W26-5 | Recursive CTE work is not bounded by `maxNodes` before projection | `src/associative.ts` | Push the limit into the recursive member |
+
+- **W26-6**: no audit event for cross-project (`scope: "all"`) or untrusted reads; the audit enum has no read operation.
