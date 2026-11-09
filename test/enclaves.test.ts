@@ -1,8 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName, rotateEnclaveKey } from "../src/store/enclaves.ts";
+import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName, rotateEnclaveKey, listEnclaveKeys, pruneEnclaveKeys } from "../src/store/enclaves.ts";
 import { getAuditTrail } from "../src/audit.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
@@ -68,6 +68,13 @@ describe("T-437: encrypted client enclaves", () => {
       const envelope = JSON.parse(readFileSync(join(memoryDir, "enclaves", "client-a", "default.enc.json"), "utf8"));
       expect(envelope.key_id).toBe(rotation.new_key_id);
       expect(getAuditTrail(memoryDir, { operation: "enclave_rotate" })).toHaveLength(1);
+      const keys = listEnclaveKeys(memoryDir);
+      expect(keys.find((key) => key.key_id === rotation.new_key_id)?.active).toBe(true);
+      expect(keys.find((key) => key.key_id === oldId)?.referenced).toBe(false);
+      const pruned = pruneEnclaveKeys(memoryDir);
+      expect(pruned.removed).toContain(oldId);
+      expect(pruned.kept).toContain(rotation.new_key_id);
+      expect(listEnclaveEntries(memoryDir, "client-a")[0].content).toBe("rotate me");
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }
@@ -82,10 +89,29 @@ describe("T-437: encrypted client enclaves", () => {
       const rotation = rotateEnclaveKey(memoryDir, { reencrypt: false });
       expect(rotation.reencrypted).toBe(0);
       expect(listEnclaveEntries(memoryDir, "client-a")[0].content).toBe("old key");
+      const dry = pruneEnclaveKeys(memoryDir, { dryRun: true });
+      expect(dry.kept).toContain(oldId);
       rmSync(join(memoryDir, "enclave.keys", `${oldId}.key`));
       expect(() => listEnclaveEntries(memoryDir, "client-a")).toThrow(/Missing enclave key/);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("backup and restore keep vaults decryptable", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-backup-"));
+    const restored = mkdtempSync(join(tmpdir(), "muse-enclave-restore-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "backup me"));
+      mkdirSync(join(restored, "enclave.keys"), { recursive: true });
+      cpSync(join(memoryDir, "enclaves"), join(restored, "enclaves"), { recursive: true });
+      cpSync(join(memoryDir, "enclave.keys"), join(restored, "enclave.keys"), { recursive: true });
+      cpSync(join(memoryDir, "enclave.active"), join(restored, "enclave.active"));
+      expect(listEnclaveEntries(restored, "client-a")[0].content).toBe("backup me");
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+      rmSync(restored, { recursive: true, force: true });
     }
   });
 
