@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Pre-flight surfaces** (2026-11-09) — PreToolUse hook + read-only `muse_preflight` MCP tool; 119 tools.
 - [x] **Wave 26 (`T-432`–`T-435`)** (2026-11-09) — recursive-CTE associative expansion (`T-432`, direct `dev`), pre-flight context (`T-433`, #370), blast-radius risk (`T-434`, #371), anchor-matched auto-recall (`T-435`, #372). Tests 1495/0.
 - [x] **Site build + scaffolding wiring** (2026-11-08) — PR #367 (Node Astro launcher; site:qa 17/17 SHIP) and #368 (briefing episodes, explicit `asserted_at` belief clock in `as_of`, duplicate decay removed).
 - [x] **Wave 24–25 review hardening** (2026-11-08) — PR #366 merged at `a485875`; playbook rail preservation, fail-loud corrupt store, id-keyed updates, unique episode ids, goal-first phases, epoch timestamps, CLI flags, doc honesty. Gauntlet: REJECT → fixed, CAPPED; website visual gate blocked by pre-existing Astro/cookie prerender error.

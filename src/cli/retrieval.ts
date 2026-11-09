@@ -263,7 +263,7 @@ export async function handleHookCommand({ positional, flags }: ParsedArgs): Prom
  */
 export async function handleHooksCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const sub = positional[0] ?? "install";
-  const { installHookPack, uninstallHookPack, runSessionStartHook, runPostToolUseHook, runStopHook } = await import(
+  const { installHookPack, uninstallHookPack, runSessionStartHook, runPreToolUseHook, runPostToolUseHook, runStopHook } = await import(
     "../hooks/pack.ts"
   );
 
@@ -301,6 +301,9 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
     case "session-start":
       await runSessionStartHook();
       return 0;
+    case "pre-tool-use":
+      runPreToolUseHook();
+      return 0;
     case "post-tool-use":
       runPostToolUseHook();
       return 0;
@@ -308,7 +311,7 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
       runStopHook();
       return 0;
     default:
-      return usageError(`unknown hooks subcommand '${sub}' (expected install | uninstall | session-start | post-tool-use | stop)`);
+      return usageError(`unknown hooks subcommand '${sub}' (expected install | uninstall | session-start | pre-tool-use | post-tool-use | stop)`);
   }
 }
 
