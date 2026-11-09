@@ -620,7 +620,7 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 ## Wave 27: R19 Git-Branchable Memories & Multi-Tenant Agency Enclaves
 - [x] T-436 · LANDED 2026-11-09 — PR #377: Branchable Memory Overlays (`memory overlay` with `set`/`rm`; merge via T-439): Branch-isolated memory layers tracking git feature branch lifecycles · src/store/branch.ts · F
 - [x] T-437 · LANDED 2026-11-09 — PR #378: Multi-Tenant Agency Enclaves: authenticated encrypted client vaults (store-key, at-rest); `scope: client` deferred · src/store/enclaves.ts · F
-- [x] T-438 · LANDED 2026-11-09 — PR #379: Signed Packet Attestation: detached Ed25519 over canonical packet hashes with tamper-evident audit chains for client handoffs · src/sync/attestation.ts · F
+- [x] T-438 · LANDED 2026-11-09 — PR #379: Signed Packet Attestation v2: Ed25519 over canonical hashes with seq/head/key-id with tamper-evident audit chains for client handoffs · src/sync/attestation.ts · F
 - [x] T-439 · LANDED 2026-11-09 — PR #380: Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
 
 ## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry

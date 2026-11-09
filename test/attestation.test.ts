@@ -3,6 +3,7 @@ import {
   canonicalJson,
   generateAttestationKeypair,
   hashPacket,
+  keyIdFromPublicKey,
   signPacket,
   verifyAttestation,
   verifyAttestationChain,
@@ -16,7 +17,10 @@ describe("T-438: zero-knowledge packet attestation", () => {
 
     expect(attestation.packet_hash).toBe(hashPacket(packet));
     expect(JSON.stringify(attestation)).not.toContain("secret");
+    expect(attestation.seq).toBe(0);
+    expect(attestation.key_id).toBe(keyIdFromPublicKey(keys.publicKey));
     expect(verifyAttestation(packet, attestation, keys.publicKey)).toBe(true);
+    expect(verifyAttestation(packet, attestation, keys.publicKey, { expectedKeyId: "deadbeef" })).toBe(false);
     expect(verifyAttestation({ ...packet, project: "other" }, attestation, keys.publicKey)).toBe(false);
     expect(verifyAttestation(packet, { ...attestation, signature: "AAAA" }, keys.publicKey)).toBe(false);
   });
@@ -25,10 +29,13 @@ describe("T-438: zero-knowledge packet attestation", () => {
     const keys = generateAttestationKeypair();
     const first = signPacket({ n: 1 }, keys.privateKey);
     const second = signPacket({ n: 2 }, keys.privateKey, { previous: first });
-    const third = signPacket({ n: 3 }, keys.privateKey, { previous: second });
+    const third = signPacket({ n: 3 }, keys.privateKey, { previous: second, head: true });
 
     expect(verifyAttestationChain([first, second, third], keys.publicKey)).toBe(true);
     expect(verifyAttestationChain([second, first, third], keys.publicKey)).toBe(false);
+    // Truncation without a head is rejected by default.
+    expect(verifyAttestationChain([first, second], keys.publicKey)).toBe(false);
+    expect(verifyAttestationChain([first, second], keys.publicKey, { requireHead: false })).toBe(true);
   });
 
   test("canonical JSON is key-order independent and rejects non-I-JSON", () => {
