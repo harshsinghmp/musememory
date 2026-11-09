@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 import type { Store } from "../store.ts";
 import { formatPromptContext, type FormattedContext } from "../retrieval.ts";
+import { scoreBlastRadius, type BlastRisk } from "../intelligence/blast_risk.ts";
 
 export interface PreflightInput {
   files?: string[];
@@ -14,6 +15,7 @@ export interface PreflightResult {
   query: string;
   files: string[];
   context: FormattedContext;
+  risk: BlastRisk;
 }
 
 /** T-433: changed files from git, empty when not in a repository. */
@@ -46,5 +48,10 @@ export function preflightContext(store: Store, input: PreflightInput = {}): Pref
     tokenBudget: input.tokenBudget ?? 800,
     project: input.project,
   });
-  return { query, files, context };
+  const risk = scoreBlastRadius({
+    files,
+    hasTests: files.length === 0 ? undefined : files.every((file) => /(^|\/)(test|tests|__tests__)\//.test(file) || /\.(test|spec)\.[^.]+$/.test(file)),
+    crossModule: new Set(files.map((file) => file.split("/")[0])).size > 1,
+  });
+  return { query, files, context, risk };
 }
