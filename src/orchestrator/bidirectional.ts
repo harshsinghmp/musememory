@@ -2,6 +2,7 @@ import type { Store } from "../store.ts";
 import { get, list } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
 import type { CodeForMemoryResult, MemoryForCodeResult } from "./types.ts";
+import { resolveMemoriesForCode, inferProject } from "../retrieval/code_context.ts";
 
 /**
  * Given a memory ID, returns all anchored code references, files, and symbols.
@@ -51,57 +52,39 @@ export function resolveCodeForMemory(
  */
 export function resolveMemoryForCode(
   store: Store,
-  options: { filePath: string; symbolName?: string }
+  options: { filePath: string; symbolName?: string; project?: string; includeUntrusted?: boolean }
 ): MemoryForCodeResult {
-  const allEntries = list(store);
-  const normalizedFile = options.filePath.toLowerCase();
-  const normalizedSymbol = options.symbolName ? options.symbolName.toLowerCase() : undefined;
+  // W26-1: shared resolver. PR context keeps prose mentions and untrusted
+  // entries for a superset view, but matching/ranking lives in one place.
+  const matches = resolveMemoriesForCode(store, {
+    files: [options.filePath],
+    symbols: options.symbolName ? [options.symbolName] : undefined,
+    project: options.project ?? inferProject(store),
+    includeMentions: true,
+    includeUntrusted: options.includeUntrusted === true,
+    enforceFreshness: false,
+    skipStaleAnchors: true,
+    limit: 50,
+  });
 
   const associated: MemoryEntry[] = [];
   const negative: MemoryEntry[] = [];
   const constraints: MemoryEntry[] = [];
 
-  for (const entry of allEntries) {
-    if (entry.status === "archived" || entry.status === "superseded") continue;
-
-    let isMatch = false;
-
-    // 1. Check native code anchors
-    if (entry.anchors && entry.anchors.length > 0) {
-      for (const anc of entry.anchors) {
-        const ancFile = anc.file_path.toLowerCase();
-        const fileMatch = ancFile.includes(normalizedFile) || normalizedFile.includes(ancFile);
-        const symbolMatch =
-          normalizedSymbol && anc.symbol_name
-            ? anc.symbol_name.toLowerCase() === normalizedSymbol
-            : false;
-
-        if (fileMatch || symbolMatch) {
-          isMatch = true;
-          break;
-        }
-      }
+  for (const { entry } of matches) {
+    if (entry.negative != null || entry.tags?.some((t) => t.includes("negative") || t.includes("anti-pattern"))) {
+      negative.push(entry);
+    } else if (entry.type === "constraint" || entry.temporal_mode === "timeless") {
+      constraints.push(entry);
+    } else {
+      associated.push(entry);
     }
+  }
 
-    // 2. Check content or title references if not already matched
-    if (!isMatch) {
-      const lowerContent = `${entry.title} ${entry.content}`.toLowerCase();
-      if (lowerContent.includes(normalizedFile)) {
-        isMatch = true;
-      } else if (normalizedSymbol && lowerContent.includes(normalizedSymbol)) {
-        isMatch = true;
-      }
-    }
 
-    if (isMatch) {
-      if (entry.negative != null || entry.tags?.some((t) => t.includes("negative") || t.includes("anti-pattern"))) {
-        negative.push(entry);
-      } else if (entry.type === "constraint" || entry.temporal_mode === "timeless") {
-        constraints.push(entry);
-      } else {
-        associated.push(entry);
-      }
-    }
+  const match_reasons: Record<string, string[]> = {};
+  for (const { entry, why_retrieved } of matches) {
+    if (why_retrieved?.length) match_reasons[entry.id] = why_retrieved;
   }
 
   return {
@@ -111,5 +94,6 @@ export function resolveMemoryForCode(
     negative_lessons: negative,
     constraints,
     total_found: associated.length + negative.length + constraints.length,
+    match_reasons,
   };
 }

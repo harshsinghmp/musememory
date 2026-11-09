@@ -301,22 +301,23 @@ describe("T-321 follow-up: project scope on the remaining audit surfaces", () =>
 
       try {
         const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
+        const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
 
         // A real <label for="..."> — a placeholder is not a label (WCAG 2.2 AA).
         expect(html).toMatch(/<label[^>]*\sfor="projectFilter"/);
         expect(html).toMatch(/<input[^>]*\sid="projectFilter"/);
 
         // The control drives the scoped query string.
-        expect(html).toContain("projectScopeQuery");
-        expect(html).toContain("encodeURIComponent");
-        expect(html).toContain("'/api/health' + projectScopeQuery()");
-        expect(html).toContain("'/api/drift' + projectScopeQuery()");
-        expect(html).toContain("'/api/cognition/clusters' + projectScopeQuery()");
-        expect(html).toContain("'/api/cognition/debt' + projectScopeQuery()");
+        expect(js).toContain("projectScopeQuery");
+        expect(js).toContain("encodeURIComponent");
+        expect(js).toContain("'/api/health' + projectScopeQuery()");
+        expect(js).toContain("'/api/drift' + projectScopeQuery()");
+        expect(js).toContain("'/api/cognition/clusters' + projectScopeQuery()");
+        expect(js).toContain("'/api/cognition/debt' + projectScopeQuery()");
 
         // The scope the user is looking at is surfaced back to them.
         expect(html).toContain('id="healthScope"');
-        expect(html).toContain("formatHealthScope");
+        expect(js).toContain("formatHealthScope");
       } finally {
         srv.close();
       }

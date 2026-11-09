@@ -111,6 +111,10 @@ export const ALL_MEMORY_TOOLS = [
   "muse_bug_clusters",
   "muse_tech_debt",
   "muse_health",
+  "muse_episodes",
+  "muse_preflight",
+  "muse_playbook_recall",
+  "muse_playbook_record",
   "muse_sync_broadcast",
   "muse_sync_ingest",
   "muse_sync_status",
@@ -531,6 +535,18 @@ export function disconnectSingleAgent(
   }
 
   try {
+    // Harness-specific Claude settings may also grant every memory tool.
+    if (id === "claude-code" || id === "claude") {
+      const settingsPath = join(home, ".claude", "settings.json");
+      if (existsSync(settingsPath)) {
+        const settings = safeReadJson(settingsPath);
+        if (Array.isArray(settings.allowedTools)) {
+          settings.allowedTools = settings.allowedTools.filter((tool: string) => !ALL_MEMORY_TOOLS.includes(tool));
+          safeWriteJson(settingsPath, settings, options.dryRun);
+        }
+      }
+    }
+
     if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
       const doc = safeReadYaml(configPath);
       if (doc.mcp_servers && doc.mcp_servers.memory) delete doc.mcp_servers.memory;

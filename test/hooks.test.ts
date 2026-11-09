@@ -27,22 +27,25 @@ describe("Claude Code Hook Pack (GAP-2)", () => {
       expect(entry.timeout).toBeGreaterThan(0);
     });
 
-    it("installs all three hooks into settings.json", () => {
+    it("installs all four hooks into settings.json", () => {
       const settingsDir = join(tmpDir, ".claude");
       mkdirSync(settingsDir, { recursive: true });
       const settingsPath = join(settingsDir, "settings.json");
 
       const result = installHookPack(tmpDir, { settingsPath });
 
-      expect(result.installed).toHaveLength(3);
+      expect(result.installed).toHaveLength(4);
       expect(result.installed.map((r) => r.event)).toEqual([
         "SessionStart",
+        "PreToolUse",
         "PostToolUse",
         "Stop",
       ]);
 
       const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
       expect(settings.hooks.SessionStart[0].command).toBe("memory hooks session-start");
+      expect(settings.hooks.PreToolUse[0].command).toBe("memory hooks pre-tool-use");
+      expect(settings.hooks.PreToolUse[0].matcher).toContain("Edit");
       expect(settings.hooks.PostToolUse[0].command).toBe("memory hooks post-tool-use");
       expect(settings.hooks.Stop[0].command).toBe("memory hooks stop");
     });
@@ -87,7 +90,7 @@ describe("Claude Code Hook Pack (GAP-2)", () => {
       writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
 
       const result = uninstallHookPack(tmpDir, { settingsPath });
-      expect(result.removed).toEqual(["SessionStart", "PostToolUse", "Stop"]);
+      expect(result.removed).toEqual(["SessionStart", "PreToolUse", "PostToolUse", "Stop"]);
 
       const after = JSON.parse(readFileSync(settingsPath, "utf8"));
       expect(after.hooks.Stop).toHaveLength(1);
@@ -186,7 +189,7 @@ describe("Claude Code Hook Pack (GAP-2)", () => {
         installHookPack(tmpDir);
         const result = uninstallHookPack(tmpDir);
         expect(result.settingsPath).toBe(join(tmpDir, ".agents", "hooks.json"));
-        expect(result.removed).toEqual(["SessionStart", "PostToolUse", "Stop"]);
+        expect(result.removed).toEqual(["SessionStart", "PreToolUse", "PostToolUse", "Stop"]);
       });
     });
   });

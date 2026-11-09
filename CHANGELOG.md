@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Outcome pilot and RC blockers**: with/without memory pilot, T-450 ADR-008 tracking boundary, overlay archive prune, workspace-root branch identity, enclave put lock.
+- **Evidence and enclave lifecycle**: dogfood retrieval benchmark + evidence ledger, benchmark title-less crash fix, `enclave keys`/`prune`, backup/restore drill and key-lifecycle runbook.
+- **Enclave key rotation**: keyring under `.memory/enclave.keys/`, active key id, `memory enclave rotate` with optional lazy re-encryption and audit.
+- **Wave 27 multi-tenant memory**: branch-scoped overlays (`memory overlay`, three-way merge with base snapshots), authenticated AES-256-GCM client vaults, domain-separated Ed25519 packet attestations, and a three-way semantic memory merge (`merge3`).
+- **Unified file→memory resolver**: pre-flight anchored invariants and PR context now share one project/trust/freshness-aware matcher, ranking and reason tokens.
+- **Pre-flight surfaces**: a matcher-scoped `PreToolUse` hook and read-only `muse_preflight` MCP tool expose anchored invariants, blast-radius risk and a token-budgeted pack before edits.
+- **Wave 26 associative retrieval**: recursive-CTE associative expansion (`memory recall --associative`), speculative pre-flight context (`memory preflight`) with blast-radius risk scoring, and anchor-matched invariant auto-recall.
+- **Episode fidelity and `muse_episodes`**: observation provenance no longer classifies failed test commands as verifications; explicit metadata phases win; recent causal episodes are available over MCP.
+- **Studio left rail (`T-451`)**: fixed 76px numbered navigation (`01 OVERVIEW`–`06 ABOUT`), warm-dark palette, Archivo Black + JetBrains Mono, and an About anchor; all prior views remain reachable from a tools group.
+- **Dual-scope memory switcher (`T-452`)**: project / global / cross-project-mesh selector with live refetch; global and mesh reads open stores read-only, writes stay project-scoped behind a visible banner.
+- **Modular cached studio assets (`T-453`)**: CSS, markup and client JS split into `src/ui_assets.ts`; `/assets/studio.css` and `/assets/studio.js` serve per-encoding strong ETags, gzip, 304 and HEAD; standalone export inlines the same modules.
+- **CI Bun fallback**: when GitHub release assets return 504, CI installs Bun from the npm registry instead of failing the job.
+
+### Added
+- **Wave 24 showcase and DX (`T-423`–`T-426`)**: reproducible terminal-demo script and recording recipe, vendored `sql.js` in-browser SQLite playground, capability-only benchmark matrix with methodology, and an accessible multi-agent demo switcher.
+- **Wave 25 cognitive playbooks (`T-427`–`T-431`)**: atomic procedural playbooks (preconditions, steps, verification, rollback, outcomes), per-session episodic causal narratives, bi-temporal belief windows (`asserted_at`), reinforced Ebbinghaus decay, and `memory playbook` / `muse_playbook_*` CLI+MCP surfaces.
+- **Studio performance (`T-466`–`T-468`)**: per-scope read projection cache invalidated on writes, hidden-tab rendering pause, and an executable sub-10ms UI benchmark.
+- **About, quick start and command deck (`T-463`–`T-465`)**: poster-style About panel with live facts and privacy, copyable onboarding cards for four leading agents, and a filterable CLI palette.
+- **Universal agents hub (`T-460`–`T-462`)**: WIRED/UNWIRED/ABSENT discovery, one-click wire/unwire with `.bak` backups and harness opt-in, and a point-any-agent manifest with a copyable MCP snippet.
+- **Graph/list toggle (`T-454`)**: instant switch between the canvas graph and a sortable table (title, type, status, project, created) with a 100ms debounced filter and `aria-sort` headers.
+- **Kinetic-settling graph (`T-455`)**: the canvas now measures per-step kinetic energy and stops its `requestAnimationFrame` loop once the layout settles (or the panel is hidden), waking on pointer, wheel, timeline, filter, search, tab and view changes; deterministic ring seeding and pointer capture.
+- **Terrain token and secret gate (`T-459`)**: terrain maps are redacted at generation and a benchmark proves maps cost under half the raw corpus tokens.
+- **Terrain vault UI (`T-458`)**: studio split-pane with the six terrain maps, GEN/MISSING badges, escaped markdown viewer and a REINDEX action with a scanline pass.
+- **Workspace terrain maps (`T-457`)**: `memory terrain --workspace [--out]` compiles deterministic `repo.md`, `stack.md`, `habits.md`, `ownership.md`, `packages.md` and `logs.md` for token-efficient agent orientation.
+- **Activity heatmap and sessions (`T-456`)**: scope-aware `GET /api/activity` returns 52 weeks of daily mutation counts plus agent session cards; the studio gains an Activity view with a 53x7 heatmap, legend, mutation badge and session log.
+
+### Fixed
+- **Site build and scaffolding wiring**: Astro builds through a Node launcher (QA 17/17), `memory briefing` prints causal episodes, `asserted_at` is a caller-settable belief clock used by `as_of`, and the duplicate decay module is removed.
+- **Wave 24–25 review hardening**: playbook safety rails survive MCP step-only updates, corrupt stores fail loud and stay byte-identical, id-keyed playbook updates, unique episode ids, goal-first phase classification, epoch-based bi-temporal comparison, CLI `--dir`/`--global`/`--run`, and honest benchmark/playground copy.
+- **Agents hub debt sweep**: 5s discovery cache (invalidated on wire/unwire), newest-3 `.bak` retention, memory tool grants removed on unwire, and a 2s mesh freshness bucket.
+- **Agents hub and projection cache hardening**: complete XDG-aware timestamped config backups with fail-loud errors, unknown-agent 404s on wire/unwire, honest success reporting, WAL/layout-aware cache freshness (read-only POSTs stay HIT), and 44px phone controls.
+- **Caller scan (`T-449`)**: `HeuristicFallbackProvider.getCallers` no longer reuses a stateful `g`-flag regex, no longer counts declarations as callers, and scans directories in sorted order; regression test added.
+- **Test hermeticity (`T-449`)**: `findProjectRoot` no longer treats `$HOME`, its ancestors or `/` as project roots, so temp workspaces below home cannot adopt the global `~/.memory`; the doc-link scan also skips `.stversions` and `.commandcode`.
+
 ## [3.2.0] - 2026-10-26
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.1.3...v3.2.0
@@ -22,6 +57,9 @@ Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secr
 - **Ecosystem Sovereignty Gate**: Automated test gate verifying zero external imports and sovereign operation (`test/sovereignty_gate.test.ts`).
 
 ### Changed
+- **Latency claims corrected** to p95 targets; measured values shown.
+- **Client scope descoped (ADR-007)**: enclaves stay explicit encrypted vaults.
+- **Code-context security boundary**: project-scoped resolver, untrusted opt-in, sanitized agent output, capped inputs.
 - Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.
 - Updated project documentation and re-generated all claims, CLI references, and MCP tool matrixes.
 
@@ -182,6 +220,7 @@ Correctness release. Fixes five defects found by a cross-file invariant audit: a
 - **Removed the legacy `web/` directory**: a second, hand-written copy of the site that the Astro build superseded, unreferenced and not deployed.
 
 ### Security
+- **Attestation v2 and merge poisoning guard**: signed sequence + terminal head with key pinning; semantic merge refuses untrusted/self-asserted supersession, content inflation, and protected constraints.
 - **The `CURRENT.md` injection channel is closed** — see *Fixed* above. This is the T-110 defence extended to the sink that was bypassing it.
 - **Secret scanning is unchanged**: the Vibeguard rules still cover 8 credential families (AI API keys, GitHub and npm tokens, AWS keys, private key blocks, Slack tokens, credentialed connection strings and generic credential assignments). The published figure was wrong, not the scanner.
 

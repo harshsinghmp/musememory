@@ -1,0 +1,150 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Base
+  title="Playground — Muse Memory"
+  description="Query a sample Muse Memory store in your browser with real SQLite compiled to WebAssembly. No server, no network calls."
+>
+  <Nav />
+  <main id="main">
+    <section class="section">
+      <div class="container">
+        <p class="kicker">In-browser playground</p>
+        <h1>Query a memory store, locally</h1>
+        <p class="lede">
+          This page runs <strong>real SQLite compiled to WebAssembly</strong> against a
+          small sample store. The database is created in your tab, the query runs in
+          your tab, and nothing is sent anywhere. The table is a four-column
+          subset of the engine's memories table, kept simple for the demo.
+        </p>
+
+        <label class="pg-label" for="playground-sql">SQL</label>
+        <textarea id="playground-sql" spellcheck="false" rows="5">SELECT type, status, COUNT(*) AS n
+FROM memories
+GROUP BY type, status
+ORDER BY n DESC;</textarea>
+        <div class="pg-actions">
+          <button type="button" id="playground-run" class="btn">Run query</button>
+          <span id="playground-status" class="pg-status" role="status" aria-live="polite">Loading SQLite…</span>
+        </div>
+        <div class="pg-table-wrap">
+          <table id="playground-result" class="pg-table"></table>
+        </div>
+
+        <noscript>
+          <p class="pg-status">The playground needs JavaScript to run WebAssembly. The rest of the site works without it.</p>
+        </noscript>
+      </div>
+    </section>
+  </main>
+  <Footer />
+
+  <style>
+    .kicker { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+    h1 { margin: 0.4rem 0 0.8rem; }
+    .lede { max-width: 64ch; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.6rem; }
+    .pg-label { display: block; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+    textarea { width: 100%; background: #0a0806; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-primary); padding: 0.9rem 1rem; font: inherit; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.6; resize: vertical; }
+    textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .pg-actions { display: flex; align-items: center; gap: 0.9rem; margin: 0.8rem 0 1rem; flex-wrap: wrap; }
+    .pg-status { color: var(--text-dim); font-size: 0.85rem; }
+    .pg-table-wrap { overflow-x: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-md); }
+    .pg-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .pg-table th, .pg-table td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border-strong); }
+    .pg-table th { color: var(--text-dim); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.06em; }
+    .pg-table td { color: var(--text-secondary); }
+  </style>
+
+  <script>
+    import initSqlJs from "sql.js";
+    import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
+
+    const statusEl = document.getElementById("playground-status") as HTMLElement | null;
+    const runButton = document.getElementById("playground-run") as HTMLButtonElement | null;
+    const sqlInput = document.getElementById("playground-sql") as HTMLTextAreaElement | null;
+    const table = document.getElementById("playground-result") as HTMLTableElement | null;
+
+    const SAMPLE = [
+      { type: "constraint", status: "confirmed", title: "Never bypass the memory store lock" },
+      { type: "constraint", status: "confirmed", title: "Secrets never enter memory bodies" },
+      { type: "fix", status: "confirmed", title: "Reset the token cache before each auth test" },
+      { type: "fix", status: "confirmed", title: "Reopen the store after migration backfill" },
+      { type: "failure", status: "confirmed", title: "Do not seed Wiki pages from untrusted text" },
+      { type: "failure", status: "candidate", title: "Suspect a WAL checkpoint race on network mounts" },
+      { type: "architecture", status: "confirmed", title: "One SQLite owner per store" },
+      { type: "architecture", status: "confirmed", title: "Retrieval is fused from FTS and vectors" },
+      { type: "operation", status: "confirmed", title: "Run doctor before releasing" },
+      { type: "discovery", status: "candidate", title: "Asserted time differs from valid time" },
+    ];
+
+    if (statusEl && runButton && sqlInput && table) {
+      let db: any = null;
+
+      const render = (columns: string[], values: unknown[][]) => {
+        table.textContent = "";
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        for (const column of columns) {
+          const th = document.createElement("th");
+          th.scope = "col";
+          th.textContent = column;
+          headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        for (const row of values) {
+          const tr = document.createElement("tr");
+          for (const value of row) {
+            const td = document.createElement("td");
+            td.textContent = String(value);
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        statusEl.textContent = `${values.length} row${values.length === 1 ? "" : "s"}`;
+      };
+
+      const run = () => {
+        if (!db) return;
+        try {
+          const result = db.exec(sqlInput.value);
+          if (!result.length) {
+            table.textContent = "";
+            statusEl.textContent = "No rows returned.";
+            return;
+          }
+          render(result[0].columns as string[], result[0].values as unknown[][]);
+        } catch (error) {
+          table.textContent = "";
+          statusEl.textContent = `SQL error: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      };
+
+      initSqlJs({ locateFile: () => wasmUrl }).then((SQL: any) => {
+        db = new SQL.Database();
+        db.run("CREATE TABLE memories (id INTEGER PRIMARY KEY, type TEXT, status TEXT, title TEXT);");
+        const insert = db.prepare("INSERT INTO memories (type, status, title) VALUES (?, ?, ?);");
+        for (const item of SAMPLE) insert.run([item.type, item.status, item.title]);
+        insert.free();
+        statusEl.textContent = "SQLite ready — local to this tab.";
+        runButton.disabled = false;
+      }).catch((error: unknown) => {
+        statusEl.textContent = `Could not start SQLite: ${error instanceof Error ? error.message : String(error)}`;
+      });
+
+      runButton.disabled = true;
+      runButton.addEventListener("click", run);
+      sqlInput.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          event.preventDefault();
+          run();
+        }
+      });
+    }
+  </script>
+</Base>

@@ -135,7 +135,7 @@ describe("T-131: honest benchmark labels (measured-vs-claimed) on all published 
       const table = formatBenchmarkScoreboard(mockReport);
       expect(table).toContain("[MEASURED] Hot Cache");
       expect(table).toContain("[MEASURED] FTS5 BM25");
-      expect(table).toContain("[CLAIMED] SLA Target Bounds");
+      expect(table).toContain("[TARGET] p95 bounds");
       expect(table).toContain("[MEASURED] Memory ROI");
       expect(table).toContain("[MEASURED] Compression");
     });

@@ -154,4 +154,6 @@ export interface MemoryForCodeResult {
   negative_lessons: MemoryEntry[];
   constraints: MemoryEntry[];
   total_found: number;
+  /** W26-1: why each memory matched (anchor:… or mention:…). */
+  match_reasons?: Record<string, string[]>;
 }

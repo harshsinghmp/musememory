@@ -1,3 +1,4 @@
+import { preflightContext } from "../hooks/preflight.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
@@ -166,8 +167,13 @@ export async function handleRecallCommand({ positional, flags }: ParsedArgs): Pr
     type: flags["type"],
     status: flags["status"],
     verified: flags["verified"] === "true",
+    associative: flags["associative"] === "true",
   });
   for (const r of res.results) printEntry(r.entry);
+  if (res.associated && res.associated.length > 0) {
+    console.log("associated:");
+    for (const node of res.associated) console.log(`  ${node.id} (depth ${node.depth})`);
+  }
   return 0;
 }
 
@@ -257,7 +263,7 @@ export async function handleHookCommand({ positional, flags }: ParsedArgs): Prom
  */
 export async function handleHooksCommand({ positional, flags }: ParsedArgs): Promise<number> {
   const sub = positional[0] ?? "install";
-  const { installHookPack, uninstallHookPack, runSessionStartHook, runPostToolUseHook, runStopHook } = await import(
+  const { installHookPack, uninstallHookPack, runSessionStartHook, runPreToolUseHook, runPostToolUseHook, runStopHook } = await import(
     "../hooks/pack.ts"
   );
 
@@ -295,6 +301,9 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
     case "session-start":
       await runSessionStartHook();
       return 0;
+    case "pre-tool-use":
+      runPreToolUseHook();
+      return 0;
     case "post-tool-use":
       runPostToolUseHook();
       return 0;
@@ -302,7 +311,7 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
       runStopHook();
       return 0;
     default:
-      return usageError(`unknown hooks subcommand '${sub}' (expected install | uninstall | session-start | post-tool-use | stop)`);
+      return usageError(`unknown hooks subcommand '${sub}' (expected install | uninstall | session-start | pre-tool-use | post-tool-use | stop)`);
   }
 }
 
@@ -320,5 +329,40 @@ export async function handleHarvestAutoCommand({ flags }: ParsedArgs): Promise<n
     console.error(`  warning: ${err}`);
   }
   console.log(res.message);
+  return 0;
+}
+
+export async function handlePreflightCommand({ positional, flags }: ParsedArgs): Promise<number> {
+  const ctx = requireRoot(flags);
+  if (!ctx) return 1;
+  const budgetRaw = flags["budget"];
+  const tokenBudget = budgetRaw !== undefined ? parseInt(budgetRaw, 10) : undefined;
+  if (budgetRaw !== undefined && (!Number.isFinite(tokenBudget) || (tokenBudget as number) <= 0)) {
+    return usageError("--budget requires a positive integer");
+  }
+  const linesRaw = flags["lines"];
+  const changedLines = linesRaw !== undefined ? parseInt(linesRaw, 10) : undefined;
+  if (linesRaw !== undefined && !Number.isFinite(changedLines)) {
+    return usageError("--lines requires a non-negative integer");
+  }
+  const files = flags["files"]
+    ? String(flags["files"]).split(",").map((file) => file.trim()).filter(Boolean)
+    : positional;
+  const symbols = flags["symbols"] ? String(flags["symbols"]).split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+  const { query, files: changed, context, risk, anchors } = preflightContext(ctx.store, {
+    files: files.length > 0 ? files : undefined,
+    branch: flags["branch"],
+    tokenBudget,
+    project: flags["project"],
+    symbols,
+    changedLines,
+    cwd: ctx.root,
+  });
+  console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${context.totalTokensUsed} tokens · risk ${risk.level} (${risk.score}/100)`);
+  if (anchors.length > 0) {
+    console.log("anchored invariants:");
+    for (const anchor of anchors) printEntry(anchor.entry);
+  }
+  console.log(context.markdown);
   return 0;
 }

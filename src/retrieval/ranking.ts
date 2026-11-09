@@ -406,7 +406,10 @@ export async function rankAndRetrieveMemories(
     const aU = Date.parse(a.entry.updated_at);
     return (Number.isNaN(bU) ? 0 : bU) - (Number.isNaN(aU) ? 0 : aU);
   });
-  const ranked = conditionalRerank(scored);
+  // Holes in a candidate array would reach the packing loops as undefined.
+  const ranked = conditionalRerank(scored).filter(
+    (item): item is (typeof scored)[number] => Boolean(item?.entry),
+  );
 
   const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 200, 1) : 10;
 
@@ -429,7 +432,7 @@ export async function rankAndRetrieveMemories(
 
     for (const item of priorityGuardrails) {
       if (packed.length >= limit) break;
-      const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
+      const tokens = Math.ceil(((item.entry.title?.length ?? 0) + (item.entry.content?.length ?? 0)) / 4);
       if (tokensUsed + tokens <= options.tokenBudget) {
         packed.push(item);
         tokensUsed += tokens;
@@ -439,9 +442,10 @@ export async function rankAndRetrieveMemories(
     // Second pass: pack remaining highest-scoring entries
     const packedIds = new Set(packed.map((p) => p.entry.id));
     for (const item of ranked) {
+      if (!item?.entry) continue;
       if (packed.length >= limit) break;
       if (packedIds.has(item.entry.id)) continue;
-      const tokens = Math.ceil((item.entry.title.length + item.entry.content.length) / 4);
+      const tokens = Math.ceil(((item.entry.title?.length ?? 0) + (item.entry.content?.length ?? 0)) / 4);
       if (tokensUsed + tokens <= options.tokenBudget) {
         packed.push(item);
         tokensUsed += tokens;

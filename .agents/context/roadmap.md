@@ -53,7 +53,7 @@
 - **Git-Aware Branchable Memory Overlays (`memory branch`)**:
   - Branch-isolated working memory overlays that mirror git branch lifecycles (`feature/*`, `fix/*`).
   - Automated `memory branch-merge` command with interactive semantic contradiction resolution when merging feature branches into `main`.
-- **Agency Multi-Tenant Enclaves (`scope: client`)**:
+- **Agency Multi-Tenant Enclaves** (`scope: client` descoped — ADR-007; vaults are explicit):
   - Cryptographically isolated client memory vaults tailored for multi-client agency delivery (Sol, Jasper, Crew, Nexus).
   - Enforces zero cross-client knowledge contamination while allowing global engineering invariants (`scope: global`) to propagate safely.
 - **Zero-Knowledge Memory Attestation**:
@@ -380,11 +380,11 @@ Exploded ticket plan: `.agents/context/ticket-plan.md` (269 tracked tickets, 21 
    - `T-387`: Client configuration recipes & shared+personal scoping governance
 
 9. **Wave 23: Dashboard Overhaul, Workspace Terrain Maps & High-Speed Agent Hub (v3.1.0 Roadmap)**
-   - `T-405`–`T-407`: Cyber-minimalist left-rail poster navigation shell, dual-scope switcher (`project` | `global` | `mesh`), and sub-10ms UI static route serving
-   - `T-408`–`T-410`: Memory Studio 2.0 with instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap
-   - `T-411`–`T-413`: Workspace Terrain Generator (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) & split-pane markdown reader with scanline reindexing
-   - `T-414`–`T-416`: Universal Agents Hub with live auto-discovery (Antigravity, OpenCode, Claude Code, Cursor, Copilot, Hermes), 1-click MCP wiring, and drop-in prompt snippets
-   - `T-417`–`T-419`: Poster-style About panel (WHAT, THE PIECES live facts table, PRIVACY guarantee), multi-agent quick start guide, and interactive CLI command deck
-   - `T-420`–`T-422`: In-memory SQLite read projection cache, tab visibility sensors for zero idle CPU burn, and headless UI performance benchmark suite
+   - `T-451`–`T-453`: Cyber-minimalist left-rail poster navigation shell, dual-scope switcher (`project` | `global` | `mesh`), and sub-10ms UI static route serving
+   - `T-454`–`T-456`: Memory Studio 2.0 with instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap
+   - `T-457`–`T-459`: Workspace Terrain Generator (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) & split-pane markdown reader with scanline reindexing
+   - `T-460`–`T-462`: Universal Agents Hub with live auto-discovery (Antigravity, OpenCode, Claude Code, Cursor, Copilot, Hermes), 1-click MCP wiring, and drop-in prompt snippets
+   - `T-463`–`T-465`: Poster-style About panel (WHAT, THE PIECES live facts table, PRIVACY guarantee), multi-agent quick start guide, and interactive CLI command deck
+   - `T-466`–`T-468`: In-memory SQLite read projection cache, tab visibility sensors for zero idle CPU burn, and headless UI performance benchmark suite
 
 

@@ -6,6 +6,8 @@ import { openStore, type Store } from "../store.ts";
 import { parseCurrentFile } from "../governor.ts";
 import { rankAndRetrieveMemories } from "../retrieval/ranking.ts";
 import { recordObservation, listObservations } from "../learning/observation.ts";
+import { preflightContext } from "./preflight.ts";
+import { sanitizeContextForAgent } from "../security/context_sanitizer.ts";
 import { distillObservationsToCandidates } from "../learning/distill.ts";
 import { recordAuditEvent } from "../audit.ts";
 
@@ -28,7 +30,7 @@ import { recordAuditEvent } from "../audit.ts";
  * harness-independent by default — see {@link resolveHookSettingsPath}.
  */
 
-export type MuseHookEvent = "SessionStart" | "PostToolUse" | "Stop";
+export type MuseHookEvent = "SessionStart" | "PreToolUse" | "PostToolUse" | "Stop";
 
 export interface HookPackReport {
   event: MuseHookEvent;
@@ -39,22 +41,27 @@ export interface HookPackReport {
 
 const HOOK_COMMANDS: Record<MuseHookEvent, string> = {
   SessionStart: "memory hooks session-start",
+  PreToolUse: "memory hooks pre-tool-use",
   PostToolUse: "memory hooks post-tool-use",
   Stop: "memory hooks stop",
 };
 
-const HOOK_EVENTS: MuseHookEvent[] = ["SessionStart", "PostToolUse", "Stop"];
+const HOOK_EVENTS: MuseHookEvent[] = ["SessionStart", "PreToolUse", "PostToolUse", "Stop"];
 
 /** Timeout so a hung memory command can never stall the agent loop. */
 const HOOK_TIMEOUT_SECONDS = 10;
 
 /** Builds the Claude Code hook entry for one event. */
 export function buildHookEntry(event: MuseHookEvent): Record<string, any> {
-  return {
+  const entry: Record<string, any> = {
     type: "command",
     command: HOOK_COMMANDS[event],
     timeout: HOOK_TIMEOUT_SECONDS,
   };
+  // Claude Code's PreToolUse entries are matcher-scoped; pre-flight only makes
+  // sense when a file is about to be edited.
+  if (event === "PreToolUse") entry.matcher = "Edit|Write|MultiEdit|NotebookEdit";
+  return entry;
 }
 
 export interface HookPackOptions {
@@ -215,6 +222,7 @@ interface HookStdinPayload {
   cwd?: string;
   tool_name?: string;
   tool_response?: string;
+  tool_input?: Record<string, any>;
 }
 
 function readStdinJson(): HookStdinPayload {
@@ -294,6 +302,49 @@ export async function runSessionStartHook(): Promise<void> {
     process.stdout.write(lines.join("\n"));
   } catch (err) {
     failOpen("session-start", err);
+  }
+}
+
+/**
+ * PreToolUse: read-only speculative pre-flight for the file about to be edited.
+ * Emits anchored invariants + a risk line as additional context; never writes.
+ */
+export function runPreToolUseHook(): void {
+  try {
+    const payload = readStdinJson();
+    const ctx = resolveHookContext(payload.cwd);
+    if (!ctx) return;
+    const input = payload.tool_input ?? {};
+    const rawPath = input.file_path ?? input.filePath ?? input.path;
+    const files = typeof rawPath === "string" ? [rawPath] : undefined;
+    const result = preflightContext(ctx.store, {
+      files,
+      project: ctx.project,
+      cwd: payload.cwd,
+    });
+
+    const lines: string[] = [
+      "<muse-memory>",
+      `Pre-flight: risk ${result.risk.level} (${result.risk.score}/100) · ${result.files.length} file(s)`,
+    ];
+    if (result.anchors.length > 0) {
+      lines.push("", "## Anchored invariants");
+      for (const anchor of result.anchors.slice(0, 5)) {
+        lines.push(`- [${anchor.entry.type}] ${sanitizeContextForAgent(anchor.entry.title, 200)}: ${sanitizeContextForAgent(anchor.entry.content.slice(0, 160), 400)}`);
+      }
+    }
+    if (result.context.markdown.trim()) lines.push("", sanitizeContextForAgent(result.context.markdown));
+    lines.push("</muse-memory>", "");
+
+    const output = {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        additionalContext: lines.join("\n"),
+      },
+    };
+    process.stdout.write(JSON.stringify(output));
+  } catch (err) {
+    failOpen("pre-tool-use", err);
   }
 }
 

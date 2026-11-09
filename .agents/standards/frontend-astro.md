@@ -1,6 +1,6 @@
 # 🚀 Astro Frontend Engineering Standards
 
-> **Runtime Target**: Astro v7.3.x · Bun / Node runtime · TypeScript Strict
+> **Runtime Target**: Astro v7.4.7 · Bun / Node runtime · TypeScript Strict
 > **Applies to**: `apps/website/` — the Muse Memory marketing and documentation site.
 
 ---
@@ -130,3 +130,5 @@ bun run --cwd apps/website scripts/audit-visual.ts
 bun test                    # the whole repository suite
 bunx tsc --noEmit           # type check
 ```
+
+> Build note: the site runs the Astro CLI through Node (`apps/website/scripts/astro.mjs`); Bun’s CJS/ESM interop rejects Astro’s `cookie` import.

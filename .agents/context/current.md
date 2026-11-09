@@ -5,6 +5,26 @@
 
 ---
 
+## 🧾 Session — Ticket Ledger Renumber & Remainder Audit (2026-11-08)
+
+Wave 23's `T-405`–`T-422` collided with the already-landed `T-405` (conflicted injection) and `T-406` (project casing), so that block is now `T-451`–`T-468` across the plan, roadmap and this file. The historical blueprint keeps its original IDs with a translation note; `HANDOFF.md`'s `T-405`/`T-406` are the unrelated landed fixes and were left untouched. Every unchecked ticket was then verified against source: 4 were already implemented (`T-150`, `T-151`, `T-153`, `T-384`) and are now marked done, 15 are partial, 86 are genuinely unbuilt, `T-163` is dropped by principal decision D3, and `T-449`/`T-450` remain filed/deferred. Full evidence table: `.agents/context/ticket-plan.md` → v15. Doc-claim gate re-run green (20/20).
+
+### Wave 23 PR 1 implemented (local, not landed)
+
+`T-451`–`T-453` are implemented in the new `src/ui_assets.ts` module and wired through `src/ui.ts`:
+
+- **T-451** — the studio now renders a fixed 76px left rail with six numbered sections (`01 OVERVIEW` … `06 ABOUT`), a tools group for the pre-existing views, a warm `#0c0a09` palette, and Archivo Black / JetBrains Mono typography. The rail uses words and numbers, not emoji.
+- **T-452** — the header carries a project / global / mesh segmented switcher that refetches live. `/api/memories`, `/api/stats`, `/api/current`, `/api/wiki`, `/api/user-profile` and `/api/audit` resolve the scope; the global store (`~/.memory`) opens lazily and is never created by a read; mesh results carry `origin_project`. Mutations stay project-scoped and the studio shows a scope banner whenever it is not viewing the project store.
+- **T-453** — CSS, markup and client JS are split out of the old 2,700-line template literal and served from `/assets/studio.css` and `/assets/studio.js` with strong ETags, pre-gzipped buffers, `Vary: Accept-Encoding` and 304 fast paths. The standalone export inlines the same modules.
+
+Gate at merge: `bun test` **1451 pass / 0 fail** across 217 files, `tsc --noEmit` clean, `bun run build` 434 modules. **Landed in [PR #337](https://github.com/harshsinghmp/musememory/pull/337) at `d0c9600`** (2026-11-08); `check:landed` → `RESULT: LANDED`.
+
+### Gauntlet run — CAPPED at the 5-round ceiling (2026-11-08)
+
+Ran the bounded gauntlet loop against this PR (contract + ledger + packet in `.agents/artifacts/gauntlet-wave23-pr1/`). Five rounds: Fresh Critic scores **5.95 → 7.63 → 7.90 → 8.85 → 7.99**. Both R5 blockers were confirmed closed (mesh-link cache invalidation; scope-generation guards on every scoped fetch); the final critic left only small markup/ARIA/banner defects, which were fixed in the post-ceiling Integrator delta and verified by the gate but not re-critiqued. The packet is explicitly **CAPPED, not a PASS**. Final gate: **1450/0**, tsc clean, build 434 modules, zero overflow at 375/768/1280, 44×44 targets at 375/768, headers 4/4 (HSTS N/A), per-encoding ETags + wildcard 304 + 406 negotiation, secret scan clean. Residual debt (scope-race test, CSP `unsafe-inline`, mesh read-only store minting, duplicated `escapeHtml`, standalone export zeros) is in `TECHNICAL_DEBT.md`.
+
+---
+
 ## 🔧 Session — Sync Recovery (2026-11-03)
 
 Restored `AGENTS.md` byte-exact from HEAD after an `updateagents` run from the umbrella directory replaced it (and persona files in sibling repos) with three-line adapters. Added `.commandcode/` and `.stversions/` to `.gitignore`, made the Syncthing ignore rules canonical in `~/.dotfiles/syncthing/`, and recorded the workspace-isolation invariant. The engine fix now stops at nested repository roots and refuses umbrella directories; the global install was refreshed. Repo-local recovery for `muse-agents` and `muse-skills` is owned by their respective agents.
@@ -145,7 +165,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## ⏭️ Next Up (Post-Release Focus)
-- **Wave 23: Dashboard Overhaul, Terrain Maps & High-Speed Agent Hub (`T-405`–`T-422`)**:
+- **Waves 23–25 are complete.** Next is **Wave 26–29** (`T-432`–`T-443`): AST associative retrieval (`T-432`–`T-435`), branchable/enclave memory (`T-436`–`T-439`), test-driven reinforcement (`T-440`–`T-443`). Site note: unblock the Astro/cookie prerender error before any visual QA on the new pages:
   - Full UI overhaul inspired by Ryoku Rashin (`http://127.0.0.1:3600`): fixed 76px left-rail cyber-minimalist navigation, instant Canvas Graph ↔ Filterable List toggle, 60fps kinetic-settling physics loop, and 52-week activity calendar heatmap.
   - Multi-scope switcher: Project Scope (`./.memory`) vs Global User Scope (`~/.memory`) vs Cross-Project Mesh.
   - Workspace Terrain Maps (`stack.md`, `habits.md`, `ownership.md`, `packages.md`, `repo.md`, `logs.md`) for token-efficient agent orientation.
@@ -160,6 +180,34 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Outcome pilot + RC blockers** (2026-11-09) — with/without pilot 2/2 vs 1/2; latency claims corrected to p95 targets; T-450 ADR-008 boundary; overlay GC, branch root identity, enclave put lock.
+- [x] **Evidence + key lifecycle** (2026-11-09) — dogfood benchmark (hit@3 10/10, MRR 0.933, 68% token savings), evidence ledger with 2 quarantined claims, benchmark title-less crash fixed, `enclave keys/prune`, backup drill, runbook.
+- [x] **Enclave key rotation + client-scope descope** (2026-11-09) — versioned keyring, `enclave rotate`, old-key rollback; `scope: client` descoped per ADR-007.
+- [x] **Attestation v2 + merge guard** (2026-11-09) — seq/head/key-id pinning, truncation rejection; semantic merge blocks untrusted lineage, inflation and protected constraints.
+- [x] **Wave 27 hardening** (2026-11-09) — audit-REJECT fixes: strict names, GCM AAD/key id, audited overlay merge via T-439, fail-closed merge3, corrected claims. Gate 1521/0; CAPPED.
+- [x] **Wave 27 (`T-436`–`T-439`)** (2026-11-09) — branch overlays (#377), encrypted enclaves (#378), packet attestations (#379), three-way merge (#380). Tests 1514/0.
+- [x] **Sensitive-read audit + project identity** (2026-11-09) — `read` audit events for `scope: "all"`/untrusted; configured project via env/config/`memory project`.
+- [x] **Code-context security boundary** (2026-11-09) — project-scoped by default, untrusted opt-in, read-time redaction/sanitization, bounded inputs; `muse_memory_for_code` accepts project/include_untrusted.
+- [x] **Unified code resolver** (2026-11-09) — `resolveMemoriesForCode` is the single matcher; pre-flight and PR context adapt it.
+- [x] **Pre-flight surfaces** (2026-11-09) — PreToolUse hook + read-only `muse_preflight` MCP tool; 119 tools.
+- [x] **Wave 26 (`T-432`–`T-435`)** (2026-11-09) — recursive-CTE associative expansion (`T-432`, direct `dev`), pre-flight context (`T-433`, #370), blast-radius risk (`T-434`, #371), anchor-matched auto-recall (`T-435`, #372). Tests 1495/0.
+- [x] **Site build + scaffolding wiring** (2026-11-08) — PR #367 (Node Astro launcher; site:qa 17/17 SHIP) and #368 (briefing episodes, explicit `asserted_at` belief clock in `as_of`, duplicate decay removed).
+- [x] **Wave 24–25 review hardening** (2026-11-08) — PR #366 merged at `a485875`; playbook rail preservation, fail-loud corrupt store, id-keyed updates, unique episode ids, goal-first phases, epoch timestamps, CLI flags, doc honesty. Gauntlet: REJECT → fixed, CAPPED; website visual gate blocked by pre-existing Astro/cookie prerender error.
+- [x] **Wave 24 (`T-423`–`T-426`)** (2026-11-08) — terminal demo script/recipe, vendored sql.js playground, capability-only benchmark matrix, accessible agent demos. PRs #362–#365. Site prerender has a pre-existing Astro/cookie CJS blocker (entrypoints compile).
+- [x] **Wave 25 (`T-427`–`T-431`)** (2026-11-08) — playbooks, episodes, bi-temporal belief windows, reinforced decay, and playbook CLI/MCP commands. PRs #356–#361.
+- [x] **Post-Wave-23 debt sweep** (2026-11-08) — PR #355 merged at `432cf01`: agents discovery cache, backup retention, unwire tool-grant cleanup, mesh freshness bucket.
+- [x] **Wave 23 gauntlet hardening** (2026-11-08) — PR #354 merged at `d2ea59c`; complete config backups (XDG-aware, timestamped, fail-loud), unknown-agent 404s, honest wire reporting, WAL/layout cache freshness, 44px phone controls. Gauntlet: 7.35 critic → REQUEST-CHANGES review → fixed; **CAPPED, not a PASS**. Evidence: `.agents/artifacts/gauntlet-wave23-pr456/`.
+- [x] **Wave 23 PR 6 (`T-466`–`T-468`)** (2026-11-08) — projection cache, hidden-tab pause and the UI performance benchmark. **Wave 23 complete.** PRs #351–#353.
+- [x] **Wave 23 PR 5 (`T-463`–`T-465`)** (2026-11-08) — poster About panel, quick-start cards and searchable command deck. PRs #348–#350.
+- [x] **Wave 23 PR 4 (`T-460`–`T-462`)** (2026-11-08) — agents hub: discovery statuses, one-click wire/unwire with `.bak` backups and harness opt-in, point-any-agent manifest. PRs #345–#347.
+- [x] **Wave 23 PR 3 / `T-459`** (2026-11-08) — PR #344 merged; generation-time redaction plus a token-savings and leak test (`test/vault_terrain.test.ts`).
+- [x] **Wave 23 PR 3 / `T-458`** (2026-11-08) — PR #343 merged at `65113af`; terrain vault split-pane (tree, GEN badges, markdown viewer, REINDEX scanline).
+- [x] **Wave 23 PR 3 / `T-457`** (2026-11-08) — PR #342 merged at `8006427`; deterministic workspace terrain generator and `terrain --workspace` CLI.
+- [x] **Wave 23 PR 2 / `T-455`** (2026-11-08) — PR #340 merged at `05b4fdf`; energy-settling loop with wake hooks, deterministic ring seed, pointer capture.
+- [x] **Wave 23 PR 2 / `T-456`** (2026-11-08) — PR #341 merged at `436d198`; scope-aware activity endpoint, 52-week heatmap and agent session cards.
+- [x] **T-449 test hermeticity** (2026-11-08) — PR #338 merged at `94620895`; `findProjectRoot` no longer adopts `$HOME`/`/` as a project root, doc-link scan skips local sync state, regression test with a fake home. Earlier caller-scan fix merged via #337 (`c0f7aef`). Issue #336 closes.
+- [x] **Wave 23 PR 2 / `T-454`** (2026-11-08) — PR #339 merged at `3e621fa`; instant graph/list toggle with a sortable table, `aria-sort`, and a 100ms debounced filter.
+- [x] **Wave 23 PR 1 (`T-451`–`T-453`)** (2026-11-08) — merged in PR #337 at `d0c9600`; `check:landed` → **LANDED**. Left rail, dual-scope switcher, modular ETag/gzip assets, read-only global/mesh reads, 375/768/1280 verified, 1451/0 at merge. Follow-ups in PR #337's thread: stateful-regex flake fixed (`c0f7aef`), npm Bun CI fallback (`b298beb`). Gauntlet verdict: CAPPED at 7.99 (not a 9.0 PASS) — evidence in `.agents/artifacts/gauntlet-wave23-pr1/`.
 - [x] **Released: v3.1.2** (2026-10-25) — completes the silent-casing fan-out:
   - PR #330 merged at `d7e875b` (*"Release: v3.1.2"*); annotated tag
     [`v3.1.2`](https://github.com/harshsinghmp/musememory/releases/tag/v3.1.2)

@@ -21,6 +21,7 @@ import {
   handleContextCommand,
   handleSearchCommand,
   handleRecallCommand,
+  handlePreflightCommand,
   handleHarvestCommand,
   handleImportTranscriptCommand,
   handleSearchTranscriptCommand,
@@ -29,6 +30,11 @@ import {
   handleHarvestAutoCommand,
   handleReindexCommand,
 } from "./cli/retrieval.ts";
+import { handleEnclaveCommand } from "./cli/enclave.ts";
+import { handleOverlayCommand } from "./cli/branch.ts";
+import { handleAttestCommand } from "./cli/attest.ts";
+import { handleMerge3Command } from "./cli/merge3.ts";
+import { handleProjectCommand } from "./cli/project.ts";
 import { handleCurrentCommand, handleUserCommand, handleCoreCommand } from "./cli/persona.ts";
 import { handleEmbedCommand } from "./cli/embed.ts";
 import { handleWikiCommand } from "./cli/wiki.ts";
@@ -78,6 +84,7 @@ import {
   handleCodeImpactCommand,
   handlePrContextCommand,
 } from "./cli/health.ts";
+import { handlePlaybookCommand } from "./cli/playbook.ts";
 import { handleConflictsCommand } from "./cli/conflicts.ts";
 import { handleSyncCommand } from "./cli/sync.ts";
 import { handleMeshCommand } from "./cli/mesh.ts";
@@ -136,6 +143,8 @@ Context & Retrieval Commands:
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
   embed [status|build|reindex]  Manage semantic embeddings (llama.cpp / OpenAI-compatible endpoint; opt-in)
   recall [query]                Search active/confirmed memories with filters
+  preflight [files...]           Speculative context for the files being edited
+  project [name]                 Show or set the configured project identity
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
 Wiki & Entity Knowledge Compounding:
@@ -174,8 +183,9 @@ Ecosystem, Migration & Connectivity:
   conflicts [--dry-run]        Inspect recorded contradictions; --dry-run previews what would be flagged
   reconcile [--prune] [--stale] Reconcile orphaned & drifted code anchors across memories
   benchmark [--iterations N]    Run microsecond speed, quality & token economy benchmark suite
+  playbook [--list|--tag T|<id>] [--success|--fail] Procedural playbooks: list, inspect or record an outcome
   scan-secrets [dir] [--json]   Native Vibeguard secret scanner (zero external dependencies)
-  terrain [--out file.md]       Collect machine hardware, toolchain & agent ecosystem map
+  terrain [--workspace] [--out]  Machine terrain, or --workspace for the six workspace maps
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
   mcp                           Run stdio MCP server for agent platforms
@@ -251,6 +261,10 @@ export async function main(argv: string[]): Promise<number> {
       return handleSearchCommand(parsed);
     case "recall":
       return handleRecallCommand(parsed);
+    case "preflight":
+      return handlePreflightCommand(parsed);
+    case "project":
+      return handleProjectCommand(parsed);
     case "search-transcript":
     case "search-transcripts":
       return handleSearchTranscriptCommand(parsed);
@@ -371,6 +385,8 @@ export async function main(argv: string[]): Promise<number> {
       return handleReconcileCommand(parsed);
     case "benchmark":
       return handleBenchmarkCommand(parsed);
+    case "playbook":
+      return handlePlaybookCommand(parsed);
     case "scan-secrets":
     case "secrets-scan":
     case "vibe-scan":
@@ -391,6 +407,14 @@ export async function main(argv: string[]): Promise<number> {
     // R23 Versioning Commands
     case "branch":
       return handleBranchCommand(parsed);
+    case "enclave":
+      return handleEnclaveCommand(parsed);
+    case "overlay":
+      return handleOverlayCommand(parsed);
+    case "attest":
+      return handleAttestCommand(parsed);
+    case "merge3":
+      return handleMerge3Command(parsed);
     case "checkout":
       return handleCheckoutCommand(parsed);
     case "blame":

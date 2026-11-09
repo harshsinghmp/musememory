@@ -11,6 +11,11 @@ import type {
 
 const SOURCE_EXTS = new Set([".ts", ".js", ".tsx", ".jsx", ".py", ".go", ".rs", ".java", ".c", ".cpp"]);
 
+/** Escape a symbol before interpolating it into a RegExp. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Built-in zero-dependency heuristic provider.
  * Uses lightweight regex and text inspection over local workspace files.
@@ -85,7 +90,14 @@ export class HeuristicFallbackProvider implements CodeIntelligenceProvider {
 
     const files = this.scanFiles(workspaceDir, 50);
     const references: SymbolReference[] = [];
-    const callPattern = new RegExp(`\\b${symbol}\\s*\\(`, "g");
+    // T-449: a `g`-flag RegExp carries lastIndex between `.test()` calls,
+    // which silently skipped call sites on shorter lines. This is a pure test,
+    // so no global flag is needed.
+    const escapedSymbol = escapeRegExp(symbol);
+    const callPattern = new RegExp(`\\b${escapedSymbol}\\s*\\(`);
+    const definitionPattern = new RegExp(
+      `\\b(?:function|class|interface|type|const|let|var|def|fn)\\s+${escapedSymbol}\\b`,
+    );
 
     for (const filePath of files) {
       try {
@@ -93,6 +105,8 @@ export class HeuristicFallbackProvider implements CodeIntelligenceProvider {
         const lines = content.split("\n");
 
         for (let i = 0; i < lines.length; i++) {
+          // A declaration is not a call site (T-449: definitions were counted).
+          if (definitionPattern.test(lines[i])) continue;
           if (callPattern.test(lines[i])) {
             references.push({
               symbol,
@@ -208,7 +222,7 @@ export class HeuristicFallbackProvider implements CodeIntelligenceProvider {
       if (files.length >= maxFiles) return;
       let entries: string[] = [];
       try {
-        entries = readdirSync(currentDir);
+        entries = readdirSync(currentDir).sort();
       } catch {
         return;
       }

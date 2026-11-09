@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { openStore, save } from "../src/store.ts";
+import { openStore, propose, save } from "../src/store.ts";
 import { startUiServer, exportStandaloneHtml } from "../src/ui.ts";
 import { setupFixtureRoot, cleanup, makeTempRoot } from "./helpers.ts";
 
@@ -48,16 +48,17 @@ describe("embedded web UI server", () => {
     const srv = await startUiServer({ port: 0, memoryDir, store });
 
     const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
-    // v2 markers
+    // v2 markup markers stay in the shell; behaviour markers moved to the JS asset (T-453).
     expect(html).toContain("timelineSlider");
     expect(html).toContain("clusterFilters");
-    expect(html).toContain("simulateStep");
-    expect(html).toContain("project(");      // perspective projection
-    expect(html).toContain("rotY");          // drag-to-rotate state
-    expect(html).toContain("wheel");         // zoom
-    expect(html).toContain("TYPE_COLORS");   // color by type
-    expect(html).toContain("degree");        // size by degree
-    expect(html).toContain("nodeVisible");   // filter gating
+    const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+    expect(js).toContain("simulateStep");
+    expect(js).toContain("project(");      // perspective projection
+    expect(js).toContain("rotY");          // drag-to-rotate state
+    expect(js).toContain("wheel");         // zoom
+    expect(js).toContain("TYPE_COLORS");   // color by type
+    expect(js).toContain("degree");        // size by degree
+    expect(js).toContain("nodeVisible");   // filter gating
     // data endpoint shape unchanged (array of raw entries)
     const mems = await (await fetch(`http://localhost:${srv.port}/api/memories`)).json();
     expect(Array.isArray(mems)).toBe(true);
@@ -76,7 +77,9 @@ describe("embedded web UI server", () => {
     const srv = await startUiServer({ port: 0, memoryDir, store });
 
     const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
-    expect(html).toContain("No memories yet"); // empty-graph guard message
+    expect(html).toContain("panel-graph");
+    const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+    expect(js).toContain("No memories yet"); // empty-graph guard message
     const mems = await (await fetch(`http://localhost:${srv.port}/api/memories`)).json();
     expect(Array.isArray(mems)).toBe(true);
     expect(mems.length).toBe(0);
@@ -235,6 +238,811 @@ describe("embedded web UI server", () => {
 
     srv.close();
     cleanup(root);
+  });
+});
+
+describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
+  test("T-451: serves a 76px numbered left rail with warm-dark typography", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
+      expect(html).toContain('class="rail"');
+      for (const n of ["01", "02", "03", "04", "05", "06"]) {
+        expect(html).toContain(`<span class="rail-num">${n}</span>`);
+      }
+      for (const view of ["graph", "health", "wiki", "cognition", "current", "about"]) {
+        expect(html).toContain(`data-view="${view}"`);
+      }
+      // The six numbered sections do not orphan the pre-existing views.
+      for (const view of ["adrs", "sync", "mesh", "persona", "sandbox", "audit"]) {
+        expect(html).toContain(`data-view="${view}"`);
+      }
+      // Rail uses words + numbers, never emoji glyphs.
+      const rail = html.slice(html.indexOf('class="rail"'), html.indexOf("</nav>"));
+      expect(rail).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+
+      const css = await (await fetch(`http://localhost:${srv.port}/assets/studio.css`)).text();
+      expect(css).toContain("width: 76px");
+      expect(css).toContain("margin-left: 76px");
+      expect(css).toContain("Archivo Black");
+      expect(css).toContain("#0c0a09");
+      expect(css).toContain("@media (max-width: 640px)");
+      expect(css).toContain("min-height: 44px");
+      expect(css).toContain("overflow-x: auto");
+      // Clickable filters/cards must be real buttons with pressed state.
+      expect(html).toContain('<button type="button" class="chip');
+      expect(html).toContain('aria-pressed="true">All</button>');
+      expect(html).toContain('<button type="button" class="archetype-card"');
+      expect(html).toContain('<span class="archetype-icon">');
+      // Buttons may not close a span with a div end tag.
+      expect(html).not.toMatch(/<span class="archetype-icon">[^<]*<\/div>/);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+
+  test("T-452: project, global and mesh scopes resolve independently", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const globalDir = join(globalRoot, ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = globalDir;
+    let srv: Awaited<ReturnType<typeof startUiServer>> | undefined;
+    try {
+      const globalStore = openStore(globalDir);
+      save(globalStore, {
+        id: "m_1700000099999_global",
+        title: "global scope marker",
+        content: "only present in the global store",
+        project: "global",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      globalStore.db?.close();
+      writeFileSync(join(globalDir, "CURRENT.md"), "# Global Constraints\n- global-only-rule\n");
+
+      srv = await startUiServer({ port: 0, memoryDir, store });
+      const base = `http://localhost:${srv.port}`;
+
+      const html = await (await fetch(`${base}/`)).text();
+      for (const scope of ["project", "global", "mesh"]) {
+        expect(html).toContain(`data-scope="${scope}"`);
+      }
+      expect(html).toContain('id="scopeSwitch"');
+      expect(html).toContain('id="scopeBanner"');
+
+      // A server that resolves ?scope= is only useful if the client sends it.
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      for (const route of ["/api/current", "/api/wiki", "/api/user-profile", "/api/audit"]) {
+        expect(js).toContain(`fetch(apiUrl('${route}')`);
+      }
+      expect(js).toContain("apiUrl('/api/wiki?page='");
+      expect(js).toContain("origin_project");
+      expect(js).toContain("Health, ADRs, Cognition, Sync and Mesh stay project-scoped");
+      expect(js).toContain("first 200 entries");
+      // Writes stay project-scoped and the UI must say so / enforce it.
+      expect(js).toContain("requireProjectScope");
+      expect(js).toContain("document.body.dataset.scope");
+      expect(js).toContain("typeof profile === 'string'");
+      expect(js).toContain("scopeGeneration");
+      expect((js.match(/requestGen !== scopeGeneration/g) || []).length).toBeGreaterThanOrEqual(5);
+
+      const project = await (await fetch(`${base}/api/memories`)).json();
+      const global = await (await fetch(`${base}/api/memories?scope=global`)).json();
+      const mesh = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(Array.isArray(project)).toBe(true);
+      expect(Array.isArray(global)).toBe(true);
+      expect(Array.isArray(mesh)).toBe(true);
+      expect(global.some((m: { id: string }) => m.id === "m_1700000099999_global")).toBe(true);
+      expect(project.some((m: { id: string }) => m.id === "m_1700000099999_global")).toBe(false);
+
+      const stats = await (await fetch(`${base}/api/stats?scope=global`)).json();
+      expect(stats.scope).toBe("global");
+      expect(stats.available).toBe(true);
+      expect(stats.total).toBeGreaterThan(0);
+
+      // Panels with a global counterpart follow the scope; the project view does not.
+      const globalCurrent = await (await fetch(`${base}/api/current?scope=global`)).json();
+      const projectCurrent = await (await fetch(`${base}/api/current`)).json();
+      expect(globalCurrent.lines.join("\n")).toContain("global-only-rule");
+      expect(projectCurrent.lines.join("\n")).not.toContain("global-only-rule");
+    } finally {
+      srv?.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-452: a missing global store stays empty and is not created by a read", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const absentDir = join(globalRoot, "absent", ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = absentDir;
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const global = await (await fetch(`http://localhost:${srv.port}/api/memories?scope=global`)).json();
+      expect(global).toEqual([]);
+      const stats = await (await fetch(`http://localhost:${srv.port}/api/stats?scope=global`)).json();
+      expect(stats.scope).toBe("global");
+      expect(stats.available).toBe(false);
+      expect(existsSync(absentDir)).toBe(false);
+    } finally {
+      srv.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-452: linking a mesh store invalidates the cached topology", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const linkedRoot = makeTempRoot();
+
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+
+      // Populate the 2s topology cache before the linked store exists.
+      const before = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(before.some((m: { id: string }) => m.id === "m_1700000077777_linked")).toBe(false);
+
+      const linkedMemory = join(linkedRoot, ".memory");
+      const linkedStore = openStore(linkedMemory);
+      save(linkedStore, {
+        id: "m_1700000077777_linked",
+        title: "linked mesh marker",
+        content: "only present after linking the store",
+        project: "linked",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      linkedStore.db?.close();
+
+      const linkRes = await fetch(`${base}/api/mesh/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: linkedRoot }),
+      });
+      expect(linkRes.status).toBe(200);
+
+      // The next read must not serve the pre-link cache.
+      const after = await (await fetch(`${base}/api/memories?scope=mesh`)).json();
+      expect(after.some((m: { id: string }) => m.id === "m_1700000077777_linked")).toBe(true);
+    } finally {
+      srv.close();
+      cleanup(root);
+      cleanup(linkedRoot);
+    }
+  });
+
+  test("T-452: reading an existing global store does not re-sync it", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const globalRoot = makeTempRoot();
+    const globalDir = join(globalRoot, ".memory");
+    const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+    process.env.MUSEMEMORY_GLOBAL_DIR = globalDir;
+    let srv: Awaited<ReturnType<typeof startUiServer>> | undefined;
+    try {
+      const globalStore = openStore(globalDir);
+      save(globalStore, {
+        id: "m_1700000088888_global",
+        title: "existing global entry",
+        content: "already present before the read",
+        project: "global",
+        status: "confirmed",
+        type: "discovery",
+        created_at: "2026-08-12T10:00:00Z",
+        updated_at: "2026-08-12T10:00:00Z",
+      });
+      globalStore.db?.close();
+
+      writeFileSync(join(globalDir, "CURRENT.md"), "# Global Constraints\n- immutable-rule\n");
+      const currentBefore = readFileSync(join(globalDir, "CURRENT.md"), "utf8");
+      const wikiDir = join(globalDir, "wiki");
+      const wikiBefore = existsSync(wikiDir)
+        ? (readdirSync(wikiDir, { recursive: true }) as string[]).sort()
+        : [];
+
+      srv = await startUiServer({ port: 0, memoryDir, store });
+      const memories = await (await fetch(`http://localhost:${srv.port}/api/memories?scope=global`)).json();
+      expect(memories.some((m: { id: string }) => m.id === "m_1700000088888_global")).toBe(true);
+
+      // The read must not rewrite CURRENT.md or compile the wiki.
+      expect(readFileSync(join(globalDir, "CURRENT.md"), "utf8")).toBe(currentBefore);
+      const wikiAfter = existsSync(wikiDir)
+        ? (readdirSync(wikiDir, { recursive: true }) as string[]).sort()
+        : [];
+      expect(wikiAfter).toEqual(wikiBefore);
+    } finally {
+      srv?.close();
+      if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+      else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+      cleanup(root);
+      cleanup(globalRoot);
+    }
+  });
+
+  test("T-453: shell and assets are served with ETag, gzip and a 304 fast path", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+
+      const cssRes = await fetch(`${base}/assets/studio.css`, { headers: { "Accept-Encoding": "identity" } });
+      expect(cssRes.status).toBe(200);
+      expect(cssRes.headers.get("content-type")).toContain("text/css");
+      expect(cssRes.headers.get("cache-control")).toContain("no-cache");
+      const cssEtag = cssRes.headers.get("etag");
+      expect(cssEtag).toBeTruthy();
+      expect(await cssRes.text()).toContain(".rail");
+
+      const jsRes = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "gzip" } });
+      expect(jsRes.status).toBe(200);
+      expect(jsRes.headers.get("content-encoding")).toBe("gzip");
+      expect(jsRes.headers.get("vary")).toContain("Accept-Encoding");
+      expect(await jsRes.text()).toContain("simulateStep");
+      const jsIdentity = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity" } });
+      expect(jsIdentity.headers.get("etag")).not.toBe(jsRes.headers.get("etag"));
+
+      const notModified = await fetch(`${base}/assets/studio.css`, {
+        // Validators are per-representation, so pin the encoding being revalidated.
+        headers: { "If-None-Match": cssEtag as string, "Accept-Encoding": "identity" },
+      });
+      expect(notModified.status).toBe(304);
+      expect(await notModified.text()).toBe("");
+
+      const wildcard = await fetch(`${base}/assets/studio.css`, { headers: { "If-None-Match": "*" } });
+      expect(wildcard.status).toBe(304);
+
+      // Monitoring/prefetch probes use HEAD; it must not 404.
+      const headRes = await fetch(`${base}/assets/studio.css`, { method: "HEAD" });
+      expect(headRes.status).toBe(200);
+      expect(headRes.headers.get("etag")).toBeTruthy();
+      expect(await headRes.text()).toBe("");
+
+      // q=0 means the client refused gzip — do not send it.
+      const refused = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "gzip;q=0" } });
+      expect(refused.headers.get("content-encoding")).toBeNull();
+      expect(await refused.text()).toContain("simulateStep");
+
+      const gzipOnly = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity;q=0, gzip" } });
+      expect(gzipOnly.headers.get("content-encoding")).toBe("gzip");
+      const unacceptable = await fetch(`${base}/assets/studio.js`, { headers: { "Accept-Encoding": "identity;q=0" } });
+      expect(unacceptable.status).toBe(406);
+
+      const htmlRes = await fetch(`${base}/`);
+      expect(htmlRes.status).toBe(200);
+      expect(htmlRes.headers.get("etag")).toBeTruthy();
+      const html = await htmlRes.text();
+      expect(html).toContain('href="/assets/studio.css"');
+      expect(html).toContain('src="/assets/studio.js"');
+      // The shell must not carry the old inline monolith.
+      expect(html).not.toContain("TYPE_COLORS");
+      expect(html.length).toBeLessThan(80_000);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 2: T-454 graph/list toggle", () => {
+  test("serves an instant toggle, a sortable table and a 100ms table filter", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-studio-view="graph"');
+      expect(html).toContain('data-studio-view="list"');
+      expect(html).toContain('id="studioListView"');
+      expect(html).toContain('id="studioTableBody"');
+      for (const key of ["title", "type", "status", "project", "created_at"]) {
+        expect(html).toContain(`data-sort="${key}"`);
+      }
+
+      expect(js).toContain("function setStudioView");
+      expect(js).toContain("function renderStudioTable");
+      expect(js).toContain("studioListSearch");
+      expect(js).toContain("listQuery = value; renderStudioTable(); }, 100)");
+      expect(js).toContain("aria-sort");
+
+      expect(css).toContain(".studio-view-switch");
+      expect(css).toContain(".studio-table");
+      expect(css).toContain(".studio-list-view");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 2: T-455 kinetic settling", () => {
+  test("stops the rAF loop at settle energy and wakes on input", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+
+      // Ring-seeded, deterministic layout.
+      expect(js).toContain("Math.sin(angle * 2) * 45");
+      expect(js).not.toContain("(Math.random() - 0.5) * 90");
+
+      // Energy-settling loop.
+      expect(js).toContain("const SETTLE_ENERGY = 0.05");
+      expect(js).toContain("graphEnergy = energy / nodes3d.length");
+      expect(js).toContain("if (!dragging && graphEnergy < SETTLE_ENERGY)");
+      expect(js).toContain("graphLoopStarted = false;");
+      expect(js).toContain("function wakeGraph");
+
+      // Pointer capture + wake on the controls.
+      expect(js).toContain("setPointerCapture");
+      expect(js).toContain("wakeGraph()");
+      expect(html).toContain('id="graphCanvas"');
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 2: T-456 activity heatmap", () => {
+  test("serves 52 weeks of mutations and agent session cards", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    save(store, {
+      id: "m_1700000066666_session",
+      title: "Session s_test start",
+      content: "started",
+      project: "t456",
+      status: "confirmed",
+      type: "session",
+      session_id: "s_test",
+      tags: ["session", "timeline"],
+      created_at: "2026-08-12T10:00:00Z",
+      updated_at: "2026-08-12T10:00:00Z",
+    });
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="activity"');
+      expect(html).toContain('id="panel-activity"');
+      expect(html).toContain('id="activityHeatmap"');
+      expect(html).toContain('id="activitySessions"');
+      expect(js).toContain("function fetchActivity");
+      expect(js).toContain("function renderActivity");
+      expect(js).toContain("apiUrl('/api/activity')");
+      expect(css).toContain(".hm-cell");
+      expect(css).toContain(".session-card");
+
+      const activity = await (await fetch(`${base}/api/activity`)).json();
+      expect(activity.scope).toBe("project");
+      expect(activity.available).toBe(true);
+      expect(activity.days.length).toBe(371);
+      expect(Array.isArray(activity.sessions)).toBe(true);
+      expect(activity.sessions.some((x: { session_id: string }) => x.session_id === "s_test")).toBe(true);
+      expect(activity.sessions[0]).toHaveProperty("messages");
+      expect(activity.sessions[0]).toHaveProperty("status");
+
+      const globalRoot = makeTempRoot();
+      const previous = process.env.MUSEMEMORY_GLOBAL_DIR;
+      process.env.MUSEMEMORY_GLOBAL_DIR = join(globalRoot, "absent", ".memory");
+      try {
+        const globalActivity = await (await fetch(`${base}/api/activity?scope=global`)).json();
+        expect(globalActivity.available).toBe(false);
+        expect(globalActivity.days).toEqual([]);
+      } finally {
+        if (previous === undefined) delete process.env.MUSEMEMORY_GLOBAL_DIR;
+        else process.env.MUSEMEMORY_GLOBAL_DIR = previous;
+        cleanup(globalRoot);
+      }
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 3: T-458 terrain vault UI", () => {
+  test("serves the split-pane, lists six maps and reindexes them", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="terrain"');
+      expect(html).toContain('id="panel-terrain"');
+      expect(html).toContain('id="terrainTree"');
+      expect(html).toContain('id="terrainContent"');
+      expect(html).toContain('id="terrainScanline"');
+      expect(html).toContain("reindexTerrain()");
+      expect(js).toContain("function fetchTerrain");
+      expect(js).toContain("function renderTerrainMarkdown");
+      expect(js).toContain("terrainScanline");
+      expect(js).toContain("}, 900)");
+      expect(css).toContain(".terrain-split");
+      expect(css).toContain(".gen-badge");
+      expect(css).toContain("@keyframes terrain-scan");
+
+      const before = await (await fetch(`${base}/api/terrain`)).json();
+      expect(before.files.map((f: { name: string }) => f.name)).toEqual([
+        "repo.md", "stack.md", "habits.md", "ownership.md", "packages.md", "logs.md",
+      ]);
+      expect(before.available).toBe(false);
+
+      const reindex = await fetch(`${base}/api/terrain/reindex`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(reindex.status).toBe(200);
+      const reindexed = await reindex.json();
+      expect(reindexed.success).toBe(true);
+      expect(reindexed.files.length).toBe(6);
+
+      const after = await (await fetch(`${base}/api/terrain`)).json();
+      expect(after.available).toBe(true);
+      expect(after.files.every((f: { generated: boolean }) => f.generated)).toBe(true);
+      const repoMap = after.files.find((f: { name: string }) => f.name === "repo.md");
+      expect(repoMap.content).toContain("Repository Terrain");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 4: T-460 agent discovery", () => {
+  test("serves the agents hub and three-state statuses", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('data-view="agents"');
+      expect(html).toContain('id="panel-agents"');
+      expect(html).toContain('id="agentsGrid"');
+      expect(js).toContain("function fetchAgents");
+      expect(js).toContain("function renderAgents");
+      expect(css).toContain(".agent-card");
+      expect(css).toContain(".agent-status");
+
+      const firstAgents = await fetch(`${base}/api/agents`);
+      expect(firstAgents.headers.get("x-cache")).toBe("MISS");
+      const secondAgents = await fetch(`${base}/api/agents`);
+      expect(secondAgents.headers.get("x-cache")).toBe("HIT");
+      const data = await firstAgents.json();
+      expect(Array.isArray(data.agents)).toBe(true);
+      expect(data.counts).toHaveProperty("wired");
+      expect(data.counts).toHaveProperty("unwired");
+      expect(data.counts).toHaveProperty("absent");
+      for (const agent of data.agents) {
+        expect(["WIRED", "UNWIRED", "ABSENT"]).toContain(agent.status);
+      }
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 4: T-461 one-click wire/unwire", () => {
+  test("wires an agent with a backup and unwires it again", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const home = makeTempRoot();
+    const previous = process.env.HOME;
+    process.env.HOME = home;
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const configPath = join(home, ".claude.json");
+      const settingsPath = join(home, ".claude", "settings.json");
+      mkdirSync(join(home, ".claude"), { recursive: true });
+      writeFileSync(configPath, JSON.stringify({}), "utf8");
+      writeFileSync(settingsPath, JSON.stringify({ allowedTools: ["Read"] }), "utf8");
+
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      expect(js).toContain("function wireAgent");
+      expect(js).toContain("function unwireAgent");
+      expect(js).toContain("data-wire");
+
+      const wireRes = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+      });
+      expect(wireRes.status).toBe(200);
+      const wired = await wireRes.json();
+      expect(wired.success).toBe(true);
+      expect(wired.backups.length).toBeGreaterThanOrEqual(2);
+      const configBackups = readdirSync(home).filter((f) => f.startsWith(".claude.json.") && f.endsWith(".bak"));
+      const settingsBackups = readdirSync(join(home, ".claude")).filter((f) => f.startsWith("settings.json.") && f.endsWith(".bak"));
+      expect(configBackups.length).toBe(1);
+      expect(settingsBackups.length).toBe(1);
+      expect(JSON.parse(readFileSync(join(home, configBackups[0]), "utf8"))).toEqual({});
+      expect(JSON.parse(readFileSync(join(home, ".claude", settingsBackups[0]), "utf8"))).toEqual({ allowedTools: ["Read"] });
+      const afterWire = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterWire.mcpServers?.memory).toBeDefined();
+
+      const unwireRes = await fetch(`${base}/api/agents/unwire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "claude-code" }),
+      });
+      expect(unwireRes.status).toBe(200);
+      const afterUnwire = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterUnwire.mcpServers?.memory).toBeUndefined();
+      const settingsAfter = JSON.parse(readFileSync(settingsPath, "utf8"));
+      expect((settingsAfter.allowedTools || []).some((tool: string) => String(tool).toLowerCase().includes("memory"))).toBe(false);
+
+      // Repeated wires must not accumulate unlimited backups.
+      for (let i = 0; i < 4; i++) {
+        const again = await fetch(`${base}/api/agents/wire`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+        });
+        expect(again.status).toBe(200);
+      }
+      const retained = readdirSync(home).filter((f) => f.startsWith(".claude.json.") && f.endsWith(".bak"));
+      expect(retained.length).toBeLessThanOrEqual(3);
+
+      const unknown = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "does-not-exist" }),
+      });
+      expect(unknown.status).toBe(404);
+
+      const unknownUnwire = await fetch(`${base}/api/agents/unwire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "does-not-exist" }),
+      });
+      expect(unknownUnwire.status).toBe(404);
+
+      const all = await fetch(`${base}/api/agents/wire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "all", harness: "claude-code" }),
+      });
+      expect(all.status).toBe(400);
+
+      // A backup that cannot be written must abort before touching the config.
+      const beforeBlocked = readFileSync(configPath, "utf8");
+      chmodSync(join(home, ".claude"), 0o500);
+      try {
+        const blocked = await fetch(`${base}/api/agents/wire`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: "claude-code", harness: "claude-code" }),
+        });
+        expect(blocked.status).toBe(500);
+        expect(readFileSync(configPath, "utf8")).toBe(beforeBlocked);
+      } finally {
+        chmodSync(join(home, ".claude"), 0o700);
+      }
+    } finally {
+      srv.close();
+      if (previous === undefined) delete process.env.HOME;
+      else process.env.HOME = previous;
+      cleanup(root);
+      cleanup(home);
+    }
+  });
+});
+
+describe("Wave 23 PR 4: T-462 point-any-agent manifest", () => {
+  test("serves local paths and a copyable MCP snippet", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+
+      expect(html).toContain('id="agentManifestSnippet"');
+      expect(html).toContain("copyAgentSnippet()");
+      expect(js).toContain("function fetchAgentManifest");
+      expect(js).toContain("function copyAgentSnippet");
+
+      const manifest = await (await fetch(`${base}/api/agents/manifest`)).json();
+      expect(manifest.mcpCommand).toBe("memory mcp");
+      expect(manifest.memoryDir).toBe(memoryDir);
+      expect(manifest.database).toContain("memory.db");
+      expect(manifest.files).toContain(memoryDir);
+      expect(manifest.snippet).toContain("memory_search");
+      expect(manifest.snippet).toContain(memoryDir);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 5: T-463 poster About panel", () => {
+  test("serves live architecture facts and the privacy guarantee", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain("about-poster");
+      expect(html).toContain('id="aboutTotal"');
+      expect(html).toContain('id="aboutConstraints"');
+      expect(html).toContain('id="aboutWiki"');
+      expect(html).toContain('id="aboutAudit"');
+      expect(html).toContain("PRIVACY");
+      expect(js).toContain("function renderAbout");
+      expect(js).toContain("renderAbout(s)");
+      expect(css).toContain(".about-grid");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 5: T-464 quick-start onboarding", () => {
+  test("renders copyable setup cards for leading agents", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('id="quickStartGrid"');
+      expect(js).toContain("QUICK_START_AGENTS");
+      expect(js).toContain("function renderQuickStart");
+      expect(js).toContain("function copyText");
+      expect(js).toContain("memory connect claude-code --harness claude");
+      expect(css).toContain(".quickstart-card");
+      expect(css).toContain(".quickstart-cmd");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 5: T-465 command deck", () => {
+  test("serves a searchable, copyable CLI palette", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const html = await (await fetch(`${base}/`)).text();
+      const js = await (await fetch(`${base}/assets/studio.js`)).text();
+      const css = await (await fetch(`${base}/assets/studio.css`)).text();
+
+      expect(html).toContain('id="commandDeck"');
+      expect(html).toContain('id="commandDeckSearch"');
+      expect(js).toContain("const COMMAND_DECK");
+      expect(js).toContain("function renderCommandDeck");
+      expect(js).toContain("memory recall");
+      expect(js).toContain("memory doctor");
+      expect(css).toContain(".command-row");
+      expect(css).toContain(".command-desc");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 6: T-466 projection cache", () => {
+  test("serves cached reads and invalidates them on a write", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const base = `http://localhost:${srv.port}`;
+      const first = await fetch(`${base}/api/memories`);
+      expect(first.headers.get("x-cache")).toBe("MISS");
+      const firstBody = await first.text();
+      const second = await fetch(`${base}/api/memories`);
+      expect(second.headers.get("x-cache")).toBe("HIT");
+      expect(await second.text()).toBe(firstBody);
+
+      const statsFirst = await fetch(`${base}/api/stats`);
+      expect(statsFirst.headers.get("x-cache")).toBe("MISS");
+      const statsSecond = await fetch(`${base}/api/stats`);
+      expect(statsSecond.headers.get("x-cache")).toBe("HIT");
+
+      const write = await fetch(`${base}/api/propose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "cache invalidation probe", project: "t466" }),
+      });
+      expect(write.status).toBe(200);
+
+      const after = await fetch(`${base}/api/memories`);
+      expect(after.headers.get("x-cache")).toBe("MISS");
+      const afterBody = await after.json();
+      expect(afterBody.some((m: { content: string }) => m.content.includes("cache invalidation probe"))).toBe(true);
+
+      // A genuinely read-only POST must not evict the projection.
+      await fetch(`${base}/api/cognition/why`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "cache" }),
+      });
+      const afterSearch = await fetch(`${base}/api/memories`);
+      expect(afterSearch.headers.get("x-cache")).toBe("HIT");
+
+      // An external writer must make the projection miss (WAL mtime is probed).
+      const external = openStore(memoryDir);
+      propose(external, { content: "external cache probe", project: "t466" });
+      const externalRead = await fetch(`${base}/api/memories`);
+      expect(externalRead.headers.get("x-cache")).toBe("MISS");
+      expect((await externalRead.json()).some((m: { content: string }) => m.content.includes("external cache probe"))).toBe(true);
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
+  });
+});
+
+describe("Wave 23 PR 6: T-467 visibility sensors", () => {
+  test("stops the animation loop while the tab is hidden", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const srv = await startUiServer({ port: 0, memoryDir, store });
+    try {
+      const js = await (await fetch(`http://localhost:${srv.port}/assets/studio.js`)).text();
+      expect(js).toContain("visibilitychange");
+      expect(js).toContain("document.hidden");
+      expect(js).toContain("documentHidden = document.hidden");
+      expect(js).toContain("graphLoopStarted = false");
+    } finally {
+      srv.close();
+      cleanup(root);
+    }
   });
 });
 
