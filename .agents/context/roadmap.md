@@ -185,9 +185,9 @@
 - Reuses `src/provenance.ts` and `src/orchestrator/freshness.ts`.
 
 ### 13. **R29: I/O Budget & NVMe Telemetry**
-- **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical.
-- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification).
-- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note.
+- **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical. **Landed 2026-11-09** (counters + on-disk SQLite/WAL/audit/observation bytes, `--json`).
+- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification). **Still open.**
+- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note. **Audit rotation landed 2026-11-09** (5 MiB segments, five retained, chain anchor on prune); observations already rotated; `wal_autocheckpoint` note remains.
 
 ### 14. **R30: Tombstones & Scoped Deletion (extends A7 suppress)**
 - **Content-hash tombstones on delete**: replayed events cannot resurrect deleted memories (qdrant-memory fence pattern; A7's suppress state already hides the bytes).

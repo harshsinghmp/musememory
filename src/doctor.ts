@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
 import { openStore, list, getStorageLayout } from "./store.ts";
 import { validateStore, auditStoredCommands, type StoredCommandAuditResult } from "./schema.ts";
-import { getAuditTrail } from "./audit.ts";
+import { getAuditTrail, getAuditStorageStats, auditFilePath } from "./audit.ts";
 import { getSchemaVersion, LATEST_SCHEMA_VERSION } from "./migrate.ts";
 import { openDatabase } from "./sqlite.ts";
 import { detectAgents, findBinary } from "./agents/detect.ts";
@@ -143,23 +143,21 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
   }
 
   // 2. Audit Trail Status
-  const auditPath = join(storagePath, "audit.jsonl");
+  const auditStats = getAuditStorageStats(storagePath);
   let auditExists = false;
   let auditCount = 0;
   let auditSize = 0;
   let lastEvent: string | undefined;
 
-  if (existsSync(auditPath)) {
+  if (auditStats.files > 0) {
     auditExists = true;
     try {
-      const stat = statSync(auditPath);
-      auditSize = stat.size;
+      auditSize = auditStats.bytes;
       const trail = getAuditTrail(storagePath, { limit: 1 });
       if (trail.length > 0) {
         lastEvent = `${trail[0].operation} on ${trail[0].entry_id} (${trail[0].timestamp})`;
       }
-      const raw = readFileSync(auditPath, "utf8");
-      auditCount = raw.split("\n").filter((l) => l.trim().length > 0).length;
+      auditCount = getAuditTrail(storagePath).length;
     } catch {}
   }
 
@@ -218,7 +216,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
     },
     audit: {
       exists: auditExists,
-      path: auditPath,
+      path: auditFilePath(storagePath),
       eventCount: auditCount,
       sizeBytes: auditSize,
       lastEvent,

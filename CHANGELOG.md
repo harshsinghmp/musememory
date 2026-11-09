@@ -8,8 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`memory io` (R29)**: process read/write counters from `/proc/self/io` plus on-disk SQLite, WAL, audit and observation bytes; `--json` for machines, and a clear "unavailable" line on platforms without procfs.
+- **Audit ledger rotation (R29)**: `audit.jsonl` rolls over at 5 MiB into `audit-archive/`, retains five segments by default (`MUSE_AUDIT_MAX_BYTES` / `MUSE_AUDIT_MAX_SEGMENTS`), and records a chain anchor when pruning so `getAuditTrail`, `getLastAuditHash` and `verifyAuditChain` keep working across the retained window.
 - **Ten-task outcome study (EVD-008)**: a condition-blind with/without study — both arms told to consult memory, only the seeding varied — measured **10/10 vs 6/10** on convention-sensitive tasks, with four discriminating tasks and no regressions. EVD-005 is no longer quarantined; its statement was narrowed to convention recall rather than an unqualified productivity claim.
-- **Read-only MCP surfaces (W27-7)**: `muse_enclave_recall` (explicit client, audit-logged), `muse_overlay_status` (list/inspect branch overlays, never mutates) and `muse_attestation_verify` (inline public key only). `listBranchOverlays` added; 119 → 122 tools with regenerated claims and CLI reference.
+- **Read-only MCP surfaces (W27-7)**: `muse_enclave_recall` (explicit client, audit-logged, credential-redacted), `muse_overlay_status` (list/inspect branch overlays, never mutates) and `muse_attestation_verify` (inline public key only). `listBranchOverlays` added; 119 → 122 tools with regenerated claims and CLI reference.
+
+### Changed
+- **Enclave vault layout (W27-8)**: each enclave entry is now its own AES-256-GCM file under `<client>/<division>/`, so a write no longer rewrites the whole vault and a corrupt record cannot take siblings down. Legacy single-file vaults remain readable and migrate on the next write; per-entry and per-vault size caps are enforced.
+- **Overlay storage caps (W27-9)**: branch overlays fail loud above 1000 entries or 2 MiB.
 - **Outcome pilot and RC blockers**: with/without memory pilot, T-450 ADR-008 tracking boundary, overlay archive prune, workspace-root branch identity, enclave put lock.
 - **Evidence and enclave lifecycle**: dogfood retrieval benchmark + evidence ledger, benchmark title-less crash fix, `enclave keys`/`prune`, backup/restore drill and key-lifecycle runbook.
 - **Enclave key rotation**: keyring under `.memory/enclave.keys/`, active key id, `memory enclave rotate` with optional lazy re-encryption and audit.

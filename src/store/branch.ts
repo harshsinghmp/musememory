@@ -38,6 +38,29 @@ export interface BranchOverlaySummary {
 
 const MAX_BRANCH_LENGTH = 200;
 
+/** Maximum branch-only entries in one overlay. */
+export const MAX_OVERLAY_ENTRIES = 1000;
+/** Maximum serialized overlay size (2 MiB). */
+export const MAX_OVERLAY_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Fail loud before writing an overlay that exceeds its storage budget. The
+ * serialized size covers entries, base snapshots and metadata alike.
+ */
+export function assertOverlayWithinLimits(overlay: BranchOverlay): void {
+  if (overlay.entries.length > MAX_OVERLAY_ENTRIES) {
+    throw new Error(
+      `Branch overlay '${overlay.meta.branch}' has ${overlay.entries.length} entries (max ${MAX_OVERLAY_ENTRIES})`,
+    );
+  }
+  const bytes = Buffer.byteLength(JSON.stringify(overlay), "utf8");
+  if (bytes > MAX_OVERLAY_BYTES) {
+    throw new Error(
+      `Branch overlay '${overlay.meta.branch}' is ${bytes} bytes (max ${MAX_OVERLAY_BYTES})`,
+    );
+  }
+}
+
 function validateBranch(branch: string): string {
   if (!branch.trim() || branch.length > MAX_BRANCH_LENGTH || /[\u0000-\u001f]/.test(branch)) {
     throw new Error(`Invalid branch name '${branch}'`);
@@ -127,6 +150,7 @@ export function listBranchOverlays(memoryDir: string): BranchOverlaySummary[] {
 
 function writeOverlay(memoryDir: string, overlay: BranchOverlay): void {
   assertValidEntries(overlay.entries, "branch overlay");
+  assertOverlayWithinLimits(overlay);
   const dir = join(memoryDir, "overlays");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = branchOverlayPath(memoryDir, overlay.meta.branch);

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import type { AuditEntry, AuditOperation, MerkleCheckpoint, MerkleProof } from "./types.ts";
@@ -6,8 +6,155 @@ import { appendJsonlWithFsync } from "./lock.ts";
 
 export const GENESIS_HASH = "0".repeat(64);
 
+/** Default active-segment ceiling (5 MiB) before rollover. */
+export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+/** Default number of archived segments retained alongside the active file. */
+export const AUDIT_MAX_SEGMENTS = 5;
+
 export function auditFilePath(memoryDir: string): string {
   return join(memoryDir, "audit.jsonl");
+}
+
+export function auditArchiveDir(memoryDir: string): string {
+  return join(memoryDir, "audit-archive");
+}
+
+function auditAnchorFilePath(memoryDir: string): string {
+  return join(memoryDir, "audit-anchor.json");
+}
+
+function auditMaxBytes(): number {
+  const configured = Number(process.env.MUSE_AUDIT_MAX_BYTES);
+  return Number.isFinite(configured) && configured > 0 ? configured : AUDIT_MAX_BYTES;
+}
+
+function auditMaxSegments(): number {
+  const configured = Number(process.env.MUSE_AUDIT_MAX_SEGMENTS);
+  return Number.isFinite(configured) && configured >= 0 ? configured : AUDIT_MAX_SEGMENTS;
+}
+
+/** Archived segments, oldest first. */
+export function listAuditArchives(memoryDir: string): string[] {
+  const dir = auditArchiveDir(memoryDir);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".jsonl"))
+    .sort()
+    .map((name) => join(dir, name));
+}
+
+/** Every ledger segment in chain order: archives oldest-first, then the active file. */
+export function listAuditSegments(memoryDir: string): string[] {
+  const segments = listAuditArchives(memoryDir);
+  const active = auditFilePath(memoryDir);
+  if (existsSync(active)) segments.push(active);
+  return segments;
+}
+
+export interface AuditStorageStats {
+  files: number;
+  bytes: number;
+  anchor_hash: string;
+}
+
+export function getAuditStorageStats(memoryDir: string): AuditStorageStats {
+  const segments = listAuditSegments(memoryDir);
+  let bytes = 0;
+  for (const path of segments) {
+    try {
+      bytes += statSync(path).size;
+    } catch {}
+  }
+  return { files: segments.length, bytes, anchor_hash: readAuditAnchor(memoryDir) };
+}
+
+/** Hash of the last entry removed by pruning; the retained window starts from it. */
+export function readAuditAnchor(memoryDir: string): string {
+  const path = auditAnchorFilePath(memoryDir);
+  if (!existsSync(path)) return GENESIS_HASH;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as { anchor_hash?: unknown };
+    return typeof parsed.anchor_hash === "string" && parsed.anchor_hash ? parsed.anchor_hash : GENESIS_HASH;
+  } catch {
+    return GENESIS_HASH;
+  }
+}
+
+function writeAuditAnchor(memoryDir: string, anchorHash: string): void {
+  mkdirSync(memoryDir, { recursive: true });
+  const path = auditAnchorFilePath(memoryDir);
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ anchor_hash: anchorHash }, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  renameSync(tmp, path);
+}
+
+function lastHashInFile(path: string): string | null {
+  try {
+    const lines = readFileSync(path, "utf8").split("\n").map((line) => line.trim()).filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const parsed = JSON.parse(lines[i]) as AuditEntry;
+        if (parsed.hash && typeof parsed.hash === "string") return parsed.hash;
+      } catch {}
+    }
+  } catch {}
+  return null;
+}
+
+function pruneAuditArchives(memoryDir: string): string[] {
+  const removed: string[] = [];
+  let archives = listAuditArchives(memoryDir);
+  const max = auditMaxSegments();
+  while (archives.length > max) {
+    const oldest = archives.shift()!;
+    const anchor = lastHashInFile(oldest);
+    if (anchor) writeAuditAnchor(memoryDir, anchor);
+    rmSync(oldest, { force: true });
+    removed.push(oldest);
+  }
+  return removed;
+}
+
+/**
+ * Rolls the active ledger over when it reaches the size ceiling. Archived
+ * segments keep the hash chain intact: pruning records the last removed hash as
+ * the verification anchor, so the retained window still proves continuity.
+ */
+export function rotateAuditIfNeeded(memoryDir: string): boolean {
+  const active = auditFilePath(memoryDir);
+  if (!existsSync(active)) return false;
+  if (statSync(active).size < auditMaxBytes()) return false;
+  const dir = auditArchiveDir(memoryDir);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  let counter = listAuditArchives(memoryDir).length;
+  let target: string;
+  do {
+    target = join(dir, `audit-${Date.now()}-${String(counter).padStart(4, "0")}.jsonl`);
+    counter++;
+  } while (existsSync(target));
+  try {
+    renameSync(active, target);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw err;
+  }
+  pruneAuditArchives(memoryDir);
+  return true;
+}
+
+/** Removes archived segments beyond the retention maximum; returns removed paths. */
+export function pruneAuditLedger(memoryDir: string, options: { maxSegments?: number } = {}): string[] {
+  if (options.maxSegments === undefined) return pruneAuditArchives(memoryDir);
+  const removed: string[] = [];
+  let archives = listAuditArchives(memoryDir);
+  while (archives.length > options.maxSegments) {
+    const oldest = archives.shift()!;
+    const anchor = lastHashInFile(oldest);
+    if (anchor) writeAuditAnchor(memoryDir, anchor);
+    rmSync(oldest, { force: true });
+    removed.push(oldest);
+  }
+  return removed;
 }
 
 export function auditSaltsFilePath(memoryDir: string): string {
@@ -87,27 +234,22 @@ export function computeAuditEntryHash(
 }
 
 /**
- * Reads the cryptographic hash of the most recent audit entry in audit.jsonl.
- * Returns GENESIS_HASH if empty or unhashed.
+ * Reads the cryptographic hash of the most recent audit entry. The active
+ * segment wins; after a rollover the newest archive is read; otherwise the
+ * retained-window anchor is the chain head.
  */
 export function getLastAuditHash(memoryDir: string): string {
-  const auditPath = auditFilePath(memoryDir);
-  if (!existsSync(auditPath)) return GENESIS_HASH;
+  const active = auditFilePath(memoryDir);
+  const fromActive = existsSync(active) ? lastHashInFile(active) : null;
+  if (fromActive) return fromActive;
 
-  try {
-    const raw = readFileSync(auditPath, "utf8");
-    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      try {
-        const parsed = JSON.parse(lines[i]);
-        if (parsed.hash && typeof parsed.hash === "string") {
-          return parsed.hash;
-        }
-      } catch {}
-    }
-  } catch {}
+  const archives = listAuditArchives(memoryDir);
+  for (let i = archives.length - 1; i >= 0; i--) {
+    const fromArchive = lastHashInFile(archives[i]);
+    if (fromArchive) return fromArchive;
+  }
 
-  return GENESIS_HASH;
+  return readAuditAnchor(memoryDir);
 }
 
 /**
@@ -130,6 +272,8 @@ export function recordAuditEvent(
   if (!existsSync(memoryDir)) {
     mkdirSync(memoryDir, { recursive: true });
   }
+
+  rotateAuditIfNeeded(memoryDir);
 
   const timestamp = new Date().toISOString();
   const saltDate = timestamp.slice(0, 10);
@@ -166,31 +310,41 @@ export interface AuditQueryOptions {
 }
 
 /**
- * Reads audit trail from .memory/audit.jsonl in reverse chronological order.
+ * Reads the audit trail across every retained segment in reverse chronological
+ * order (active first, then archives newest-first).
  */
 export function getAuditTrail(memoryDir: string, options: AuditQueryOptions = {}): AuditEntry[] {
-  const auditPath = auditFilePath(memoryDir);
-  if (!existsSync(auditPath)) return [];
+  const segments = listAuditSegments(memoryDir);
+  if (segments.length === 0) return [];
 
-  const raw = readFileSync(auditPath, "utf8");
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const linesBySegment = segments.map((path) => {
+    try {
+      return readFileSync(path, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    } catch {
+      return [] as string[];
+    }
+  });
+
   const entries: AuditEntry[] = [];
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    try {
-      const parsed = JSON.parse(lines[i]) as AuditEntry;
-      if (options.operation && parsed.operation !== options.operation) {
-        continue;
+  for (let segment = linesBySegment.length - 1; segment >= 0; segment--) {
+    const lines = linesBySegment[segment];
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const parsed = JSON.parse(lines[i]) as AuditEntry;
+        if (options.operation && parsed.operation !== options.operation) {
+          continue;
+        }
+        if (options.entryId && parsed.entry_id !== options.entryId) {
+          continue;
+        }
+        entries.push(parsed);
+        if (options.limit && entries.length >= options.limit) {
+          return entries;
+        }
+      } catch {
+        // Ignore corrupt lines
       }
-      if (options.entryId && parsed.entry_id !== options.entryId) {
-        continue;
-      }
-      entries.push(parsed);
-      if (options.limit && entries.length >= options.limit) {
-        break;
-      }
-    } catch {
-      // Ignore corrupt lines
     }
   }
 
@@ -210,81 +364,92 @@ export interface AuditChainVerificationResult {
  * T-102: Verifies the integrity of the audit ledger line-by-line against hash chaining and per-day salts.
  */
 export function verifyAuditChain(memoryDir: string): AuditChainVerificationResult {
-  const auditPath = auditFilePath(memoryDir);
-  if (!existsSync(auditPath)) {
+  const segments = listAuditSegments(memoryDir);
+  if (segments.length === 0) {
     return { valid: true, totalEntries: 0, verifiedEntries: 0 };
   }
 
-  const raw = readFileSync(auditPath, "utf8");
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-  let expectedPrevHash = GENESIS_HASH;
-  let verified = 0;
-
-  for (let i = 0; i < lines.length; i++) {
+  const linesBySegment = segments.map((path) => {
     try {
-      const entry = JSON.parse(lines[i]) as AuditEntry;
+      return readFileSync(path, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    } catch {
+      return [] as string[];
+    }
+  });
+  const totalEntries = linesBySegment.reduce((sum, lines) => sum + lines.length, 0);
+  let expectedPrevHash = readAuditAnchor(memoryDir);
+  let verified = 0;
+  let index = 0;
 
-      // Gracefully handle legacy pre-hash-chaining entries
-      if (!entry.hash) {
-        expectedPrevHash = GENESIS_HASH;
-        continue;
-      }
+  for (const lines of linesBySegment) {
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as AuditEntry;
 
-      if (entry.prev_hash !== expectedPrevHash) {
+        // Gracefully handle legacy pre-hash-chaining entries
+        if (!entry.hash) {
+          expectedPrevHash = GENESIS_HASH;
+          index++;
+          continue;
+        }
+
+        if (entry.prev_hash !== expectedPrevHash) {
+          return {
+            valid: false,
+            totalEntries,
+            verifiedEntries: verified,
+            corruptedIndex: index,
+            corruptedEntryId: entry.entry_id,
+            error: `Hash chain broken at index ${index}: expected prev_hash "${expectedPrevHash}" but found "${entry.prev_hash}"`,
+          };
+        }
+
+        const saltDate = entry.salt_date || (entry.timestamp ? entry.timestamp.slice(0, 10) : "");
+        const salt = getDailySalt(memoryDir, saltDate);
+        const recomputedHash = computeAuditEntryHash(
+          {
+            prev_hash: entry.prev_hash,
+            timestamp: entry.timestamp,
+            operation: entry.operation,
+            entry_id: entry.entry_id,
+            project: entry.project,
+            actor: entry.actor,
+            reason: entry.reason,
+            details: entry.details,
+            salt_date: saltDate,
+          },
+          salt,
+        );
+
+        if (recomputedHash !== entry.hash) {
+          return {
+            valid: false,
+            totalEntries,
+            verifiedEntries: verified,
+            corruptedIndex: index,
+            corruptedEntryId: entry.entry_id,
+            error: `Tampered entry hash at index ${index}: stored "${entry.hash}" does not match recomputed "${recomputedHash}"`,
+          };
+        }
+
+        expectedPrevHash = entry.hash;
+        verified++;
+        index++;
+      } catch (err: any) {
         return {
           valid: false,
-          totalEntries: lines.length,
+          totalEntries,
           verifiedEntries: verified,
-          corruptedIndex: i,
-          corruptedEntryId: entry.entry_id,
-          error: `Hash chain broken at index ${i}: expected prev_hash "${expectedPrevHash}" but found "${entry.prev_hash}"`,
+          corruptedIndex: index,
+          error: `Corrupt JSON line at index ${index}: ${err.message || String(err)}`,
         };
       }
-
-      const saltDate = entry.salt_date || (entry.timestamp ? entry.timestamp.slice(0, 10) : "");
-      const salt = getDailySalt(memoryDir, saltDate);
-      const recomputedHash = computeAuditEntryHash(
-        {
-          prev_hash: entry.prev_hash,
-          timestamp: entry.timestamp,
-          operation: entry.operation,
-          entry_id: entry.entry_id,
-          project: entry.project,
-          actor: entry.actor,
-          reason: entry.reason,
-          details: entry.details,
-          salt_date: saltDate,
-        },
-        salt,
-      );
-
-      if (recomputedHash !== entry.hash) {
-        return {
-          valid: false,
-          totalEntries: lines.length,
-          verifiedEntries: verified,
-          corruptedIndex: i,
-          corruptedEntryId: entry.entry_id,
-          error: `Tampered entry hash at index ${i}: stored "${entry.hash}" does not match recomputed "${recomputedHash}"`,
-        };
-      }
-
-      expectedPrevHash = entry.hash;
-      verified++;
-    } catch (err: any) {
-      return {
-        valid: false,
-        totalEntries: lines.length,
-        verifiedEntries: verified,
-        corruptedIndex: i,
-        error: `Corrupt JSON line at index ${i}: ${err.message || String(err)}`,
-      };
     }
   }
 
   return {
     valid: true,
-    totalEntries: lines.length,
+    totalEntries,
     verifiedEntries: verified,
   };
 }

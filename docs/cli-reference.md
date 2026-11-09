@@ -33,6 +33,7 @@ Core Memory Lifecycle Commands:
   restore <id> [--replay [--apply]]  Restore a tombstoned entry; --replay rebuilds content from audit.jsonl
   list / ls [--status S] [--type T] [--project P] List memory entries with multi-field filtering
   stats                         Display total memory counts and status/type distribution
+  io [--json]                   Process read/write counters and on-disk store usage
   stale [--days N]              List entries exceeding staleness policy
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   optimize [--dry-run] [--project P] [--force] Prune test noise, junk, duplicates & vacuum SQLite DB

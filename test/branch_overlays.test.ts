@@ -12,6 +12,9 @@ import {
   loadBranchOverlay,
   branchOverlayPath,
   pruneOverlayArchives,
+  assertOverlayWithinLimits,
+  MAX_OVERLAY_ENTRIES,
+  MAX_OVERLAY_BYTES,
 } from "../src/store/branch.ts";
 import { getAuditTrail } from "../src/audit.ts";
 
@@ -110,5 +113,47 @@ describe("T-436: branchable memory overlays", () => {
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }
+  });
+
+  test("refuses an overlay that exceeds its entry budget", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-branch-caps-"));
+    try {
+      const store = openStore(memoryDir);
+      createBranchOverlay(store, { branch: "feat/cap" });
+      const before = readFileSync(branchOverlayPath(memoryDir, "feat/cap"), "utf8");
+      const base = propose(store, { content: "seed", project: "p", type: "constraint", confirmed: true });
+      const oversized = {
+        ...base,
+        id: "m_9999999999999_big",
+        title: "oversized",
+        content: "x".repeat(MAX_OVERLAY_BYTES + 1024),
+      };
+      expect(() => writeBranchEntry(store, "feat/cap", oversized)).toThrow(/bytes/);
+      expect(readFileSync(branchOverlayPath(memoryDir, "feat/cap"), "utf8")).toBe(before);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("assertOverlayWithinLimits rejects too many entries", () => {
+    const now = new Date().toISOString();
+    const entries = Array.from({ length: MAX_OVERLAY_ENTRIES + 1 }, (_, index) => ({
+      id: `m_${index}`,
+      title: "t",
+      content: "c",
+      project: "p",
+      type: "discovery",
+      status: "confirmed",
+      created_at: now,
+      updated_at: now,
+    })) as any[];
+    expect(() =>
+      assertOverlayWithinLimits({
+        meta: { branch: "feat/many", created_at: now, updated_at: now },
+        base_entries: [],
+        entries,
+        deleted_ids: [],
+      }),
+    ).toThrow(/entries/);
   });
 });

@@ -207,7 +207,9 @@ propose → candidate → confirmed → superseded
 - **No network by default.** Semantic embeddings are opt-in and require an
   explicitly configured endpoint. Everything else runs in-process.
 - **Writes are auditable.** Every write appends to `audit.jsonl` and the
-  tamper-evident hash chain.
+  tamper-evident hash chain. At 5 MiB the active file rolls into
+  `audit-archive/`; the chain continues across segments, and pruning records an
+  anchor hash so `verifyAuditChain` still validates the retained window.
 
 ## 10. Verifying the installation
 

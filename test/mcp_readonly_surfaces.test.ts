@@ -67,6 +67,26 @@ describe("W27-7: read-only enclave, overlay and attestation MCP surfaces", () =>
     }
   });
 
+  test("muse_enclave_recall redacts credentials before returning them", async () => {
+    const { root, memoryDir, invoke } = fixture();
+    try {
+      createEnclave(memoryDir, "acme");
+      putEnclaveEntry(
+        memoryDir,
+        "acme",
+        entry({ id: "m_secret_1", content: "deploy key AKIAIOSFODNN7EXAMPLE for the nightly job" }),
+      );
+
+      const payload = JSON.parse((await invoke("muse_enclave_recall", { client: "acme" })).content[0].text);
+      expect(payload.redacted).toBe(1);
+      expect(payload.entries[0].redacted).toBe(true);
+      expect(payload.entries[0].content).toContain("[REDACTED_SECRET]");
+      expect(payload.entries[0].content).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("muse_enclave_recall requires an explicit client and an unknown vault returns empty", async () => {
     const { root, memoryDir, invoke } = fixture();
     try {

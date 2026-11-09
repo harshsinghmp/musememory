@@ -27,6 +27,19 @@ covers the happy paths, the fail-loud cases and the read-only guarantee.
 Still open from the Wave 27 debt table: W27-8 (whole-vault rewrite) and W27-9
 (overlay size caps).
 
+**Follow-up (same day) — W27-8/W27-9 closed, R29 started.** Enclave vaults now
+store one AES-256-GCM file per entry under `<client>/<division>/`; a write no
+longer rewrites the vault, legacy single-file vaults stay readable and migrate
+on the next write, and per-entry (1 MiB) plus per-vault (5000) caps fail loud.
+Branch overlays are capped at 1000 entries / 2 MiB. `muse_enclave_recall` now
+redacts credentials with `redactSecrets` before returning content. On the
+operations side, `audit.jsonl` rotates at 5 MiB into `audit-archive/` (five
+segments retained by default), pruning writes a chain anchor so
+`getAuditTrail`/`getLastAuditHash`/`verifyAuditChain` remain valid across the
+retained window, and `memory io [--json]` reports `/proc/self/io` counters plus
+SQLite/WAL/audit/observation bytes. R29 remains partial: YAML dual-write
+batching is still open.
+
 ---
 
 ## 🧾 Session — Ticket Ledger Renumber & Remainder Audit (2026-11-08)
