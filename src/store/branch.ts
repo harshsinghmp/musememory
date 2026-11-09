@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { workspaceRootFor } from "../root.ts";
 import type { Store } from "../store.ts";
 import { list, get, save } from "../store.ts";
 import type { MemoryEntry } from "../types.ts";
@@ -107,7 +108,7 @@ export function createBranchOverlay(
   store: Store,
   options: { branch?: string; baseBranch?: string } = {},
 ): BranchOverlay {
-  const branch = options.branch ?? currentGitBranch(store.dir);
+  const branch = options.branch ?? currentGitBranch(workspaceRootFor(store.memoryDir ?? store.dir));
   if (!branch) throw new Error("Cannot determine branch: pass --branch (detached HEAD)");
   validateBranch(branch);
   const memoryDir = store.memoryDir ?? store.dir;
@@ -241,6 +242,25 @@ export function mergeBranchOverlay(
   const path = branchOverlayPath(memoryDir, branch);
   if (existsSync(path)) renameSync(path, `${path}.merged.${Date.now()}`);
   return { branch, applied, archived, conflicts: [] };
+}
+
+/** Remove merged/dropped overlay archives older than the retention window. */
+export function pruneOverlayArchives(
+  store: Store,
+  options: { maxAgeDays?: number; now?: number } = {},
+): string[] {
+  const dir = join(store.memoryDir ?? store.dir, "overlays");
+  if (!existsSync(dir)) return [];
+  const cutoff = (options.now ?? Date.now()) - (options.maxAgeDays ?? 30) * 86_400_000;
+  const removed: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !/\.(merged|dropped)\.\d+$/.test(entry.name)) continue;
+    const path = join(dir, entry.name);
+    if (statSync(path).mtimeMs > cutoff) continue;
+    rmSync(path, { force: true });
+    removed.push(entry.name);
+  }
+  return removed;
 }
 
 export function dropBranchOverlay(store: Store, branch: string): boolean {

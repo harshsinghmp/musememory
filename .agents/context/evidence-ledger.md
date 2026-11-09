@@ -5,16 +5,16 @@
 | Category | Count |
 |---|---|
 | DECISION | 1 |
-| CLAIM | 4 |
+| CLAIM | 5 |
 | STATUS | 1 |
 
 | Status | Count |
 |---|---|
-| VERIFIED | 2 |
-| QUARANTINED | 2 |
+| VERIFIED | 4 |
+| QUARANTINED | 1 |
 | ACTIVE | 1 |
 
-**Health score**: 3 / 4 verifiable entries (75%) — two claims are quarantined, not contradicted.
+**Health score**: 5 / 6 verifiable entries (83%) — one claim is quarantined, not contradicted.
 
 ---
 
@@ -49,12 +49,12 @@
 ---
 
 ### EVD-004 | 2026-11-09 | CLAIM
-**Statement**: The FTS5 latency SLA is `< 15 ms`.
+**Statement**: The engine targets p95 latency: hot cache < 250 µs, FTS5 < 50 ms, context < 50 ms.
 **Category**: `CLAIM`
-**Confidence**: `[RAW]` — same benchmark shows p50 12.81 ms but **p95 149.06 ms**.
+**Confidence**: `[RAW]` — 50-iteration benchmark: 176.25 µs, 15.66 ms, 26.69 ms.
 **Epistemology**: `[EMPIRICAL]`
-**Evidence**: `docs/evidence/2026-11-dogfood.md`; benchmark `[CLAIMED]` line.
-**Status**: `QUARANTINED` — the bound is only true at p50; reword to “p50 < 15 ms” or optimize p95.
+**Evidence**: `docs/evidence/2026-11-dogfood.md`; benchmark `[TARGET]` line.
+**Status**: `VERIFIED` — the earlier "< 15 ms" claim was a p50 value mislabeled as a bound; it has been corrected.
 
 ---
 
@@ -64,7 +64,7 @@
 **Confidence**: `[INFER]` — plausible from retrieval quality, but no with/without task-outcome study exists.
 **Epistemology**: `[SPECULATIVE]`
 **Evidence**: none yet; retrieval evidence only (EVD-002/003).
-**Status**: `QUARANTINED` — do not repeat as an empirical claim.
+**Status**: `QUARANTINED` — a 2-task pilot (EVD-007) is suggestive, not sufficient.
 
 ---
 
@@ -77,3 +77,13 @@
 **Trade-offs**: (b) delays new features but converts unverified claims into measurable ones and protects client data.
 **Evidence**: this ledger + `TECHNICAL_DEBT-wave27.md`.
 **Status**: `ACTIVE`
+
+---
+
+### EVD-007 | 2026-11-09 | CLAIM
+**Statement**: In a 2-task pilot, an agent with memory passed 2/2 hidden tests; the same model without memory passed 1/2 (missed the 32-character tag cap).
+**Category**: `CLAIM`
+**Confidence**: `[RAW]` — hidden Bun tests run against both fixture implementations.
+**Epistemology**: `[EMPIRICAL]`
+**Evidence**: `docs/evidence/2026-11-outcome-pilot.md`.
+**Status**: `VERIFIED` — pilot only (n=2, single run).

@@ -180,6 +180,7 @@ on any blocking failure, so CI runs it. Report:
 ---
 
 ## 🏁 Recently Landed Waves (Verified on `dev`)
+- [x] **Outcome pilot + RC blockers** (2026-11-09) — with/without pilot 2/2 vs 1/2; latency claims corrected to p95 targets; T-450 ADR-008 boundary; overlay GC, branch root identity, enclave put lock.
 - [x] **Evidence + key lifecycle** (2026-11-09) — dogfood benchmark (hit@3 10/10, MRR 0.933, 68% token savings), evidence ledger with 2 quarantined claims, benchmark title-less crash fixed, `enclave keys/prune`, backup drill, runbook.
 - [x] **Enclave key rotation + client-scope descope** (2026-11-09) — versioned keyring, `enclave rotate`, old-key rollback; `scope: client` descoped per ADR-007.
 - [x] **Attestation v2 + merge guard** (2026-11-09) — seq/head/key-id pinning, truncation rejection; semantic merge blocks untrusted lineage, inflation and protected constraints.

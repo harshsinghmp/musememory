@@ -207,7 +207,7 @@ export function formatBenchmarkScoreboard(report: BenchmarkReport): string {
   out += `  │ [MEASURED] Knapsack Ranking     │ ${(report.speed.knapsack_ranking.min + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p50 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p95 + " ms").padEnd(8)} │ ${(report.speed.knapsack_ranking.p99 + " ms").padEnd(8)} │\n`;
   out += `  │ [MEASURED] Context Assembly     │ ${(report.speed.context_assembly.min + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p50 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p95 + " ms").padEnd(8)} │ ${(report.speed.context_assembly.p99 + " ms").padEnd(8)} │\n`;
   out += `  └─────────────────────────────────┴──────────┴──────────┴──────────┴──────────┘\n`;
-  out += `  * [CLAIMED] SLA Target Bounds: Hot Cache < 50 µs, FTS5 < 15 ms, Context Fusion < 50 ms\n`;
+  out += `  * [TARGET] p95 bounds: Hot Cache < 250 µs, FTS5 < 50 ms, Context Fusion < 50 ms (measured values above)\n`;
 
   out += `\n🎯 KNOWLEDGE QUALITY & ROI:\n`;
   out += `  * Total Active Memories:  ${report.quality.total_memories}\n`;

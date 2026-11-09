@@ -13,6 +13,7 @@ import {
 import { dirname, join } from "node:path";
 import type { MemoryEntry } from "../types.ts";
 import { recordAuditEvent } from "../audit.ts";
+import { withStoreLock } from "../lock.ts";
 
 const VERSION = 1;
 const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -276,11 +277,13 @@ export function putEnclaveEntry(
   entry: MemoryEntry,
   division: string = "default",
 ): MemoryEntry[] {
-  const entries = listEnclaveEntries(memoryDir, client, division).filter((candidate) => candidate.id !== entry.id);
-  entries.push(entry);
-  const { key, id } = activeKey(memoryDir);
-  writeEnvelope(enclavePath(memoryDir, client, division), encryptWith(key, id, client, division, entries));
-  return entries;
+  return withStoreLock(memoryDir, () => {
+    const entries = listEnclaveEntries(memoryDir, client, division).filter((candidate) => candidate.id !== entry.id);
+    entries.push(entry);
+    const { key, id } = activeKey(memoryDir);
+    writeEnvelope(enclavePath(memoryDir, client, division), encryptWith(key, id, client, division, entries));
+    return entries;
+  });
 }
 
 export function getEnclaveEntry(

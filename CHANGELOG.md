@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Outcome pilot and RC blockers**: with/without memory pilot, T-450 ADR-008 tracking boundary, overlay archive prune, workspace-root branch identity, enclave put lock.
 - **Evidence and enclave lifecycle**: dogfood retrieval benchmark + evidence ledger, benchmark title-less crash fix, `enclave keys`/`prune`, backup/restore drill and key-lifecycle runbook.
 - **Enclave key rotation**: keyring under `.memory/enclave.keys/`, active key id, `memory enclave rotate` with optional lazy re-encryption and audit.
 - **Wave 27 multi-tenant memory**: branch-scoped overlays (`memory overlay`, three-way merge with base snapshots), authenticated AES-256-GCM client vaults, domain-separated Ed25519 packet attestations, and a three-way semantic memory merge (`merge3`).
@@ -56,6 +57,7 @@ Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secr
 - **Ecosystem Sovereignty Gate**: Automated test gate verifying zero external imports and sovereign operation (`test/sovereignty_gate.test.ts`).
 
 ### Changed
+- **Latency claims corrected** to p95 targets; measured values shown.
 - **Client scope descoped (ADR-007)**: enclaves stay explicit encrypted vaults.
 - **Code-context security boundary**: project-scoped resolver, untrusted opt-in, sanitized agent output, capped inputs.
 - Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.

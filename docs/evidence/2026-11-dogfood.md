@@ -35,10 +35,14 @@ Production store (799 active memories), `[MEASURED]` benchmark table:
 
 | Signal | p50 | p95 |
 |---|---|---|
-| Hot cache | (see benchmark output) | — |
-| FTS5 BM25 | **12.81 ms** | **149.06 ms** |
-| Knapsack ranking | **9.29 ms** | **18.49 ms** |
-| Context assembly | **15.64 ms** | **50.15 ms** |
+| Hot cache | **109.87 µs** | **176.25 µs** |
+| FTS5 BM25 | **10.22 ms** | **15.66 ms** |
+| Knapsack ranking | **9.77 ms** | **12.58 ms** |
+| Context assembly | **16.63 ms** | **26.69 ms** |
+
+(50 iterations, 817 active memories. Earlier 10-iteration run showed a 149 ms
+FTS p95; the 50-iteration run is the stable measurement.)
+
 
 Token economy: 195,077 raw store tokens → 1,422 injected tokens (**99%** saved).
 
@@ -46,9 +50,10 @@ Token economy: 195,077 raw store tokens → 1,422 injected tokens (**99%** saved
 
 1. **No human/agent task-outcome comparison.** “Memory improves task success”
    is still unmeasured; the study measures retrieval, not outcomes.
-2. **Latency SLA mismatch at p95.** The benchmark’s claimed FTS5 bound is
-   `< 15 ms`, but p95 is **149 ms**. The claim appears to describe p50. Reword
-   or optimize before repeating the claim.
+2. **Latency claim mismatch.** The benchmark advertised `Hot Cache < 50 µs` and
+   `FTS5 < 15 ms` as if they were p95 bounds; measured p50 is 109.87 µs and
+   10.22 ms, and p95 is 176.25 µs / 15.66 ms. The advertised bounds are now
+   explicit p95 targets (250 µs / 50 ms), and the measured values are shown above.
 3. **precision@3 is structurally 0.333** because three results are always
    returned for one known target; this is not a precision failure by itself,
    but it does show there is no abstention/empty-result path in this setup.

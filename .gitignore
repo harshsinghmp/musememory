@@ -98,3 +98,9 @@ apps/website/.gif-build/
 .docs.hash
 .context.hash
 **/.context.hash
+
+# Ephemeral agent working state (ADR-008 / T-450)
+.agents/plans/
+.agents/archive/
+.agents/worktree-leases/
+.agents/scratch/
