@@ -28,10 +28,18 @@ function fingerprint(entry: MemoryEntry): string {
     content: entry.content,
     status: entry.status,
     type: entry.type,
+    project: entry.project,
+    source: entry.source,
     tags: entry.tags ?? [],
     anchors: entry.anchors ?? [],
+    verification: entry.verification ?? null,
+    salience: entry.salience ?? null,
+    utility: entry.utility ?? null,
+    mem_path: entry.mem_path ?? null,
+    supersedes_id: entry.supersedes_id ?? null,
     valid_from: entry.valid_from,
     valid_to: entry.valid_to,
+    expires_at: entry.expires_at ?? null,
   });
 }
 
@@ -40,13 +48,35 @@ function same(a?: MemoryEntry, b?: MemoryEntry): boolean {
   return fingerprint(a) === fingerprint(b);
 }
 
+function isProtected(entry: MemoryEntry): boolean {
+  if (entry.type === "constraint" || entry.type === "adr") return true;
+  const level = entry.verification?.level;
+  return level === "authoritative" || level === "independently-verified";
+}
+
+function sameAnchors(a: MemoryEntry, b: MemoryEntry): boolean {
+  return JSON.stringify(a.anchors ?? []) === JSON.stringify(b.anchors ?? []);
+}
+
+/** Strict extension: same type/anchors, losing content is a whole prefix. */
+function strictExtension(winner: MemoryEntry, loser: MemoryEntry): boolean {
+  if (winner.type !== loser.type || !sameAnchors(winner, loser)) return false;
+  if (!winner.content.startsWith(loser.content)) return false;
+  const next = winner.content[loser.content.length];
+  return next === undefined || /[\s.,;:!?)\]}]/.test(next);
+}
+
 function semanticWinner(ours: MemoryEntry, theirs: MemoryEntry): MemoryEntry | "conflict" {
-  if (ours.supersedes_id === theirs.id) return ours;
-  if (theirs.supersedes_id === ours.id) return theirs;
-  if (ours.status === "archived" && theirs.status !== "archived") return theirs;
-  if (theirs.status === "archived" && ours.status !== "archived") return ours;
-  if (ours.content.includes(theirs.content)) return ours;
-  if (theirs.content.includes(ours.content)) return theirs;
+  // Untrusted/self-asserted lineage must never auto-win a merge.
+  if (ours.trust === "untrusted" || theirs.trust === "untrusted") return "conflict";
+  if (isProtected(ours) || isProtected(theirs)) return "conflict";
+
+  const live = new Set(["active", "confirmed"]);
+  if (ours.status === "archived" && live.has(theirs.status)) return theirs;
+  if (theirs.status === "archived" && live.has(ours.status)) return ours;
+
+  if (strictExtension(ours, theirs)) return ours;
+  if (strictExtension(theirs, ours)) return theirs;
   return "conflict";
 }
 

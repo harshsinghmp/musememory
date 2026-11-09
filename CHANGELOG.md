@@ -215,6 +215,7 @@ Correctness release. Fixes five defects found by a cross-file invariant audit: a
 - **Removed the legacy `web/` directory**: a second, hand-written copy of the site that the Astro build superseded, unreferenced and not deployed.
 
 ### Security
+- **Attestation v2 and merge poisoning guard**: signed sequence + terminal head with key pinning; semantic merge refuses untrusted/self-asserted supersession, content inflation, and protected constraints.
 - **The `CURRENT.md` injection channel is closed** — see *Fixed* above. This is the T-110 defence extended to the sink that was bypassing it.
 - **Secret scanning is unchanged**: the Vibeguard rules still cover 8 credential families (AI API keys, GitHub and npm tokens, AWS keys, private key blocks, Slack tokens, credentialed connection strings and generic credential assignments). The published figure was wrong, not the scanner.
 

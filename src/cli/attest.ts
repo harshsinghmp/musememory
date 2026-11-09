@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { requireRoot, usageError } from "./shared.ts";
 import type { ParsedArgs } from "./shared.ts";
-import { generateAttestationKeypair, signPacket, verifyAttestation, verifyAttestationChain, type Attestation } from "../sync/attestation.ts";
+import { generateAttestationKeypair, keyIdFromPublicKey, signPacket, verifyAttestation, verifyAttestationChain, type Attestation } from "../sync/attestation.ts";
 import { recordAuditEvent } from "../audit.ts";
 
 export async function handleAttestCommand({ positional, flags }: ParsedArgs): Promise<number> {
@@ -30,7 +30,7 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
         reason: "attestation_keygen",
         details: { path: keyPath, rotated: flags["force"] !== undefined },
       });
-      console.log(`wrote ${keyPath} and attestation.pub`);
+      console.log(`wrote ${keyPath} and attestation.pub (key id ${keyIdFromPublicKey(pair.publicKey)})`);
       return 0;
     }
     case "sign": {
@@ -38,7 +38,13 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
       const keyPath = flags["key"];
       if (!packetPath || !keyPath) return usageError("attest sign <packet.json> --key <private.pem>");
       const packet = JSON.parse(readFileSync(packetPath, "utf8"));
-      const attestation = signPacket(packet, readFileSync(keyPath, "utf8"), { signer: flags["signer"] });
+      const previous = flags["previous"] ? (JSON.parse(readFileSync(flags["previous"], "utf8")) as Attestation) : undefined;
+      const attestation = signPacket(packet, readFileSync(keyPath, "utf8"), {
+        signer: flags["signer"],
+        previous,
+        head: flags["head"] !== undefined,
+        audience: flags["audience"],
+      });
       recordAuditEvent(ctx.memoryDir, {
         operation: "attest_sign",
         entry_id: "attestation",
@@ -56,8 +62,12 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
       if (!packetPath || !attestationPath || !pubPath) return usageError("attest verify <packet.json> <attestation.json> --pub <public.pem>");
       const packet = JSON.parse(readFileSync(packetPath, "utf8"));
       const attestation = JSON.parse(readFileSync(attestationPath, "utf8")) as Attestation;
-      const ok = verifyAttestation(packet, attestation, readFileSync(pubPath, "utf8"));
-      console.log(ok ? "valid" : "invalid");
+      const publicKey = readFileSync(pubPath, "utf8");
+      const ok = verifyAttestation(packet, attestation, publicKey, {
+        expectedKeyId: flags["key-id"] ?? keyIdFromPublicKey(publicKey),
+        expectedAudience: flags["audience"],
+      });
+      console.log(ok ? `valid (signer ${attestation.signer}, seq ${attestation.seq})` : "invalid");
       return ok ? 0 : 1;
     }
     case "verify-chain": {
@@ -65,8 +75,13 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
       const pubPath = flags["pub"];
       if (!chainPath || !pubPath) return usageError("attest verify-chain <chain.json> --pub <public.pem>");
       const chain = JSON.parse(readFileSync(chainPath, "utf8")) as Attestation[];
-      const ok = verifyAttestationChain(chain, readFileSync(pubPath, "utf8"));
-      console.log(ok ? "valid" : "invalid");
+      const publicKey = readFileSync(pubPath, "utf8");
+      const ok = verifyAttestationChain(chain, publicKey, {
+        requireHead: flags["no-head"] === undefined,
+        expectedKeyId: flags["key-id"] ?? keyIdFromPublicKey(publicKey),
+        expectedAudience: flags["audience"],
+      });
+      console.log(ok ? `valid (${chain.length} record(s))` : "invalid");
       return ok ? 0 : 1;
     }
     default:
