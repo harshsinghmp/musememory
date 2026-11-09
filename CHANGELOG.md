@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Wave 27 multi-tenant memory**: branch-scoped overlays (`memory overlay`), AES-256-GCM client enclaves, Ed25519 packet attestations with tamper-evident chains, and a three-way semantic memory merge (`merge3`).
 - **Unified file→memory resolver**: pre-flight anchored invariants and PR context now share one project/trust/freshness-aware matcher, ranking and reason tokens.
 - **Pre-flight surfaces**: a matcher-scoped `PreToolUse` hook and read-only `muse_preflight` MCP tool expose anchored invariants, blast-radius risk and a token-budgeted pack before edits.
 - **Wave 26 associative retrieval**: recursive-CTE associative expansion (`memory recall --associative`), speculative pre-flight context (`memory preflight`) with blast-radius risk scoring, and anchor-matched invariant auto-recall.

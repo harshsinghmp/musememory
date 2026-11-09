@@ -618,10 +618,10 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 - [x] T-435 · LANDED 2026-11-09 — PR #372: Anchor-Matched Invariant Auto-Recall: Bind exported symbols and route interfaces directly to governing ADRs and architectural invariants · src/retrieval/anchors.ts · F
 
 ## Wave 27: R19 Git-Branchable Memories & Multi-Tenant Agency Enclaves
-- [ ] T-436 · Branchable Memory Overlays (`memory branch` / `branch-merge`): Branch-isolated memory layers tracking git feature branch lifecycles · src/store/branch.ts · F
-- [ ] T-437 · Multi-Tenant Agency Enclaves (`scope: client`): Cryptographically segregated client vaults across Council divisions (Sol, Jasper, Crew, Nexus) · src/store/enclaves.ts · F
-- [ ] T-438 · Zero-Knowledge Memory Attestation: Cryptographic SHA-256 signing of SyncPackets with tamper-evident audit chains for client handoffs · src/sync/attestation.ts · F
-- [ ] T-439 · Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
+- [x] T-436 · LANDED 2026-11-09 — PR #377: Branchable Memory Overlays (`memory overlay` / `merge3`): Branch-isolated memory layers tracking git feature branch lifecycles · src/store/branch.ts · F
+- [x] T-437 · LANDED 2026-11-09 — PR #378: Multi-Tenant Agency Enclaves (`scope: client`): Cryptographically segregated client vaults across Council divisions (Sol, Jasper, Crew, Nexus) · src/store/enclaves.ts · F
+- [x] T-438 · LANDED 2026-11-09 — PR #379: Zero-Knowledge Memory Attestation: Cryptographic SHA-256 signing of SyncPackets with tamper-evident audit chains for client handoffs · src/sync/attestation.ts · F
+- [x] T-439 · LANDED 2026-11-09 — PR #380: Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
 
 ## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry
 - [ ] T-440 · Automated CI / Test Harness Integration: Bind memory utility directly to real test outcomes (`bun test`, `vitest`, `cargo test`); increment ROI on green, decay on red · src/quality/test_feedback.ts · F
