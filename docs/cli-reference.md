@@ -59,6 +59,7 @@ Context & Retrieval Commands:
   reindex                       Rebuild the local vector index (.memory/index.json) for hybrid search
   embed [status|build|reindex]  Manage semantic embeddings (llama.cpp / OpenAI-compatible endpoint; opt-in)
   recall [query]                Search active/confirmed memories with filters
+  preflight [files...]           Speculative context for the files being edited
   search-transcript <query> [file.jsonl] [--window N] Full-text transcript search with bookends
 
 Wiki & Entity Knowledge Compounding:
