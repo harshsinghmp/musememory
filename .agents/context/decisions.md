@@ -31,3 +31,7 @@
 ### ADR-007: Client Scope Descoped from the Memory Store
 - **Decision** (2026-11-09): `scope: client` is not added to `MemoryScope`. Client enclaves remain an explicit encrypted vault (`memory enclave create|list|put|rotate`) outside normal retrieval, recall, and MCP surfaces.
 - **Rationale**: wiring a tenant scope through store/retrieval/sync would make cross-tenant disclosure a single filter bug away. The encrypted vault has its own key lifecycle and is auditable at the CLI boundary. Revisit only with a tenant-aware store substrate and per-client key rotation tests.
+
+### ADR-008: Agent Workspace Tracking Boundary (T-450)
+- **Decision** (2026-11-09): keep `.agents/standards/`, `.agents/skills/`, `.agents/context/`, `.agents/brand/`, `.agents/artifacts/` and `.agents/research/` tracked. Ignore new ephemeral state under `.agents/plans/`, `.agents/archive/`, `.agents/worktree-leases/` and `.agents/scratch/`. Already-tracked files stay tracked for history; the rule applies to new files.
+- **Rationale**: standards, skills, decisions, evidence and audit artifacts are collaborator-facing truth. Plans, leases and scratch are per-agent working state that causes churn and merge noise. Removing already-tracked history would break links in prior tickets, so the boundary moves forward only.

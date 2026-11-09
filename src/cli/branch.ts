@@ -7,6 +7,7 @@ import {
   listBranchMemories,
   loadBranchOverlay,
   mergeBranchOverlay,
+  pruneOverlayArchives,
   writeBranchEntry,
   deleteBranchEntry,
 } from "../store/branch.ts";
@@ -66,6 +67,13 @@ export async function handleOverlayCommand({ positional, flags }: ParsedArgs): P
       console.log(`overlay ${branch}: removed ${id}`);
       return 0;
     }
+    case "prune": {
+      const days = flags["max-age-days"] ? parseInt(flags["max-age-days"], 10) : undefined;
+      if (days !== undefined && (!Number.isFinite(days) || days < 0)) return usageError("--max-age-days must be a non-negative integer");
+      const removed = pruneOverlayArchives(ctx.store, { maxAgeDays: days });
+      console.log(`removed ${removed.length} overlay archive(s)`);
+      return 0;
+    }
     case "merge": {
       const strategy = (flags["strategy"] ?? "semantic") as "ours" | "theirs" | "semantic";
       const report = mergeBranchOverlay(ctx.store, branch!, { strategy });
@@ -87,7 +95,7 @@ export async function handleOverlayCommand({ positional, flags }: ParsedArgs): P
       return 0;
     }
     default:
-      return usageError(`unknown overlay subcommand '${sub}' (expected list | create | show | entries | set | rm | merge | drop)`);
+      return usageError(`unknown overlay subcommand '${sub}' (expected list | create | show | entries | set | rm | merge | prune | drop)`);
   }
   } catch (err) {
     return usageError(err instanceof Error ? err.message : String(err));
