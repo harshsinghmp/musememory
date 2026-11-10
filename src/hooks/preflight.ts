@@ -5,8 +5,11 @@ import { formatPromptContext, type FormattedContext, type ScoredEntry } from "..
 import { scoreBlastRadius, type BlastRisk } from "../intelligence/blast_risk.ts";
 import { recallAnchoredMemories } from "../retrieval/anchors.ts";
 import { inferProject } from "../retrieval/code_context.ts";
+import { estimateTokens } from "../compress.ts";
 
 const MAX_FILES = 15;
+const DEFAULT_TOKEN_BUDGET = 800;
+const MAX_ENTRY_LIMIT = 8;
 
 export interface PreflightInput {
   files?: string[];
@@ -24,6 +27,10 @@ export interface PreflightResult {
   context: FormattedContext;
   risk: BlastRisk;
   anchors: ScoredEntry[];
+  /** W26-2: true cost of the assembled pack, not just the entry subset. */
+  markdownTokens: number;
+  /** W26-2: whether the requested budget was actually honoured. */
+  withinBudget: boolean;
 }
 
 /** T-433: changed files from git, empty when not in a repository. */
@@ -71,18 +78,45 @@ function isTestPath(file: string): boolean {
 /**
  * T-433: speculative pre-flight context. Read-only: it must not bump access
  * counts or rewrite CURRENT.md just because an editor opened a file.
+ *
+ * W26-2: `tokenBudget` bounds the whole assembled pack, not just the entry
+ * subset. Constraints, USER.md, CORE.md and the handoff block are appended
+ * after the entry search has already spent its budget, so honouring only the
+ * entry budget reported figures like "47 tokens" for a pack that actually
+ * injected over 1,100. The fix measures the final markdown and re-queries
+ * with a reduced entry budget until the whole thing fits — or keeps the
+ * mandatory blocks and reports honestly that it could not.
  */
 export function preflightContext(store: Store, input: PreflightInput = {}): PreflightResult {
   const files = (input.files ?? detectChangedFiles(input.cwd)).slice(0, MAX_FILES);
   const query = buildPreflightQuery(files, input.branch) || "preflight";
   const project = input.project ?? inferProject(store);
-  const context = formatPromptContext(store, store.memoryDir, query, {
-    limit: 8,
-    tokenBudget: input.tokenBudget ?? 800,
-    project,
-    recordAccess: false,
-    syncConstraints: false,
-  });
+  const budget = input.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
+
+  const build = (entryBudget: number, entryLimit: number): FormattedContext =>
+    formatPromptContext(store, store.memoryDir, query, {
+      limit: entryLimit,
+      tokenBudget: entryBudget,
+      project,
+      recordAccess: false,
+      syncConstraints: false,
+    });
+
+  let entryBudget = budget;
+  let entryLimit = MAX_ENTRY_LIMIT;
+  let context = build(entryBudget, entryLimit);
+  let markdownTokens = estimateTokens(context.markdown);
+
+  // Halve the entry allocation until the full pack fits. Mandatory blocks
+  // (constraints, profile, core) are never dropped: silently omitting a hard
+  // constraint to hit a number would be worse than an honest overrun.
+  while (markdownTokens > budget && entryLimit > 0) {
+    entryLimit = entryLimit > 1 ? Math.floor(entryLimit / 2) : 0;
+    entryBudget = entryLimit === 0 ? 0 : Math.max(1, Math.floor(entryBudget / 2));
+    context = build(entryBudget, entryLimit);
+    markdownTokens = estimateTokens(context.markdown);
+  }
+
   const sourceDirs = new Set(
     files.filter((file) => !isTestPath(file)).map((file) => file.split("/")[0]).filter(Boolean),
   );
@@ -98,5 +132,13 @@ export function preflightContext(store: Store, input: PreflightInput = {}): Pref
     symbols: input.symbols,
     project,
   });
-  return { query, files, context, risk, anchors };
+  return {
+    query,
+    files,
+    context,
+    risk,
+    anchors,
+    markdownTokens,
+    withinBudget: markdownTokens <= budget,
+  };
 }
