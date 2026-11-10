@@ -10,7 +10,21 @@ import type { ParsedArgs } from "./shared.ts";
 export async function handlePlaybookCommand(args: ParsedArgs): Promise<number> {
   const startDir = args.flags.dir || process.cwd();
   const { memoryDir } = findOrCreateProjectRoot(startDir, { global: Boolean(args.flags.global) });
-  const id = args.flags.id || args.flags.run || args.flags.show || args.positional[0];
+
+  // D7: `--run` used to be a silent show alias, so `memory playbook --run <id>`
+  // looked like it executed the trajectory and actually just printed it.
+  // Playbook steps carry arbitrary shell commands, so executing them needs a
+  // confirmation gate and its own security review; until that exists this flag
+  // refuses loudly instead of implying it ran something.
+  if (args.flags.run !== undefined) {
+    console.error(
+      "playbook --run is not implemented: playbooks are advisory, not executable.\n" +
+        "Inspect the steps with `memory playbook <id>` and run them yourself.",
+    );
+    return 2;
+  }
+
+  const id = args.flags.id || args.flags.show || args.positional[0];
   const wantsList = Boolean(args.flags.list) || !id;
 
   try {
