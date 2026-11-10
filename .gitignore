@@ -104,3 +104,10 @@ apps/website/.gif-build/
 .agents/archive/
 .agents/worktree-leases/
 .agents/scratch/
+
+# Generated workspace terrain maps (regenerate: memory terrain --workspace)
+# Live indexes of branch/HEAD/commit-log/file-counts go stale on every commit,
+# and habits.md publishes a test count that contradicts claims.json (the
+# authoritative source). Per ADR-008 this is derived per-agent state, tracked
+# only where it is stable — standards, context, artifacts.
+.agents/terrain/

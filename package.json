@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "bench:graph": "bun scripts/bench-graph.ts",
+    "agents:terrain": "bun run bin/musememory.ts terrain --workspace --out .agents/terrain",
     "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
     "site:dev": "bun run --cwd apps/website dev",
     "site:build": "bun run --cwd apps/website build",
