@@ -1,6 +1,6 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.3.0` (post-release `dev`)  
+> **Version**: `v3.4.0` (post-release `dev`)  
 > **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
 
 ---

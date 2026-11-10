@@ -84,7 +84,7 @@ musememory/
 │   ├── agents/             # Workstation coding agents detection & registry (52 platforms)
 │   └── migrator/           # Multi-provider auto-detection & migration engine (30 providers)
 ├── test/                   # Automated Bun test suites (1592 tests across 252 suites)
-├── package.json            # Package metadata & dependencies (v3.3.0)
+├── package.json            # Package metadata & dependencies (v3.4.0)
 └── dist/                   # Compiled Node/Bun bundle
 ```
 

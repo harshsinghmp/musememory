@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-11-10
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.3.0...v3.4.0
+
 ### Added
 - **Flaky test and environment-drift detector (`T-442`)**: `src/doctor/flaky.ts` reconstructs runs from the `test_feedback` ledger and reports flaky tests (fail → pass → fail, analysed per command), failure bursts, and dependency-file changes shortly before a burst. Surfaces: `memory flaky` and `muse_flaky_tests`.
 - **Remediation playbook generator (`T-443`)**: `src/cognition/remediation.ts` synthesizes playbook candidates from recurring failures, reusing regression-sentry guidance for steps and verification, and persists resolved candidates only (`--apply`). Surfaces: `memory remediation` and `muse_remediation_playbooks`. Tool count 124 → 126.
