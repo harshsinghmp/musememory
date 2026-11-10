@@ -291,7 +291,16 @@ export interface SearchResult {
   stale: boolean;
   fromCache?: boolean;
   totalTokensUsed?: number;
-  /** T-432: Associated memory ids discovered by the recursive CTE. */
+  /**
+   * T-432: Associated memory ids discovered by the recursive CTE.
+   *
+   * W26-4 consumer contract: these are **graph neighbours, not ranked
+   * results**. They are computed after fusion and packing, so they are not
+   * scored by the multi-factor model, do not appear in `results`, and are
+   * **not counted in `totalTokensUsed`** — a caller that injects them into a
+   * prompt must budget for them separately. They are ids plus depth only:
+   * fetch the entry via `get(store, id)` when content is needed.
+   */
   associated?: AssociativeNode[];
   /** T-133: Explicit flag indicating whether retrieval operated in degraded mode. */
   degraded?: boolean;

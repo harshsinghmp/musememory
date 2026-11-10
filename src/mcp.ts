@@ -1743,6 +1743,15 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             success: { type: "boolean", description: "Record a successful run" },
             dir: { type: "string", description: "Optional workspace directory path" },
           },
+          // D4: this tool has two modes, so a flat `required` would be wrong
+          // for one of them. Declare each mode's minimum instead: recording an
+          // outcome needs id + success; saving needs title + goal + one step.
+          // The handler still validates at runtime — this tells MCP clients
+          // what to send rather than making them discover it from an error.
+          anyOf: [
+            { required: ["id", "success"] },
+            { required: ["title", "goal", "steps"] },
+          ],
         },
       },
       {
