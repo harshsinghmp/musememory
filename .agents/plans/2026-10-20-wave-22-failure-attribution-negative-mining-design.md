@@ -195,4 +195,4 @@ Log four distinct operations to `.memory/audit.jsonl`:
 2. `bun test` (full suite, 527+ tests green)
 3. `bunx tsc --noEmit` (clean, 0 type errors)
 4. `bun run build` (build completes without warnings)
-5. `bun ~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts .` (0 secret leaks)
+5. `memory scan-secrets .` (0 secret leaks)

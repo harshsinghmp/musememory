@@ -74,7 +74,7 @@ Minor feature release (Wave 29). Ships the native zero-dependency Vibeguard secr
 - **Latency claims corrected** to p95 targets; measured values shown.
 - **Client scope descoped (ADR-007)**: enclaves stay explicit encrypted vaults.
 - **Code-context security boundary**: project-scoped resolver, untrusted opt-in, sanitized agent output, capped inputs.
-- Purged all legacy external imports (`@LIFEOS`) and temporary import tools from source tree, achieving 100% self-contained memory operations.
+- Purged all legacy external imports and temporary import tools from source tree, achieving 100% self-contained memory operations.
 - Updated project documentation and re-generated all claims, CLI references, and MCP tool matrixes.
 
 ## [3.1.3] - 2026-10-26

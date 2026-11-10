@@ -36,7 +36,7 @@ The `./.memory` directory at the project root is the local persistent memory sto
 
 ---
 
-## 3. Creed Native Context & Canonical LifeOS Sources
+## 3. Creed Native Context & Canonical Memory Sources
 
 Agents reference these canonical sovereign Muse Memory sources:
 
