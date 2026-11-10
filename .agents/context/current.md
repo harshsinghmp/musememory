@@ -5,6 +5,37 @@
 
 ---
 
+## 🧾 Session — Changelog Repair & D5 Write Race (2026-11-10)
+
+**v3.3.0 shipped with no changelog section.** The tag and the npm publish
+both went out while all 29 release bullets were still under `[Unreleased]`,
+so the published release notes omitted the entire release; the section also
+carried two separate `### Added` headings. Promoted the 29 bullets verbatim
+into a dated `[3.3.0]` section (verified byte-identical against
+`git show v3.3.0:CHANGELOG.md`), rebuilt `[Unreleased]` from only the 12
+post-tag bullets, and added the five changes from this session. There is no
+CI check for changelog structure — this was only caught by reading it.
+
+**D5 — playbook writes lost data across processes.** The debt said "random
+temp suffix + fsync". Implementing exactly that did **not** fix the bug: 8
+concurrent processes still persisted only 5. The temp-name fix prevents
+staging collisions, but `savePlaybook` and `recordPlaybookOutcome` are
+read-modify-write, so both processes read the same list and the later rename
+drops the earlier write. Wrapping both in the existing `withStoreLock`
+fixed it — 8/8 persist. Outcome recording had the same race, silently
+corrupting the success/failure ratio ranking depends on.
+
+**Lesson recorded:** the first regression test used an in-process
+`Promise.all` race and passed with *and* without the fix, because the write
+path is synchronous and can never interleave in one process. It was
+replaced with a real multi-process test; both guards now fail against the
+old implementation (6 expected, 3 received).
+
+Gate: `bun test` 1592/1592 pass across 252 files; `bunx tsc --noEmit`
+clean; `check:landed` → **LANDED** at `9270d97`.
+
+---
+
 ## 🧾 Session — Stack Landing, W26-5 CTE Bound & PR Queue Cleanup (2026-11-10)
 
 **CI gap on stacked PRs (#390).** The `pull_request` trigger listed only
