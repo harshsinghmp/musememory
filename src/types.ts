@@ -430,6 +430,7 @@ export type AuditOperation =
   | "flush_pending_promotions"
   | "regression_strike"
   | "strike_decay"
+  | "test_feedback"
   | "dispute_triggered";
 
 export interface AuditEntry {

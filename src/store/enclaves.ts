@@ -62,6 +62,37 @@ export function enclavePath(memoryDir: string, client: string, division: string 
   return join(memoryDir, "enclaves", client, `${division}.enc.json`);
 }
 
+/** Maximum entries in one vault; bounds listing and decrypt cost. */
+export const MAX_ENCLAVE_ENTRIES = 5000;
+/** Maximum serialized size of one entry; bounds a single vault record. */
+export const MAX_ENCLAVE_ENTRY_BYTES = 1024 * 1024;
+
+/** Directory holding one encrypted file per entry for a client/division vault. */
+export function enclaveVaultDir(memoryDir: string, client: string, division: string = "default"): string {
+  validateEnclaveName(client, "client");
+  validateEnclaveName(division, "division");
+  return join(memoryDir, "enclaves", client, division);
+}
+
+function encodeEntryId(id: string): string {
+  if (!id) throw new Error("Enclave entry id must not be empty");
+  return Buffer.from(id, "utf8").toString("base64url");
+}
+
+function decodeEntryId(name: string): string {
+  return Buffer.from(name, "base64url").toString("utf8");
+}
+
+/** Path of the single-entry encrypted file for one vault record. */
+export function enclaveEntryPath(
+  memoryDir: string,
+  client: string,
+  id: string,
+  division: string = "default",
+): string {
+  return join(enclaveVaultDir(memoryDir, client, division), `${encodeEntryId(id)}.enc.json`);
+}
+
 function keyId(master: Buffer): string {
   return createHash("sha256").update(master).digest("hex").slice(0, 16);
 }
@@ -258,17 +289,59 @@ function writeEnvelope(path: string, envelope: EnclaveEnvelope): void {
 }
 
 export function createEnclave(memoryDir: string, client: string, division: string = "default"): void {
-  const path = enclavePath(memoryDir, client, division);
-  if (existsSync(path)) return;
+  mkdirSync(enclaveVaultDir(memoryDir, client, division), { recursive: true, mode: 0o700 });
+}
+
+function vaultEntryFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((name) => name.endsWith(".enc.json")).sort();
+}
+
+/**
+ * Converts a legacy single-file vault into one encrypted file per entry.
+ * Reads stay read-only; migration runs on the next write.
+ */
+function migrateLegacyVault(memoryDir: string, client: string, division: string): void {
+  const legacy = enclavePath(memoryDir, client, division);
+  if (!existsSync(legacy)) return;
+  const envelope = JSON.parse(readFileSync(legacy, "utf8")) as EnclaveEnvelope;
+  const entries = decrypt(memoryDir, client, division, envelope);
   const { key, id } = activeKey(memoryDir);
-  writeEnvelope(path, encryptWith(key, id, client, division, []));
+  mkdirSync(enclaveVaultDir(memoryDir, client, division), { recursive: true, mode: 0o700 });
+  for (const entry of entries) {
+    writeEnvelope(
+      enclaveEntryPath(memoryDir, client, entry.id, division),
+      encryptWith(key, id, client, division, [entry]),
+    );
+  }
+  renameSync(legacy, `${legacy}.migrated`);
 }
 
 export function listEnclaveEntries(memoryDir: string, client: string, division: string = "default"): MemoryEntry[] {
-  const path = enclavePath(memoryDir, client, division);
-  if (!existsSync(path)) return [];
-  const envelope = JSON.parse(readFileSync(path, "utf8")) as EnclaveEnvelope;
-  return decrypt(memoryDir, client, division, envelope);
+  const byId = new Map<string, MemoryEntry>();
+
+  const legacy = enclavePath(memoryDir, client, division);
+  if (existsSync(legacy)) {
+    const envelope = JSON.parse(readFileSync(legacy, "utf8")) as EnclaveEnvelope;
+    for (const entry of decrypt(memoryDir, client, division, envelope)) {
+      byId.set(entry.id, entry);
+    }
+  }
+
+  const dir = enclaveVaultDir(memoryDir, client, division);
+  for (const name of vaultEntryFiles(dir)) {
+    const expectedId = decodeEntryId(name.slice(0, -".enc.json".length));
+    const path = join(dir, name);
+    const envelope = JSON.parse(readFileSync(path, "utf8")) as EnclaveEnvelope;
+    for (const entry of decrypt(memoryDir, client, division, envelope)) {
+      if (entry.id !== expectedId) {
+        throw new Error(`Enclave entry id mismatch in ${path}: expected '${expectedId}', found '${entry.id}'`);
+      }
+      byId.set(entry.id, entry);
+    }
+  }
+
+  return [...byId.values()];
 }
 
 export function putEnclaveEntry(
@@ -278,10 +351,24 @@ export function putEnclaveEntry(
   division: string = "default",
 ): MemoryEntry[] {
   return withStoreLock(memoryDir, () => {
+    const size = Buffer.byteLength(JSON.stringify(entry), "utf8");
+    if (size > MAX_ENCLAVE_ENTRY_BYTES) {
+      throw new Error(`Enclave entry exceeds ${MAX_ENCLAVE_ENTRY_BYTES} bytes (${size})`);
+    }
+
+    migrateLegacyVault(memoryDir, client, division);
+
     const entries = listEnclaveEntries(memoryDir, client, division).filter((candidate) => candidate.id !== entry.id);
-    entries.push(entry);
+    if (entries.length >= MAX_ENCLAVE_ENTRIES) {
+      throw new Error(`Enclave '${client}/${division}' exceeds ${MAX_ENCLAVE_ENTRIES} entries`);
+    }
+
     const { key, id } = activeKey(memoryDir);
-    writeEnvelope(enclavePath(memoryDir, client, division), encryptWith(key, id, client, division, entries));
+    writeEnvelope(
+      enclaveEntryPath(memoryDir, client, entry.id, division),
+      encryptWith(key, id, client, division, [entry]),
+    );
+    entries.push(entry);
     return entries;
   });
 }
@@ -292,6 +379,13 @@ export function getEnclaveEntry(
   id: string,
   division: string = "default",
 ): MemoryEntry | null {
+  const path = enclaveEntryPath(memoryDir, client, id, division);
+  if (existsSync(path)) {
+    const envelope = JSON.parse(readFileSync(path, "utf8")) as EnclaveEnvelope;
+    const entry = decrypt(memoryDir, client, division, envelope).find((candidate) => candidate.id === id);
+    if (!entry) throw new Error(`Enclave entry id mismatch in ${path}`);
+    return entry;
+  }
   return listEnclaveEntries(memoryDir, client, division).find((entry) => entry.id === id) ?? null;
 }
 

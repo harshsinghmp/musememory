@@ -33,6 +33,7 @@ Core Memory Lifecycle Commands:
   restore <id> [--replay [--apply]]  Restore a tombstoned entry; --replay rebuilds content from audit.jsonl
   list / ls [--status S] [--type T] [--project P] List memory entries with multi-field filtering
   stats                         Display total memory counts and status/type distribution
+  io [--json]                   Process read/write counters and on-disk store usage
   stale [--days N]              List entries exceeding staleness policy
   consolidate [--project P] [--dry-run]  Cluster confirmed memories into scene rollups
   optimize [--dry-run] [--project P] [--force] Prune test noise, junk, duplicates & vacuum SQLite DB
@@ -44,6 +45,10 @@ Core Memory Lifecycle Commands:
   distill [--min-count N] [--dry-run]  Distill recurring fix patterns into .agents/skills/ folders
   verify <id> [--timeout S] [--strict] Execute test_command or run full strict integrity gate
   briefing [--limit N]          Executive summary of active and stale memories
+  test-feedback --command C --exit-code N [--memory ID,...]  Reinforce/penalize applied memories from a real test run
+  sentry --command C --exit-code N [--input F|-]  Read-only regression sentry against negative memories
+  flaky [--json]                Flaky tests, failure bursts and dependency-file drift from recorded runs
+  remediation [--apply]         Synthesize reusable playbooks from recurring, resolved test failures
 
 Evidence, Provenance & Cognitive Governance:
   source [add|list|show]        Manage external documentation and URLs in provenance Source Ledger
@@ -115,7 +120,7 @@ Version Control (R23):
 
 ## MCP tools
 
-**119 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
+**126 tools** are registered, exposed through **7 task-focused profiles** (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`). The authoritative machine-readable list is [`mcp-tool-matrix.json`](./mcp-tool-matrix.json).
 
 Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_profile_list` for the live mapping.
 
@@ -230,8 +235,8 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_tech_debt` | — | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
 | `muse_health` | — | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
 | `muse_code_impact` | `file_path` | Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level |
-| `muse_pr_context` | — | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
-| `muse_reconcile_anchors` | — | Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted |
+| `muse_pr_context` | `command`, `exit_code` | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
+| `muse_reconcile_anchors` | `command`, `exit_code` | Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted |
 
 ### Knowledge compounding
 
@@ -272,7 +277,14 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_episodes` | `packet` | Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations |
 | `muse_playbook_recall` | `packet` | Recall procedural playbooks: list by tag, or fetch one by id/title |
 | `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
+| `memory_test_feedback` | `command`, `exit_code` | Bind a real test run to the memories that were applied: green runs reinforce them, red runs record a failed application and a regression strike for anchor-relevant memories. Returns the parsed run plus regression-sentry matches. |
+| `muse_regression_sentry` | `client` | Read-only: match failing tests against recorded BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories and return remediation playbooks |
+| `muse_flaky_tests` | `client` | Read-only: flaky tests, failure bursts and dependency-file drift derived from recorded test_feedback runs |
+| `muse_remediation_playbooks` | `client` | Read-only: synthesize remediation playbook candidates from recurring, resolved test failures (nothing is persisted) |
+| `muse_enclave_recall` | `client` | Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged. |
+| `muse_overlay_status` | `public_key` | Read-only: list branch memory overlays and their entry counts, or inspect one branch overlay's entries |
+| `muse_attestation_verify` | `public_key` | Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key |
 
 ---
 
-Counts in this file are generated from the same source as [`claims.json`](../claims.json): 119 tools, 7 profiles, 30 import formats, 8 credential rule families.
+Counts in this file are generated from the same source as [`claims.json`](../claims.json): 126 tools, 7 profiles, 30 import formats, 8 credential rule families.

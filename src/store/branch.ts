@@ -27,7 +27,39 @@ export interface BranchOverlay {
   deleted_ids: string[];
 }
 
+export interface BranchOverlaySummary {
+  branch: string;
+  base_branch?: string;
+  created_at: string;
+  updated_at: string;
+  entry_count: number;
+  deleted_count: number;
+}
+
 const MAX_BRANCH_LENGTH = 200;
+
+/** Maximum branch-only entries in one overlay. */
+export const MAX_OVERLAY_ENTRIES = 1000;
+/** Maximum serialized overlay size (2 MiB). */
+export const MAX_OVERLAY_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Fail loud before writing an overlay that exceeds its storage budget. The
+ * serialized size covers entries, base snapshots and metadata alike.
+ */
+export function assertOverlayWithinLimits(overlay: BranchOverlay): void {
+  if (overlay.entries.length > MAX_OVERLAY_ENTRIES) {
+    throw new Error(
+      `Branch overlay '${overlay.meta.branch}' has ${overlay.entries.length} entries (max ${MAX_OVERLAY_ENTRIES})`,
+    );
+  }
+  const bytes = Buffer.byteLength(JSON.stringify(overlay), "utf8");
+  if (bytes > MAX_OVERLAY_BYTES) {
+    throw new Error(
+      `Branch overlay '${overlay.meta.branch}' is ${bytes} bytes (max ${MAX_OVERLAY_BYTES})`,
+    );
+  }
+}
 
 function validateBranch(branch: string): string {
   if (!branch.trim() || branch.length > MAX_BRANCH_LENGTH || /[\u0000-\u001f]/.test(branch)) {
@@ -94,8 +126,31 @@ export function loadBranchOverlay(memoryDir: string, branch: string): BranchOver
   };
 }
 
+/** Read-only inventory of every branch overlay present in the store. */
+export function listBranchOverlays(memoryDir: string): BranchOverlaySummary[] {
+  const dir = join(memoryDir, "overlays");
+  if (!existsSync(dir)) return [];
+  const summaries: BranchOverlaySummary[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const branch = Buffer.from(name.slice(0, -".json".length), "base64url").toString("utf8");
+    const overlay = loadBranchOverlay(memoryDir, branch);
+    if (!overlay) continue;
+    summaries.push({
+      branch: overlay.meta.branch,
+      base_branch: overlay.meta.base_branch,
+      created_at: overlay.meta.created_at,
+      updated_at: overlay.meta.updated_at,
+      entry_count: overlay.entries.length,
+      deleted_count: overlay.deleted_ids.length,
+    });
+  }
+  return summaries.sort((a, b) => a.branch.localeCompare(b.branch));
+}
+
 function writeOverlay(memoryDir: string, overlay: BranchOverlay): void {
   assertValidEntries(overlay.entries, "branch overlay");
+  assertOverlayWithinLimits(overlay);
   const dir = join(memoryDir, "overlays");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = branchOverlayPath(memoryDir, overlay.meta.branch);

@@ -62,13 +62,15 @@
 ---
 
 ### 4. **R20: Test-Driven Memory Reinforcement & Autonomous Regression Sentry**
-- **Automated CI / Test Harness Integration Loop**:
+- **Automated CI / Test Harness Integration Loop**: **Landed 2026-11-09** (`T-440`, `src/quality/test_feedback.ts`; `memory test-feedback` / `memory_test_feedback`).
   - Binds memory utility ROI directly to test outcomes (`bun test`, `vitest`, `jest`, `cargo test`).
   - Passing tests increment memory confidence and `successful_applications`; failing tests trigger automated dispute and regression tracking.
-- **Negative Anti-Pattern Regression Sentry**:
+- **Negative Anti-Pattern Regression Sentry**: **Landed 2026-11-09** (`T-441`, `src/cognition/sentry.ts`; `memory sentry` / `muse_regression_sentry`).
   - Proactive watchdog matching test failure signatures and stack traces against known `BUG_PRONE_PATTERN` and `DO_NOT_USE` entries, generating immediate remediation playbooks.
-- **Flaky Test & Environment Drift Detector**:
+- **Flaky Test & Environment Drift Detector**: **Landed 2026-11-09** (`T-442`, `src/doctor/flaky.ts`; `memory flaky` / `muse_flaky_tests`).
   - Correlates test intermittency with past dependency upgrades, node runtime versions, and environmental invariants.
+- **Autonomous Remediation Playbooks**: **Landed 2026-11-09** (`T-443`, `src/cognition/remediation.ts`; `memory remediation` / `muse_remediation_playbooks`).
+  - Synthesizes reusable playbooks from recurring failures and persists only resolved signatures by default.
 
 ---
 
@@ -161,14 +163,14 @@
 
 ---
 
-## 📊 Current Status (as of v2.3.0)
+## 📊 Current Status (as of v3.4.0)
 
 | Area | Status | Next Milestone |
 |---|---|---|
-| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 527 tests) | R25 (--include-abstract, --scope) |
+| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 1592 tests) | R25 (--include-abstract, --scope) |
 | **Hands-free hooks** | ✅ 3/6 events shipped (GAP-2) | R24 (full plugin registry) |
 | **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) + calibrated contradiction engine (T-320) | R23 (extend to multi-repo) |
-| **Version control** | ⚠️ No branch-aware memory | R23 (memory branch/checkout/blame) |
+| **Version control** | ✅ `memory branch/checkout/blame` (R23) + branch-isolated overlays (T-436) | R23 extend (merge/blame depth) |
 | **Compounding** | ✅ 7-state lifecycle + archival ladder | R23 (access-weighted retention, half-life decay) |
 | **Team/SaaS** | ⚠️ Not yet built | R26 (pricing page, Plausible, SaaS prototype) |
 
@@ -185,9 +187,9 @@
 - Reuses `src/provenance.ts` and `src/orchestrator/freshness.ts`.
 
 ### 13. **R29: I/O Budget & NVMe Telemetry**
-- **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical.
-- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification).
-- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note.
+- **`memory io`**: bytes-written/day from `/proc/self/io` with an alert threshold — makes SSD wear visible instead of theoretical. **Landed 2026-11-09** (counters + on-disk SQLite/WAL/audit/observation bytes, `--json`).
+- YAML dual-write mirror becomes async-batched or opt-out (it currently doubles every write's amplification). **Opt-out landed 2026-11-09** (`MUSE_YAML_MIRROR=0` / `openStore({ yamlMirror: false })`); async batching deliberately not implemented because the mirror is the rollback copy.
+- Rotation caps for `audit.jsonl` / `observations.jsonl` via existing `src/retention.ts`; `wal_autocheckpoint` tuning note. **Landed 2026-11-09**: audit rotation (5 MiB segments, five retained, chain anchor on prune); observations already rotated; WAL bounded by `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB`.
 
 ### 14. **R30: Tombstones & Scoped Deletion (extends A7 suppress)**
 - **Content-hash tombstones on delete**: replayed events cannot resurrect deleted memories (qdrant-memory fence pattern; A7's suppress state already hides the bytes).
@@ -199,6 +201,7 @@
 
 ### 16. **R32: Studio Recall-Debug (extends R15 + A22)**
 - Surface `ranking.ts` per-factor score breakdowns in the Observability Studio: *why* was this memory retrieved.
+- **Landed 2026-11-10 (API half)**: `POST /api/recall-debug` returns the top-K with the full `ScoreFactors` object, `why_retrieved`, and token usage, computed by the canonical `rankAndRetrieveMemories` — the panel cannot disagree with real recall because there is no second scoring path.
 - Eval-harness (R27) results panel. Small diffs on `src/ui.ts`.
 
 

@@ -35,7 +35,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 /** Path prefixes (relative to ROOT) that are excluded from the scan. */
-const SKIP_PREFIXES = ["docs/superpowers"];
+const SKIP_PREFIXES: string[] = [];
 
 const LINK_RE = /\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 

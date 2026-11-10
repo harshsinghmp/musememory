@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, fsyncSync, mkdirSync, openSync, closeSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { withStoreLock } from "../lock.ts";
 
 /**
  * T-427: procedural memory. A playbook is a reusable trajectory with
@@ -46,9 +48,27 @@ function playbookFile(memoryDir: string): string {
 }
 
 function writeAtomic(path: string, body: string): void {
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, body, "utf8");
-  renameSync(tmp, path);
+  // W24-25/D5: a fixed `${path}.tmp` name lets two concurrent writers — the
+  // MCP server and a CLI invocation sharing one memory dir — clobber each
+  // other's staged body before either renames, silently losing one update.
+  // A per-write unique suffix removes the shared path; fsync makes the
+  // rename durable rather than leaving an unflushed file after a crash.
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const fd = openSync(tmp, "w");
+  try {
+    writeFileSync(fd, body, "utf8");
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    renameSync(tmp, path);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {}
+    throw err;
+  }
 }
 
 export function loadPlaybooks(memoryDir: string): Playbook[] {
@@ -90,40 +110,51 @@ export function savePlaybook(memoryDir: string, input: PlaybookInput): Playbook 
     }
   });
   const now = new Date().toISOString();
-  const existing = loadPlaybooks(memoryDir);
-  const match = input.id ? existing.find((playbook) => playbook.id === input.id) : undefined;
-  if (input.id && !match) throw new Error(`Playbook '${input.id}' not found`);
-  const playbook: Playbook = {
-    id: match?.id ?? `pb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    title: input.title,
-    goal: input.goal,
-    steps: input.steps,
-    // An update that only replaces steps must not erase the safety rails.
-    preconditions: input.preconditions ?? match?.preconditions ?? [],
-    verification: input.verification ?? match?.verification ?? [],
-    rollback: input.rollback ?? match?.rollback ?? [],
-    tags: Array.from(new Set(input.tags ?? match?.tags ?? [])),
-    createdAt: match?.createdAt ?? now,
-    updatedAt: now,
-    successCount: match?.successCount ?? 0,
-    failureCount: match?.failureCount ?? 0,
-  };
-  const next = [playbook, ...existing.filter((entry) => entry.id !== playbook.id)];
   mkdirSync(memoryDir, { recursive: true });
-  writeAtomic(playbookFile(memoryDir), JSON.stringify(next, null, 2));
+  // D5: load and store must happen under the single-writer lock, or two
+  // processes both read the same list and the later rename silently drops
+  // the earlier writer's playbook.
+  const playbook = withStoreLock(memoryDir, () => {
+    const existing = loadPlaybooks(memoryDir);
+    const match = input.id ? existing.find((entry) => entry.id === input.id) : undefined;
+    if (input.id && !match) throw new Error(`Playbook '${input.id}' not found`);
+    const record: Playbook = {
+      id: match?.id ?? `pb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      title: input.title,
+      goal: input.goal,
+      steps: input.steps,
+      // An update that only replaces steps must not erase the safety rails.
+      preconditions: input.preconditions ?? match?.preconditions ?? [],
+      verification: input.verification ?? match?.verification ?? [],
+      rollback: input.rollback ?? match?.rollback ?? [],
+      tags: Array.from(new Set(input.tags ?? match?.tags ?? [])),
+      createdAt: match?.createdAt ?? now,
+      updatedAt: now,
+      successCount: match?.successCount ?? 0,
+      failureCount: match?.failureCount ?? 0,
+    };
+    const next = [record, ...existing.filter((entry) => entry.id !== record.id)];
+    writeAtomic(playbookFile(memoryDir), JSON.stringify(next, null, 2));
+    return record;
+  });
   return playbook;
 }
 
 export function recordPlaybookOutcome(memoryDir: string, id: string, success: boolean): Playbook | null {
-  const playbooks = loadPlaybooks(memoryDir);
-  const target = playbooks.find((playbook) => playbook.id === id || playbook.title === id);
-  if (!target) return null;
-  if (success) target.successCount += 1;
-  else target.failureCount += 1;
-  target.updatedAt = new Date().toISOString();
   mkdirSync(memoryDir, { recursive: true });
-  writeAtomic(playbookFile(memoryDir), JSON.stringify(playbooks, null, 2));
-  return target;
+  // D5: the counter bump is a read-modify-write too. Two concurrent outcome
+  // records would otherwise both read the same count and one increment is
+  // lost — which corrupts the success/failure ratio the ranking relies on.
+  return withStoreLock(memoryDir, () => {
+    const playbooks = loadPlaybooks(memoryDir);
+    const target = playbooks.find((playbook) => playbook.id === id || playbook.title === id);
+    if (!target) return null;
+    if (success) target.successCount += 1;
+    else target.failureCount += 1;
+    target.updatedAt = new Date().toISOString();
+    writeAtomic(playbookFile(memoryDir), JSON.stringify(playbooks, null, 2));
+    return target;
+  });
 }
 
 export function formatPlaybook(playbook: Playbook): string {

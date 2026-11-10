@@ -1,0 +1,65 @@
+# Muse Memory
+
+> Autonomous, local-first cognitive memory engine for AI coding agents and agency networks. Runs in-process: sub-2ms recall, write-time citation verification, 52 agent platforms wired by one command, 0 background daemons, MIT licensed.
+>
+> Version 3.3.0 · https://harshsinghmp.github.io/musememory/
+
+Muse Memory gives an AI agent a memory that survives between sessions. Every memory is checked against the real code before it is stored and re-checked before it is served, so an agent is never handed a fact that has since become false.
+
+## Install
+
+```bash
+npx musememory connect
+```
+
+No account, no API key, no configuration file, no background daemon. The store is two plain directories: `.memory/` inside each project and `~/.memory/` globally.
+
+## Documentation
+
+- [README](README.md): quickstart, command surface, proof and FAQ.
+- [Agent reference](docs/agent-reference.md): the exact contract — install, file layout, session protocol, trust gates, failure semantics.
+- [CLI & MCP reference](docs/cli-reference.md): every CLI command and every MCP tool (generated from `src/`).
+- [User guide](docs/user-guide.md): the daily ground → constrain → capture loop.
+- [Concepts](docs/concepts.md): core concepts and the guarded 7-state lifecycle.
+- [Team setup](docs/team-getting-started.md): server, auth and client recipes.
+- [Contributing](CONTRIBUTING.md): branch model and commit protocol.
+- [Changelog](CHANGELOG.md): release history.
+- [Full site text](https://harshsinghmp.github.io/musememory/llms-full.txt): the whole website as plain text.
+
+## Authoritative machine-readable files
+
+- [`claims.json`](claims.json) — every countable figure, generated from `src/`.
+- [`docs/mcp-tool-matrix.json`](docs/mcp-tool-matrix.json) — the registered MCP tool list, generated.
+- [`schema.json`](schema.json) — the memory entry schema.
+
+Never hand-edit these three; regenerate with `bun run claims:generate`.
+
+## Key entry points
+
+- `src/` — engine source (CLI, MCP server, store, retrieval, cognition).
+- `bin/` — `memory` / `musememory` executables.
+- `test/` — Bun test suite (`bun test`).
+- `apps/website/` — the Astro site published at `/musememory`.
+- `.agents/` — agent standards, durable context and terrain maps.
+
+## MCP tools an agent should know
+
+| Tool | Purpose |
+| --- | --- |
+| `get_context` | Mandatory on the first turn of a session. Fused recall: constraints, ranked memories, negative lessons, code anchors, under one token budget. |
+| `memory_capture` | Persist a decision, fix or constraint. Every write is secret-scanned and citation-verified. |
+| `search` | Full-text search across the store. |
+| `memory_current` | Read or write the active working constraints in CURRENT.md. |
+| `muse_context` | Task-shaped fused context for a specific job. |
+| `muse_why` | Explain why the code is the way it is, from ADRs and past fixes. |
+| `memory_supersede` | Replace an outdated memory with a newer one. |
+
+126 tools are registered in total, exposed through 7 task-focused profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`).
+
+## Behaviour an agent must know
+
+1. Call `get_context` on the first turn of any session.
+2. Capture decisions, fixes and constraints as they happen — `memory_capture`.
+3. Supersede rather than delete when knowledge changes — `memory_supersede`.
+4. Every write is scanned for credentials and refused if one is present.
+5. Every code citation is verified against the live filesystem at write time and re-checked at recall; drifted memories are withheld and reported, not served.

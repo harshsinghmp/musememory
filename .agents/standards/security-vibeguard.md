@@ -1,4 +1,4 @@
-# 🛡️ LifeOS Vibeguard & Core Safety Protocol
+# 🛡️ Vibeguard Security & Core Safety Protocol
 
 All agents operating in this workspace must strictly follow these security and system safety guardrails:
 

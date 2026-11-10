@@ -244,7 +244,7 @@ Run: `bun run build`
 Expected: Clean build, 0 warnings.
 
 - [ ] **Step 4: Run pre-ship SecretScan**
-Run: `bun ~/.config/LIFEOS/runtime/TOOLS/SecretScan.ts .`
+Run: `memory scan-secrets .`
 Expected: 0 secrets detected.
 
 ---

@@ -594,9 +594,9 @@ Source: Deep research on local Agent OS (Ryoku Rashin `http://127.0.0.1:3600`) a
 
 ---
 
-# v14 — STRATEGIC HORIZONS & SOVEREIGN LIFEOS RETIREMENT (WAVES 24–29, 2026-10-26)
+# v14 — STRATEGIC HORIZONS & SOVEREIGN ECOSYSTEM RETIREMENT (WAVES 24–29, 2026-10-26)
 
-Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive horizons, and LifeOS sovereignty audit.
+Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive horizons, and the sovereignty audit.
 
 ## Wave 24: Showcase, Interactive Playground & DX Assets
 - [x] T-423 · LANDED 2026-11-08 — PR #362: Terminal Showreel & GIF Recording: Script and record high-fidelity terminal demo (`showreel.mp4`, `muse-memory-demo.gif`) on v3.0.0 highlighting failure attribution, negative mining, and HOT.md compounding · assets/, docs/ · N
@@ -624,16 +624,16 @@ Source: Strategic roadmaps, developer experience assets, R17–R20 tri-cognitive
 - [x] T-439 · LANDED 2026-11-09 — PR #380: Semantic Contradiction Merge Resolver: Interactive 3-way semantic conflict resolution on branch merge into `main` · src/quality/branch_merge.ts · F
 
 ## Wave 28: R20 Test-Driven Reinforcement & Regression Sentry
-- [ ] T-440 · Automated CI / Test Harness Integration: Bind memory utility directly to real test outcomes (`bun test`, `vitest`, `cargo test`); increment ROI on green, decay on red · src/quality/test_feedback.ts · F
-- [ ] T-441 · Negative Anti-Pattern Regression Sentry: Proactive watchdog matching test failures against `BUG_PRONE_PATTERN` and `DO_NOT_USE` records · src/cognition/sentry.ts · F
-- [ ] T-442 · Flaky Test & Environment Drift Detector: Correlate test flakiness and failure bursts with dependency updates and environmental churn · src/doctor/flaky.ts · F
-- [ ] T-443 · Autonomous Remediation Playbook Generator: Automatically synthesize recurring test fix sequences into verified reusable playbooks · src/cognition/remediation.ts · F
+- [x] T-440 · LANDED 2026-11-09 — Automated CI / Test Harness Integration: `src/quality/test_feedback.ts` parses bun/vitest/jest/cargo/pytest/go output and binds ROI to real outcomes; CLI `test-feedback` + MCP `memory_test_feedback` · F
+- [x] T-441 · LANDED 2026-11-09 — Negative Anti-Pattern Regression Sentry: read-only matching against BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories with remediation playbooks; CLI `sentry` + MCP `muse_regression_sentry` · src/cognition/sentry.ts · F
+- [x] T-442 · LANDED 2026-11-09 — Flaky Test & Environment Drift Detector: `src/doctor/flaky.ts` derives flaky tests (per command), failure bursts and dependency-file drift from the `test_feedback` ledger; CLI `flaky` + MCP `muse_flaky_tests` · F
+- [x] T-443 · LANDED 2026-11-09 — Autonomous Remediation Playbook Generator: `src/cognition/remediation.ts` synthesizes playbook candidates from recurring failures using sentry guidance; applies resolved candidates only; CLI `remediation` + MCP `muse_remediation_playbooks` · F
 
 ## Wave 29: Sovereign Ecosystem Migration & Decommissioning
 - [x] T-444 · Sovereign Persona & Memory Ingestion: Synthesize user persona into `~/.memory/USER.md` and SQLite memory store; legacy import tool permanently removed from source · F
 - [x] T-445 · Native Vibeguard CLI (`memory scan-secrets`): Standalone secret scanning binary in `musememory` with zero external dependencies · src/cli/secrets.ts · F
 - [x] T-446 · Machine Terrain Collector in `src/vault/`: Incorporate hardware, toolchain, and package scans into unified workspace maps (`memory terrain`) · src/vault/system.ts · F
-- [x] T-447 · Global Governance De-LifeOSification: Remove all legacy imports and rewrite governance directives to point purely to Muse Memory and Muse Skills · ~/.agents/AGENTS.md · N
+- [x] T-447 · Global Governance Decommissioning: Remove all legacy imports and rewrite governance directives to point purely to Muse Memory and Muse Skills · ~/.agents/AGENTS.md · N
 - [x] T-448 · Sovereign Ecosystem Decommissioning Gate: Verification audit confirming zero dangling runtime dependencies and legacy tool removal · test/sovereignty_gate.test.ts · F
 
 ## v14 Totals

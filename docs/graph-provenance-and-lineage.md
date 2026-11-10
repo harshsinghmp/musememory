@@ -93,6 +93,7 @@ console.log(lineage.edges);   // Typed edges (supersedes, superseded_by, conflic
 ### 2.8 Hash-Chained Audit Ledger & Session Merkle Checkpoints (T-102)
 Guarantees tamper-evident audit security for multi-agent workflows:
 - **Hash Chaining**: Every audit entry in `.memory/audit.jsonl` contains `prev_hash`, `hash`, and `salt_date`.
+- **Bounded Ledger**: at 5 MiB the active ledger rolls into `.memory/audit-archive/` (five segments retained by default). The chain continues across segments; pruning writes an anchor to `.memory/audit-anchor.json` so retained segments still verify.
 - **Per-Day Salt Rotation**: Rotating cryptographic salt per date partition stored in `.memory/audit_salts.json`.
 - **Integrity Verification**: `verifyAuditChain(memoryDir)` validates the hash chain line-by-line, instantly detecting tampering, reordering, or line deletion.
 - **Session Merkle Checkpoints**: Computes Merkle tree roots over session events (`createSessionMerkleCheckpoint`, `verifySessionMerkleCheckpoint`, `generateMerkleProof`, `verifyMerkleProof`).

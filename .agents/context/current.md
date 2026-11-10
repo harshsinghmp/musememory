@@ -1,7 +1,160 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.1.3`  
-> **Status**: Wave 29 Landed — Sovereign LifeOS Migration & Complete Decommissioning (T-444 to T-448).
+> **Version**: `v3.4.0` (post-release `dev`)  
+> **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
+
+---
+
+## 🧾 Session — Changelog Repair & D5 Write Race (2026-11-10)
+
+**v3.3.0 shipped with no changelog section.** The tag and the npm publish
+both went out while all 29 release bullets were still under `[Unreleased]`,
+so the published release notes omitted the entire release; the section also
+carried two separate `### Added` headings. Promoted the 29 bullets verbatim
+into a dated `[3.3.0]` section (verified byte-identical against
+`git show v3.3.0:CHANGELOG.md`), rebuilt `[Unreleased]` from only the 12
+post-tag bullets, and added the five changes from this session. There is no
+CI check for changelog structure — this was only caught by reading it.
+
+**D5 — playbook writes lost data across processes.** The debt said "random
+temp suffix + fsync". Implementing exactly that did **not** fix the bug: 8
+concurrent processes still persisted only 5. The temp-name fix prevents
+staging collisions, but `savePlaybook` and `recordPlaybookOutcome` are
+read-modify-write, so both processes read the same list and the later rename
+drops the earlier write. Wrapping both in the existing `withStoreLock`
+fixed it — 8/8 persist. Outcome recording had the same race, silently
+corrupting the success/failure ratio ranking depends on.
+
+**Lesson recorded:** the first regression test used an in-process
+`Promise.all` race and passed with *and* without the fix, because the write
+path is synchronous and can never interleave in one process. It was
+replaced with a real multi-process test; both guards now fail against the
+old implementation (6 expected, 3 received).
+
+Gate: `bun test` 1592/1592 pass across 252 files; `bunx tsc --noEmit`
+clean; `check:landed` → **LANDED** at `9270d97`.
+
+---
+
+## 🧾 Session — Stack Landing, W26-5 CTE Bound & PR Queue Cleanup (2026-11-10)
+
+**CI gap on stacked PRs (#390).** The `pull_request` trigger listed only
+`main`/`master`/`dev`. Retargeting stacked PRs onto their parent branches
+therefore left three of four layers with **no CI at all** — they reported
+"no checks reported" and looked fine to a reviewer. Widened the filter to
+`["**"]`. Note for future stack work: GitHub reads `pull_request`
+workflows from the **base** branch, so the fix has to reach the base first.
+Retargeting alone emits no event; a close/reopen is what re-triggers CI.
+
+**W26-5 — recursive CTE bound.** `maxNodes` was clamped and passed to SQL,
+but `LIMIT` sat only on the outer `SELECT`, so SQLite materialised the whole
+reachable frontier before projecting. `preflightContext` calls this path on
+every file open. A `LIMIT` inside the recursive member took a 3000-node
+dense graph from **269.8ms to 9.7ms** (27x) with identical output. The
+regression test asserts a 50ms ceiling and was verified to *fail* without
+the fix (177ms) — a guard that only passes is not a guard.
+
+**W26-2 follow-up.** The over-budget message printed the pack total beside
+the word "over" — "192 tokens (over budget: 192 tokens)" reads as "over by
+192" when the overage was 42. Now "(over the 150 budget)". Caught by
+running the CLI, not by tests, which asserted engine fields but never the
+printed line.
+
+**PR queue cleaned.** Five spec PRs (#52–#56) were closed as superseded:
+their content already lives in `roadmap.md` in more detail, they targeted
+`main` against the `dev` convention, and each added a file to
+`.agents/plans/` — gitignored by ADR-008, so merging would have re-tracked
+a path the repo deliberately excluded.
+
+Gate: `bun test` 1590/1590 pass across 252 files; `bunx tsc --noEmit`
+clean; 162 doc links resolve; `check:landed` → **LANDED** at `df9e43f`.
+
+---
+
+## 🧾 Session — Agent Context Sync & AI-Readiness Closeout (2026-11-10)
+
+**Context drift repaired.** Agent-facing docs had fallen behind the engine:
+`AGENTS.md` pinned `v3.0.2` and `.agents/context/index.md` pinned `v3.1.0`
+while `package.json` is `3.3.0`. `architecture.md` still advertised 69 MCP
+tools, 80+ agent platforms, 24+ migrator formats, 498 tests across 81 suites
+and `v2.0.0`; the generated `claims.json` says 126 tools, 52 platforms, 30
+providers and 1584 tests across 251 files. All corrected from the generated
+source of truth, not from prose.
+
+**Roadmap debt closed.** The status table was dated `v2.3.0` and still listed
+"no branch-aware memory" as missing; `memory branch/checkout/blame` (R23) and
+branch-isolated overlays (T-436) both shipped, so the row now records them.
+
+**Standards adopted.** Five canonical core standards that were never present
+here are now materialised and routed from `AGENTS.md`: `anti-patterns.md`,
+`boundary-governance.md`, `test-failure-audit.md`, `language-policy.md` and
+`visual-inspection.md`. Curated local standards (project-specific naming, the
+project's own Landing Gate, `memory scan-secrets`) were deliberately **not**
+overwritten — the canon differs from them by design, and the sync engine
+reports that divergence rather than clobbering it.
+
+**Audit 9/14 → 14/14.** Added the assets the readiness matrix was missing:
+`.env.example` documenting the 15 real `MUSE_*` variables, `.mcp.json` wiring
+this repo's own MCP server (smoke-tested over stdio), a root `llms.txt` index,
+a `.agents/artifacts/README.md` contract stub, and the six Wave-23 terrain maps
+generated by the repo's own `writeWorkspaceTerrain` (not hand-written), which
+pass the terrain audit with zero credential leaks and zero hardcoded paths.
+
+Gate: `bun test` 1584/1584 pass, `bunx tsc --noEmit` clean, 162 doc links
+resolve, `--lint-context` clean, `--check` reports zero context drift.
+
+---
+
+## 🧾 Session — Outcome Study & W27-7 Read-Only Surfaces (2026-11-09)
+
+**Outcome study (EVD-008).** Replaced the two-task pilot with a ten-task,
+condition-blind study. Both arms received identical instructions and were told
+to consult memory; the only variable was whether ten project conventions were
+seeded. Result: **10/10 with memory vs 6/10 without**, four discriminating tasks
+(duration units, UTC dates, slug length cap, CSV whitespace quoting), zero
+regressions, Fisher one-sided p = 0.043. EVD-005 is no longer quarantined — its
+statement was narrowed to convention recall rather than an unqualified
+productivity claim. Evidence: `docs/evidence/2026-11-outcome-study.md` and
+`.agents/artifacts/outcome-study-2026-11/`.
+
+**W27-7 read-only MCP surfaces.** Added three read-only tools with explicit
+scope: `muse_enclave_recall` (client required, every read audit-logged),
+`muse_overlay_status` (list or inspect branch overlays, never mutates), and
+`muse_attestation_verify` (inline public key only — no model-supplied file
+paths). `src/store/branch.ts` gained `listBranchOverlays`. Tool count 119 → 122;
+claims and CLI reference regenerated; `test/mcp_readonly_surfaces.test.ts`
+covers the happy paths, the fail-loud cases and the read-only guarantee.
+Still open from the Wave 27 debt table: W27-8 (whole-vault rewrite) and W27-9
+(overlay size caps).
+
+**Follow-up (same day) — W27-8/W27-9 closed, R29 started.** Enclave vaults now
+store one AES-256-GCM file per entry under `<client>/<division>/`; a write no
+longer rewrites the vault, legacy single-file vaults stay readable and migrate
+on the next write, and per-entry (1 MiB) plus per-vault (5000) caps fail loud.
+Branch overlays are capped at 1000 entries / 2 MiB. `muse_enclave_recall` now
+redacts credentials with `redactSecrets` before returning content. On the
+operations side, `audit.jsonl` rotates at 5 MiB into `audit-archive/` (five
+segments retained by default), pruning writes a chain anchor so
+`getAuditTrail`/`getLastAuditHash`/`verifyAuditChain` remain valid across the
+retained window, and `memory io [--json]` reports `/proc/self/io` counters plus
+SQLite/WAL/audit/observation bytes. R29 is now complete except for optional
+async batching: the YAML mirror can be skipped with `MUSE_YAML_MIRROR=0` /
+`openStore({ yamlMirror: false })` (SQLite stays authoritative), and the WAL is
+bounded by `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB`.
+
+**Wave 28 complete (`T-440`–`T-443`).** The outcome loop is wired both ways:
+`test_feedback.ts` parses bun/vitest/jest/cargo/pytest/go output, binds a real run
+to the applied memory IDs, and reinforces green runs or records a failed
+application plus a T-313 regression strike only for anchor-relevant memories.
+`cognition/sentry.ts` matches failures against BUG_PRONE_PATTERN / DO_NOT_USE /
+failed-approach memories and returns reproduction/avoidance/recommendation
+playbooks without mutating anything. `doctor/flaky.ts` reconstructs the run
+history and reports flaky tests (per command), failure bursts and dependency-file
+drift before a burst. `cognition/remediation.ts` turns recurring failures into
+playbook candidates and persists resolved ones (dry-run by default). Surfaces:
+`memory test-feedback`, `sentry`, `flaky`, `remediation`, `memory_test_feedback`,
+`muse_regression_sentry`, `muse_flaky_tests`, `muse_remediation_playbooks`
+(126 tools).
 
 ---
 
@@ -33,12 +186,12 @@ Restored `AGENTS.md` byte-exact from HEAD after an `updateagents` run from the u
 
 ## 🏛️ Wave 29 — Sovereign Ecosystem Migration & Decommissioning Complete (2026-10-26)
 
-All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and de-LifeOSified agent governance. Legacy import tools have been permanently purged from source:
+All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and decommissioned legacy agent governance. Legacy import tools have been permanently purged from source:
 
-- **Sovereign Persona & Store Ingestion (`T-444`)**: Identity, telos, and operational rules synthesized directly into sovereign `~/.memory/USER.md` persona and SQLite store. Legacy tool `import_lifeos.ts` permanently deleted from source.
+- **Sovereign Persona & Store Ingestion (`T-444`)**: Identity, telos, and operational rules synthesized directly into sovereign `~/.memory/USER.md` persona and SQLite store. The legacy import tool was permanently deleted from source.
 - **Native Vibeguard CLI (`T-445`)**: `memory scan-secrets [dir]` standalone zero-dependency secret scanner replacing legacy external scripts (`test/cli_secrets.test.ts`).
 - **Machine Terrain Collector (`T-446`)**: `memory terrain [--out file.md]` compiles deterministic hardware, toolchain, and local agent ecosystem maps into `system.md` (`test/vault_system.test.ts`).
-- **Global Governance De-LifeOSification (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
+- **Global Governance Decommissioning (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
 - **Sovereignty Decommissioning Gate (`T-448`)**: Enforces zero external legacy imports, confirms legacy tool removal, and passes 100% cleanly in `test/sovereignty_gate.test.ts`.
 - **Golden Sequence Documentation**: Published the complete 4-phase best-practice sequence for using Muse Memory with AI coding agents in `README.md`, `docs/agent-reference.md`, and `docs/cli-reference.md`.
 
@@ -276,7 +429,7 @@ on any blocking failure, so CI runs it. Report:
   - `T-144`: Trajectory fix-pair mining discovering negative memories (`AVOID: ...`) from *Error ➔ Remediation ➔ No Recurrence* observation sequences with affinity filters excluding non-mutating commands (`ls`, `cat`), dynamic line number normalization, Vibeguard secret scrubbing, and session volume cap of max 3 candidates (`test/fix_pair_mining.test.ts`, commit `cc4b5c5`).
   - `T-314`: Source-tagged recall hits wiring `.memory/HOT.md` candidates into retrieval ranking with sub-millisecond memoized `mtime` cache, origin tagging (`source_channels: ("hot" | "fts" | "vector" | "tree" | "distilled")[]`), relevance-gated `sourceBonus` (+0.20), and explainability tokens (`source:hot`, `source:fts`) (`test/source_tagging_frequency.test.ts`, commit `f9f6a93`).
   - `T-315`: LangMem logarithmic frequency rank curve ($0.25 \times \frac{\ln(1 + \text{effectiveCount})}{\ln(1 + 50)}$) replacing unbounded linear frequency scoring; weights verified memory applications $2\times$ over passive context loads; 7-day recency bonus (+0.05) capped at 0.30; outputs `freq:high` tokens (`test/source_tagging_frequency.test.ts`, commit `f3c8f1d`).
-- [x] **Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing**:
+- [x] **Wave 21: Ecosystem Distillation, Mutation Safety & Knowledge Routing**:
   - `T-050`: Overnight & in-lock mutation safety guards (`verifyMutationSafety`, `MutationSafetyError`, `ESUSPECT_SHRINK`, `ESUSPECT_EROSION`, `allowDrastic`) preventing accidental bulk erasure or semantic erosion during compaction/governance (`test/mutation_guards.test.ts`, commit `439e31c`).
   - `T-177`: Pre-mutation 30-snapshot rolling ring buffer (`captureSnapshotRing`, `listSnapshotRing`, `restoreSnapshotRing`) with zero resident daemons in `.memory/snapshots/` before write transactions and compaction handoffs (`test/snapshot_ring.test.ts`, commit `76c58eb`).
   - `T-324`: Diff-preserving `CURRENT.md` checkpoint merge semantics (`parseCurrentConstraints`, `mergeCurrentConstraints`), preventing mid-session hand-added constraints from being overwritten (`test/current_compaction_guard.test.ts`, commit `f1a4756`).
@@ -474,4 +627,4 @@ Removed remaining competitor product names and external comparison links from we
 ## 1. Verified Shipped Reality
 - **2026-10-22**: T-321 per-project health gate scope
 - **2026-10-22**: T-320 contradiction engine calibration
-- **2026-10-20**: Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)
+- **2026-10-20**: Wave 21: Ecosystem Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)

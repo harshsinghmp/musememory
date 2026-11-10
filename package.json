@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "bench:graph": "bun scripts/bench-graph.ts",
+    "agents:terrain": "bun run bin/musememory.ts terrain --workspace --out .agents/terrain",
     "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
     "site:dev": "bun run --cwd apps/website dev",
     "site:build": "bun run --cwd apps/website build",

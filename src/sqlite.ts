@@ -51,6 +51,10 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb.run("PRAGMA cache_size = -64000;");
     rawDb.run("PRAGMA mmap_size = 268435456;");
     rawDb.run("PRAGMA temp_store = MEMORY;");
+    // R29: bound WAL growth — checkpoint about every 2 MiB and keep the file
+    // from retaining a large high-water mark between checkpoints.
+    rawDb.run("PRAGMA wal_autocheckpoint = 512;");
+    rawDb.run("PRAGMA journal_size_limit = 67108864;");
 
     const db: SqliteDatabase = {
       exec(sql: string) {
@@ -93,6 +97,9 @@ export function openDatabase(dbPath: string): SqliteDatabase {
     rawDb.exec("PRAGMA cache_size = -64000;");
     rawDb.exec("PRAGMA mmap_size = 268435456;");
     rawDb.exec("PRAGMA temp_store = MEMORY;");
+    // R29: bound WAL growth (see the Bun driver above).
+    rawDb.exec("PRAGMA wal_autocheckpoint = 512;");
+    rawDb.exec("PRAGMA journal_size_limit = 67108864;");
 
     const db: SqliteDatabase = {
       exec(sql: string) {

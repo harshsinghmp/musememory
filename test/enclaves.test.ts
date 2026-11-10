@@ -1,8 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, validateEnclaveName, rotateEnclaveKey, listEnclaveKeys, pruneEnclaveKeys } from "../src/store/enclaves.ts";
+import { createEnclave, listEnclaveEntries, putEnclaveEntry, getEnclaveEntry, enclavePath, enclaveEntryPath, enclaveVaultDir, validateEnclaveName, rotateEnclaveKey, listEnclaveKeys, pruneEnclaveKeys, MAX_ENCLAVE_ENTRY_BYTES } from "../src/store/enclaves.ts";
 import { getAuditTrail } from "../src/audit.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
@@ -19,8 +19,9 @@ describe("T-437: encrypted client enclaves", () => {
       putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "super secret credential plan"));
       expect(getEnclaveEntry(memoryDir, "client-a", "m_1_secret")?.content).toBe("super secret credential plan");
 
-      const file = join(memoryDir, "enclaves", "client-a", "default.enc.json");
+      const file = enclaveEntryPath(memoryDir, "client-a", "m_1_secret");
       expect(readFileSync(file, "utf8")).not.toContain("super secret");
+      expect(readdirSync(enclaveVaultDir(memoryDir, "client-a"))).toEqual([`${Buffer.from("m_1_secret").toString("base64url")}.enc.json`]);
       const activeId = readFileSync(join(memoryDir, "enclave.active"), "utf8").trim();
       expect(statSync(join(memoryDir, "enclave.keys", `${activeId}.key`)).mode & 0o077).toBe(0);
 
@@ -43,7 +44,7 @@ describe("T-437: encrypted client enclaves", () => {
 
       createEnclave(memoryDir, "client-a");
       putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "alpha only"));
-      const source = enclavePath(memoryDir, "client-a");
+      const source = enclaveEntryPath(memoryDir, "client-a", "m_1_secret");
       const target = enclavePath(memoryDir, "client-b");
       const { mkdirSync } = require("node:fs") as typeof import("node:fs");
       mkdirSync(join(memoryDir, "enclaves", "client-b"), { recursive: true });
@@ -65,7 +66,7 @@ describe("T-437: encrypted client enclaves", () => {
       expect(rotation.new_key_id).not.toBe(oldId);
       expect(rotation.reencrypted).toBe(1);
       expect(listEnclaveEntries(memoryDir, "client-a")[0].content).toBe("rotate me");
-      const envelope = JSON.parse(readFileSync(join(memoryDir, "enclaves", "client-a", "default.enc.json"), "utf8"));
+      const envelope = JSON.parse(readFileSync(enclaveEntryPath(memoryDir, "client-a", "m_1_secret"), "utf8"));
       expect(envelope.key_id).toBe(rotation.new_key_id);
       expect(getAuditTrail(memoryDir, { operation: "enclave_rotate" })).toHaveLength(1);
       const keys = listEnclaveKeys(memoryDir);
@@ -120,12 +121,59 @@ describe("T-437: encrypted client enclaves", () => {
     try {
       createEnclave(memoryDir, "client-a");
       putEnclaveEntry(memoryDir, "client-a", entry("m_1_secret", "secret"));
-      const file = join(memoryDir, "enclaves", "client-a", "default.enc.json");
+      const file = enclaveEntryPath(memoryDir, "client-a", "m_1_secret");
       const envelope = JSON.parse(readFileSync(file, "utf8"));
       envelope.ciphertext = Buffer.from("tampered").toString("base64");
       writeFileSync(file, JSON.stringify(envelope));
       expect(() => listEnclaveEntries(memoryDir, "client-a")).toThrow();
       expect(existsSync(file)).toBe(true);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("per-entry files keep writes bounded and leave sibling records untouched", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-entries-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_1", "first"));
+      const firstPath = enclaveEntryPath(memoryDir, "client-a", "m_1");
+      const before = readFileSync(firstPath, "utf8");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_2", "second"));
+      expect(readFileSync(firstPath, "utf8")).toBe(before);
+      expect(listEnclaveEntries(memoryDir, "client-a").map((e) => e.id).sort()).toEqual(["m_1", "m_2"]);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("reads a legacy single-file vault and migrates it on the next write", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-legacy-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      putEnclaveEntry(memoryDir, "client-a", entry("m_legacy", "old format"));
+      const legacyPath = enclavePath(memoryDir, "client-a");
+      writeFileSync(legacyPath, readFileSync(enclaveEntryPath(memoryDir, "client-a", "m_legacy")));
+      rmSync(enclaveEntryPath(memoryDir, "client-a", "m_legacy"));
+      expect(listEnclaveEntries(memoryDir, "client-a").map((e) => e.id)).toEqual(["m_legacy"]);
+
+      putEnclaveEntry(memoryDir, "client-a", entry("m_new", "new format"));
+      expect(existsSync(legacyPath)).toBe(false);
+      expect(existsSync(`${legacyPath}.migrated`)).toBe(true);
+      expect(listEnclaveEntries(memoryDir, "client-a").map((e) => e.id).sort()).toEqual(["m_legacy", "m_new"]);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects an entry larger than the per-record budget", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-enclave-size-"));
+    try {
+      createEnclave(memoryDir, "client-a");
+      expect(() =>
+        putEnclaveEntry(memoryDir, "client-a", entry("m_big", "x".repeat(MAX_ENCLAVE_ENTRY_BYTES + 1))),
+      ).toThrow(/exceeds/);
+      expect(existsSync(enclaveEntryPath(memoryDir, "client-a", "m_big"))).toBe(false);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }

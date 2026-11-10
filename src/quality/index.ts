@@ -1,6 +1,7 @@
 export * from "./dedup.ts";
 export * from "./contradiction.ts";
 export * from "./utility.ts";
+export * from "./test_feedback.ts";
 export * from "./retention.ts";
 export * from "./eval.ts";
 export * from "./corroboration.ts";
