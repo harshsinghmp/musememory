@@ -5,6 +5,41 @@
 
 ---
 
+## 🧾 Session — Stack Landing, W26-5 CTE Bound & PR Queue Cleanup (2026-11-10)
+
+**CI gap on stacked PRs (#390).** The `pull_request` trigger listed only
+`main`/`master`/`dev`. Retargeting stacked PRs onto their parent branches
+therefore left three of four layers with **no CI at all** — they reported
+"no checks reported" and looked fine to a reviewer. Widened the filter to
+`["**"]`. Note for future stack work: GitHub reads `pull_request`
+workflows from the **base** branch, so the fix has to reach the base first.
+Retargeting alone emits no event; a close/reopen is what re-triggers CI.
+
+**W26-5 — recursive CTE bound.** `maxNodes` was clamped and passed to SQL,
+but `LIMIT` sat only on the outer `SELECT`, so SQLite materialised the whole
+reachable frontier before projecting. `preflightContext` calls this path on
+every file open. A `LIMIT` inside the recursive member took a 3000-node
+dense graph from **269.8ms to 9.7ms** (27x) with identical output. The
+regression test asserts a 50ms ceiling and was verified to *fail* without
+the fix (177ms) — a guard that only passes is not a guard.
+
+**W26-2 follow-up.** The over-budget message printed the pack total beside
+the word "over" — "192 tokens (over budget: 192 tokens)" reads as "over by
+192" when the overage was 42. Now "(over the 150 budget)". Caught by
+running the CLI, not by tests, which asserted engine fields but never the
+printed line.
+
+**PR queue cleaned.** Five spec PRs (#52–#56) were closed as superseded:
+their content already lives in `roadmap.md` in more detail, they targeted
+`main` against the `dev` convention, and each added a file to
+`.agents/plans/` — gitignored by ADR-008, so merging would have re-tracked
+a path the repo deliberately excluded.
+
+Gate: `bun test` 1590/1590 pass across 252 files; `bunx tsc --noEmit`
+clean; 162 doc links resolve; `check:landed` → **LANDED** at `df9e43f`.
+
+---
+
 ## 🧾 Session — Agent Context Sync & AI-Readiness Closeout (2026-11-10)
 
 **Context drift repaired.** Agent-facing docs had fallen behind the engine:
