@@ -16,12 +16,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Audit ledger rotation (R29)**: `audit.jsonl` rolls over at 5 MiB into `audit-archive/`, retains five segments by default (`MUSE_AUDIT_MAX_BYTES` / `MUSE_AUDIT_MAX_SEGMENTS`), and records a chain anchor when pruning so `getAuditTrail`, `getLastAuditHash` and `verifyAuditChain` keep working across the retained window.
 - **Ten-task outcome study (EVD-008)**: a condition-blind with/without study — both arms told to consult memory, only the seeding varied — measured **10/10 vs 6/10** on convention-sensitive tasks, with four discriminating tasks and no regressions. EVD-005 is no longer quarantined; its statement was narrowed to convention recall rather than an unqualified productivity claim.
 - **Read-only MCP surfaces (W27-7)**: `muse_enclave_recall` (explicit client, audit-logged, credential-redacted), `muse_overlay_status` (list/inspect branch overlays, never mutates) and `muse_attestation_verify` (inline public key only). `listBranchOverlays` added; 119 → 122 tools with regenerated claims and CLI reference.
+- **Studio recall debugging (R32)**: `POST /api/recall-debug` returns the top-K with the full `ScoreFactors` object, `why_retrieved` labels and token usage, computed by the canonical `rankAndRetrieveMemories`. Reusing the canonical ranker is the point — a second scoring path would let the panel disagree with what recall actually did. Empty queries are rejected rather than scoring the whole store.
 
 ### Changed
 - **YAML mirror opt-out (R29)**: `openStore({ yamlMirror: false })` or `MUSE_YAML_MIRROR=0` skips the per-entry `memories/*.yaml` second copy. SQLite remains authoritative and reads/list/get are unchanged; the mirror stays the default for export and rollback.
 - **Bounded WAL (R29)**: `wal_autocheckpoint = 512` and `journal_size_limit = 64 MiB` cap WAL growth between checkpoints.
 - **Enclave vault layout (W27-8)**: each enclave entry is now its own AES-256-GCM file under `<client>/<division>/`, so a write no longer rewrites the whole vault and a corrupt record cannot take siblings down. Legacy single-file vaults remain readable and migrate on the next write; per-entry and per-vault size caps are enforced.
 - **Overlay storage caps (W27-9)**: branch overlays fail loud above 1000 entries or 2 MiB.
+- **Pre-flight honours the whole budget (W26-2)**: `tokenBudget` now bounds the assembled pack, not just the entry subset. Constraints, `USER.md`, `CORE.md` and the handoff block are appended after the entry search spends its budget, so a pack reported as 47 tokens against a 400 budget actually injected 1,120. The final markdown is measured and the entry allocation shrinks until it fits; mandatory blocks are never dropped, and `markdownTokens` / `withinBudget` report the real figure. When it cannot fit it says so instead of claiming compliance.
+- **CI runs on stacked pull requests**: the `pull_request` trigger listed only `main`/`master`/`dev`, so a PR targeting its parent feature branch got no CI at all — it showed "no checks reported" and looked fine to a reviewer. Widened to any base branch.
+
+### Fixed
+- **Recursive CTE bounded inside the walk (W26-5)**: `maxNodes` was clamped and passed to SQL, but the `LIMIT` sat only on the outer `SELECT`, so SQLite materialised the whole reachable frontier before projecting. A 3000-node dense graph walked ~11.5k rows and took 269.8ms to return at most 100 nodes — on a path `preflightContext` calls on every file open. Bounded: 9.7ms with identical output.
+- **Pre-flight over-budget message**: printed the pack total beside the word "over" — a 192-token pack against a 150 budget read as "over by 192" when the overage was 42. Now names the budget that was breached.
+
+## [3.3.0] - 2026-11-09
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.2.0...v3.3.0
+
+### Added
 - **Outcome pilot and RC blockers**: with/without memory pilot, T-450 ADR-008 tracking boundary, overlay archive prune, workspace-root branch identity, enclave put lock.
 - **Evidence and enclave lifecycle**: dogfood retrieval benchmark + evidence ledger, benchmark title-less crash fix, `enclave keys`/`prune`, backup/restore drill and key-lifecycle runbook.
 - **Enclave key rotation**: keyring under `.memory/enclave.keys/`, active key id, `memory enclave rotate` with optional lazy re-encryption and audit.
@@ -35,7 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modular cached studio assets (`T-453`)**: CSS, markup and client JS split into `src/ui_assets.ts`; `/assets/studio.css` and `/assets/studio.js` serve per-encoding strong ETags, gzip, 304 and HEAD; standalone export inlines the same modules.
 - **CI Bun fallback**: when GitHub release assets return 504, CI installs Bun from the npm registry instead of failing the job.
 
-### Added
 - **Wave 24 showcase and DX (`T-423`–`T-426`)**: reproducible terminal-demo script and recording recipe, vendored `sql.js` in-browser SQLite playground, capability-only benchmark matrix with methodology, and an accessible multi-agent demo switcher.
 - **Wave 25 cognitive playbooks (`T-427`–`T-431`)**: atomic procedural playbooks (preconditions, steps, verification, rollback, outcomes), per-session episodic causal narratives, bi-temporal belief windows (`asserted_at`), reinforced Ebbinghaus decay, and `memory playbook` / `muse_playbook_*` CLI+MCP surfaces.
 - **Studio performance (`T-466`–`T-468`)**: per-scope read projection cache invalidated on writes, hidden-tab rendering pause, and an executable sub-10ms UI benchmark.
