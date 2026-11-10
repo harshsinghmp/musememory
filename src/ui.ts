@@ -22,7 +22,8 @@ import { setCurrent, updateSessionHandoff, WorkspaceGovernor } from "./governor.
 import { getUserProfile, setUserProfile, initUserProfile, type UserArchetype } from "./user.ts";
 import { getAuditTrail } from "./audit.ts";
 import { listWikiPages, getWikiPage } from "./wiki/index.ts";
-import { RetrievalEngine } from "./retrieval/index.ts";
+import { RetrievalEngine, rankAndRetrieveMemories } from "./retrieval/index.ts";
+import { estimateTokens } from "./compress.ts";
 import { validateStore } from "./schema.ts";
 import { exportSnapshot } from "./snapshot.ts";
 import { getStorageLayout } from "./store.ts";
@@ -804,6 +805,57 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
           });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ search: resSearch, promptContext: promptCtx }));
+        } catch (err: unknown) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+        return;
+      }
+
+      if (pathname === "/api/recall-debug" && req.method === "POST") {
+        try {
+          const body = await parseJsonBody(req);
+          const query = String(body.query || "");
+          if (!query.trim()) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "query is required" }));
+            return;
+          }
+          const rawLimit = typeof body.limit === "number" ? body.limit : 10;
+          const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(100, rawLimit) : 10;
+          const rawBudget = typeof body.tokenBudget === "number" && Number.isFinite(body.tokenBudget) && body.tokenBudget > 0
+            ? Math.min(100000, Math.floor(body.tokenBudget))
+            : undefined;
+          // R32: reuse the canonical ranker. A second scoring path here would
+          // let the panel disagree with what recall actually did.
+          const ranked = await rankAndRetrieveMemories(opts.store, query, {
+            limit,
+            tokenBudget: rawBudget,
+            project: body.project ? String(body.project) : undefined,
+            activeFilePath: body.activeFilePath ? String(body.activeFilePath) : undefined,
+            targetSymbol: body.targetSymbol ? String(body.targetSymbol) : undefined,
+          });
+          const totalTokens = ranked.reduce((sum, r) => sum + estimateTokens(`${r.entry.title}\n${r.entry.content}`), 0);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              query,
+              limit,
+              tokenBudget: rawBudget ?? null,
+              totalTokens,
+              count: ranked.length,
+              results: ranked.map((r) => ({
+                id: r.entry.id,
+                title: r.entry.title,
+                type: r.entry.type,
+                status: r.entry.status,
+                project: r.entry.project,
+                score: Number(r.score.toFixed(4)),
+                why_retrieved: r.why_retrieved ?? [],
+                factors: r.factors,
+              })),
+            }),
+          );
         } catch (err: unknown) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: String(err) }));
