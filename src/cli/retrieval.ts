@@ -1,4 +1,4 @@
-import { preflightContext } from "../hooks/preflight.ts";
+import { preflightContext, DEFAULT_TOKEN_BUDGET } from "../hooks/preflight.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { queryContext, formatPromptContext, type DisclosureDepth } from "../retrieval.ts";
@@ -358,7 +358,7 @@ export async function handlePreflightCommand({ positional, flags }: ParsedArgs):
     changedLines,
     cwd: ctx.root,
   });
-  const overrun = withinBudget ? "" : ` (over budget: ${markdownTokens} tokens)`;
+  const overrun = withinBudget ? "" : ` (over the ${tokenBudget ?? DEFAULT_TOKEN_BUDGET} budget)`;
   console.log(`preflight: ${changed.length} file(s) · query "${query}" · ${markdownTokens} tokens${overrun} · risk ${risk.level} (${risk.score}/100)`);
   if (anchors.length > 0) {
     console.log("anchored invariants:");

@@ -71,4 +71,22 @@ describe("T-433: speculative pre-flight context", () => {
       rmSync(memoryDir, { recursive: true, force: true });
     }
   });
+
+  // Degenerate budgets must not spin the shrink loop or claim compliance.
+  test("degenerate budgets terminate and report honestly", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-preflight-w262-edge-"));
+    try {
+      const store = openStore(memoryDir);
+      propose(store, { content: "auth session tokens are rotated", project: "p", confirmed: true });
+      for (const budget of [1, 0, -5, Number.NaN]) {
+        const result = preflightContext(store, { files: ["src/auth/session.ts"], tokenBudget: budget });
+        // The shrink loop is bounded: it must terminate, not spin.
+        expect(result.withinBudget).toBe(false);
+        expect(result.context.entries.length).toBe(0);
+        expect(result.markdownTokens).toBe(estimateTokens(result.context.markdown));
+      }
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
 });

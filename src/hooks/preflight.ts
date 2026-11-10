@@ -8,7 +8,7 @@ import { inferProject } from "../retrieval/code_context.ts";
 import { estimateTokens } from "../compress.ts";
 
 const MAX_FILES = 15;
-const DEFAULT_TOKEN_BUDGET = 800;
+export const DEFAULT_TOKEN_BUDGET = 800;
 const MAX_ENTRY_LIMIT = 8;
 
 export interface PreflightInput {
