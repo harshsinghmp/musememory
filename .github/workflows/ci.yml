@@ -4,7 +4,10 @@ on:
   push:
     branches: [main, master, dev]
   pull_request:
-    branches: [main, master, dev]
+    # Any base branch, not just the trunk. A stacked PR targets its parent
+    # feature branch, and restricting this list meant stacked layers got no
+    # CI at all — their code was never exercised before merge.
+    branches: ["**"]
 
 jobs:
   test:
