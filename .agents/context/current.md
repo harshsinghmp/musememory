@@ -1,7 +1,7 @@
 # 📍 Current Shipped State & Active Invariants
 
 > **Version**: `v3.3.0` (post-release `dev`)  
-> **Status**: Wave 29 Landed — Sovereign LifeOS Migration & Complete Decommissioning (T-444 to T-448).
+> **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
 
 ---
 
@@ -120,12 +120,12 @@ Restored `AGENTS.md` byte-exact from HEAD after an `updateagents` run from the u
 
 ## 🏛️ Wave 29 — Sovereign Ecosystem Migration & Decommissioning Complete (2026-10-26)
 
-All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and de-LifeOSified agent governance. Legacy import tools have been permanently purged from source:
+All personal identity, telos, operational rules, and hardware terrain scanning migrated into sovereign `musememory` engines, native Vibeguard secret scanning, and decommissioned legacy agent governance. Legacy import tools have been permanently purged from source:
 
-- **Sovereign Persona & Store Ingestion (`T-444`)**: Identity, telos, and operational rules synthesized directly into sovereign `~/.memory/USER.md` persona and SQLite store. Legacy tool `import_lifeos.ts` permanently deleted from source.
+- **Sovereign Persona & Store Ingestion (`T-444`)**: Identity, telos, and operational rules synthesized directly into sovereign `~/.memory/USER.md` persona and SQLite store. The legacy import tool was permanently deleted from source.
 - **Native Vibeguard CLI (`T-445`)**: `memory scan-secrets [dir]` standalone zero-dependency secret scanner replacing legacy external scripts (`test/cli_secrets.test.ts`).
 - **Machine Terrain Collector (`T-446`)**: `memory terrain [--out file.md]` compiles deterministic hardware, toolchain, and local agent ecosystem maps into `system.md` (`test/vault_system.test.ts`).
-- **Global Governance De-LifeOSification (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
+- **Global Governance Decommissioning (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
 - **Sovereignty Decommissioning Gate (`T-448`)**: Enforces zero external legacy imports, confirms legacy tool removal, and passes 100% cleanly in `test/sovereignty_gate.test.ts`.
 - **Golden Sequence Documentation**: Published the complete 4-phase best-practice sequence for using Muse Memory with AI coding agents in `README.md`, `docs/agent-reference.md`, and `docs/cli-reference.md`.
 
@@ -363,7 +363,7 @@ on any blocking failure, so CI runs it. Report:
   - `T-144`: Trajectory fix-pair mining discovering negative memories (`AVOID: ...`) from *Error ➔ Remediation ➔ No Recurrence* observation sequences with affinity filters excluding non-mutating commands (`ls`, `cat`), dynamic line number normalization, Vibeguard secret scrubbing, and session volume cap of max 3 candidates (`test/fix_pair_mining.test.ts`, commit `cc4b5c5`).
   - `T-314`: Source-tagged recall hits wiring `.memory/HOT.md` candidates into retrieval ranking with sub-millisecond memoized `mtime` cache, origin tagging (`source_channels: ("hot" | "fts" | "vector" | "tree" | "distilled")[]`), relevance-gated `sourceBonus` (+0.20), and explainability tokens (`source:hot`, `source:fts`) (`test/source_tagging_frequency.test.ts`, commit `f9f6a93`).
   - `T-315`: LangMem logarithmic frequency rank curve ($0.25 \times \frac{\ln(1 + \text{effectiveCount})}{\ln(1 + 50)}$) replacing unbounded linear frequency scoring; weights verified memory applications $2\times$ over passive context loads; 7-day recency bonus (+0.05) capped at 0.30; outputs `freq:high` tokens (`test/source_tagging_frequency.test.ts`, commit `f3c8f1d`).
-- [x] **Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing**:
+- [x] **Wave 21: Ecosystem Distillation, Mutation Safety & Knowledge Routing**:
   - `T-050`: Overnight & in-lock mutation safety guards (`verifyMutationSafety`, `MutationSafetyError`, `ESUSPECT_SHRINK`, `ESUSPECT_EROSION`, `allowDrastic`) preventing accidental bulk erasure or semantic erosion during compaction/governance (`test/mutation_guards.test.ts`, commit `439e31c`).
   - `T-177`: Pre-mutation 30-snapshot rolling ring buffer (`captureSnapshotRing`, `listSnapshotRing`, `restoreSnapshotRing`) with zero resident daemons in `.memory/snapshots/` before write transactions and compaction handoffs (`test/snapshot_ring.test.ts`, commit `76c58eb`).
   - `T-324`: Diff-preserving `CURRENT.md` checkpoint merge semantics (`parseCurrentConstraints`, `mergeCurrentConstraints`), preventing mid-session hand-added constraints from being overwritten (`test/current_compaction_guard.test.ts`, commit `f1a4756`).
@@ -561,4 +561,4 @@ Removed remaining competitor product names and external comparison links from we
 ## 1. Verified Shipped Reality
 - **2026-10-22**: T-321 per-project health gate scope
 - **2026-10-22**: T-320 contradiction engine calibration
-- **2026-10-20**: Wave 21: LifeOS Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)
+- **2026-10-20**: Wave 21: Ecosystem Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)

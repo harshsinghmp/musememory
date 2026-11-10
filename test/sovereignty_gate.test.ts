@@ -44,10 +44,8 @@ describe("T-448: Sovereign Ecosystem & Decommissioning Gate", () => {
     expect(existsSync(legacyToolPath)).toBe(false);
   });
 
-  it("verifies lifeos_retirement.md documentation exists", () => {
+  it("verifies lifeos_retirement.md is archived out of the shipped tree", () => {
     const docPath = join(process.cwd(), "docs", "lifeos_retirement.md");
-    expect(existsSync(docPath)).toBe(true);
-    const content = readFileSync(docPath, "utf8");
-    expect(content).toContain("Ecosystem Decommissioning & Retirement Gate");
+    expect(existsSync(docPath)).toBe(false);
   });
 });
