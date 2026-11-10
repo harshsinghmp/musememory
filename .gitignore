@@ -20,7 +20,7 @@ build/
 .jez/
 .orca/
 
-# Environment Variables & Secrets (LifeOS Vibeguard Protocol)
+# Environment Variables & Secrets (Vibeguard Protocol)
 .env
 .env.local
 .env.*.local

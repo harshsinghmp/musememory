@@ -41,7 +41,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 🚚 [The Landing Gate](./.agents/standards/landing-gate.md) — A commit is not a delivery; the gate proves remote reachability.
 - 📑 [DOX Hierarchy & Subtree Contracts](./.agents/standards/dox-hierarchy.md) — Reading order, child doc shape, closeout checklist, pruning.
 - 🎭 [Council Roles & Routing](./.agents/standards/council-roles.md) — Muse, Sol, Jasper, Crew, Nexus roles and dispatch policy.
-- 🧠 [Context, Memory & Identity](./.agents/standards/memory-context.md) — Context hygiene, `./.memory` lifecycle, Creed proposals, LifeOS sources.
+- 🧠 [Context, Memory & Identity](./.agents/standards/memory-context.md) — Context hygiene, `./.memory` lifecycle, Creed proposals, canonical memory sources.
 
 ### 🎨 Brand Identity, UI & Accessibility System
 - 🎨 [Design System & UI Standards](./.agents/brand/design.md) — Token architecture, 7 required UI component states, fluid typography.
