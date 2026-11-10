@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Store } from "../store.ts";
 import type { ObservationEntry } from "../types.ts";
 import { scanSecrets } from "../secrets.ts";
+import { appendJsonlWithFsync, withStoreLock } from "../lock.ts";
 
 export const MAX_OBSERVATIONS_FILE_BYTES = 256 * 1024; // 256 KB default cap
 
@@ -154,6 +155,57 @@ export function listObservations(
   }
 
   return results;
+}
+
+/**
+ * R31: merge observations from other writers into this store's ledger.
+ *
+ * The observation log is append-only, so merging is a set union keyed on
+ * `id` — an existing observation is never rewritten or dropped, which means
+ * re-merging the same batch is idempotent. Entries are appended under the
+ * single-writer lock so two concurrent merges cannot interleave partial
+ * lines, and each append is fsynced (`appendJsonlWithFsync`) because a
+ * half-written observation would corrupt every later read of the file.
+ *
+ * Returns the ids actually appended, so a caller can report what landed
+ * instead of assuming the whole batch was new.
+ */
+export function mergeObservations(
+  store: Store,
+  incoming: ObservationEntry[],
+): { appended: string[]; skipped: number } {
+  if (!Array.isArray(incoming) || incoming.length === 0) return { appended: [], skipped: 0 };
+
+  const memoryDir = store.memoryDir || store.dir;
+  if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
+  const filePath = observationsFilePath(memoryDir);
+
+  return withStoreLock(memoryDir, () => {
+    const existing = new Set(listObservations(store).map((o) => o.id));
+    const appended: string[] = [];
+    let skipped = 0;
+
+    for (const entry of incoming) {
+      if (!entry || typeof entry.id !== "string" || !entry.id) {
+        skipped++;
+        continue;
+      }
+      if (existing.has(entry.id)) {
+        skipped++;
+        continue;
+      }
+      // Never admit an unvalidated record: the ledger feeds prompt context.
+      if (typeof entry.raw !== "string" || !entry.raw.trim()) {
+        skipped++;
+        continue;
+      }
+      appendJsonlWithFsync(filePath, JSON.stringify(entry));
+      existing.add(entry.id);
+      appended.push(entry.id);
+    }
+
+    return { appended, skipped };
+  });
 }
 
 /**

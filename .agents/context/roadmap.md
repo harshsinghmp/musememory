@@ -167,7 +167,7 @@
 
 | Area | Status | Next Milestone |
 |---|---|---|
-| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 1594 tests) | R25 (--include-abstract, --scope) |
+| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 1600 tests) | R25 (--include-abstract, --scope) |
 | **Hands-free hooks** | ✅ 3/6 events shipped (GAP-2) | R24 (full plugin registry) |
 | **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) + calibrated contradiction engine (T-320) | R23 (extend to multi-repo) |
 | **Version control** | ✅ `memory branch/checkout/blame` (R23) + branch-isolated overlays (T-436) | R23 extend (merge/blame depth) |
@@ -198,6 +198,7 @@
 ### 15. **R31: Multi-Writer Merge (extends R19 + sync mesh)**
 - Concurrent writers on one shared store: observations merge append-only; memory-level conflicts are flagged, never clobbered (existing contradiction invariant).
 - Reuses `src/sync/` vector clocks and the contradiction engine. Single-writer remains the default; merge mode is opt-in. No distributed locks.
+- **Landed 2026-11-10 (observation half)**: `mergeObservations` unions observation ledgers by `id` under the existing store lock, appends with fsync, never rewrites an existing record, and is idempotent on re-merge. Memory-level conflicts remain handled by `merge3` / `mergeMemories3Way`; observations are the append-only channel and need no conflict resolution.
 
 ### 16. **R32: Studio Recall-Debug (extends R15 + A22)**
 - Surface `ranking.ts` per-factor score breakdowns in the Observability Studio: *why* was this memory retrieved.
