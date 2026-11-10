@@ -89,4 +89,51 @@ describe("T-427: procedural playbook engine", () => {
       rmSync(memoryDir, { recursive: true, force: true });
     }
   });
+
+  // D5: a fixed `${path}.tmp` name means two writers — the MCP server and a
+  // CLI invocation sharing one memory dir — stage to the SAME temp file, so
+  // one clobbers the other before either rename and an update is lost.
+  test("a save does not clobber an unrelated staged temp file", () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-playbook-race-"));
+    try {
+      // Writer A holds a staged body at the legacy shared path.
+      const legacyTmp = join(memoryDir, "playbooks.json.tmp");
+      const staged = JSON.stringify([{ id: "A", title: "A" }]);
+      writeFileSync(legacyTmp, staged, "utf8");
+
+      savePlaybook(memoryDir, { title: "B", goal: "b", steps: [{ action: "x" }] } as any);
+
+      // A's staged bytes survive untouched: the writer used a unique temp
+      // name, so it never wrote through this path.
+      expect(readFileSync(legacyTmp, "utf8")).toBe(staged);
+      // B's own write landed intact.
+      expect(loadPlaybooks(memoryDir).map((p) => p.title)).toEqual(["B"]);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  // D5: the read-modify-write cycle is only racy ACROSS processes — within
+  // one process the path is synchronous, so an in-process promise race can
+  // never interleave. This is the shape the bug actually took: the MCP
+  // server and a CLI invocation sharing one memory dir.
+  test("concurrent processes all persist their playbook", async () => {
+    const memoryDir = mkdtempSync(join(tmpdir(), "muse-playbook-proc-"));
+    try {
+      const script = `import { savePlaybook } from ${JSON.stringify(join(import.meta.dir, "..", "src", "cognition", "playbooks.ts"))};
+savePlaybook(process.argv[1], { title: process.argv[2], goal: "g", steps: [{ action: "s" }] });`;
+      const writers = 6;
+      const procs = Array.from({ length: writers }, (_, i) =>
+        Bun.spawn(["bun", "-e", script, memoryDir, `P${i}`], { stdout: "pipe", stderr: "pipe" }),
+      );
+      const codes = await Promise.all(procs.map((p) => p.exited));
+
+      expect(codes.every((c) => c === 0)).toBe(true);
+      // Without the lock the writers all read the same empty list and the
+      // last rename wins, so persisted < writers.
+      expect(loadPlaybooks(memoryDir).length).toBe(writers);
+    } finally {
+      rmSync(memoryDir, { recursive: true, force: true });
+    }
+  }, 30000);
 });
