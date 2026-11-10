@@ -7,20 +7,25 @@
 > Load a standard on demand, not up front. Each one states what it governs and
 > when to open it.
 
-## Routored from `AGENTS.md`
+## Routed from `AGENTS.md`
 
 | Standard | Governs |
 | :--- | :--- |
 | [`execution-kernel.md`](./execution-kernel.md) | Judgment laws, refactoring discipline, code-complete standards, byte-capping. |
+| [`anti-patterns.md`](./anti-patterns.md) | Negative constraints, YAGNI, forbidden dependencies, Anti-Deltas. |
+| [`boundary-governance.md`](./boundary-governance.md) | Goal, facts, method, proof and blast-radius checkpoints before merge. |
 | [`security-vibeguard.md`](./security-vibeguard.md) | Secret isolation, the Destructive Command Gate, untrusted tool output. |
 | [`system-design.md`](./system-design.md) | Domain modelling, resilience, migration rehearsal, schemas. |
 | [`workflows.md`](./workflows.md) | Scaled tiers, the 5-phase pipeline, PR-per-feature and the post-merge sequence. |
+| [`test-failure-audit.md`](./test-failure-audit.md) | Repeated red is a signal to audit your own outputs, triage root cause, then fix. |
+| [`language-policy.md`](./language-policy.md) | English working language; narration between tool calls counts as output. |
 | [`git-workflow.md`](./git-workflow.md) | Branch lifecycle, commit standards, SemVer. |
 | [`landing-gate.md`](./landing-gate.md) | The delivery contract: a commit is not a delivery. `bun run check:landed` proves work reached the remote before *landed* may be used. |
 | [`dox-hierarchy.md`](./dox-hierarchy.md) | Reading order, child document shape, the closeout checklist, the pruning loop. |
 | [`council-roles.md`](./council-roles.md) | Muse / Sol / Jasper / Crew / Nexus responsibilities and subagent dispatch policy. |
 | [`memory-context.md`](./memory-context.md) | Context hygiene, the `.memory` store lifecycle, durable proposals. |
 | [`frontend-astro.md`](./frontend-astro.md) | The `apps/website` stack: the `/musememory` base-path rule, generated assets, the a11y and visual gates. |
+| [`visual-inspection.md`](./visual-inspection.md) | Rendered-output verification for UI work; screenshots live in `.agents/brand/screenshots/`. |
 
 The brand and accessibility standards live in [`../brand/`](../brand/) and are
 routed from the same place: `design.md`, `bem-conventions.md`, `a11y.md` and
