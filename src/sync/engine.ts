@@ -184,12 +184,61 @@ export function ingestKnowledge(
 
   const memoryDir = store.memoryDir || join(workspaceRoot, ".memory");
 
+  // R31: the peer's last-sync timestamp is the concurrency signal below, so
+  // it must be read before this packet updates it.
+  const senderPeers = loadPeers(memoryDir);
+
   // 3. Process each incoming memory
   for (const incoming of packet.payload.memories) {
     const existing = get(store, incoming.id);
 
     // Exact ID match
     if (existing) {
+      // R31: do not treat a concurrent write as a stale one. Comparing
+      // wall-clock timestamps alone silently drops whichever side lost the
+      // race, and the roadmap forbids that: memory-level conflicts are
+      // flagged, never clobbered.
+      //
+      // MemoryEntry carries no per-entry vector clock, so a true causal
+      // comparison is not available. The defensible signal from real data is
+      // the peer's last sync time: if BOTH the stored copy and the incoming
+      // copy were modified after we last synced with this sender, neither can
+      // have seen the other's edit — that is a concurrent write.
+      const lastSync = senderPeers[packet.sender_id]?.last_seen_at;
+      const concurrent =
+        Boolean(lastSync) &&
+        existing.updated_at > lastSync! &&
+        incoming.updated_at > lastSync! &&
+        existing.content.trim() !== incoming.content.trim();
+
+      if (concurrent) {
+        // Never clobber. Both versions are legitimate, and they collide on the
+        // same id, so the incoming copy is preserved under a derived id —
+        // deterministic, so re-ingesting the same packet does not pile up
+        // duplicate conflict rows.
+        const disputedId = `${incoming.id}__conflict_${packet.sender_id}`;
+        const existingDisputed = get(store, disputedId);
+        if (!existingDisputed) {
+          save(store, {
+            ...incoming,
+            id: disputedId,
+            // Mark it disputed rather than confirmed: it is evidence of a
+            // divergence, not an established fact.
+            status: "candidate",
+          });
+        }
+        flagConflict(
+          store,
+          existing.id,
+          disputedId,
+          `Concurrent write during sync from ${packet.sender_id}: both sides changed this memory after the last sync`,
+          { conflict_type: "concurrent_write", confidence: 0.9 },
+        );
+        result.conflict_count++;
+        result.details.conflicted_ids.push(incoming.id);
+        continue;
+      }
+
       if (existing.updated_at >= incoming.updated_at) {
         result.duplicate_count++;
         result.details.duplicate_ids.push(incoming.id);

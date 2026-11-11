@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Concurrent writes during sync are flagged, not clobbered (R31)**: `ingestKnowledge` compared `updated_at` alone, so when two agents edited the same memory after their last sync the later timestamp won and the other edit vanished silently — exactly what the roadmap forbids. Detection now uses the peer's last-sync time to recognise true concurrency, preserves both versions (the incoming copy under a deterministic `__conflict_<sender>` id so re-ingesting is idempotent), and records a `concurrent_write` contradiction for deliberate resolution.
+
 ## [3.4.0] - 2026-11-10
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.3.0...v3.4.0
