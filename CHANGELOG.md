@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Showreel demo script called a command that does not exist (D8)**: `assets/showreel/demo-script.sh` invoked `memory brief`; the command is `memory briefing`. Under `set -e` the demo aborted with exit 2 partway through, so a recording take would fail and the cause was easy to miss. Verified the corrected script now runs end-to-end with exit 0 in a scratch directory, and the README records that `set -e` makes a pre-record smoke run mandatory.
+
+### Fixed
 - **Changelog gate range bounded by tag date**: a squash-merged release rewrites history, so commits it shipped are not ancestors of the tag and `ref..HEAD` re-flagged work already documented. The gate now judges only commits made after the tag's commit time, which is exactly what the next cycle owes regardless of how many staged sections sit above it.
 
 ## [3.4.1] - 2026-11-10
