@@ -66,6 +66,11 @@ function lastTag(): string {
 
 /** Subjects of behavioural commits since `ref`, newest last. */
 export function behaviouralCommits(ref: string): { sha: string; subject: string }[] {
+  // Date-bounded, not ancestry-bounded. A squash-merged release rewrites
+  // history, so a commit shipped in an earlier tag is usually NOT an ancestor
+  // of that tag and `ref..HEAD` wrongly includes it — which re-flagged four
+  // commits already documented under [3.4.0] after v3.4.1 was cut. Everything
+  // committed after the tag is what this release cycle actually owes.
   const range = ref ? `${ref}..HEAD` : "HEAD";
   let raw = "";
   try {
@@ -81,6 +86,25 @@ export function behaviouralCommits(ref: string): { sha: string; subject: string 
     if (!sha || !subject) continue;
     const type = subject.match(/^([a-z]+)(?:\([^)]*\))?!?:/)?.[1];
     if (type && BEHAVIOURAL_TYPES.has(type)) out.push({ sha, subject });
+  }
+  // A squash-merged tag is not an ancestor of the commits it shipped, so the
+  // range alone over-includes. Bound by the tag's commit timestamp instead.
+  if (out.length && ref) {
+    let tagTime = 0;
+    try {
+      tagTime = Number(git(["log", "-1", "--format=%ct", ref]));
+    } catch {
+      tagTime = 0;
+    }
+    if (tagTime > 0) {
+      return out.filter(({ sha }) => {
+        try {
+          return Number(git(["log", "-1", "--format=%ct", sha])) > tagTime;
+        } catch {
+          return true;
+        }
+      });
+    }
   }
   return out;
 }
@@ -157,10 +181,7 @@ function main(): void {
   // NOT an ancestor of the tag and lands in this range spuriously. Coverage in
   // the released section itself is the reliable signal that it already
   // shipped, so those are excluded before judging [Unreleased].
-  const releasedBody = ref ? releasedSectionBody(ref) : "";
-  const uncovered = commits.filter(
-    ({ subject }) => !isCovered(subject, body) && !isCovered(subject, releasedBody),
-  );
+  const uncovered = commits.filter(({ subject }) => !isCovered(subject, body));
 
   if (JSON_OUT) {
     console.log(
