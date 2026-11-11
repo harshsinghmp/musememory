@@ -84,4 +84,57 @@ describe("T-431: playbook CLI and MCP commands", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // D7: `--run` was a silent alias for show, so `--run <id>` appeared to
+  // execute the trajectory and only printed it. It must refuse loudly rather
+  // than imply execution it never performed.
+  test("CLI refuses --run instead of silently showing the playbook", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "muse-playbook-run-"));
+    const previous = process.cwd();
+    try {
+      const memoryDir = join(dir, ".memory");
+      savePlaybook(memoryDir, { title: "Deploy", goal: "ship", steps: [{ action: "build" }] });
+      process.chdir(dir);
+
+      const errors: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let runCode: number;
+      try {
+        runCode = await handlePlaybookCommand({ positional: [], flags: { run: "Deploy" } } as any);
+      } finally {
+        console.error = originalError;
+      }
+
+      // Non-zero, and it says why rather than printing the playbook.
+      expect(runCode).toBe(2);
+      expect(errors.join(" ")).toContain("not implemented");
+
+      // The plain show path still works.
+      expect(await handlePlaybookCommand({ positional: ["Deploy"], flags: {} } as any)).toBe(0);
+    } finally {
+      process.chdir(previous);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // D4: the tool has two modes, so MCP clients need to know each mode's
+  // minimum. A flat `required` array would be wrong for one of them.
+  test("muse_playbook_record advertises both mode contracts", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "muse-playbook-schema-"));
+    try {
+      const server = createServer(dir, "full");
+      const listHandler = (server as any)._requestHandlers.get("tools/list");
+      expect(listHandler).toBeDefined();
+      const response = await listHandler({ method: "tools/list", params: {} });
+      const record = response.tools.find((t: any) => t.name === "muse_playbook_record");
+      expect(record).toBeDefined();
+      const anyOf = record.inputSchema.anyOf;
+      expect(Array.isArray(anyOf)).toBe(true);
+      expect(anyOf).toContainEqual({ required: ["id", "success"] });
+      expect(anyOf).toContainEqual({ required: ["title", "goal", "steps"] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

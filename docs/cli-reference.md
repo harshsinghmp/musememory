@@ -233,7 +233,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_why` | `target` | Autonomous Engineering Cognition: Explain WHY code was designed or modified the way it is by tracing historical bug fixes, ADRs, trade-offs, and invariants |
 | `muse_bug_clusters` | — | Analyze and cluster recurring bug fixes, negative lessons, and failures into architectural fragility hotspots with root-cause hypotheses |
 | `muse_tech_debt` | — | Scan repository and memory store for technical debt indicators (TODO/FIXME/HACK, unsafe 'as any' casts, drifted code anchors) and generate refactoring priorities |
-| `muse_health` | — | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
+| `muse_health` | `id`, `success` | Unified 5-Pillar Project Health Gate: audit memory store integrity, code anchor validity, documentation drift, anti-pattern sentry, and technical debt with overall grade (A-F) and pass/fail gate status |
 | `muse_code_impact` | `file_path` | Evaluates comprehensive code and memory impact before editing: callers, test suites, ADRs, negative warnings, active constraints, and composite risk level |
 | `muse_pr_context` | `command`, `exit_code` | Generates rich GitHub PR descriptions from git diff linking touched code anchors, respected ADRs, tested invariants, and composite risk assessment |
 | `muse_reconcile_anchors` | `command`, `exit_code` | Interactively audits, prunes, or updates drifted and orphaned code anchors across memories when code is refactored or deleted |
@@ -273,10 +273,10 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 
 | Tool | Required parameters | Description |
 | --- | --- | --- |
-| `muse_preflight` | — | Read-only pre-flight: anchored invariants, blast-radius risk and a token-budgeted context pack for the files about to be edited |
-| `muse_episodes` | `packet` | Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations |
-| `muse_playbook_recall` | `packet` | Recall procedural playbooks: list by tag, or fetch one by id/title |
-| `muse_playbook_record` | `packet` | Save a playbook trajectory, or record success/failure for an existing playbook |
+| `muse_preflight` | `id`, `success` | Read-only pre-flight: anchored invariants, blast-radius risk and a token-budgeted context pack for the files about to be edited |
+| `muse_episodes` | `id`, `success` | Recall recent episodic narratives (goal → hypothesis → trajectory → verification → retrospective) built from observations |
+| `muse_playbook_recall` | `id`, `success` | Recall procedural playbooks: list by tag, or fetch one by id/title |
+| `muse_playbook_record` | `id`, `success` | Save a playbook trajectory, or record success/failure for an existing playbook |
 | `memory_test_feedback` | `command`, `exit_code` | Bind a real test run to the memories that were applied: green runs reinforce them, red runs record a failed application and a regression strike for anchor-relevant memories. Returns the parsed run plus regression-sentry matches. |
 | `muse_regression_sentry` | `client` | Read-only: match failing tests against recorded BUG_PRONE_PATTERN / DO_NOT_USE / failed-approach memories and return remediation playbooks |
 | `muse_flaky_tests` | `client` | Read-only: flaky tests, failure bursts and dependency-file drift derived from recorded test_feedback runs |
