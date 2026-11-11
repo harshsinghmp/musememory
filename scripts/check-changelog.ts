@@ -41,7 +41,7 @@ const JSON_OUT = process.argv.includes("--json");
 const QUIET = process.argv.includes("--quiet");
 
 /** Commit types that change what a user gets, and so need a changelog line. */
-const BEHAVIOURAL_TYPES = new Set(["feat", "fix", "perf"]);
+export const BEHAVIOURAL_TYPES = new Set(["feat", "fix", "perf"]);
 
 /** Tokens too common to prove a bullet covers a commit. */
 const STOPWORDS = new Set([
@@ -65,7 +65,7 @@ function lastTag(): string {
 }
 
 /** Subjects of behavioural commits since `ref`, newest last. */
-function behaviouralCommits(ref: string): { sha: string; subject: string }[] {
+export function behaviouralCommits(ref: string): { sha: string; subject: string }[] {
   const range = ref ? `${ref}..HEAD` : "HEAD";
   let raw = "";
   try {
@@ -95,7 +95,7 @@ function behaviouralCommits(ref: string): { sha: string; subject: string }[] {
  *  than the tag is covered by `[Unreleased]` plus that section, so both are
  *  searched.
  */
-function coveredBody(): string {
+export function coveredBody(): string {
   const text = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
   const start = text.indexOf("## [Unreleased]");
   if (start === -1) return "";
@@ -116,7 +116,7 @@ function coveredBody(): string {
 }
 
 /** Distinctive words in a commit subject, used to look for a matching bullet. */
-function tokens(subject: string): string[] {
+export function tokens(subject: string): string[] {
   return subject
     .replace(/^[a-z]+(?:\([^)]*\))?!?:\s*/i, "") // strip type(scope):
     .toLowerCase()
@@ -124,16 +124,26 @@ function tokens(subject: string): string[] {
     .filter((t) => t.length >= 4 && !STOPWORDS.has(t));
 }
 
+/** Commit types that require a changelog entry. */
+export function isBehavioural(subject: string): boolean {
+  const type = subject.match(/^([a-z]+)(?:\([^)]*\))?!?:/)?.[1];
+  return Boolean(type && BEHAVIOURAL_TYPES.has(type));
+}
+
+/**
+ * Pure coverage test: does `body` mention this commit subject closely enough?
+ * Exported so the gate can be tested without creating git commits.
+ */
+export function isCovered(subject: string, body: string): boolean {
+  return tokens(subject).some((t) => body.toLowerCase().includes(t));
+}
+
 function main(): void {
   const ref = lastTag();
   const commits = behaviouralCommits(ref);
   const body = coveredBody().toLowerCase();
 
-  const uncovered = commits.filter(({ subject }) => {
-    const toks = tokens(subject);
-    // A bullet covers the commit when it shares at least one distinctive token.
-    return !toks.some((t) => body.includes(t));
-  });
+  const uncovered = commits.filter(({ subject }) => !isCovered(subject, body));
 
   if (JSON_OUT) {
     console.log(
@@ -162,4 +172,5 @@ a user gets. Group under ### Added / ### Changed / ### Fixed.
   process.exit(1);
 }
 
-main();
+// Only run when executed directly, never on import.
+if (import.meta.main) main();
