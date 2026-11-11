@@ -51,6 +51,13 @@ jobs:
       - name: Documentation link integrity
         # Catches dead relative links and machine-specific file:/// URLs.
         run: bun run scripts/check-doc-links.ts
+      - name: Changelog covers behavioural commits
+        # v3.3.0 shipped to npm with no changelog section, and the R31
+        # observation merge plus the D7/D4 fixes later landed under an empty
+        # [Unreleased]. Both were caught by a human reading the file, twice in
+        # two sessions. Every other derived artifact here is gated for drift;
+        # this is the one that kept rotting silently.
+        run: bun run scripts/check-changelog.ts
       - name: Showreel matches its inputs
         # The committed video must correspond to the committed composition.
         # Caught here rather than at deploy, so a stale render never reaches

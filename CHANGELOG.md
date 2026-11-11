@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Append-only observation merge (R31)**: `mergeObservations` unions peer observation ledgers by `id` under the single-writer store lock, appends each record with fsync, never rewrites an existing observation, and rejects malformed records so the ledger cannot be corrupted. Re-merging a batch is a no-op, which makes retries safe. Memory-level conflicts remain `merge3`'s job; the append-only observation channel was the missing half of R31.
+
+### Changed
+- **Pre-flight budget now bounds the whole pack (W26-2 follow-up)**: `--budget` measures the assembled markdown rather than the entry subset, and reports the budget it breached instead of the pack total — `192 tokens (over the 150 budget)` rather than `(over budget: 192 tokens)`, where 192 was the whole pack and the overage was 42.
+
+### Fixed
+- **`playbook --run` no longer pretends to execute (D7)**: the flag was a silent alias for `show`, so `memory playbook --run <id>` appeared to run a trajectory and only printed it. It now refuses with exit 2 and says playbooks are advisory. Execution is deliberately unimplemented: steps carry arbitrary shell commands and need a confirmation gate and security review.
+- **`associated` contract documented (W26-4)**: the field is graph neighbours, not ranked results — excluded from `results` and **not counted in `totalTokensUsed`**, so callers injecting it must budget separately. Documented on the type rather than fused, since fusion would change ranking behaviour.
+- **`muse_playbook_record` declares both mode contracts (D4)**: `anyOf` over `[id, success]` (record an outcome) and `[title, goal, steps]` (save), instead of no `required` at all. A flat `required` would have been wrong for one of the two modes.
+
 ## [3.4.0] - 2026-11-10
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.3.0...v3.4.0
