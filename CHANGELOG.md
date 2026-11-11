@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`playbook --run` no longer pretends to execute (D7)**: the flag was a silent alias for `show`, so `memory playbook --run <id>` appeared to run a trajectory and only printed it. It now refuses with exit 2 and says playbooks are advisory. Execution is deliberately unimplemented: steps carry arbitrary shell commands and need a confirmation gate and security review.
 - **`associated` contract documented (W26-4)**: the field is graph neighbours, not ranked results — excluded from `results` and **not counted in `totalTokensUsed`**, so callers injecting it must budget separately. Documented on the type rather than fused, since fusion would change ranking behaviour.
 - **`muse_playbook_record` declares both mode contracts (D4)**: `anyOf` over `[id, success]` (record an outcome) and `[title, goal, steps]` (save), instead of no `required` at all. A flat `required` would have been wrong for one of the two modes.
+- **Concurrent writes during sync are flagged, not clobbered (R31)**: `ingestKnowledge` compared `updated_at` alone, so when two agents edited the same memory after their last sync the later timestamp won and the other edit vanished silently — exactly what the roadmap forbids. Detection now uses the peer's last-sync time to recognise true concurrency, preserves both versions (the incoming copy under a deterministic `__conflict_<sender>` id so re-ingesting is idempotent), and records a `concurrent_write` contradiction for deliberate resolution.
+
 
 ## [3.4.0] - 2026-11-10
 
