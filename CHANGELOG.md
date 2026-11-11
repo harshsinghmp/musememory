@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Changelog gate range bounded by tag date**: a squash-merged release rewrites history, so commits it shipped are not ancestors of the tag and `ref..HEAD` re-flagged work already documented. The gate now judges only commits made after the tag's commit time, which is exactly what the next cycle owes regardless of how many staged sections sit above it.
+
 ## [3.4.1] - 2026-11-10
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.0...v3.4.1
