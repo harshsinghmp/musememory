@@ -48,9 +48,16 @@ describe("changelog coverage gate: classifier", () => {
 });
 
 describe("changelog coverage gate: repository state", () => {
+  /** Most recent release tag, discovered rather than hardcoded — a pinned
+   *  version breaks the moment the repo cuts its next release. */
+  function latestTag(): string {
+    const proc = Bun.spawnSync(["git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"], { cwd: ROOT });
+    return proc.stdout.toString().trim();
+  }
+
   test("every behavioural commit since the last tag is covered", () => {
     const body = coveredBody();
-    const commits = behaviouralCommits("v3.4.0");
+    const commits = behaviouralCommits(latestTag());
     const uncovered = commits.filter((c) => !isCovered(c.subject, body));
     expect(uncovered.map((c) => c.subject)).toEqual([]);
   });
@@ -59,7 +66,14 @@ describe("changelog coverage gate: repository state", () => {
     // Releases land by squash merge, so shipped commits are often not tag
     // ancestors. Scanning only [Unreleased] re-flagged already-documented
     // work, which is why the body spans the newest dated section too.
-    expect(coveredBody()).toContain("## [3.4.0]");
+    //
+    // Assert against the section that actually comes first, not the newest
+    // tag: while a release is staged but untagged (exactly this branch), the
+    // first dated section is the version being cut, which has no tag yet.
+    const text = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
+    const firstDated = text.slice(text.indexOf("## [Unreleased]")).match(/^## \[(\d+\.\d+\.\d+)\]/m);
+    expect(firstDated).not.toBeNull();
+    expect(coveredBody()).toContain(`## [${firstDated![1]}]`);
   });
 
   test("the gate script exits zero on the current tree", () => {

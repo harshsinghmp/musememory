@@ -85,34 +85,44 @@ export function behaviouralCommits(ref: string): { sha: string; subject: string 
   return out;
 }
 
-/** Text from `[Unreleased]` down to the first dated section, plus that
- *  section's own body when the tag has already been cut.
+/**
+ * Text from `[Unreleased]` down to (but excluding) the section for `sinceTag`.
  *
- *  Range subtlety: releases land on `main` via squash merge, so a commit that
- *  shipped in v3.4.0 is often NOT an ancestor of the tag — it was rewritten
- *  into a single squash commit. Scanning only `[Unreleased]` therefore
- *  re-flags work that is already documented under `[3.4.0]`. Everything newer
- *  than the tag is covered by `[Unreleased]` plus that section, so both are
- *  searched.
+ * Everything newer than the measured tag is legitimately covered here: the
+ * unreleased section, plus any release staged but not yet tagged. Stopping at
+ * the first dated section was wrong — while v3.4.1 is staged but untagged,
+ * commits already documented under v3.4.0 sit one level deeper, and the gate
+ * re-flagged them. Releases also land by squash merge, so a shipped commit is
+ * often not an ancestor of the tag and cannot be excluded that way.
  */
-export function coveredBody(): string {
+export function coveredBody(sinceTag = ""): string {
   const text = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
   const start = text.indexOf("## [Unreleased]");
   if (start === -1) return "";
   const afterUnreleased = text.slice(start + "## [Unreleased]".length);
-  // First dated section header.
-  const firstDated = afterUnreleased.search(/^## \[\d/m);
-  if (firstDated === -1) return afterUnreleased;
-  const unreleased = afterUnreleased.slice(0, firstDated);
-  const rest = afterUnreleased.slice(firstDated);
-  // That section runs to the next dated header. Search from after its own
-  // leading `## ` (3 chars) so the current header is not re-matched — an
-  // earlier off-by-three here let a section's whole body count as
-  // "unreleased" whenever [Unreleased] was empty, which made the gate pass
-  // with every entry stripped.
+
+  const cutoffVersion = sinceTag.replace(/^v/, "");
+  if (cutoffVersion) {
+    // Stop at the measured tag's own section.
+    const marker = afterUnreleased.search(new RegExp(`^## \\[${cutoffVersion.replace(/\./g, "\\.")}\\]`, "m"));
+    if (marker !== -1) return afterUnreleased.slice(0, marker);
+  }
+  // No tag measured (first release) or section absent: everything counts.
+  return afterUnreleased;
+}
+
+
+/** Body of the section belonging to `tag` (e.g. v3.4.0 -> the [3.4.0] block). */
+export function releasedSectionBody(tag: string): string {
+  const text = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
+  const version = tag.replace(/^v/, "");
+  const escaped = version.replace(/\./g, "\\.");
+  const startMatch = text.search(new RegExp(`^## \\[${escaped}\\]`, "m"));
+  if (startMatch === -1) return "";
+  const rest = text.slice(startMatch);
+  // The section runs to the next dated header, or the end of the file.
   const next = rest.slice(3).search(/^## \[\d/m);
-  const firstSection = next === -1 ? rest : rest.slice(0, next + 3);
-  return `${unreleased}\n${firstSection}`;
+  return next === -1 ? rest : rest.slice(0, next + 3);
 }
 
 /** Distinctive words in a commit subject, used to look for a matching bullet. */
@@ -141,9 +151,16 @@ export function isCovered(subject: string, body: string): boolean {
 function main(): void {
   const ref = lastTag();
   const commits = behaviouralCommits(ref);
-  const body = coveredBody().toLowerCase();
+  const body = coveredBody(ref).toLowerCase();
 
-  const uncovered = commits.filter(({ subject }) => !isCovered(subject, body));
+  // A squash-merged release rewrites history, so a shipped commit is often
+  // NOT an ancestor of the tag and lands in this range spuriously. Coverage in
+  // the released section itself is the reliable signal that it already
+  // shipped, so those are excluded before judging [Unreleased].
+  const releasedBody = ref ? releasedSectionBody(ref) : "";
+  const uncovered = commits.filter(
+    ({ subject }) => !isCovered(subject, body) && !isCovered(subject, releasedBody),
+  );
 
   if (JSON_OUT) {
     console.log(

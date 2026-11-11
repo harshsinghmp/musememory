@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-11-10
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.0...v3.4.1
+
 ### Added
 - **Append-only observation merge (R31)**: `mergeObservations` unions peer observation ledgers by `id` under the single-writer store lock, appends each record with fsync, never rewrites an existing observation, and rejects malformed records so the ledger cannot be corrupted. Re-merging a batch is a no-op, which makes retries safe. Memory-level conflicts remain `merge3`'s job; the append-only observation channel was the missing half of R31.
 
