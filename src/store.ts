@@ -614,6 +614,35 @@ function readEntry(store: Store, id: string): MemoryEntry | null {
       // Preserve the DB-owned values across the re-insert.
       try {
         const existing = getMemoryById(store.db!, id);
+        // Audit F3: the mirror is a SECONDARY copy, so it must not roll back
+        // newer authoritative data — but it must also never IGNORE a genuine
+        // external edit. Two signals, and the safe rule wins only when both
+        // agree the mirror is stale:
+        //
+        //  - payload timestamps differ            -> someone may have edited it
+        //  - file mtime is not newer than the row -> could be a stale write
+        //
+        // Treating "old mtime" alone as stale loses real edits under clock
+        // skew, rsync, or a restore from backup (verified: an external edit
+        // with a backdated mtime was silently discarded). So the mirror is
+        // accepted unless BOTH its payload timestamp and its file time are
+        // older than the row — a stale mirror from a failed rename satisfies
+        // both, while an external edit almost always changes one of them.
+        const dbUpdatedMs = Date.parse(existing?.updated_at ?? "");
+        const yamlUpdatedMs = Date.parse(fromYaml.updated_at ?? "");
+        const payloadIsOlder = Number.isFinite(dbUpdatedMs) && Number.isFinite(yamlUpdatedMs) && yamlUpdatedMs < dbUpdatedMs;
+        // Strictly older, not <=: an external edit written in the same
+        // millisecond as the row is indistinguishable from it by time alone,
+        // and a tie must favour the edit. Using <= failed in CI (coarse mtime
+        // resolution) while passing locally, which is how this was caught.
+        const fileIsOlder = fileMtime !== undefined && Number.isFinite(dbUpdatedMs) && fileMtime < dbUpdatedMs;
+        const mirrorIsStale = Boolean(existing) && payloadIsOlder && fileIsOlder;
+        if (mirrorIsStale) {
+          // DB is authoritative — keep it, and refresh the cache from the row
+          // rather than from the stale mirror.
+          if (store.cache) store.cache.setEntry(existing!, undefined, fileMtime);
+          return existing!;
+        }
         const merged: MemoryEntry = {
           ...fromYaml,
           access_count: existing?.access_count ?? fromYaml.access_count,
