@@ -1710,32 +1710,47 @@ export function queryContext(
     entries = entries.filter((e) => e.project === options.project);
   }
   let hidden_count = 0;
-  // When as_of is NOT provided, apply current active lifecycle filters
-  if (options.as_of === undefined) {
-    entries = entries.filter((e) => {
-      if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
-        hidden_count++;
-        return false;
-      }
-      // T-405: conflicted memories are known potential falsehoods — withheld
-      // from prompts by default (badgeless injection defect #313). A caller
-      // that explicitly asks for the conflicted status (audits, conflicts
-      // listings) still receives them — same guard as the archived gate.
-      if (!options.includeConflicted && options.status !== "conflicted" && e.status === "conflicted") {
-        hidden_count++;
-        return false;
-      }
-      if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
-        hidden_count++;
-        return false;
-      }
-      if (!options.includeExpired && isExpired(e, now)) {
-        hidden_count++;
-        return false;
-      }
-      return true;
-    });
-  }
+  // Audit F2: these gates apply ALWAYS, not only to current-state reads.
+  // They used to be nested under `as_of === undefined`, so setting as_of
+  // silently re-admitted conflicted, archived and TTL-expired memories into
+  // prompt-serving reads — known-contradictory pairs injected as if both were
+  // true. A retracted belief is not valid at any timestamp, and expiry is a
+  // wall-clock fact, not a hypothesis about the past.
+  entries = entries.filter((e) => {
+    if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
+      hidden_count++;
+      return false;
+    }
+    // T-405: conflicted memories are known potential falsehoods — withheld
+    // from prompts by default (badgeless injection defect #313). A caller
+    // that explicitly asks for the conflicted status (audits, conflicts
+    // listings) still receives them — same guard as the archived gate.
+    if (!options.includeConflicted && options.status !== "conflicted" && e.status === "conflicted") {
+      hidden_count++;
+      return false;
+    }
+    if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
+      hidden_count++;
+      return false;
+    }
+    // Expiry is a WALL-CLOCK fact for current reads, but a historical read must
+    // judge it at the queried instant: a memory that expired last month was
+    // perfectly valid three months ago, and hoisting this gate unchanged made
+    // every such history query return nothing (caught by the gauntlet critic).
+    const expiryReference = options.as_of !== undefined ? Date.parse(String(options.as_of)) : now;
+    if (!options.includeExpired && isExpired(e, Number.isFinite(expiryReference) ? expiryReference : now)) {
+      hidden_count++;
+      return false;
+    }
+    // Superseded entries are also excluded from as_of reads unless asked for:
+    // a superseded belief was replaced, so it is not the answer at any point
+    // after supersession, and its replacement carries the valid window.
+    if (options.as_of !== undefined && !options.includeSuperseded && e.status === "superseded") {
+      hidden_count++;
+      return false;
+    }
+    return true;
+  });
   if (options.type) {
     entries = entries.filter((e) => e.type === options.type);
   }

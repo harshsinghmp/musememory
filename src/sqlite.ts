@@ -376,6 +376,17 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
 
 export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): void {
   try {
+    // Audit F1: SQLite's OR REPLACE resolves a UNIQUE conflict by DELETING the
+    // conflicting row. With the unique index on idempotency_key, an unrelated
+    // write that reuses a key erased the row holding it — including a GDPR
+    // tombstone, which then vanished from the store entirely. Release the key
+    // from any other row first: the colliding row must never be deleted.
+    if (entry.idempotency_key) {
+      db.run(`UPDATE memories SET idempotency_key = NULL WHERE idempotency_key = ? AND id <> ?`, [
+        entry.idempotency_key,
+        entry.id,
+      ]);
+    }
     const sql = `
       INSERT OR REPLACE INTO memories (
         id, title, content, project, type, status, salience, reinforcement,

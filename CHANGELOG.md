@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Idempotency key could delete a tombstoned memory (audit F1)**: SQLite's `INSERT OR REPLACE` resolves a UNIQUE conflict by **deleting the conflicting row**. With the unique index on `idempotency_key`, an unrelated write reusing a key erased the row holding it — including a GDPR tombstone, which then vanished from the store entirely and defeated the "propose cannot resurrect a tombstone" guard. The colliding key is now released from other rows first.
+- **`as_of` disabled every lifecycle gate (audit F2)**: the superseded/conflicted/archived/expired filters were nested under `if (options.as_of === undefined)`, so any historical query re-admitted **known-contradictory pairs and TTL-expired facts** into prompt-serving reads — violating the T-405 invariant. The gates now always apply, with expiry judged at the queried instant so a memory that has since expired is still retrievable at a time it was valid.
+- **A stale YAML mirror reverted newer SQLite state on read (audit F3)**: `readEntry` wrote the mirror back unconditionally, so a failed rename or crash between the DB commit and the mirror write silently rolled authoritative data backwards — and the result depended on whether `get()` or `list()` ran first. The mirror is now rejected only when both its payload timestamp and its file time are older than the row, so a genuine external edit is never dropped under clock skew.
+- **Secret scanner missed passwords with punctuation (audit F8)**: the generic credential value class stopped at the first `!`, `$`, `+`, `/` or `@`, so passwords like a typical human-chosen one were not detected at all and were persisted in plaintext by the write gate. The value class now matches any non-whitespace run after an assignment; prose that merely mentions the word does not fire.
+
+### Fixed
 - **Showreel demo script called a command that does not exist (D8)**: `assets/showreel/demo-script.sh` invoked `memory brief`; the command is `memory briefing`. Under `set -e` the demo aborted with exit 2 partway through, so a recording take would fail and the cause was easy to miss. Verified the corrected script now runs end-to-end with exit 0 in a scratch directory, and the README records that `set -e` makes a pre-record smoke run mandatory.
 
 ### Fixed
