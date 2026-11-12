@@ -631,7 +631,11 @@ function readEntry(store: Store, id: string): MemoryEntry | null {
         const dbUpdatedMs = Date.parse(existing?.updated_at ?? "");
         const yamlUpdatedMs = Date.parse(fromYaml.updated_at ?? "");
         const payloadIsOlder = Number.isFinite(dbUpdatedMs) && Number.isFinite(yamlUpdatedMs) && yamlUpdatedMs < dbUpdatedMs;
-        const fileIsOlder = fileMtime !== undefined && Number.isFinite(dbUpdatedMs) && fileMtime <= dbUpdatedMs;
+        // Strictly older, not <=: an external edit written in the same
+        // millisecond as the row is indistinguishable from it by time alone,
+        // and a tie must favour the edit. Using <= failed in CI (coarse mtime
+        // resolution) while passing locally, which is how this was caught.
+        const fileIsOlder = fileMtime !== undefined && Number.isFinite(dbUpdatedMs) && fileMtime < dbUpdatedMs;
         const mirrorIsStale = Boolean(existing) && payloadIsOlder && fileIsOlder;
         if (mirrorIsStale) {
           // DB is authoritative — keep it, and refresh the cache from the row
