@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { isBehavioural, isCovered, tokens, coveredBody, behaviouralCommits } from "../scripts/check-changelog.ts";
+import { isBehavioural, isCovered, tokens, coveredBody, behaviouralCommits, duplicateHeadings } from "../scripts/check-changelog.ts";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -79,6 +79,18 @@ describe("changelog coverage gate: repository state", () => {
   test("the gate script exits zero on the current tree", () => {
     const proc = Bun.spawnSync(["bun", "scripts/check-changelog.ts"], { cwd: ROOT });
     expect(proc.exitCode).toBe(0);
+  });
+
+  test("no [Unreleased] section repeats a heading", () => {
+    // Three separate sessions appended their own "### Fixed" to [Unreleased]
+    // and the coverage check waved it through, so the published file was
+    // structurally invalid while the gate reported success.
+    //
+    // Judged through the gate's own exported check rather than re-implementing
+    // the rule here: a test that duplicates the logic can pass while the gate
+    // is broken. Released sections are deliberately out of scope — their
+    // duplicates are immutable history, not something to rewrite.
+    expect(duplicateHeadings()).toEqual([]);
   });
 
   test("the published changelog has no duplicate version sections", () => {

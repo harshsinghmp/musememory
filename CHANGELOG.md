@@ -12,13 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`as_of` disabled every lifecycle gate (audit F2)**: the superseded/conflicted/archived/expired filters were nested under `if (options.as_of === undefined)`, so any historical query re-admitted **known-contradictory pairs and TTL-expired facts** into prompt-serving reads — violating the T-405 invariant. The gates now always apply, with expiry judged at the queried instant so a memory that has since expired is still retrievable at a time it was valid.
 - **A stale YAML mirror reverted newer SQLite state on read (audit F3)**: `readEntry` wrote the mirror back unconditionally, so a failed rename or crash between the DB commit and the mirror write silently rolled authoritative data backwards — and the result depended on whether `get()` or `list()` ran first. The mirror is now rejected only when both its payload timestamp and its file time are older than the row, so a genuine external edit is never dropped under clock skew.
 - **Secret scanner missed passwords with punctuation (audit F8)**: the generic credential value class stopped at the first `!`, `$`, `+`, `/` or `@`, so passwords like a typical human-chosen one were not detected at all and were persisted in plaintext by the write gate. The value class now matches any non-whitespace run after an assignment; prose that merely mentions the word does not fire.
-
-### Fixed
 - **Showreel demo script called a command that does not exist (D8)**: `assets/showreel/demo-script.sh` invoked `memory brief`; the command is `memory briefing`. Under `set -e` the demo aborted with exit 2 partway through, so a recording take would fail and the cause was easy to miss. Verified the corrected script now runs end-to-end with exit 0 in a scratch directory, and the README records that `set -e` makes a pre-record smoke run mandatory.
-
-### Fixed
 - **Changelog gate range bounded by tag date**: a squash-merged release rewrites history, so commits it shipped are not ancestors of the tag and `ref..HEAD` re-flagged work already documented. The gate now judges only commits made after the tag's commit time, which is exactly what the next cycle owes regardless of how many staged sections sit above it.
-
 ## [3.4.1] - 2026-11-10
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.0...v3.4.1
