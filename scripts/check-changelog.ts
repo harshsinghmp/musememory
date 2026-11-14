@@ -66,6 +66,11 @@ function lastTag(): string {
 
 /** Subjects of behavioural commits since `ref`, newest last. */
 export function behaviouralCommits(ref: string): { sha: string; subject: string }[] {
+  // Date-bounded, not ancestry-bounded. A squash-merged release rewrites
+  // history, so a commit shipped in an earlier tag is usually NOT an ancestor
+  // of that tag and `ref..HEAD` wrongly includes it — which re-flagged four
+  // commits already documented under [3.4.0] after v3.4.1 was cut. Everything
+  // committed after the tag is what this release cycle actually owes.
   const range = ref ? `${ref}..HEAD` : "HEAD";
   let raw = "";
   try {
@@ -81,6 +86,25 @@ export function behaviouralCommits(ref: string): { sha: string; subject: string 
     if (!sha || !subject) continue;
     const type = subject.match(/^([a-z]+)(?:\([^)]*\))?!?:/)?.[1];
     if (type && BEHAVIOURAL_TYPES.has(type)) out.push({ sha, subject });
+  }
+  // A squash-merged tag is not an ancestor of the commits it shipped, so the
+  // range alone over-includes. Bound by the tag's commit timestamp instead.
+  if (out.length && ref) {
+    let tagTime = 0;
+    try {
+      tagTime = Number(git(["log", "-1", "--format=%ct", ref]));
+    } catch {
+      tagTime = 0;
+    }
+    if (tagTime > 0) {
+      return out.filter(({ sha }) => {
+        try {
+          return Number(git(["log", "-1", "--format=%ct", sha])) > tagTime;
+        } catch {
+          return true;
+        }
+      });
+    }
   }
   return out;
 }
@@ -125,6 +149,35 @@ export function releasedSectionBody(tag: string): string {
   return next === -1 ? rest : rest.slice(0, next + 3);
 }
 
+
+/**
+ * Structural check: each version section may have at most one of each `###`
+ * heading. Three separate sessions appended their own "### Fixed" to
+ * [Unreleased] and the coverage check waved them through, so the published
+ * file was invalid while the gate reported success. Coverage and structure are
+ * different guarantees; both must hold.
+ */
+export function duplicateHeadings(): string[] {
+  const text = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
+  const offenders: string[] = [];
+  for (const section of text.split(/^(?=## \[)/m)) {
+    const title = (section.split("\n")[0] ?? "").replace(/^## /, "").trim();
+    // Only [Unreleased] is judged. Released sections are immutable history: a
+    // duplicate there is a fact about a past release, and rewriting it would
+    // falsify the record. [3.0.0] has carried duplicate Added/Changed headings
+    // since it shipped, and correcting it is a separate decision — not
+    // something a gate should force on the way past.
+    if (!title.startsWith("[Unreleased")) continue;
+    const seen = new Set<string>();
+    for (const h of section.match(/^### .+$/gm) ?? []) {
+      const key = h.trim();
+      if (seen.has(key)) offenders.push(`${title} -> duplicate "${key}"`);
+      seen.add(key);
+    }
+  }
+  return offenders;
+}
+
 /** Distinctive words in a commit subject, used to look for a matching bullet. */
 export function tokens(subject: string): string[] {
   return subject
@@ -157,32 +210,44 @@ function main(): void {
   // NOT an ancestor of the tag and lands in this range spuriously. Coverage in
   // the released section itself is the reliable signal that it already
   // shipped, so those are excluded before judging [Unreleased].
-  const releasedBody = ref ? releasedSectionBody(ref) : "";
-  const uncovered = commits.filter(
-    ({ subject }) => !isCovered(subject, body) && !isCovered(subject, releasedBody),
-  );
+  const structural = duplicateHeadings();
+  const uncovered = commits.filter(({ subject }) => !isCovered(subject, body));
 
   if (JSON_OUT) {
     console.log(
       JSON.stringify(
-        { since: ref || "(no tag)", behavioural: commits.length, uncovered: uncovered.map((c) => ({ sha: c.sha, subject: c.subject })) },
+        {
+          since: ref || "(no tag)",
+          behavioural: commits.length,
+          uncovered: uncovered.map((c) => ({ sha: c.sha, subject: c.subject })),
+          structural,
+        },
         null,
         2,
       ),
     );
-    process.exit(uncovered.length === 0 ? 0 : 1);
+    process.exit(uncovered.length === 0 && structural.length === 0 ? 0 : 1);
   }
 
-  if (uncovered.length === 0) {
+  if (uncovered.length === 0 && structural.length === 0) {
     if (!QUIET) {
       console.log(`✅ Changelog covers all ${commits.length} behavioural commit(s) since ${ref || "the start"}.`);
     }
     process.exit(0);
   }
 
-  console.error(`❌ ${uncovered.length} behavioural commit(s) since ${ref || "the start"} have no [Unreleased] entry:`);
+  if (structural.length > 0) {
+    console.error(`❌ ${structural.length} duplicated heading(s) — a version section may have one of each ### heading:`);
+    for (const o of structural) console.error(`   ${o}`);
+    console.error(`
+Merge the repeated bullets into the section's single heading. Keep-a-Changelog
+sections are Added / Changed / Deprecated / Removed / Fixed / Security.
+`);
+  }
+
+  if (uncovered.length > 0) console.error(`❌ ${uncovered.length} behavioural commit(s) since ${ref || "the start"} have no [Unreleased] entry:`);
   for (const c of uncovered) console.error(`   ${c.sha}  ${c.subject}`);
-  console.error(`
+  if (uncovered.length > 0) console.error(`
 Add a bullet for each under "## [Unreleased]" in CHANGELOG.md, describing what
 a user gets. Group under ### Added / ### Changed / ### Fixed.
 `);

@@ -376,6 +376,37 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
 
 export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): void {
   try {
+    // Audit F1: SQLite's OR REPLACE resolves a UNIQUE conflict by DELETING the
+    // conflicting row. With the unique index on idempotency_key, an unrelated
+    // write that reuses a key erased the row holding it — including a GDPR
+    // tombstone, which then vanished from the store entirely. Release the key
+    // from any other row first: the colliding row must never be deleted.
+    if (entry.idempotency_key) {
+      db.run(`UPDATE memories SET idempotency_key = NULL WHERE idempotency_key = ? AND id <> ?`, [
+        entry.idempotency_key,
+        entry.id,
+      ]);
+    }
+
+    // Audit F4: `deleted_at` is a COLUMN, not a field of MemoryEntry, so any
+    // caller that reads a row and writes it back (readEntry's mirror merge is
+    // the live one) silently clears the tombstone — a GDPR-erased memory
+    // reappears. MemoryEntry cannot carry the marker, so the write path is the
+    // only place that can enforce it: an existing tombstone is terminal unless
+    // the caller explicitly restores.
+    try {
+      const tombstone = db
+        .query("SELECT deleted_at FROM memories WHERE id = ?")
+        .get([entry.id]) as { deleted_at?: string | null } | null;
+      if (tombstone?.deleted_at) {
+        const restore = (entry as { restore_tombstone?: boolean }).restore_tombstone === true;
+        if (!restore) return;
+      }
+    } catch {
+      // A read that cannot answer (closed or degraded handle) must not block a
+      // legitimate write. The tombstone guard is fail-SAFE, not fail-closed:
+      // the primary insert below still runs and reports its own error.
+    }
     const sql = `
       INSERT OR REPLACE INTO memories (
         id, title, content, project, type, status, salience, reinforcement,

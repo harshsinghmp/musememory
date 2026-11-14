@@ -100,6 +100,7 @@ All releases and git tags must follow strict `vX.Y.Z` semantic versioning:
 - Any version bump regenerates derived artifacts **in the same commit**: `claims.json` embeds the package version, so a bump without `bun run claims:generate` fails CI's `claims:check` (caught live on the v3.1.0 cut).
 - Stage on `release/vX.Y.Z` from `dev` → merge to `main` → back-merge to `dev`.
 - CI publishes on `v*` tag push (`git tag -a vX.Y.Z -m "release: vX.Y.Z"`). Never publish manually.
+- **Admin bypass on `main` is authorised.** The `main` ruleset requires review, and GitHub refuses self-approval — so when the principal is the only reviewer, `gh pr merge --admin` is the sanctioned path, not a violation. This is the principal acting as themselves, not an agent circumventing review. Do not treat the `BLOCKED` state as a reason to abandon a release; do state plainly in the report that the bypass was used.
 - **README "What's New" Rule**:
   - Keep only the current release/feature highlights in `README.md` under `## 🚀 What's New`.
   - Do NOT accumulate historical version blocks (`### vX.Y.Z`).

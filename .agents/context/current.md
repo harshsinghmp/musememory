@@ -1,7 +1,43 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.4.1` (post-release `dev`)  
+> **Version**: `v3.4.2` (post-release `dev`)  
 > **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
+
+---
+
+## 🧾 Session — v3.4.1 Release & Changelog Gate (2026-11-10)
+
+**v3.4.1 shipped.** Tag, merge `a83d9d1`, npm live with `latest` pointing at
+it, GitHub release published; `dev` and `main` content-identical. Patch
+bump: six user-visible changes, no new MCP tool or CLI command (still 126).
+
+**Changelog coverage gate landed.** The changelog had failed twice in two
+sessions — v3.3.0 went to npm with no section at all, then this session's
+work merged under an empty `[Unreleased]`. Both were caught by a human
+reading the file. CI now fails when a `feat:`/`fix:`/`perf:` commit has no
+entry, which is the same treatment `claims.json`, the MCP matrix, doc links
+and the showreel hash already had.
+
+**Three defects found in the gate while cutting the release**, each caught
+by running it rather than trusting it:
+1. The gate's own tests created git branches and committed, which fails in
+   CI (detached checkout, no author identity). Rewritten against exported
+   pure classifiers — no worktree mutation.
+2. The tests hardcoded `v3.4.0` and broke the moment a new version was
+   staged. Now derived from `git describe`.
+3. The gate re-flagged four commits already shipped in v3.4.0, because a
+   squash merge means a shipped commit is not an ancestor of the tag. Fixed
+   by excluding commits already documented in the released section, and
+   re-verified that a genuinely undocumented commit still fails.
+
+**R31 concurrent-write detection.** `ingestKnowledge` compared `updated_at`
+alone, so a concurrent edit vanished silently. Now detected via the peer's
+last-sync time, both versions preserved under a deterministic conflict id,
+and a contradiction recorded. My first attempt flagged the conflict and then
+overwrote the local entry anyway — the test caught it.
+
+Gate: `bun test` 1612/1612 pass across 255 files; `bunx tsc --noEmit`
+clean; `check:landed` → **LANDED**.
 
 ---
 

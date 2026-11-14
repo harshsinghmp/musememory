@@ -614,6 +614,35 @@ function readEntry(store: Store, id: string): MemoryEntry | null {
       // Preserve the DB-owned values across the re-insert.
       try {
         const existing = getMemoryById(store.db!, id);
+        // Audit F3: the mirror is a SECONDARY copy, so it must not roll back
+        // newer authoritative data — but it must also never IGNORE a genuine
+        // external edit. Two signals, and the safe rule wins only when both
+        // agree the mirror is stale:
+        //
+        //  - payload timestamps differ            -> someone may have edited it
+        //  - file mtime is not newer than the row -> could be a stale write
+        //
+        // Treating "old mtime" alone as stale loses real edits under clock
+        // skew, rsync, or a restore from backup (verified: an external edit
+        // with a backdated mtime was silently discarded). So the mirror is
+        // accepted unless BOTH its payload timestamp and its file time are
+        // older than the row — a stale mirror from a failed rename satisfies
+        // both, while an external edit almost always changes one of them.
+        const dbUpdatedMs = Date.parse(existing?.updated_at ?? "");
+        const yamlUpdatedMs = Date.parse(fromYaml.updated_at ?? "");
+        const payloadIsOlder = Number.isFinite(dbUpdatedMs) && Number.isFinite(yamlUpdatedMs) && yamlUpdatedMs < dbUpdatedMs;
+        // Strictly older, not <=: an external edit written in the same
+        // millisecond as the row is indistinguishable from it by time alone,
+        // and a tie must favour the edit. Using <= failed in CI (coarse mtime
+        // resolution) while passing locally, which is how this was caught.
+        const fileIsOlder = fileMtime !== undefined && Number.isFinite(dbUpdatedMs) && fileMtime < dbUpdatedMs;
+        const mirrorIsStale = Boolean(existing) && payloadIsOlder && fileIsOlder;
+        if (mirrorIsStale) {
+          // DB is authoritative — keep it, and refresh the cache from the row
+          // rather than from the stale mirror.
+          if (store.cache) store.cache.setEntry(existing!, undefined, fileMtime);
+          return existing!;
+        }
         const merged: MemoryEntry = {
           ...fromYaml,
           access_count: existing?.access_count ?? fromYaml.access_count,
@@ -678,27 +707,55 @@ export function list(
     entries = listMemories(store.db, filters);
     // Check if new external YAML files were dropped on disk that are not yet in SQLite
     if (existsSync(store.dir)) {
-      const dbIds = new Set(entries.map((e) => e.id));
+      // Audit F4/F5: reconciliation used to derive the id from the filename and
+      // then read via get(). Two defects fell out of that:
+      //
+      //  F4 — files are stored as slugifyId(id) + ".yaml", so for any id that
+      //  is not slug-clean the filename is NOT the id. `dbIds.has(diskId)` was
+      //  false for a row that already existed, get() passed the tombstone gate
+      //  (it looked up the wrong id), and readEntry wrote the row back WITHOUT
+      //  deleted_at — resurrecting an erased memory and duplicating the entry.
+      //
+      //  F5 — get() calls recordAccess(), so every non-matching entry was
+      //  treated as external and counted. A read-only list() therefore issued
+      //  O(N) writes and inflated access_count, which feeds ranking.
+      //
+      // Fix: build the known-id set from the unfiltered table (authoritative,
+      // tombstone-aware) and reconcile with a non-counting read.
+      const allIds = new Set<string>(
+        (store.db.query("SELECT id FROM memories").all() as { id: string }[]).map((r) => r.id),
+      );
       const diskFiles = readdirSync(store.dir);
-      // T-025: reconcile the whole batch as one commit instead of three per file.
       withTransaction(store.db, () => {
         for (const f of diskFiles) {
-          if (f.endsWith(".yaml")) {
-            const diskId = f.slice(0, -5);
-            if (!dbIds.has(diskId)) {
-              const externalEntry = get(store, diskId);
-              if (externalEntry) {
-                try {
-                  insertOrReplaceMemory(store.db!, externalEntry);
-                } catch {}
-                let matches = true;
-                if (filters?.project && externalEntry.project !== filters.project) matches = false;
-                if (filters?.type && externalEntry.type !== filters.type) matches = false;
-                if (filters?.status && externalEntry.status !== filters.status) matches = false;
-                if (matches) entries.push(externalEntry);
-              }
-            }
+          if (!f.endsWith(".yaml")) continue;
+          // Resolve the entry, then trust ITS id — never the filename.
+          // readEntry is the non-counting read: it parses the mirror and
+          // returns the entry as stored, including deleted_at.
+          const fileId = f.slice(0, -5);
+          if (allIds.has(fileId)) continue;
+          const externalEntry = readEntry(store, fileId);
+          if (!externalEntry) continue;
+          const resolvedId = externalEntry.id;
+          if (!resolvedId || allIds.has(resolvedId)) continue;
+          // Never resurrect a tombstoned entry. `deleted_at` is a COLUMN, not
+          // part of MemoryEntry, so it is invisible on the parsed object and
+          // insertOrReplaceMemory would clear it. Consult the column.
+          const tombstone = store.db!
+            .query("SELECT deleted_at FROM memories WHERE id = ?")
+            .get([resolvedId]) as { deleted_at?: string | null } | null;
+          if (tombstone?.deleted_at) continue;
+          try {
+            insertOrReplaceMemory(store.db!, externalEntry);
+          } catch {
+            continue;
           }
+          allIds.add(resolvedId);
+          let matches = true;
+          if (filters?.project && externalEntry.project !== filters.project) matches = false;
+          if (filters?.type && externalEntry.type !== filters.type) matches = false;
+          if (filters?.status && externalEntry.status !== filters.status) matches = false;
+          if (matches) entries.push(externalEntry);
         }
       });
     }

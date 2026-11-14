@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-11-14
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.1...v3.4.2
+
+### Fixed
+- **`list()` resurrected erased memories and corrupted ranking (issues #406, #407)**: reconciliation derived the memory id from the YAML filename, but files are stored as a slug of the id — so for any id that is not already slug-clean the two differ. The row looked "new", the tombstone gate was bypassed, and the entry was written back without `deleted_at`, bringing a GDPR-erased memory back and duplicating it in every `list()`. The same loop also read through `get()`, which increments `access_count`: a single filtered `list()` issued 118 writes and inflated the counter on entries that were never retrieved, steering the ranking. Reconciliation now uses the unfiltered id set and a non-counting read, and the write path refuses to clear an existing tombstone.
+- **Idempotency key could delete a tombstoned memory (audit F1)**: SQLite's `INSERT OR REPLACE` resolves a UNIQUE conflict by **deleting the conflicting row**. With the unique index on `idempotency_key`, an unrelated write reusing a key erased the row holding it — including a GDPR tombstone, which then vanished from the store entirely and defeated the "propose cannot resurrect a tombstone" guard. The colliding key is now released from other rows first.
+- **`as_of` disabled every lifecycle gate (audit F2)**: the superseded/conflicted/archived/expired filters were nested under `if (options.as_of === undefined)`, so any historical query re-admitted **known-contradictory pairs and TTL-expired facts** into prompt-serving reads — violating the T-405 invariant. The gates now always apply, with expiry judged at the queried instant so a memory that has since expired is still retrievable at a time it was valid.
+- **A stale YAML mirror reverted newer SQLite state on read (audit F3)**: `readEntry` wrote the mirror back unconditionally, so a failed rename or crash between the DB commit and the mirror write silently rolled authoritative data backwards — and the result depended on whether `get()` or `list()` ran first. The mirror is now rejected only when both its payload timestamp and its file time are older than the row, so a genuine external edit is never dropped under clock skew.
+- **Secret scanner missed passwords with punctuation (audit F8)**: the generic credential value class stopped at the first `!`, `$`, `+`, `/` or `@`, so passwords like a typical human-chosen one were not detected at all and were persisted in plaintext by the write gate. The value class now matches any non-whitespace run after an assignment; prose that merely mentions the word does not fire.
+- **Showreel demo script called a command that does not exist (D8)**: `assets/showreel/demo-script.sh` invoked `memory brief`; the command is `memory briefing`. Under `set -e` the demo aborted with exit 2 partway through, so a recording take would fail and the cause was easy to miss. Verified the corrected script now runs end-to-end with exit 0 in a scratch directory, and the README records that `set -e` makes a pre-record smoke run mandatory.
+- **Changelog gate range bounded by tag date**: a squash-merged release rewrites history, so commits it shipped are not ancestors of the tag and `ref..HEAD` re-flagged work already documented. The gate now judges only commits made after the tag's commit time, which is exactly what the next cycle owes regardless of how many staged sections sit above it.
 ## [3.4.1] - 2026-11-10
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.0...v3.4.1

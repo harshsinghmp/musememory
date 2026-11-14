@@ -39,7 +39,15 @@ export const SECRET_RULES: { name: string; pattern: RegExp }[] = [
   },
   {
     name: "Generic Credential Assignment",
-    pattern: /(?:password|passwd|secret_key|api_key|apikey|auth_token|bearer_token)\s*[:=]\s*['"]?[a-zA-Z0-9_\-\.]{8,}['"]?/i,
+    // Audit F8: the value class used to be [a-zA-Z0-9_\-\.]{8,}, which stopped
+    // at the first !, $, +, /, or @ — so a password containing punctuation was
+    // not detected at all and was persisted in plaintext by the write gate.
+    // Real passwords contain punctuation; match anything that is not
+    // whitespace or a closing quote, and let the caller redact. The assignment
+    // form is still required, so prose that merely mentions the word does not
+    // fire. This comment deliberately avoids spelling out a matching literal:
+    // the scanner reads this file too.
+    pattern: /(?:password|passwd|secret_key|api_key|apikey|auth_token|bearer_token|private_key)\s*[:=]\s*['"]?[^\s'"]{8,}/i,
   },
 ];
 
