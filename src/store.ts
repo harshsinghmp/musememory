@@ -2209,6 +2209,10 @@ export function searchMemories(
   const filtered = hits.filter((h) => !tombstones.has(h.entry.id)) as FtsSearchHits;
   filtered.degraded = hits.degraded;
   filtered.error = hits.error;
+  // Issue #410: filter() returns a bare array, so every property hung off the FTS
+  // result has to be re-attached by hand. `hidden_count` was dropped, which made a
+  // tombstone-filtered page look like it had hidden nothing.
+  filtered.hidden_count = hits.hidden_count;
   return filtered;
 }
 
