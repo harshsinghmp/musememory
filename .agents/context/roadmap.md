@@ -163,7 +163,7 @@
 
 ---
 
-## 📊 Current Status (as of v3.4.1)
+## 📊 Current Status (as of v3.4.2)
 
 | Area | Status | Next Milestone |
 |---|---|---|

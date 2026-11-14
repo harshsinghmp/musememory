@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-11-14
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.1...v3.4.2
+
 ### Fixed
 - **`list()` resurrected erased memories and corrupted ranking (issues #406, #407)**: reconciliation derived the memory id from the YAML filename, but files are stored as a slug of the id — so for any id that is not already slug-clean the two differ. The row looked "new", the tombstone gate was bypassed, and the entry was written back without `deleted_at`, bringing a GDPR-erased memory back and duplicating it in every `list()`. The same loop also read through `get()`, which increments `access_count`: a single filtered `list()` issued 118 writes and inflated the counter on entries that were never retrieved, steering the ranking. Reconciliation now uses the unfiltered id set and a non-counting read, and the write path refuses to clear an existing tombstone.
 - **Idempotency key could delete a tombstoned memory (audit F1)**: SQLite's `INSERT OR REPLACE` resolves a UNIQUE conflict by **deleting the conflicting row**. With the unique index on `idempotency_key`, an unrelated write reusing a key erased the row holding it — including a GDPR tombstone, which then vanished from the store entirely and defeated the "propose cannot resurrect a tombstone" guard. The colliding key is now released from other rows first.
