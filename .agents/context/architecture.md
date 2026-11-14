@@ -83,7 +83,7 @@ musememory/
 │   ├── user.ts             # Persona & working preference engine
 │   ├── agents/             # Workstation coding agents detection & registry (52 platforms)
 │   └── migrator/           # Multi-provider auto-detection & migration engine (30 providers)
-├── test/                   # Automated Bun test suites (1620 tests across 256 suites)
+├── test/                   # Automated Bun test suites (1624 tests across 257 suites)
 ├── package.json            # Package metadata & dependencies (v3.4.2)
 └── dist/                   # Compiled Node/Bun bundle
 ```
