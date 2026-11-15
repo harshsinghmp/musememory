@@ -375,130 +375,95 @@ export function rowToMemoryEntry(row: DbMemoryRow): MemoryEntry {
 }
 
 export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): void {
-  try {
-    // Audit F1: SQLite's OR REPLACE resolves a UNIQUE conflict by DELETING the
-    // conflicting row. With the unique index on idempotency_key, an unrelated
-    // write that reuses a key erased the row holding it — including a GDPR
-    // tombstone, which then vanished from the store entirely. Release the key
-    // from any other row first: the colliding row must never be deleted.
-    if (entry.idempotency_key) {
-      db.run(`UPDATE memories SET idempotency_key = NULL WHERE idempotency_key = ? AND id <> ?`, [
-        entry.idempotency_key,
-        entry.id,
-      ]);
-    }
-
-    // Audit F4: `deleted_at` is a COLUMN, not a field of MemoryEntry, so any
-    // caller that reads a row and writes it back (readEntry's mirror merge is
-    // the live one) silently clears the tombstone — a GDPR-erased memory
-    // reappears. MemoryEntry cannot carry the marker, so the write path is the
-    // only place that can enforce it: an existing tombstone is terminal unless
-    // the caller explicitly restores.
-    try {
-      const tombstone = db
-        .query("SELECT deleted_at FROM memories WHERE id = ?")
-        .get([entry.id]) as { deleted_at?: string | null } | null;
-      if (tombstone?.deleted_at) {
-        const restore = (entry as { restore_tombstone?: boolean }).restore_tombstone === true;
-        if (!restore) return;
-      }
-    } catch {
-      // A read that cannot answer (closed or degraded handle) must not block a
-      // legitimate write. The tombstone guard is fail-SAFE, not fail-closed:
-      // the primary insert below still runs and reports its own error.
-    }
-    const sql = `
-      INSERT OR REPLACE INTO memories (
-        id, title, content, project, type, status, salience, reinforcement,
-        session_id, due_at, expires_at, valid_from, valid_to, valid_to_exact, src_ts, linked_memory_ids,
-        supersedes_id, conflicts_with_id,
-        mem_path, last_accessed_at, access_count, decay_score, idempotency_key, content_hash, data,
-        created_at, updated_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?,
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?
-      )
-    `;
-
-    const supersedesId =
-      entry.supersedes_id ??
-      (typeof entry.supersedes === "string" ? entry.supersedes : Array.isArray(entry.supersedes) ? (entry.supersedes[0] ?? null) : null);
-    const conflictsWithId =
-      entry.conflicts_with_id ??
-      (Array.isArray(entry.conflict_ids) ? (entry.conflict_ids[0] ?? null) : null);
-
-    db.run(sql, [
+  // Audit F1: SQLite's OR REPLACE resolves a UNIQUE conflict by DELETING the
+  // conflicting row. With the unique index on idempotency_key, an unrelated
+  // write that reuses a key erased the row holding it — including a GDPR
+  // tombstone, which then vanished from the store entirely. Release the key
+  // from any other row first: the colliding row must never be deleted.
+  if (entry.idempotency_key) {
+    db.run(`UPDATE memories SET idempotency_key = NULL WHERE idempotency_key = ? AND id <> ?`, [
+      entry.idempotency_key,
       entry.id,
-      entry.title,
-      entry.content,
-      entry.project,
-      entry.type || "discovery",
-      entry.status,
-      typeof entry.salience === "number" ? entry.salience : null,
-      typeof entry.reinforcement === "number" ? entry.reinforcement : null,
-      entry.session_id ?? null,
-      entry.due_at ?? null,
-      entry.expires_at ?? null,
-      entry.valid_from ?? null,
-      entry.valid_to ?? null,
-      entry.valid_to_exact ? 1 : 0,
-      entry.src_ts ?? null,
-      entry.linked_memory_ids ? JSON.stringify(entry.linked_memory_ids) : null,
-      supersedesId,
-      conflictsWithId,
-      entry.mem_path ?? null,
-      entry.last_accessed_at ?? null,
-      typeof entry.access_count === "number" ? entry.access_count : null,
-      typeof entry.decay_score === "number" ? entry.decay_score : 1.0,
-      entry.idempotency_key ?? null,
-      entry.content_hash ?? null,
-      JSON.stringify(entry),
-      entry.created_at,
-      entry.updated_at,
     ]);
-  } catch (err: any) {
-    if (err && String(err.message || err).includes("no column named")) {
-      const legacySql = `
-        INSERT OR REPLACE INTO memories (
-          id, title, content, project, type, status, salience, reinforcement,
-          session_id, due_at, expires_at, valid_from, valid_to,
-          mem_path, last_accessed_at, access_count, data,
-          created_at, updated_at
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
-          ?, ?
-        )
-      `;
-      db.run(legacySql, [
-        entry.id,
-        entry.title,
-        entry.content,
-        entry.project,
-        entry.type || "discovery",
-        entry.status,
-        typeof entry.salience === "number" ? entry.salience : null,
-        typeof entry.reinforcement === "number" ? entry.reinforcement : null,
-        entry.session_id ?? null,
-        entry.due_at ?? null,
-        entry.expires_at ?? null,
-        entry.valid_from ?? null,
-        entry.valid_to ?? null,
-        entry.mem_path ?? null,
-        entry.last_accessed_at ?? null,
-        typeof entry.access_count === "number" ? entry.access_count : null,
-        JSON.stringify(entry),
-        entry.created_at,
-        entry.updated_at,
-      ]);
-    } else {
-      throw err;
-    }
   }
+
+  // Audit F4: `deleted_at` is a COLUMN, not a field of MemoryEntry, so any
+  // caller that reads a row and writes it back (readEntry's mirror merge is
+  // the live one) silently clears the tombstone — a GDPR-erased memory
+  // reappears. MemoryEntry cannot carry the marker, so the write path is the
+  // only place that can enforce it: an existing tombstone is terminal unless
+  // the caller explicitly restores.
+  try {
+    const tombstone = db
+      .query("SELECT deleted_at FROM memories WHERE id = ?")
+      .get([entry.id]) as { deleted_at?: string | null } | null;
+    if (tombstone?.deleted_at) {
+      const restore = (entry as { restore_tombstone?: boolean }).restore_tombstone === true;
+      if (!restore) return;
+    }
+  } catch {
+    // A read that cannot answer (closed or degraded handle) must not block a
+    // legitimate write. The tombstone guard is fail-SAFE, not fail-closed:
+    // the primary insert below still runs and reports its own error.
+  }
+
+  // Issue #410: a `no column named` catch here retried with a "legacy" INSERT that
+  // still listed mem_path / last_accessed_at / access_count — the exact columns absent
+  // on the databases the fallback existed for — so it could never succeed and only
+  // masked the real SQLite error. openStore() migrates before any write, so no
+  // supported shape needs it: let the original error propagate.
+  const sql = `
+    INSERT OR REPLACE INTO memories (
+      id, title, content, project, type, status, salience, reinforcement,
+      session_id, due_at, expires_at, valid_from, valid_to, valid_to_exact, src_ts, linked_memory_ids,
+      supersedes_id, conflicts_with_id,
+      mem_path, last_accessed_at, access_count, decay_score, idempotency_key, content_hash, data,
+      created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?,
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?
+    )
+  `;
+
+  const supersedesId =
+    entry.supersedes_id ??
+    (typeof entry.supersedes === "string" ? entry.supersedes : Array.isArray(entry.supersedes) ? (entry.supersedes[0] ?? null) : null);
+  const conflictsWithId =
+    entry.conflicts_with_id ??
+    (Array.isArray(entry.conflict_ids) ? (entry.conflict_ids[0] ?? null) : null);
+
+  db.run(sql, [
+    entry.id,
+    entry.title,
+    entry.content,
+    entry.project,
+    entry.type || "discovery",
+    entry.status,
+    typeof entry.salience === "number" ? entry.salience : null,
+    typeof entry.reinforcement === "number" ? entry.reinforcement : null,
+    entry.session_id ?? null,
+    entry.due_at ?? null,
+    entry.expires_at ?? null,
+    entry.valid_from ?? null,
+    entry.valid_to ?? null,
+    entry.valid_to_exact ? 1 : 0,
+    entry.src_ts ?? null,
+    entry.linked_memory_ids ? JSON.stringify(entry.linked_memory_ids) : null,
+    supersedesId,
+    conflictsWithId,
+    entry.mem_path ?? null,
+    entry.last_accessed_at ?? null,
+    typeof entry.access_count === "number" ? entry.access_count : null,
+    typeof entry.decay_score === "number" ? entry.decay_score : 1.0,
+    entry.idempotency_key ?? null,
+    entry.content_hash ?? null,
+    JSON.stringify(entry),
+    entry.created_at,
+    entry.updated_at,
+  ]);
 
   // Synchronize FTS5 virtual table with index-time credential redaction (T-103)
   try {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openStore, propose, confirm, type Store } from "../src/store.ts";
+import { openStore, propose, confirm, get, deleteEntry, type Store } from "../src/store.ts";
 import {
   queryContext,
   formatPromptContext,
@@ -391,6 +391,77 @@ describe("T-098: progressive wikilink expansion after fusion", () => {
       expect(res.expanded_count).toBe(1);
       expect(res.expanded_wikilinks).toBeDefined();
       expect(res.expanded_wikilinks![0].target).toBe(linked.id);
+    });
+  });
+
+  describe("issue #408: tombstone gate on wikilink expansion", () => {
+    it("does not expand a tombstoned (GDPR-erased) target", () => {
+      const erased = confirm(
+        store,
+        propose(store, {
+          title: "Erased Retention Policy",
+          content: "Customer personal data retention window is 30 days.",
+          project: "test-proj",
+          type: "constraint",
+        }).id,
+      )!;
+
+      confirm(
+        store,
+        propose(store, {
+          title: "Retention Sweep Runbook",
+          content: `The sweep job enforces [[${erased.id}]].`,
+          project: "test-proj",
+          type: "decision",
+        }).id,
+      );
+
+      expect(deleteEntry(store, erased.id, "gdpr erasure")).toBe(true);
+      expect(get(store, erased.id)).toBeNull();
+
+      const res = queryContext(store, "Retention Sweep Runbook", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+
+      const expandedTargets = res.expanded_wikilinks?.map((w) => w.target) ?? [];
+      const expandedIds = res.expanded_wikilinks?.map((w) => w.entry?.id) ?? [];
+      expect(expandedTargets).not.toContain(erased.id);
+      expect(expandedIds).not.toContain(erased.id);
+    });
+
+    it("still expands a live target resolved by title through the row mapper", () => {
+      confirm(
+        store,
+        propose(store, {
+          title: "Deploy Freeze Window",
+          content: "No deploys between Friday 16:00 and Monday 09:00.",
+          project: "test-proj",
+          type: "constraint",
+        }).id,
+      );
+
+      confirm(
+        store,
+        propose(store, {
+          title: "Release Checklist Entry",
+          content: "Check the [[Deploy Freeze Window]] before tagging a release.",
+          project: "test-proj",
+          type: "decision",
+        }).id,
+      );
+
+      const res = queryContext(store, "Release Checklist Entry", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+
+      const expanded = res.expanded_wikilinks?.find((w) => w.target === "Deploy Freeze Window");
+      expect(expanded).toBeDefined();
+      expect(expanded!.entry?.title).toBe("Deploy Freeze Window");
+      expect(expanded!.entry?.content).toContain("No deploys between Friday");
     });
   });
 });

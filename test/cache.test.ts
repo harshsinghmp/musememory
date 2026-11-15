@@ -155,6 +155,32 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
       expect(secondLookup?.title).toBe("Original Title");
     });
 
+    it("returns copies from getQuery so callers cannot poison the cached result", () => {
+      const cache = new MemoryStoreCache();
+      const entry: MemoryEntry = {
+        id: "m_query",
+        title: "Query Entry",
+        content: "cached body",
+        project: "test",
+        status: "candidate",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      cache.setQuery("sig", [entry]);
+
+      const first = cache.getQuery("sig");
+      expect(first?.length).toBe(1);
+      // A caller mutating a returned entry in place must not reach the cache.
+      first![0].status = "confirmed";
+      first![0].title = "Mutated Title";
+
+      const second = cache.getQuery("sig");
+      expect(second?.[0].status).toBe("candidate");
+      expect(second?.[0].title).toBe("Query Entry");
+      expect(cache.getQuery("sig")).not.toBe(first);
+    });
+
     it("invalidates query and context caches when entries mutate", () => {
       const cache = new MemoryStoreCache();
       cache.setQuery("query_1", []);
@@ -367,6 +393,40 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
 
       // In-bounds queries still search.
       expect(searchMemories(store, "bounded marker").length).toBe(1);
+    });
+
+    it("carries hidden_count onto the tombstone-filtered result", () => {
+      const store = openStore(memoryDir);
+      const live = propose(store, {
+        title: "Release Gate Visible",
+        content: "release gate visible marker",
+        project: "audit",
+        confirmed: true,
+      });
+      const rejected = propose(store, {
+        title: "Release Gate Rejected",
+        content: "release gate rejected marker",
+        project: "audit",
+        confirmed: true,
+      });
+      const erased = propose(store, {
+        title: "Release Gate Erased",
+        content: "release gate erased marker",
+        project: "audit",
+        confirmed: true,
+      });
+
+      // One hidden (rejected) hit for the FTS counter, one tombstone so the
+      // tombstone-filtered branch of searchMemories() actually runs.
+      save(store, { ...rejected, status: "rejected" });
+      expect(deleteEntry(store, erased.id)).toBe(true);
+
+      const raw = searchMemoriesFts(store.db!, "release gate");
+      expect(raw.hidden_count).toBe(1);
+
+      const filtered = searchMemories(store, "release gate");
+      expect(filtered.map((h) => h.entry.id)).toEqual([live.id]);
+      expect(filtered.hidden_count).toBe(raw.hidden_count);
     });
   });
 

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Wikilink expansion bypassed the tombstone gate (issue #408)**: the `expandFusedWikilinks` fallback resolved a target with `SELECT data FROM memories WHERE id = ? OR title = ?` — no `deleted_at` predicate and no row mapper — so a GDPR-erased memory was lifted straight out of its `data` blob and emitted into prompt context. It now selects the full row, filters `(deleted_at IS NULL OR deleted_at = '')` and maps through `rowToMemoryEntry` like every other read path, keeping the defensive `try/catch` so a bad row cannot break expansion. Verified by a test that erases a memory with `deleteEntry(...)` and asserts `queryContext(..., { expand_wikilinks: true })` never surfaces it; it fails on the unfixed fallback.
+- **`getQuery` handed out the cache's own array (issue #409)**: unlike `getEntry`, it returned `item.value` by reference, so a caller mutating one entry in place poisoned every later cached `list()` with state that was never persisted. It now returns shallow copies of each entry, matching `getEntry`'s contract. Verified by a test that mutates a returned entry's `status` and asserts the next read still shows the stored value.
+- **Two audit nitpicks in the read-path and write-path code (issue #410)**: `searchMemories()` copied `degraded` and `error` onto its tombstone-filtered hits but dropped `hidden_count`, so a filtered page claimed nothing had been hidden; the count is now carried through. `insertOrReplaceMemory`'s `no column named` catch retried with a "legacy" INSERT that still listed `mem_path`, `last_accessed_at` and `access_count` — the exact columns absent on the databases the fallback existed for — so it could never succeed and only masked the real error; the fallback is deleted and the original error propagates. Verified by tests asserting the filtered `hidden_count` matches `searchMemoriesFts` and that a deliberately broken table shape surfaces the real missing-column error.
+
 ## [3.4.2] - 2026-11-14
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.1...v3.4.2

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { tokenize, splitCompoundToken } from "../src/retrieval.ts";
 import { escapeFtsToken, buildSafeFtsQuery, searchMemoriesFts, openDatabase, insertOrReplaceMemory } from "../src/sqlite.ts";
+import { runMigrations } from "../src/migrate.ts";
 import type { MemoryEntry } from "../src/types.ts";
 
 describe("Wave 3 - Task 2: FTS5 Query Injection Safety & Compound Token Splitting", () => {
@@ -78,6 +79,9 @@ describe("Wave 3 - Task 2: FTS5 Query Injection Safety & Compound Token Splittin
 
     test("searchMemoriesFts safely executes hostile queries on real SQLite FTS5 database", () => {
       const db = openDatabase(":memory:");
+      // The insert path no longer hides a missing post-v0 column behind a legacy
+      // retry, so the schema has to be the migrated one `openStore` would build.
+      runMigrations(db);
 
       const sample: MemoryEntry = {
         id: "mem-test-fts-1",

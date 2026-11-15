@@ -165,7 +165,10 @@ export class MemoryStoreCache {
     }
 
     this.stats.hits++;
-    return item.value;
+    // Issue #409: match getEntry's contract — hand back copies, never the cached
+    // array or its entries. A caller that mutates an entry in place otherwise
+    // poisons every later cached list() with state that was never persisted.
+    return item.value.map((e) => ({ ...e }));
   }
 
   public setQuery(
