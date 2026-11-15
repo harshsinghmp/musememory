@@ -386,6 +386,10 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
     }
   });
 
+  // Generous per-test budget: this test starts a real HTTP server, creates and
+  // writes a second on-disk store, links it and performs two fetches, so the
+  // cost is server + filesystem I/O (~3s here), not computation. The default
+  // 5s runner budget leaves no slack for that I/O on a loaded shared machine.
   test("T-452: linking a mesh store invalidates the cached topology", async () => {
     const { root, memoryDir } = setupFixtureRoot();
     const store = openStore(memoryDir);
@@ -428,7 +432,8 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
       cleanup(root);
       cleanup(linkedRoot);
     }
-  });
+    // 20s per-test timeout — see the comment above the test.
+  }, 20_000);
 
   test("T-452: reading an existing global store does not re-sync it", async () => {
     const { root, memoryDir } = setupFixtureRoot();

@@ -2,13 +2,75 @@ import { describe, test, expect } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore, propose, save, get } from "../src/store.ts";
+import { openStore, propose, save, get, type Store } from "../src/store.ts";
 import { expandAssociative, expandAssociativeDetailed } from "../src/associative.ts";
 import { queryContext } from "../src/retrieval.ts";
 
 function link(store: ReturnType<typeof openStore>, from: string, to: string) {
   const entry = get(store, from)!;
   save(store, { ...entry, linked_memory_ids: [...(entry.linked_memory_ids ?? []), to] });
+}
+
+/**
+ * Counts the rows the recursive CTE materialises for one expansion call.
+ *
+ * A wall-clock ceiling cannot do this reliably on shared CI hardware, so the
+ * walk's work is measured instead of its duration: `expandAssociativeDetailed`
+ * issues exactly one recursive-CTE query, and re-running only that CTE with a
+ * `COUNT(*)` projection reports how many rows the recursion produced. Bounding
+ * the recursive member keeps the count at `maxNodes`; an unbounded member
+ * materialises the entire reachable frontier.
+ */
+function materialisedCteRows(db: NonNullable<Store["db"]>, sql: string, params: unknown[]): number {
+  // "WITH RECURSIVE <name>(<cols>) AS (" — everything before the body is kept
+  // verbatim so the counted query is the implementation's own CTE, never a copy.
+  const cte = /^\s*WITH\s+RECURSIVE\s+([A-Za-z_][\w$]*)\s*\([^)]*\)\s*AS\s*\(/i.exec(sql);
+  if (!cte) return Number.NaN;
+  let depth = 0;
+  let bodyEnd = -1;
+  for (let i = cte.index + cte[0].length - 1; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")" && --depth === 0) {
+      bodyEnd = i;
+      break;
+    }
+  }
+  if (bodyEnd < 0) return Number.NaN;
+  const prefix = sql.slice(0, bodyEnd + 1);
+  // Only the placeholders that live inside the CTE body are re-bound; the
+  // outer projection's parameters (e.g. its own LIMIT) are not part of it.
+  const placeholders = (prefix.match(/\?/g) ?? []).length;
+  const counted = db
+    .query<{ n: number }>(`${prefix} SELECT COUNT(*) AS n FROM ${cte[1]}`)
+    .get(params.slice(0, placeholders));
+  return counted?.n ?? Number.NaN;
+}
+
+/** Wraps a store so every recursive-CTE query it runs is also row-counted. */
+function countingStore(store: Store): { store: Store; cteRows: number[] } {
+  const cteRows: number[] = [];
+  const db = store.db!;
+  const instrumented: Store = {
+    ...store,
+    db: {
+      ...db,
+      query<T = unknown>(sql: string) {
+        const statement = db.query<T>(sql);
+        return {
+          all(params?: unknown[] | Record<string, unknown>): T[] {
+            if (/^\s*WITH\s+RECURSIVE/i.test(sql)) {
+              cteRows.push(materialisedCteRows(db, sql, (params as unknown[]) ?? []));
+            }
+            return (statement.all as (p?: unknown) => T[])(params);
+          },
+          get(params?: unknown[] | Record<string, unknown>): T | null | undefined {
+            return (statement.get as (p?: unknown) => T | null | undefined)(params);
+          },
+        };
+      },
+    },
+  };
+  return { store: instrumented, cteRows };
 }
 
 describe("T-432: recursive CTE associative expansion", () => {
@@ -74,18 +136,24 @@ describe("T-432: recursive CTE associative expansion", () => {
         ids.push(`dense_${i}`);
       }
 
-      const started = performance.now();
-      const result = expandAssociativeDetailed(store, [ids[0]], { maxDepth: 5, maxNodes: 100 });
-      const elapsed = performance.now() - started;
+      const { store: counted, cteRows } = countingStore(store);
+      const result = expandAssociativeDetailed(counted, [ids[0]], { maxDepth: 5, maxNodes: 100 });
 
       // The node cap is still honoured — the fix bounds work, not the answer.
+      // This cap alone is not the regression guard: `maxNodes` trims the output
+      // whether or not the recursion is bounded, so it passes either way.
       expect(result.nodes.length).toBeLessThanOrEqual(100);
       expect(result.nodes.length).toBeGreaterThan(0);
-      // Generous ceiling: with the inner LIMIT this is ~7ms on a 1200-node
-      // dense graph; without it, ~112ms. The bound is set well above the
-      // fixed cost and well below the unbounded one, so it fails if the
-      // inner LIMIT is ever removed.
-      expect(elapsed).toBeLessThan(50);
+
+      // W26-5 regression guard, without a wall clock. With the inner LIMIT the
+      // recursive member materialises `maxNodes` rows; remove that LIMIT and it
+      // materialises the whole reachable frontier instead (4851 rows, ~115ms
+      // vs 100 rows / ~6ms on this 1200-node graph, depth 5). Counting the rows
+      // the CTE produced discriminates bounded from unbounded work
+      // deterministically, whereas a millisecond ceiling flakes on loaded
+      // shared runners — the old `elapsed < 50` assertion did exactly that.
+      expect(cteRows).toHaveLength(1);
+      expect(cteRows[0]).toBeLessThanOrEqual(100);
     } finally {
       rmSync(memoryDir, { recursive: true, force: true });
     }
