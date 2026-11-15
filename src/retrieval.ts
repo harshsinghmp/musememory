@@ -11,7 +11,7 @@ import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
-import { buildSafeFtsQuery } from "./sqlite.ts";
+import { buildSafeFtsQuery, rowToMemoryEntry, type DbMemoryRow } from "./sqlite.ts";
 import { expandAssociativeDetailed, type AssociativeNode } from "./associative.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
@@ -1467,9 +1467,17 @@ export function expandFusedWikilinks(
 
         if (!resolvedEntry && store.db) {
           try {
-            const row = store.db.query("SELECT data FROM memories WHERE id = ? OR title = ? LIMIT 1").get([target, target]) as { data: string } | null;
+            // Issue #408: this fallback used to read `data` straight off the row with no
+            // tombstone predicate and no row mapper, so a GDPR-erased memory was emitted
+            // into prompt context. Select the full row, gate on `deleted_at`, and map it
+            // the way every other read path does.
+            const row = store.db
+              .query<DbMemoryRow>(
+                `SELECT * FROM memories WHERE (id = ? OR title = ?) AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1`,
+              )
+              .get([target, target]);
             if (row?.data) {
-              resolvedEntry = JSON.parse(row.data);
+              resolvedEntry = rowToMemoryEntry(row);
             }
           } catch {}
         }
@@ -1656,6 +1664,28 @@ export function queryContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): SearchResult {
+  // T-072 / #199: wire the abstention gate into the read path. A punctuation-only,
+  // greeting or stopword-only query has no searchable terms, so it must not pay
+  // for a full candidate scan, filtering, scoring or access recording.
+  // An EMPTY / whitespace-only query is deliberately NOT gated: it means "no query
+  // filter", and callers such as formatPromptContext(store, dir, "") rely on it to
+  // return the general context pack.
+  if (query.trim().length > 0) {
+    const decision = evaluateAbstentionGate(query);
+    if (decision.abstain) {
+      return {
+        results: [],
+        source: "live",
+        stale: false,
+        fromCache: false,
+        totalTokensUsed: 0,
+        mode: "no_confident_match",
+        no_confident_match: true,
+        hidden_count: 0,
+      };
+    }
+  }
+
   if (options.enable_ladder) {
     return executeRetrievalLadder(store, query, { ...options, enable_ladder: false });
   }

@@ -8,6 +8,7 @@ import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { GenericAdapter } from "../src/migrator/adapters/generic.ts";
 import { runMigration, detectProviders } from "../src/migrator/index.ts";
 import { expandPath } from "../src/migrator/detect.ts";
+import { VERIFICATION_BONUS } from "../src/types.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "migrator-quarantine-test-"));
@@ -130,6 +131,38 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     const recs = GenericAdapter.extract(join(docDir, "readme.txt"));
     expect(recs.length).toBe(1);
     expect(recs[0].status).toBe("candidate");
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("issue #139: runMigration end-to-end quarantines an unconfirmed provider record as candidate/unverified", async () => {
+    const root = temp();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    // `.beads` is a detected local provider whose adapter answers only for
+    // beads.json / markdown. A plain .txt file therefore lands on the generic
+    // fallback, which never self-certifies — exactly the unconfirmed intake the
+    // `confirmed: record.status === "confirmed"` gate must honour.
+    const beadsDir = join(root, ".beads");
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, "runbook.txt"),
+      "Beads migration note: the deployment runbook lives in infra/runbooks and is refreshed weekly by the platform team.",
+      "utf8",
+    );
+
+    const report = await runMigration(store, memoryDir, { provider: "beads" });
+    expect(report.errors).toEqual([]);
+    expect(report.providers.length).toBe(1);
+    expect(report.providers[0].status).toBe("success");
+    expect(report.totalMigrated).toBe(1);
+
+    const stored = list(store);
+    expect(stored.length).toBe(1);
+    // The stored entry — not the adapter's in-memory record — must stay quarantined.
+    expect(stored[0].status).toBe("candidate");
+    expect(stored[0].verification?.level ?? "unverified").toBe("unverified");
 
     rmSync(root, { recursive: true, force: true });
   });
@@ -343,5 +376,85 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     expect(normalizeMemoryType("skill")).toBe("operation");
     expect(normalizeMemoryType("runbook")).toBe("operation");
     expect(normalizeMemoryType("playbook")).toBe("operation");
+  });
+
+  test("issue #141: strips unearned verification unless a test_result backs it", () => {
+    // Every level above `unverified` earns a ranking bonus, and an import can
+    // assert any of them without evidence. Only a real test_result survives.
+    for (const level of ["observed", "reproducible", "user-confirmed", "authoritative", "independently-verified"] as const) {
+      const stripped = validateMigratedRecord({
+        title: `Unbacked ${level} claim`,
+        content: "A claim carried over from another memory provider",
+        status: "confirmed",
+        verification: { level, method: "asserted-by-provider", verified_by: "migrator:agentmemory" },
+      });
+      expect(stripped).not.toBeNull();
+      expect(stripped?.verification).toBeUndefined();
+      // No verification object means the scorer reads the level as `unverified`, worth 0.
+      expect(VERIFICATION_BONUS[stripped?.verification?.level ?? "unverified"]).toBe(0);
+    }
+
+    // Backed by a real test result: the level is evidence, not an assertion.
+    const backed = validateMigratedRecord({
+      title: "Authoritative claim with evidence",
+      content: "Deployment rollback is a single documented command",
+      verification: { level: "authoritative", test_result: "bun test: 1640 pass, 0 fail" },
+    });
+    expect(backed?.verification?.level).toBe("authoritative");
+    expect(VERIFICATION_BONUS[backed!.verification!.level]).toBeGreaterThan(0);
+
+    // A bare `unverified` attestation carries no bonus and is kept as-is.
+    const unverified = validateMigratedRecord({
+      title: "Unverified attestation",
+      content: "Nothing was proven about this record",
+      verification: { level: "unverified", method: "asserted" },
+    });
+    expect(unverified?.verification).toEqual({ level: "unverified", method: "asserted" });
+  });
+
+  test("issue #151: a provider status may narrow but never promote without isLatest", () => {
+    const root = temp();
+    const jsonPath = join(root, "standalone.json");
+    writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        "mem:memories": {
+          "m_1": {
+            id: "mem_1",
+            title: "Claimed confirmed",
+            content: "Status confirmed, isLatest omitted",
+            status: "confirmed",
+          },
+          "m_2": {
+            id: "mem_2",
+            title: "Confirmed and latest",
+            content: "Status confirmed, explicitly latest",
+            status: "confirmed",
+            isLatest: true,
+          },
+          "m_3": {
+            id: "mem_3",
+            title: "Explicitly superseded",
+            content: "Only isLatest false",
+            isLatest: false,
+          },
+          "m_4": {
+            id: "mem_4",
+            title: "Stale claim",
+            content: "Status stale with isLatest omitted",
+            status: "stale",
+          },
+        },
+      }),
+      "utf8"
+    );
+
+    const statusByTitle = new Map(AgentMemoryAdapter.extract(jsonPath).map((r) => [r.title, r.status]));
+    expect(statusByTitle.get("Claimed confirmed")).toBe("candidate");
+    expect(statusByTitle.get("Confirmed and latest")).toBe("confirmed");
+    expect(statusByTitle.get("Explicitly superseded")).toBe("superseded");
+    expect(statusByTitle.get("Stale claim")).toBe("stale");
+
+    rmSync(root, { recursive: true, force: true });
   });
 });

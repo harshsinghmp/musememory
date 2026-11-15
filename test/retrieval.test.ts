@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { openStore, propose, markSuperseded } from "../src/store.ts";
+import { openStore, propose, markSuperseded, list } from "../src/store.ts";
 import { verifyRuntimeFiles } from "../src/graph.ts";
 import { setCurrent } from "../src/current.ts";
 import {
@@ -638,6 +638,53 @@ describe("unified context & retrieval engine", () => {
     const emptyQuery = queryContext(store, "");
     expect(emptyQuery.mode).toBe("confident_match");
     expect(emptyQuery.no_confident_match).toBe(false);
+
+    cleanup(root);
+  });
+
+  test("issue #199: queryContext abstains on punctuation-only queries before scanning", () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    const entry = propose(store, {
+      title: "Auth token handling",
+      content: "Always use HttpOnly secure cookies for auth session tokens.",
+      project: "aria",
+      confirmed: true,
+    });
+
+    // `list()` is the non-counting read; `get()` bumps access_count itself.
+    const accessCount = () => list(store).find((e) => e.id === entry.id)?.access_count ?? 0;
+    const before = accessCount();
+
+    // 1. Punctuation-only query: no scan, no scoring, no access bookkeeping.
+    const abstained = queryContext(store, "!!!");
+    expect(abstained.results).toEqual([]);
+    expect(abstained.mode).toBe("no_confident_match");
+    expect(abstained.no_confident_match).toBe(true);
+    expect(abstained.source).toBe("live");
+    expect(abstained.stale).toBe(false);
+    expect(abstained.fromCache).toBe(false);
+    expect(abstained.totalTokensUsed).toBe(0);
+    expect(abstained.hidden_count).toBe(0);
+    expect(accessCount()).toBe(before);
+
+    // 2. Regression guard: an empty query is NOT an abstention — it means "no
+    //    query filter" and must still return the general context pack, which is
+    //    what callers like formatPromptContext(store, dir, "") depend on.
+    const general = queryContext(store, "");
+    expect(general.results.map((r) => r.entry.id)).toContain(entry.id);
+    const generalPack = formatPromptContext(store, undefined, "");
+    expect(generalPack.entries.length).toBeGreaterThan(0);
+    const afterGeneral = accessCount();
+
+    // 3. A normal query is unaffected: it still scores and records access.
+    const scored = queryContext(store, "auth session tokens");
+    const hit = scored.results.find((r) => r.entry.id === entry.id);
+    expect(hit).toBeDefined();
+    expect(hit!.score).toBeGreaterThan(0);
+    expect(accessCount()).toBeGreaterThan(afterGeneral);
 
     cleanup(root);
   });

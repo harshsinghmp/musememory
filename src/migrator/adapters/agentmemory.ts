@@ -47,6 +47,13 @@ export const AgentMemoryAdapter: ProviderAdapter = {
           status = "superseded";
         } else if (item.status) {
           status = normalizeMemoryStatus(String(item.status));
+          // #151: a provider-supplied status may narrow but never promote. Only
+          // an explicit isLatest === true earns `confirmed`; without it the
+          // claim is quarantined back to candidate (isLatest === false already
+          // took the superseded branch above).
+          if (status === "confirmed" && item.isLatest !== true) {
+            status = "candidate";
+          }
         } else if (item.isLatest === true) {
           status = "confirmed";
         } else {
