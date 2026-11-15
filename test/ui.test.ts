@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, spyOn } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createServer, connect } from "node:net";
 import { openStore, propose, save } from "../src/store.ts";
 import { startUiServer, exportStandaloneHtml } from "../src/ui.ts";
 import { setupFixtureRoot, cleanup, makeTempRoot } from "./helpers.ts";
@@ -1100,3 +1101,78 @@ describe("standalone HTML export", () => {
   });
 });
 
+describe("issue #165: handleUiCommand port validation and signal teardown", () => {
+  /** Ask the OS for a free port, then release it so the studio can bind it. */
+  const reserveFreePort = (): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const srv = createServer();
+      srv.on("error", reject);
+      srv.listen(0, "127.0.0.1", () => {
+        const address = srv.address();
+        const port = typeof address === "object" && address ? address.port : 0;
+        srv.close(() => resolve(port));
+      });
+    });
+
+  const canConnect = (port: number, timeoutMs = 500): Promise<boolean> =>
+    new Promise((resolve) => {
+      const socket = connect({ port, host: "127.0.0.1" });
+      let settled = false;
+      const done = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        resolve(value);
+      };
+      socket.once("connect", () => done(true));
+      socket.once("error", () => done(false));
+      setTimeout(() => done(false), timeoutMs);
+    });
+
+  test("invalid --port exits 1 before any server is started", async () => {
+    const { handleUiCommand } = await import("../src/cli/ecosystem.ts");
+    const root = makeTempRoot();
+
+    for (const port of ["not-a-number", "0", "65536", "-1"]) {
+      const code = await handleUiCommand({ positional: [], flags: { dir: root, port } });
+      expect(code).toBe(1);
+    }
+
+    cleanup(root);
+  });
+
+  test("SIGINT closes the studio server and resolves exit 0", async () => {
+    const { handleUiCommand } = await import("../src/cli/ecosystem.ts");
+    const root = makeTempRoot();
+    const port = await reserveFreePort();
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    let exitCode: number | undefined;
+    try {
+      const cmdPromise = handleUiCommand({ positional: [], flags: { dir: root, port: String(port) } });
+      const deadline = Date.now() + 5000;
+      while (!logs.some((l) => l.includes("[Studio]")) && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      expect(logs.some((l) => l.includes("[Studio]"))).toBe(true);
+      expect(await canConnect(port)).toBe(true); // listening before the signal
+
+      process.emit("SIGINT");
+      exitCode = await cmdPromise;
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(exitCode).toBe(0);
+    // srv.close() must have released the listener; a resolve without close
+    // leaves the port bound and this fails.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await canConnect(port)).toBe(false);
+
+    cleanup(root);
+  });
+});

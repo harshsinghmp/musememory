@@ -1,5 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { get as httpGet, request as httpRequest } from "node:http";
+import { mkdirSync, writeFileSync, renameSync } from "node:fs";
+import { join } from "node:path";
 import { startHub, type HubHandle } from "../src/daemon.ts";
 import { makeTempRoot, cleanup } from "./helpers.ts";
 
@@ -45,6 +47,31 @@ function readEvents(port: number, predicate: (frame: string) => boolean, timeout
       req.destroy();
       resolve(frames);
     }, timeoutMs);
+  });
+}
+
+/** Open an SSE stream and collect every frame seen during `windowMs`, then close. */
+function collectFrames(port: number, windowMs: number): Promise<string[]> {
+  return new Promise((resolve) => {
+    const frames: string[] = [];
+    let buffer = "";
+    const req = httpGet({ host: "127.0.0.1", port, path: "/events" }, (res) => {
+      res.on("data", (chunk) => {
+        buffer += chunk.toString();
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const frame = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          if (frame.trim()) frames.push(frame);
+        }
+      });
+      res.on("error", () => {});
+    });
+    req.on("error", () => {});
+    setTimeout(() => {
+      req.destroy();
+      resolve(frames);
+    }, windowMs);
   });
 }
 
@@ -261,6 +288,62 @@ describe("real-time agency hub (SSE)", () => {
     const exitCode = await cmdPromise;
     expect(exitCode).toBe(0);
 
+    cleanup(root);
+  });
+
+  test("issue #155: rapid memory writes collapse into one debounced memory.changed broadcast", async () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    mkdirSync(join(memoryDir, "memories"), { recursive: true });
+    writeFileSync(join(memoryDir, "CURRENT.md"), "# Active Project Constraints\n", "utf8");
+
+    const hub = await startHub(0, memoryDir);
+    const framesPromise = collectFrames(hub.port, 1500);
+    await new Promise((r) => setTimeout(r, 150)); // let the SSE client register
+
+    // Five distinct file events, all inside one 300ms debounce window.
+    for (let i = 0; i < 5; i++) {
+      writeFileSync(join(memoryDir, "memories", `burst-${i}.yaml`), `title: burst ${i}\n`, "utf8");
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const frames = await framesPromise;
+    const changed = frames.filter((f) => f.includes("event: memory.changed"));
+    // Per-event fanout would emit 5; the per-type debounce must emit exactly 1.
+    expect(changed.length).toBe(1);
+    expect(changed[0]).toContain('"source":"watcher"');
+
+    await hub.close();
+    cleanup(root);
+  });
+
+  test("issue #155: an atomic rename over CURRENT.md re-arms the watcher instead of detaching it", async () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    const memoriesDir = join(memoryDir, "memories");
+    mkdirSync(memoriesDir, { recursive: true });
+    const currentMd = join(memoryDir, "CURRENT.md");
+    writeFileSync(currentMd, "# Active Project Constraints\n- initial\n", "utf8");
+
+    const hub = await startHub(0, memoryDir);
+    const framesPromise = collectFrames(hub.port, 2300);
+    await new Promise((r) => setTimeout(r, 150));
+
+    // Phase 1: atomic replace (write temp + rename). The watched inode is
+    // unlinked, so a watcher that is not re-armed goes permanently deaf.
+    writeFileSync(`${currentMd}.tmp`, "# Active Project Constraints\n- replaced\n", "utf8");
+    renameSync(`${currentMd}.tmp`, currentMd);
+    await new Promise((r) => setTimeout(r, 600)); // > DEBOUNCE_MS
+
+    // Phase 2: an ordinary in-place write must still be observed.
+    writeFileSync(currentMd, "# Active Project Constraints\n- written after rename\n", "utf8");
+
+    const frames = await framesPromise;
+    const changed = frames.filter((f) => f.includes("event: constraints.changed"));
+    // 1 broadcast for the rename, 1+ for the write that follows it.
+    expect(changed.length).toBeGreaterThanOrEqual(2);
+
+    await hub.close();
     cleanup(root);
   });
 });

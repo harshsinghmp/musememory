@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -93,6 +93,53 @@ describe("Automated Upgrade & Self-Healing Installer Engine", () => {
       flags: { "dry-run": "true" },
     });
     expect(codeDryRun).toBe(0);
+  });
+
+  it("issue #157: --check exits 1 when the registry lookup fails", async () => {
+    const { handleUpgradeCommand } = await import("../src/cli/upgrade.ts");
+
+    // Registry unreachable: stub the fetch seam and empty PATH so the
+    // execFileSync("npm view") fallback fails fast with ENOENT — no network.
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(
+      (async () => new Response("upstream unavailable", { status: 503 })) as unknown as typeof fetch,
+    );
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const code = await handleUpgradeCommand({ positional: [], flags: { check: "true" } });
+      expect(code).toBe(1);
+      // Contrast: without --check the failure is not fatal (best-effort flow).
+      const dryRunCode = await handleUpgradeCommand({ positional: [], flags: { "dry-run": "true" } });
+      expect(dryRunCode).toBe(0);
+    } finally {
+      process.env.PATH = originalPath;
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("issue #157: --fail-on-update and --strict exit 1 when a newer release exists", async () => {
+    const { handleUpgradeCommand, getCurrentVersion } = await import("../src/cli/upgrade.ts");
+
+    const [major] = getCurrentVersion().split(".");
+    const newer = `${(parseInt(major, 10) || 0) + 1}.0.0`;
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ version: newer }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })) as unknown as typeof fetch,
+    );
+    try {
+      // Plain --check stays advisory ...
+      expect(await handleUpgradeCommand({ positional: [], flags: { check: "true" } })).toBe(0);
+      // ... but the CI gates turn "an update exists" into a non-zero status.
+      expect(
+        await handleUpgradeCommand({ positional: [], flags: { check: "true", "fail-on-update": "true" } }),
+      ).toBe(1);
+      expect(await handleUpgradeCommand({ positional: [], flags: { check: "true", strict: "true" } })).toBe(1);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("T-359: repairInstallation surfaces errors in RepairResult instead of swallowing them", async () => {
