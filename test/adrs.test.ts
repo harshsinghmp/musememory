@@ -128,6 +128,57 @@ describe("R11: Architecture Decision Records (ADRs) & Documentation Drift Engine
       expect(auditLog).toContain('"operation":"adr_superseded"');
     });
 
+    it("issue #161: a failed save of the new ADR leaves the old ADR un-superseded", () => {
+      const adr1 = recordAdr(store, tmpDir, {
+        project: "app",
+        title: "Monolithic Router Architecture",
+        context_and_drivers: ["Early prototype"],
+        decision: "Use single file router for all API endpoints.",
+        consequences: { positive: ["Simple"] },
+      });
+      expect(adr1.adr?.status).toBe("accepted");
+
+      // Inject a write error scoped to the NEW ADR only. The supersession write
+      // of ADR-1 is allowed to succeed, so the ordering — not the error — is
+      // what decides whether a dangling superseded_by can be left behind.
+      const failingDb = new Proxy(store.db!, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop);
+          if (prop === "run") {
+            return (sql: string, params?: unknown[]) => {
+              if (Array.isArray(params) && String(params[0] ?? "").endsWith("_adr_2")) {
+                throw new Error("SQLITE_IOERR: disk I/O error");
+              }
+              return (value as Function).apply(target, [sql, params]);
+            };
+          }
+          return typeof value === "function" ? (value as Function).bind(target) : value;
+        },
+      });
+      const failingStore = { ...store, db: failingDb } as typeof store;
+
+      expect(() =>
+        recordAdr(failingStore, tmpDir, {
+          project: "app",
+          title: "Modular Domain Router Architecture",
+          context_and_drivers: ["Route file exceeds 3000 lines"],
+          decision: "Split router into domain-specific modules.",
+          consequences: { positive: ["Separation of concerns"] },
+          supersedes: adr1.id,
+        }),
+      ).toThrow();
+
+      // Save-before-supersede: the failed save must leave no dangling link.
+      const refreshedAdr1 = get(store, adr1.id);
+      expect(refreshedAdr1?.status).toBe("confirmed");
+      expect(refreshedAdr1?.superseded_by).toBeUndefined();
+      expect(refreshedAdr1?.valid_to).toBeUndefined();
+      expect(refreshedAdr1?.adr?.status).toBe("accepted");
+      expect(refreshedAdr1?.adr?.superseded_by).toBeUndefined();
+      // The replacement was never persisted either.
+      expect(listAdrs(store).length).toBe(1);
+    });
+
     it("lists ADRs and filters by status", () => {
       recordAdr(store, tmpDir, {
         project: "app",

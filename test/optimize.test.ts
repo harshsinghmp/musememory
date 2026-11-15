@@ -8,7 +8,7 @@ import {
   readOptimizationMetadata,
   writeOptimizationMetadata,
 } from "../src/optimize.ts";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { setupFixtureRoot, cleanup, makeTempRoot } from "./helpers.ts";
 
@@ -193,19 +193,26 @@ describe("Autonomous Memory Optimizer & Auto-Cadence Governor", () => {
     cleanup(root);
   });
 
-  test("T-029: save() touches activity metadata", async () => {
+  test("issue #179: save() persists a strictly newer last_activity_at into optimization_meta.json", async () => {
     const root = makeTempRoot();
     const memoryDir = join(root, ".memory");
     const store = openStore(memoryDir);
 
-    // Initial state
-    const metaBefore = readOptimizationMetadata(memoryDir);
-    const beforeTime = Date.parse(metaBefore.last_activity_at);
-
-    // Wait a brief moment to ensure timestamp change
-    await new Promise((r) => setTimeout(r, 15));
+    // Seed an OLD stamp through the writer (not the reader, which fabricates
+    // "now" when the file is missing). An old value also clears the 1s
+    // touchActivity throttle only by being the first touch for this dir, so the
+    // write cannot be silently suppressed.
+    const seeded = "2020-01-01T00:00:00.000Z";
+    writeOptimizationMetadata(memoryDir, {
+      last_optimized_at: seeded,
+      last_activity_at: seeded,
+      total_optimizations: 0,
+    });
+    const metaPath = join(memoryDir, "optimization_meta.json");
+    expect(existsSync(metaPath)).toBe(true);
 
     // Propose / save a memory
+    await new Promise((r) => setTimeout(r, 15));
     propose(store, {
       title: "Test Activity Touch",
       content: "Testing that store writes touch optimization activity.",
@@ -213,9 +220,13 @@ describe("Autonomous Memory Optimizer & Auto-Cadence Governor", () => {
       type: "decision",
     });
 
-    const metaAfter = readOptimizationMetadata(memoryDir);
-    const afterTime = Date.parse(metaAfter.last_activity_at);
-    expect(afterTime).toBeGreaterThanOrEqual(beforeTime);
+    // Assert on the persisted file, not on the reader: the reader returns a
+    // fresh timestamp even when nothing was ever written.
+    expect(existsSync(metaPath)).toBe(true);
+    const persisted = JSON.parse(readFileSync(metaPath, "utf8"));
+    expect(Date.parse(persisted.last_activity_at)).toBeGreaterThan(Date.parse(seeded));
+    // Only activity moved — the optimization cadence stamp is untouched.
+    expect(persisted.last_optimized_at).toBe(seeded);
 
     cleanup(root);
   });

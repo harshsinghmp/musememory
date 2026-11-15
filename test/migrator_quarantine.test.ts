@@ -134,6 +134,38 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  test("issue #139: runMigration end-to-end quarantines an unconfirmed provider record as candidate/unverified", async () => {
+    const root = temp();
+    const memoryDir = join(root, ".memory");
+    const store = openStore(memoryDir);
+
+    // `.beads` is a detected local provider whose adapter answers only for
+    // beads.json / markdown. A plain .txt file therefore lands on the generic
+    // fallback, which never self-certifies — exactly the unconfirmed intake the
+    // `confirmed: record.status === "confirmed"` gate must honour.
+    const beadsDir = join(root, ".beads");
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, "runbook.txt"),
+      "Beads migration note: the deployment runbook lives in infra/runbooks and is refreshed weekly by the platform team.",
+      "utf8",
+    );
+
+    const report = await runMigration(store, memoryDir, { provider: "beads" });
+    expect(report.errors).toEqual([]);
+    expect(report.providers.length).toBe(1);
+    expect(report.providers[0].status).toBe("success");
+    expect(report.totalMigrated).toBe(1);
+
+    const stored = list(store);
+    expect(stored.length).toBe(1);
+    // The stored entry — not the adapter's in-memory record — must stay quarantined.
+    expect(stored[0].status).toBe("candidate");
+    expect(stored[0].verification?.level ?? "unverified").toBe("unverified");
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
   test("T-340: GenericAdapter ignores package.json and arbitrary JSON config objects", () => {
     const root = temp();
 
