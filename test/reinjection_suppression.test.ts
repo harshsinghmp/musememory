@@ -84,6 +84,36 @@ describe("T-108: Re-injection suppression per session (6-turn LRU)", () => {
     expect(result.suppressed[0].turnsAgo).toBe(1);
   });
 
+  it("exempts pinned entries from re-injection suppression (issue #259)", () => {
+    const sessionId = "session_test_pinned";
+    tracker.recordInjected(sessionId, ["pinned_note", "unpinned_note"], 1);
+
+    const pinnedEntry: MemoryEntry = {
+      id: "pinned_note",
+      title: "Pinned knowledge",
+      content: "Pin this fact so it survives context pressure",
+      type: "decision",
+      pinned: true,
+      project: "test-proj",
+      status: "confirmed",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const unpinnedEntry: MemoryEntry = {
+      ...pinnedEntry,
+      id: "unpinned_note",
+      pinned: false,
+    };
+
+    const result = tracker.filterSuppressed(sessionId, [pinnedEntry, unpinnedEntry], { turn: 2 });
+
+    // The pinned entry was injected on a prior turn but is still allowed.
+    expect(result.allowed.map((e) => e.id)).toEqual(["pinned_note"]);
+    // The identical entry without the pin and without the pin flag is suppressed.
+    expect(result.suppressed.map((s) => s.item.id)).toEqual(["unpinned_note"]);
+    expect(result.suppressed[0].turnsAgo).toBe(1);
+  });
+
   it("isolates suppression state across different sessions", () => {
     tracker.recordInjected("session_A", ["shared_mem_1"], 1);
 

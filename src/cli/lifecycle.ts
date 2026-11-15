@@ -28,6 +28,7 @@ import { validateStore } from "../schema.ts";
 import { exportSnapshot, importSnapshot } from "../snapshot.ts";
 import { getAuditTrail } from "../audit.ts";
 import { recordSessionStart, recordSessionEnd, findSession } from "../sessions.ts";
+import { flushPendingPromotions } from "../promotion/pending.ts";
 import type { MemoryType } from "../types.ts";
 import { requireRoot, printEntry, usageError, fail, type ParsedArgs } from "./shared.ts";
 
@@ -680,6 +681,19 @@ export async function handleSessionCommand({ positional, flags }: ParsedArgs): P
     if (!start) return fail(`error: no session start with id ${id}`);
     const entry = recordSessionEnd(ctx.store, id, start.project);
     console.log(`session ${id} ended (${entry?.id})`);
+    // #257: session end is the flush point for the two-tier promotion queue, so a
+    // session that ends without an explicit flush cannot strand staged promotions
+    // until some unrelated later command. A flush failure is a warning, not a
+    // failed session end — the session record above is already committed.
+    try {
+      const flush = flushPendingPromotions(ctx.store);
+      console.log(
+        `promotions flushed: ${flush.promoted_count} promoted, ${flush.rejected_count} rejected`,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`warning: pending promotion flush failed: ${msg}`);
+    }
     return 0;
   }
   return usageError("session requires start|end");

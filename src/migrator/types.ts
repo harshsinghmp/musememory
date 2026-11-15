@@ -130,10 +130,14 @@ export function validateMigratedRecord(raw: unknown): MigratedRecord | null {
 
   const type = normalizeMemoryType(typeof item.type === "string" ? item.type : undefined);
 
-  // F-04 / T-338: Strip self-certified independently-verified from unverified migrations
+  // F-04 / T-338 / #141: An external migration cannot prove an elevated
+  // verification level by assertion alone, and every level above `unverified`
+  // earns a ranking bonus (VERIFICATION_BONUS in src/types.ts). Strip the whole
+  // verification block unless a real `test_result` backs the claim; a bare
+  // `unverified` attestation carries no bonus and is kept as-is.
   let verification = item.verification;
   if (verification) {
-    if (verification.level === "independently-verified" && !verification.test_result) {
+    if (verification.level !== "unverified" && !verification.test_result) {
       verification = undefined;
     }
   }

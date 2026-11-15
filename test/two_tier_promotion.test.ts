@@ -12,6 +12,8 @@ import {
   flushPendingPromotions,
   loadPendingPromotions,
 } from "../src/promotion/pending.ts";
+import { handleSessionCommand } from "../src/cli/lifecycle.ts";
+import { recordSessionStart } from "../src/sessions.ts";
 
 describe("T-107: Two-tier promotion (pending tier -> session-end flush)", () => {
   let tmpDir: string;
@@ -225,6 +227,50 @@ describe("T-107: Two-tier promotion (pending tier -> session-end flush)", () => 
     expect(item1?.status).toBe("flushed");
     expect(item1?.flushed_at).toBeDefined();
     expect(item2?.status).toBe("rejected");
+  });
+
+  it("flushes staged promotions when the session ends through the CLI handler (issue #257)", async () => {
+    const entry: MemoryEntry = {
+      id: "mem_session_end_flush",
+      title: "Qualified candidate",
+      content: "Valid architecture pattern",
+      project: "test-proj",
+      type: "architecture",
+      status: "confirmed",
+      scope: "local",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    save(store, entry);
+
+    const { sessionId } = recordSessionStart(store, "test-proj", "two-tier flush");
+    stagePendingPromotion(store, "mem_session_end_flush", { sessionId: "sess-end" });
+
+    // The staged promotion is untouched until the session closes.
+    expect(get(store, "mem_session_end_flush")?.scope).toBe("local");
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.join(" "));
+    };
+    let code: number;
+    try {
+      code = await handleSessionCommand({
+        positional: ["end", sessionId],
+        flags: { dir: path.join(tmpDir, ".memory") },
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(code).toBe(0);
+    expect(get(store, "mem_session_end_flush")?.scope).toBe("project");
+    expect(listPendingPromotions(store, { status: "pending" }).length).toBe(0);
+
+    const output = logs.join("\n");
+    expect(output).toContain(`session ${sessionId} ended`);
+    expect(output).toContain("promotions flushed: 1 promoted, 0 rejected");
   });
 
   it("preserves session isolation during flush", () => {
