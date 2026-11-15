@@ -1664,6 +1664,28 @@ export function queryContext(
   query: string = "",
   options: ContextQueryOptions = {},
 ): SearchResult {
+  // T-072 / #199: wire the abstention gate into the read path. A punctuation-only,
+  // greeting or stopword-only query has no searchable terms, so it must not pay
+  // for a full candidate scan, filtering, scoring or access recording.
+  // An EMPTY / whitespace-only query is deliberately NOT gated: it means "no query
+  // filter", and callers such as formatPromptContext(store, dir, "") rely on it to
+  // return the general context pack.
+  if (query.trim().length > 0) {
+    const decision = evaluateAbstentionGate(query);
+    if (decision.abstain) {
+      return {
+        results: [],
+        source: "live",
+        stale: false,
+        fromCache: false,
+        totalTokensUsed: 0,
+        mode: "no_confident_match",
+        no_confident_match: true,
+        hidden_count: 0,
+      };
+    }
+  }
+
   if (options.enable_ladder) {
     return executeRetrievalLadder(store, query, { ...options, enable_ladder: false });
   }

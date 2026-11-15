@@ -89,7 +89,7 @@ export class SessionReinjectionTracker {
     return { suppressed: false, turnsAgo, injectedAtTurn: rec.turn };
   }
 
-  filterSuppressed<T extends { id: string; type?: string; temporal_mode?: string }>(
+  filterSuppressed<T extends { id: string; type?: string; temporal_mode?: string; pinned?: boolean }>(
     sessionId: string,
     entries: T[],
     options: {
@@ -108,7 +108,12 @@ export class SessionReinjectionTracker {
     const suppressed: SuppressionFilterResult<T>["suppressed"] = [];
 
     for (const entry of entries) {
-      if (allowExempt && (exempt.has(entry.type ?? "") || entry.temporal_mode === "timeless")) {
+      // #259: pinned knowledge is exempt — it is deliberately retained, so it
+      // must not be withheld just because an earlier turn already injected it.
+      if (
+        allowExempt &&
+        (exempt.has(entry.type ?? "") || entry.temporal_mode === "timeless" || entry.pinned === true)
+      ) {
         allowed.push(entry);
         continue;
       }
