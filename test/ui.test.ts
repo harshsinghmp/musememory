@@ -388,8 +388,9 @@ describe("Wave 23: studio shell, dual-scope switcher, cached assets", () => {
 
   // Generous per-test budget: this test starts a real HTTP server, creates and
   // writes a second on-disk store, links it and performs two fetches, so the
-  // cost is server + filesystem I/O (~3s here), not computation. The default
-  // 5s runner budget leaves no slack for that I/O on a loaded shared machine.
+  // cost is server + filesystem I/O (~3.4s observed), not computation. The 15s
+  // global default in bunfig.toml leaves little slack for that I/O on a loaded
+  // shared machine, so the budget is stated here rather than inferred.
   test("T-452: linking a mesh store invalidates the cached topology", async () => {
     const { root, memoryDir } = setupFixtureRoot();
     const store = openStore(memoryDir);
