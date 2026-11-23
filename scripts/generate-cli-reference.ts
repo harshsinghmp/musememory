@@ -193,6 +193,20 @@ lines.push(
 );
 lines.push("");
 
-writeFileSync(OUT, lines.join("\n"));
+const serialized = lines.join("\n");
+// `claims:check` gates claims.json and the tool matrix; this file had no gate
+// at all, so a stale reference could ship while every check reported green.
+const checkOnly = process.argv.includes("--check");
+if (checkOnly) {
+  const current = readFileSync(OUT, "utf8");
+  if (current !== serialized) {
+    console.error(`STALE: ${OUT} — regenerate with "bun run scripts/generate-cli-reference.ts"`);
+    process.exit(1);
+  }
+  console.log(`${OUT} is up to date.`);
+  process.exit(0);
+}
+
+writeFileSync(OUT, serialized);
 console.log(`Wrote ${OUT} — ${tools.length} MCP tools, ${USAGE.trim().split("\n").length} usage lines.`);
 process.exit(0);

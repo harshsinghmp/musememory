@@ -48,6 +48,11 @@ jobs:
         # README is quietly wrong. The check fails with the regeneration
         # command.
         run: bun run scripts/generate-claims.ts --check
+      - name: CLI reference is up to date
+        # docs/cli-reference.md is generated from src/ and was the last derived
+        # artifact with no drift gate. An agent following a stale reference calls
+        # tools that do not exist, which is exactly how the README table rotted.
+        run: bun run scripts/generate-cli-reference.ts --check
       - name: Documentation link integrity
         # Catches dead relative links and machine-specific file:/// URLs.
         run: bun run scripts/check-doc-links.ts
