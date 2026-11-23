@@ -52,7 +52,6 @@ export interface GradeOptions {
   k?: number;
   recallFloor?: number;
   distractorTolerance?: number;
-  p50BudgetMs?: number;
 }
 
 function calculatePercentiles(samples: number[], unit: "ms" | "µs"): LatencyMetric {
@@ -71,6 +70,14 @@ function calculatePercentiles(samples: number[], unit: "ms" | "µs"): LatencyMet
 /**
  * T-140: Grade recall against must-return relevant hits, must-not-return distractors,
  * and abstention evaluation where noise is treated as failure.
+ *
+ * T-142: p50/p95/p99 are **reported** beside the recall scores; they are not a
+ * pass criterion. A shared CI runner cannot make a wall-clock budget a
+ * correctness gate — the same commit measures tens of milliseconds on one
+ * machine and hundreds on a contended runner, so gating on it fails on
+ * hardware rather than on retrieval quality. The exported `P50_BUDGET_MS` /
+ * `P95_BUDGET_MS` / `P99_BUDGET_MS` constants stay as reference budgets for
+ * humans, benchmarks and published claims.
  */
 export function gradeRecallSet(
   store: Store,
@@ -80,7 +87,6 @@ export function gradeRecallSet(
   const k = options.k ?? 5;
   const floor = options.recallFloor ?? RECALL5_FLOOR;
   const distractorTolerance = options.distractorTolerance ?? 10;
-  const p50Budget = options.p50BudgetMs ?? P50_BUDGET_MS;
 
   let recallSum = 0;
   let relevantQueryCount = 0;
@@ -118,10 +124,9 @@ export function gradeRecallSet(
   const latency = calculatePercentiles(latencies, "ms");
   const noiseAsFailureCount = distractorViolations;
 
-  const passed =
-    recallAtK >= floor &&
-    distractorViolations <= distractorTolerance &&
-    latency.p50 <= p50Budget;
+  // Quality gate only. Latency is reported (T-142), never a pass criterion:
+  // a wall-clock budget cannot be a correctness gate on a shared CI runner.
+  const passed = recallAtK >= floor && distractorViolations <= distractorTolerance;
 
   return {
     totalQueries: queries.length,
