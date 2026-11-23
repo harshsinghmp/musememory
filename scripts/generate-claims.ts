@@ -176,6 +176,15 @@ if (checkOnly) {
       `STALE: claims.json — claims ${currentClaims.tests.files} test files but the suite contains ${claims.tests.files}`,
     );
   }
+  // Same rule for assertions. This is not hypothetical: v3.4.3 shipped
+  // `assertions: 7799` while the suite made 7797, because the check compared
+  // only the test count and file count.
+  if (currentClaims.tests.assertions > claims.tests.assertions) {
+    stale = true;
+    console.error(
+      `STALE: claims.json — claims ${currentClaims.tests.assertions} assertions but the suite makes ${claims.tests.assertions}`,
+    );
+  }
 
   // The tool matrix must match exactly: it is a list, not a statistic.
   const currentMatrix = readFileSync(toolMatrixPath, "utf8");
