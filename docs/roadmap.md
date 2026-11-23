@@ -37,13 +37,7 @@ Incoming community proposals, agent adapters and feature requests pending sprint
 
 Confirmed high-leverage features scheduled for upcoming sprints.
 
-- [ ] **Tiered retrieval engine** — deterministic Tier 0 (manifest), Tier 1 (invariants), Tier 2 (bounded bodies) knapsack retrieval
-- [ ] **Provenance and claim ledgers** — direct memory citations with `[RAW]`, `[FETCH]`, `[SEARCH]` and `[INFER]` confidence tagging
-- [ ] **Frozen context snapshots** — immutable SHA-256 state tracking for reproducible agent execution
-- [ ] **Native prompt registry** — declarative prompt library and runner (`.memory/prompts/*.md`, `memory prompt run`)
 - [ ] **Temporal compounding** — multi-scale day → week → quarter wiki rollups and the `.memory/HOT.md` cache
-- [ ] **Gauntlet iteration ledger** — multi-turn improvement loop with plateau detection
-- [ ] **Strict health gate** — comprehensive `memory verify --strict` referential, link and secret validator
 
 ## ⚡ Phase 3 — In progress
 
@@ -130,6 +124,12 @@ intent per symbol before removing.
 
 | Milestone / feature | Shipped release / tracker |
 | :--- | :--- |
+| **Tiered retrieval engine** — deterministic Tier 0 (manifest), Tier 1 (invariants), Tier 2 (bounded bodies) knapsack retrieval | shipped v1.11.0 |
+| **Provenance and claim ledgers** — direct memory citations with `[RAW]`, `[FETCH]`, `[SEARCH]` and `[INFER]` confidence tagging | shipped v1.11.0 |
+| **Frozen context snapshots** — immutable SHA-256 state tracking for reproducible agent execution | shipped v1.11.0 |
+| **Native prompt registry** — declarative prompt library and runner (`.memory/prompts/*.md`, `memory prompt run`) | shipped v1.11.0 |
+| **Gauntlet iteration ledger** — multi-turn improvement loop with plateau detection | shipped v1.11.0 |
+| **Strict health gate** — comprehensive `memory verify --strict` referential, link and secret validator | shipped v1.11.0 |
 | **SOW-201**: Live runtime file & symbol verification gate (`STRONG`/`WEAK`/`STALE`) | shipped v1.8.0 |
 | **SOW-202**: Deterministic relevance cutoff gate (hard score threshold ≥ 0.45) | shipped v1.8.0 |
 | **SOW-203**: Git code-drift scanner CLI (`memory drift` / `memory check`) | shipped v1.8.0 |
