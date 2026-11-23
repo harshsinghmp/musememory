@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-11-23
+
+**Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.2...v3.4.3
+
 ### Added
 - **Discriminating coverage for seven shipped fixes (issues #139, #179, #155, #157, #161, #165, #191)**: each of these behaviours had shipped with a test that passed whether or not the fix was present, so each now has one that fails when the behaviour is removed — migrator quarantine at the store boundary (a `runMigration` end-to-end run that must store `candidate`/`unverified`), `optimization_meta.json` activity stamping after `save()`, the daemon's per-event debounce and rename re-arm on real fs events, `upgrade --check` and `--fail-on-update`/`--strict` exit codes, ADR save-before-supersede atomicity when the save fails, `memory ui` port validation and SIGINT teardown, and the plasticity `MAX_GRAPH_NODES` prune, no-change write skip and retrieval-side associative expansion. **Tests only — no behaviour change.**
 
