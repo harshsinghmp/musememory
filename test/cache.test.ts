@@ -258,6 +258,15 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
         "utf8",
       );
 
+      // `get()` detects external edits by comparing the file's mtime against the
+      // mtime cached at the last read. On a coarse filesystem clock the write can
+      // land in the same timestamp tick as that read, the two mtimes match, and
+      // the stale cached entry is served — a real CI flake ("Expected: External
+      // Modification"). Pin the mtime a couple of seconds ahead so the mismatch
+      // is unambiguous, rather than sleeping and hoping the clock ticked.
+      const later = new Date(Date.now() + 2000);
+      utimesSync(filePath, later, later);
+
       // Next get should detect mtime change and return updated content
       const refreshed = get(store, entry.id);
       expect(refreshed?.title).toBe("External Modification");

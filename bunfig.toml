@@ -1,6 +1,8 @@
 # Muse Memory Bun Configuration
 # Surface hardening for bun test and runtime execution
 
-[test]
-# Explicit global test timeout in milliseconds (prevents runner stalls)
-timeout = 15000
+# Test timeouts are NOT configurable here: bunfig.toml has no timeout key.
+# Bun only accepts a timeout as the third argument to test()/it()
+# (e.g. it("spawns git", () => { ... }, 20_000)) or as --timeout on the CLI.
+# A `[test] timeout = ...` entry is silently ignored, which made an earlier
+# version of this file promise a global stall guard that never existed.
