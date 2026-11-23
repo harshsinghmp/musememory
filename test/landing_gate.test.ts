@@ -48,6 +48,11 @@ describe("The Landing Gate", () => {
   let origin: string;
   let work: string;
 
+  // Setup spawns four real `git` processes and runs BEFORE each test's own
+  // timeout applies: Bun gives hooks their own default 5s budget (verified — a
+  // hook sleeping 7s fails with "a beforeEach/afterEach hook timed out for this
+  // test" even when the test body declares 20_000). Give it the same budget as
+  // the tests below, so a loaded CI runner cannot fail the suite in setup.
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "muse-landing-gate-"));
     origin = join(tmp, "origin.git");
@@ -58,7 +63,7 @@ describe("The Landing Gate", () => {
     expect(git(tmp, ["clone", origin, work]).code).toBe(0);
     expect(git(work, ["config", "user.email", "gate@test.invalid"]).code).toBe(0);
     expect(git(work, ["config", "user.name", "Gate Test"]).code).toBe(0);
-  });
+  }, 20_000);
 
   afterEach(() => {
     rmSync(tmp, { recursive: true, force: true });
@@ -89,7 +94,7 @@ describe("The Landing Gate", () => {
       expect(gate.out).toContain("RESULT: LOCAL");
       expect(gate.out).toContain("LOCAL");
       expect(gate.out).not.toContain("RESULT: LANDED");
-    });
+    }, 20_000);
 
     it("FAILS on a branch that was pushed but never merged into the integration branch", () => {
       seedIntegrationBranch();
@@ -101,7 +106,7 @@ describe("The Landing Gate", () => {
       expect(gate.code).toBe(1);
       expect(gate.out).toContain("RESULT: LOCAL");
       expect(gate.out).toContain("is NOT an ancestor");
-    });
+    }, 20_000);
 
     it("FAILS when the integration branch does not exist on the remote", () => {
       // No seedIntegrationBranch() — origin/dev does not exist yet.
@@ -112,7 +117,7 @@ describe("The Landing Gate", () => {
 
       expect(gate.code).toBe(1);
       expect(gate.out).toContain("RESULT: LOCAL");
-    });
+    }, 20_000);
   });
 
   describe("the passing case", () => {
@@ -129,7 +134,7 @@ describe("The Landing Gate", () => {
       expect(gate.code).toBe(0);
       expect(gate.out).toContain("RESULT: LANDED");
       expect(gate.out).toContain("is an ancestor of");
-    });
+    }, 20_000);
   });
 
   describe("pre-review mode", () => {
@@ -142,7 +147,7 @@ describe("The Landing Gate", () => {
       expect(gate.code).toBe(1);
       expect(gate.out).toContain("RESULT: NOT REVIEWABLE");
       expect(gate.out).toContain("never pushed");
-    });
+    }, 20_000);
   });
 
   describe("the doctrine it encodes", () => {
@@ -158,7 +163,7 @@ describe("The Landing Gate", () => {
       expect(results.length).toBe(1);
       expect(results[0]).toBe("RESULT: LOCAL");
       expect(gate.out).not.toContain("RESULT: LANDED");
-    });
+    }, 20_000);
 
     it("uses verdicts that cannot be misread as each other", () => {
       // "RESULT: NOT LANDED" would contain "LANDED" as a substring — a report
@@ -174,7 +179,7 @@ describe("The Landing Gate", () => {
 
       const prGate = runGate(work, ["--pr", "--branch", "fix/feature", "--no-fetch"]);
       expect(prGate.out).not.toContain("RESULT: REVIEWABLE");
-    });
+    }, 20_000);
 
     it("tells the agent what to do next when it fails", () => {
       seedIntegrationBranch();
@@ -185,6 +190,6 @@ describe("The Landing Gate", () => {
       expect(gate.out).toContain("git push");
       expect(gate.out).toContain("gh pr create");
       expect(gate.out).toContain("Do not describe this work as landed");
-    });
+    }, 20_000);
   });
 });
