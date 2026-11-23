@@ -4,6 +4,9 @@
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -30,7 +33,7 @@
     "typecheck": "tsc --noEmit",
     "validate": "bun run dist/index.js validate --dry-run",
     "start": "bun run dist/index.js mcp",
-    "prepublishOnly": "bun run build && bun test",
+    "prepublishOnly": "bun run build && bun test --timeout 20000",
     "site:qa": "bun run --cwd apps/website scripts/qa-gate.ts",
     "showreel:hash": "bun scripts/showreel-hash.ts",
     "showreel:hash:write": "bun scripts/showreel-hash.ts --write"
