@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CI gated on wall-clock latency and never applied its own timeout**: `gradeRecallSet` folded `latency.p50 <= p50Budget` into `passed`, so the suite failed on runner speed rather than on retrieval quality — `test/recall-eval.test.ts` died at `p95 = 83.32ms` against a 60ms budget, an earlier dense-graph test on `elapsed < 50ms`, and `test/landing_gate.test.ts` timed out at 5027ms under Bun's 5s default. `passed` is now the quality gate alone (recall floor and distractor tolerance), p50/p95/p99 are still **reported** beside the recall scores per T-142, and the test keeps one catastrophic ceiling (`p99 < 2000ms`) that only catches an order-of-magnitude regression; the now-unused `p50BudgetMs` option is gone while `P50_BUDGET_MS`/`P95_BUDGET_MS`/`P99_BUDGET_MS` stay as reference budgets. `bunfig.toml` has no `timeout` key in Bun — only the `--timeout` CLI flag — so the 20s stall guard it promised never existed; `bun test --timeout 20000` is now what CI, the publish workflow and the `test` script actually run, proven with a 7-second test that fails at the 5s default and passes with the flag. The `Tests-… Passed` README badge said 1444 against a suite of 1645 and now says 1645.
+
 ## [3.4.3] - 2026-11-23
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.2...v3.4.3
