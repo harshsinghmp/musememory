@@ -1,7 +1,54 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.4.2` (post-release `dev`)  
+> **Version**: `v3.4.3` (post-release `dev`)  
 > **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
+
+---
+
+## 🧾 Session — v3.4.3 Closeout, CI Trustworthiness & the Flake Class (2026-11-23)
+
+**v3.4.3 shipped.** npm publish is live with `gitHead d215dd7`; the annotated tag
+`v3.4.3` sits on `6642b11`. The delta between the two is tests and config only —
+no product surface changed.
+
+**The release was blocked by a flake class, not by defects.** Three separate CI
+runs died on wall-clock assertions: `test/recall-eval.test.ts` measured
+`p95 = 83.32ms` against its `60ms` budget (the failure standing on `dev`), earlier
+a dense-graph test asserted `elapsed < 50ms`, and `test/landing_gate.test.ts`
+timed out at 5027ms under Bun's 5s default. Separately, `bunfig.toml` had no
+`timeout` key — Bun has no such config key at all, only `--timeout` on the CLI —
+so the global stall guard the file promised never existed. A previous PR corrected
+that comment; the flag itself was still passed nowhere, so the 5s default was the
+only timeout in force.
+
+**Latency is now reported, not gated.** `gradeRecallSet` computed `passed` as
+recall floor **and** distractor tolerance **and** `latency.p50 <= p50Budget`. A
+shared runner cannot make a wall clock a correctness gate — the same commit
+measures 1ms here and 83ms on a contended runner — so `passed` is now the quality
+gate alone (`recallAtK >= floor && distractorViolations <= distractorTolerance`)
+and the unused `p50BudgetMs` option is gone. T-142 still requires p50/p95/p99 to
+be **reported** beside the recall scores; `P50_BUDGET_MS`/`P95_BUDGET_MS`/
+`P99_BUDGET_MS` stay as reference budgets for humans and benchmarks. The test keeps
+the log line and every quality assertion, and swaps the three budget assertions for
+a single catastrophic ceiling (`p99 < 2000ms`) that only catches an
+order-of-magnitude regression.
+
+**The 20s timeout is real now.** `bun test --timeout 20000` is what CI actually
+runs: both the storage-compatibility matrix and the full suite in `ci.yml`, the
+publish gate in `npm-publish.yml`, and the `test` script. Proven with a throwaway
+7-second test — it fails at the 5s default and passes with the flag.
+
+**Roadmap sweep: 50 → 5 open issues.** Two are parked (`#39` Pattern-Key taxonomy,
+`#40` `.learnings/` loop) and three are re-scoped (`#41` manifest-first knapsack
+retrieval, `#43` proactive review loop, `#44` skill export bridge).
+
+**README badge corrected.** The `Tests-… Passed` shield claimed 1444 while the
+suite is 1645. Nothing gated that number, which is exactly why it aged; every
+other shield was checked against `claims.json` and already agreed.
+
+Gate: `bun test` 1645/1645 pass on three consecutive full-suite runs;
+`bunx tsc --noEmit` clean; `bun run build`; `changelog:check`, `claims:check` and
+`docs:check` all green.
 
 ---
 
