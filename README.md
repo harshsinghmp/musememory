@@ -144,62 +144,35 @@ memory optimize
 > One flat list of what is current. Historical releases live in the
 > [Changelog](./CHANGELOG.md) and the [GitHub Releases](https://github.com/harshsinghmp/musememory/releases) pages.
 
-**Correctness**
-
-- **Five defects closed in the engine**: a prompt-injection channel through
-  `CURRENT.md`, a store that could fail its own schema validator, bi-temporal
-  queries answered from a stale cache entry, a tiered-context path that
-  silently dropped `as_of`, and an access counter that never accumulated.
-- **Every published number is generated from the source** and checked by a test,
-  so the site can no longer advertise a figure the code does not produce.
-- **The contradiction engine no longer flags unrelated memories.** It used to
-  compare two memories with bare keyword pairs, so "pooling is enabled" and
-  "pooling is disabled" looked like a conflict. It now compares *claims* about
-  the same subject in the same scope, and a read-only
-  `memory conflicts --dry-run` previews what it would flag.
-- **The health report no longer attributes a store-wide number to one
-  arbitrary project.** It states its own scope — the filter, the projects it
-  covered, the entry count — and `memory health --project P` asks for one
-  project's health directly. The same filter now reaches every audit
-  surface — anchor audit, drift audit, bug clusters, technical debt — plus
-  a labelled **Project Scope** control in the studio whose value is carried
-  in the URL, so a scoped report can be shared or reloaded.
-
-**Delivery discipline**
-
-- **A commit is not a delivery.** `check:landed` runs in CI on every pull
-  request and push: work is *landed* only when it is reachable from the
-  integration branch *on the remote*, and every report must be able to
-  quote that evidence instead of asserting it.
-- **Shared checkouts are leased.** Two agents in one tree cannot collide
-  silently: the checkout is leased before git mutations, broad `git add`
-  is banned, and staging is verified against `git status` immediately
-  before a commit.
-- **The page no longer reads blank without JavaScript**, and the mobile menu
-  no longer overflows the viewport.
-
-**The website**
-
-- **Rebuilt** on a developer-vertical anatomy — hero, demo, architecture, code
-  grid, proof, quickstart — with a fluid token system, a new twelve-second
-  showreel and a line-icon set. Every figure is bound to the same manifest the
-  code generates, so no number on the page can drift from the code.
-- **The release gate is executable code** (`apps/website/scripts/qa-gate.ts`):
-  critical paths, keyboard-only navigation, 200% zoom reflow, the
-  no-JavaScript first frame, animation performance, the payload budget and a
-  second rendering engine. It exits non-zero on a blocking failure and runs in
-  CI, so a broken page cannot ship.
-
-**Capabilities**
-
-- Closed-loop failure attribution matching code anchors with decaying strike
-  counters.
-- Trajectory fix-pair mining that discovers negative lessons from agent error
-  sequences.
-- Active working-set compounding and candidate scoring straight from `HOT.md`.
-- LangMem logarithmic frequency ranking with 2x application weighting.
-- A multi-channel distillation router across system, content and health.
-- A pre-mutation snapshot ring for zero-daemon recovery.
+- **Deleted memories stay deleted.** A link pointing at a memory you had erased
+  used to be enough to pull it back into an agent's context. Erased memories are
+  now unreachable from every direction, including links between memories.
+- **Reads no longer share one mutable copy.** A caller that edited an entry it
+  had just listed could silently corrupt what every later read of that page
+  saw. Each reader now gets its own copy, so one caller cannot change another's
+  results.
+- **Filtered lists say how much they hid.** When a listing withholds memories,
+  it now reports how many instead of implying that nothing was hidden.
+- **Errors you can act on.** A database fallback that could never succeed has
+  been removed, so a genuine problem with an old-format store now reports the
+  real cause rather than a misleading one.
+- **Imported memories cannot award themselves trust.** A migrated record can no
+  longer claim a higher verification level, or a "confirmed" status, on its own
+  say-so: verification now needs real test evidence, and confirmation needs the
+  record to be the current version.
+- **Pinned memories stay in the loop.** Knowledge you deliberately pin is exempt
+  from the "do not repeat this too soon" rule, so it keeps reaching the agent
+  instead of going quiet for several turns.
+- **Ending a session finishes its work.** `memory session end` now flushes the
+  promotions that were staged during the session, instead of leaving them for
+  some unrelated later command to pick up.
+- **Queries with nothing to search for cost nothing.** A greeting, a
+  punctuation-only query or a handful of filler words now returns "no confident
+  match" immediately instead of scanning and scoring the entire memory store.
+- **Proof behind seven past fixes, and a steadier build.** Seven fixes that had
+  only ever been guarded by tests that passed with or without the fix now have
+  tests that fail when the fix is removed, and two tests that failed at random
+  in the build pipeline now pass or fail for a real reason.
 
 ---
 
