@@ -197,18 +197,40 @@ function enqueueWrites(writes: Array<() => void>): void {
 
 process.on("exit", flushPendingWrites);
 
+// --- #432: one Store per memory directory, for the life of the process --------
+// `resolveStoreForRequest` used to open a brand-new Store for every request that
+// carried a `dir`, and nothing ever closed it: each call leaked the SQLite
+// handle (plus its WAL), so a long-lived MCP server walked into the fd limit.
+// At that limit `openDatabase` throws EMFILE, which `openStore` degrades past,
+// and every tool then silently answers from the YAML mirror while reporting
+// success. Caching by memory directory bounds the fds, and makes every handler
+// for a directory share one cache and one circuit breaker instead of a fresh,
+// permanently-cold pair per request.
+const storeByMemoryDir = new Map<string, Store>();
+
+/** Return the cached Store for `memoryDir`, opening and caching it on first use. */
+export function getCachedStore(memoryDir: string): Store {
+  const cached = storeByMemoryDir.get(memoryDir);
+  if (cached) return cached;
+  const opened = openStore(memoryDir);
+  storeByMemoryDir.set(memoryDir, opened);
+  return opened;
+}
+
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
   const { root, memoryDir } = findOrCreateProjectRoot(resolvedTarget);
-  const store = openStore(memoryDir);
+  // #432: the server's own store goes through the cache too, so a request that
+  // names this project's directory reuses it rather than opening a second one.
+  const store = getCachedStore(memoryDir);
 
   function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
     const dir = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
     if (typeof dir === "string" && dir.trim()) {
       const resolved = findOrCreateProjectRoot(dir.trim());
       return {
-        activeStore: openStore(resolved.memoryDir),
+        activeStore: getCachedStore(resolved.memoryDir),
         activeMemoryDir: resolved.memoryDir,
         activeRoot: resolved.root,
       };

@@ -89,9 +89,34 @@ export function normalizeMemoryType(raw?: string): MemoryType {
   return "discovery";
 }
 
-const VALID_MEMORY_STATUSES: Set<MemoryStatus> = new Set([
-  "candidate", "active", "confirmed", "superseded", "stale", "disputed", "rejected", "conflicted", "cold", "dormant", "archived"
-]);
+/**
+ * #442: the single source of truth for the valid `MemoryStatus` members.
+ *
+ * This used to be a hand-written list inside the `Set`, and it carried 11 of the
+ * 12 union members — `"expired"` was missing, so `normalizeMemoryStatus("expired")`
+ * fell through the final `has` check to `"candidate"` and an imported expired
+ * memory came back to life as a live candidate.
+ *
+ * The `satisfies readonly MemoryStatus[]` means a typo or a removed member fails
+ * the build, and `MEMORY_STATUS_VALUES` staying next to `MemoryStatus` is the
+ * reminder to extend it when the union grows.
+ */
+const MEMORY_STATUS_VALUES = [
+  "candidate",
+  "active",
+  "confirmed",
+  "superseded",
+  "stale",
+  "disputed",
+  "rejected",
+  "conflicted",
+  "cold",
+  "dormant",
+  "archived",
+  "expired",
+] as const satisfies readonly MemoryStatus[];
+
+const VALID_MEMORY_STATUSES: Set<MemoryStatus> = new Set(MEMORY_STATUS_VALUES);
 
 /**
  * Normalizes raw status strings into valid MemoryStatus members.

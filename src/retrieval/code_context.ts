@@ -3,8 +3,13 @@ import { basename, dirname, join } from "node:path";
 import type { Store } from "../store.ts";
 import { list } from "../store.ts";
 import { recordAuditEvent } from "../audit.ts";
-import type { ScoredEntry } from "../retrieval.ts";
-import type { MemoryEntry } from "../types.ts";
+// #441: one expiry rule for every read path. This module used to carry its own
+// `isExpired` (past `valid_to` or past `expires_at`, no status check), which
+// disagreed with the canonical `retrieval.isExpired` (past `expires_at` or
+// `status === "expired"`) on 2 of 3 shapes — so code-context recall could serve
+// a memory that every other path treats as expired. `retrieval.ts` does not
+// import this module (only `retrieval/anchors.ts` does), so this is not a cycle.
+import { isExpired, type ScoredEntry } from "../retrieval.ts";
 
 export interface CodeContextInput {
   files?: string[];
@@ -43,12 +48,6 @@ function fileMatches(anchorPath: string, queryPath: string): boolean {
   const a = normalizeCodePath(anchorPath);
   const b = normalizeCodePath(queryPath);
   return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
-}
-
-function isExpired(entry: MemoryEntry, now: number): boolean {
-  if (entry.valid_to && Date.parse(entry.valid_to) <= now) return true;
-  if (entry.expires_at && Date.parse(entry.expires_at) <= now) return true;
-  return false;
 }
 
 export interface ProjectIdentity {
