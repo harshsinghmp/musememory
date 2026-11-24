@@ -24,6 +24,7 @@ import {
   insertFactProvenance,
   getFactProvenanceRow,
   listFactProvenanceRows,
+  getContentGeneration,
   type SqliteDatabase,
   type FtsSearchHits,
 } from "./sqlite.ts";
@@ -315,17 +316,62 @@ function withTransaction<T>(db: SqliteDatabase | undefined, fn: () => T): T {
 }
 
 /**
- * T-020: SQLite's total change counter moves on every committed write, including
- * writes that never touch the memories directory. Used as the query-cache write
- * generation so a cached result is never served after a write.
+ * T-020 (revised): the read cache is invalidated by CONTENT writes, not by every
+ * committed statement. The generation lives beside `insertOrReplaceMemory`
+ * (`src/sqlite.ts`), which is the single write choke point, so a direct insert
+ * outside `save()` still invalidates the cache. Access-telemetry UPDATEs do not.
+ *
+ * This does not weaken external-write detection: `total_changes()` is
+ * per-connection, so another process's write never moved it either — the
+ * directory-mtime guard covers YAML drops.
  */
-function dbWriteGeneration(db: SqliteDatabase | undefined): number | undefined {
-  if (!db) return undefined;
-  try {
-    return db.query<{ t: number }>(`SELECT total_changes() AS t`).get()?.t;
-  } catch {
-    return undefined;
+function contentGenerationOf(store: Store): number | undefined {
+  if (!store.db) return undefined;
+  return getContentGeneration(store.db);
+}
+
+/**
+ * Access-telemetry overlay (T-020 revised companion).
+ *
+ * `recordAccessFor` writes `last_accessed_at`/`access_count` straight to SQLite.
+ * Those writes no longer invalidate the list cache — that invalidation is what
+ * made every ranked query re-parse the whole store — so a cache hit would serve
+ * the counts from before the query. The overlay carries only the values written
+ * since the cache was filled and is applied to the returned copies, which keeps
+ * the visible contract at O(results) instead of O(store).
+ */
+interface AccessStamp {
+  at: string;
+  count: number;
+}
+const accessOverlay = new WeakMap<Store, Map<string, AccessStamp>>();
+
+/** Record an access increment so cached listings reflect it immediately. */
+export function noteAccess(store: Store, id: string, at: string, count: number): void {
+  let map = accessOverlay.get(store);
+  if (!map) {
+    map = new Map();
+    accessOverlay.set(store, map);
   }
+  map.set(id, { at, count });
+}
+
+/** Drop an overlay entry when the row itself is rewritten from content. */
+export function clearAccessOverlay(store: Store, id: string): void {
+  accessOverlay.get(store)?.delete(id);
+}
+
+function withAccessOverlay(store: Store, entries: MemoryEntry[]): MemoryEntry[] {
+  const map = accessOverlay.get(store);
+  if (!map || map.size === 0) return entries;
+  let changed = false;
+  const out = entries.map((e) => {
+    const stamp = map.get(e.id);
+    if (!stamp) return e;
+    changed = true;
+    return { ...e, last_accessed_at: stamp.at, access_count: stamp.count };
+  });
+  return changed ? out : entries;
 }
 
 function getStoreMemoriesFingerprint(store: Store): string {
@@ -716,14 +762,14 @@ export function list(
   // T-055: If circuit breaker is open (degraded mode), return cache without crashing
   if (store.circuit?.isDegraded()) {
     const cached = store.cache?.getQuery(cacheKey, dirMtime);
-    return cached ?? [];
+    return withAccessOverlay(store, cached ?? []);
   }
 
   // 1. Check L0 query cache. T-020: the write generation guards against writes the
   // dir mtime cannot see (coarse mtimes, SQLite-only writes).
   if (store.cache) {
-    const cached = store.cache.getQuery(cacheKey, dirMtime, dbWriteGeneration(store.db));
-    if (cached) return cached;
+    const cached = store.cache.getQuery(cacheKey, dirMtime, contentGenerationOf(store));
+    if (cached) return withAccessOverlay(store, cached);
   }
 
   // 2. High-speed path: SQLite indexed table (avoids O(N) filesystem stat storm)
@@ -808,10 +854,10 @@ export function list(
     // Cache the query result last: setEntry() invalidates the query cache, so
     // caching it first would self-destruct. Stamped with the post-write generation
     // so results computed before a reconciliation write are never served (T-020).
-    store.cache.setQuery(cacheKey, entries, undefined, dirMtime, dbWriteGeneration(store.db));
+    store.cache.setQuery(cacheKey, entries, undefined, dirMtime, contentGenerationOf(store));
   }
 
-  return entries;
+  return withAccessOverlay(store, entries);
 }
 
 /**
@@ -928,6 +974,11 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
   } else {
     doSave();
   }
+
+  // T-020 (revised): a content write invalidates the read cache from inside
+  // `insertOrReplaceMemory`, the single write choke point. The access overlay is
+  // cleared here because the row now carries its own authoritative counters.
+  clearAccessOverlay(store, entry.id);
 
   // T-029: Touch optimization activity on store writes
   if (store.memoryDir) {
