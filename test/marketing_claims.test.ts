@@ -31,7 +31,7 @@ const claims = JSON.parse(readFileSync(join(ROOT, "claims.json"), "utf8"));
 const toolMatrix = JSON.parse(readFileSync(join(ROOT, "docs/mcp-tool-matrix.json"), "utf8"));
 
 function registeredToolNames(): Set<string> {
-  const src = readFileSync(join(ROOT, "src/mcp.ts"), "utf8");
+  const src = readFileSync(join(ROOT, "src/mcp/catalog.ts"), "utf8");
   return new Set(
     [...src.matchAll(/name:\s*"([a-z0-9_]+)"/g)].map((m) => m[1]!).filter((n) => n !== "musememory"),
   );
@@ -39,7 +39,7 @@ function registeredToolNames(): Set<string> {
 
 describe("Published-claim integrity", () => {
   describe("claims.json is derived from source", () => {
-    it("mcpTools equals the number of tools registered in src/mcp.ts", () => {
+    it("mcpTools equals the number of tools registered in src/mcp/catalog.ts", () => {
       expect(claims.mcpTools).toBe(registeredToolNames().size);
     });
 

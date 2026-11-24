@@ -24,9 +24,10 @@ const ROOT = resolve(__dirname, "..");
 const OUT = join(ROOT, "docs/cli-reference.md");
 
 /* ── MCP tools ────────────────────────────────────────────────────────────
-   Parsed from the single ListTools handler in src/mcp.ts. The handler is a
-   flat array of `{ name, description, inputSchema }` objects, so a targeted
-   scan of that array is enough — and it cannot disagree with the server. */
+   Parsed from `MCP_TOOL_CATALOG` in src/mcp/catalog.ts — the single array the
+   ListTools handler serves. It is a flat array of `{ name, description,
+   inputSchema }` objects, so a targeted scan of that array is enough — and it
+   cannot disagree with the server. */
 interface Tool {
   name: string;
   description: string;
@@ -34,11 +35,10 @@ interface Tool {
 }
 
 function parseTools(): Tool[] {
-  const src = readFileSync(join(ROOT, "src/mcp.ts"), "utf8");
-  const start = src.indexOf("server.setRequestHandler(ListToolsRequestSchema");
-  if (start === -1) throw new Error("ListTools handler not found in src/mcp.ts");
-  const end = src.indexOf("return { tools: ", start);
-  const body = src.slice(start, end === -1 ? src.length : end);
+  const src = readFileSync(join(ROOT, "src/mcp/catalog.ts"), "utf8");
+  const start = src.indexOf("export const MCP_TOOL_CATALOG");
+  if (start === -1) throw new Error("MCP_TOOL_CATALOG not found in src/mcp/catalog.ts");
+  const body = src.slice(start);
 
   const tools: Tool[] = [];
   const toolRe = /name:\s*"([a-z0-9_]+)",\s*\n\s*description:\s*"((?:[^"\\]|\\.)*)"/g;
