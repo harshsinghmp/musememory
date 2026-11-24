@@ -2149,7 +2149,14 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
             const text = String(a.constraint || a.text || "");
             if (!text.trim()) return toolError("Missing constraint text to append");
             const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
-            const updated = setCurrent(activeMemoryDir, text, projectName);
+            // #433: the write path now rejects over-length constraints instead of
+            // letting the next sync silently delete them — surface it as a tool error.
+            let updated: string[];
+            try {
+              updated = setCurrent(activeMemoryDir, text, projectName);
+            } catch (err: unknown) {
+              return toolError(err instanceof Error ? err.message : String(err));
+            }
             syncConstraints(activeMemoryDir, activeStore);
             return toolResult({ success: true, updated_constraints: updated });
           }
@@ -2252,9 +2259,13 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
               session_id: a.session_id ? String(a.session_id) : undefined,
             });
             if (a.type === "constraint") {
+              // #433: an over-length constraint is refused by the write path.
+              // Returning the reason beats a silent omission from CURRENT.md.
               try {
                 setCurrent(activeMemoryDir, String(a.content), projectName);
-              } catch {}
+              } catch (err: unknown) {
+                return toolError(err instanceof Error ? err.message : String(err));
+              }
             }
             if (activeMemoryDir) {
               try {

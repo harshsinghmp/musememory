@@ -3,6 +3,7 @@ import { openStore, propose, confirm, supersede, markStale, reject, deleteEntry 
 import {
   getCurrent,
   setCurrent,
+  writeCurrentFile,
   syncConstraints,
   currentFilePath,
   updateSessionHandoff,
@@ -183,6 +184,63 @@ describe("CURRENT.md auto-population and synchronization lifecycle", () => {
     const completedHandoff = getSessionHandoff(memoryDir);
     expect(completedHandoff?.status).toBe("COMPLETED");
     expect(completedHandoff?.task).toContain("[COMPLETED]");
+
+    cleanup(root);
+  });
+});
+
+describe("#433 over-length constraints: rejected at the write path, never deleted on read", () => {
+  test("setCurrent rejects a 301-character constraint with the limit and the length in the message", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+
+    const err = (() => {
+      try {
+        setCurrent(memoryDir, "x".repeat(301));
+        return null;
+      } catch (e) {
+        return e as Error;
+      }
+    })();
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err!.message).toContain("300");
+    expect(err!.message).toContain("301");
+    // Nothing was written: the line is refused, not stored and pruned later.
+    expect(getCurrent(memoryDir).some((c) => c.includes("x".repeat(301)))).toBe(false);
+
+    cleanup(root);
+  });
+
+  test("a 320-character line already in CURRENT.md survives syncConstraints unchanged", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const long = `legacy-long-constraint ${"y".repeat(320)}`;
+
+    // Written by an older build / a previous version: it is already on disk, so the
+    // read path must keep it rather than silently deleting it on the next sync.
+    const data = parseCurrentFile(memoryDir);
+    data.constraints.push(long);
+    writeCurrentFile(memoryDir, data);
+
+    const after = syncConstraints(memoryDir, store);
+
+    expect(after.some((c) => c.includes(long))).toBe(true);
+    expect(getCurrent(memoryDir).some((c) => c.includes(long))).toBe(true);
+    expect(readFileSync(currentFilePath(memoryDir), "utf8")).toContain(long);
+
+    cleanup(root);
+  });
+
+  test("a 300-character constraint is accepted at write time and survives a sync", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const store = openStore(memoryDir);
+    const exact = "z".repeat(300);
+
+    const written = setCurrent(memoryDir, exact);
+    expect(written.some((c) => c.includes(exact))).toBe(true);
+
+    const after = syncConstraints(memoryDir, store);
+    expect(after.some((c) => c.includes(exact))).toBe(true);
 
     cleanup(root);
   });

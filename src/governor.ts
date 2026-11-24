@@ -403,6 +403,12 @@ export function getCurrent(memoryDir: string): string[] {
   return parseCurrentFile(memoryDir).constraints;
 }
 
+/**
+ * #433: hard cap on one CURRENT.md constraint. Enforced at the WRITE path only —
+ * `syncConstraints` must never delete a line that already exists just for being long.
+ */
+export const MAX_CONSTRAINT_CHARS = 300;
+
 export function setCurrent(memoryDir: string, text: string, project = "default"): string[] {
   // T-110: strip injected context blocks at the sink, not only at the store.
   // CURRENT.md is replayed verbatim into every later prompt (see
@@ -413,6 +419,16 @@ export function setCurrent(memoryDir: string, text: string, project = "default")
   const sanitized = stripInjectedContextBlocks(text);
   const trimmed = sanitized.trim();
   if (!trimmed) return getCurrent(memoryDir);
+  // #433: reject over-length input here, where it can still be reported to the
+  // caller. The read path used to drop such a line silently on the next sync,
+  // so the constraint vanished from CURRENT.md with no error anywhere.
+  // Length is measured on what would be stored (post-sanitisation, trimmed).
+  if (trimmed.length > MAX_CONSTRAINT_CHARS) {
+    throw new Error(
+      `Constraint rejected: ${trimmed.length} characters exceeds the ${MAX_CONSTRAINT_CHARS}-character limit for CURRENT.md constraints. ` +
+        `Shorten it to ${MAX_CONSTRAINT_CHARS} characters or fewer and retry.`,
+    );
+  }
   const current = parseCurrentFile(memoryDir);
   const stamp = `[${new Date().toISOString()}] (${project}) ${trimmed}`;
   if (!current.constraints.some((c) => c.includes(trimmed))) {
@@ -424,7 +440,11 @@ export function setCurrent(memoryDir: string, text: string, project = "default")
 
 function isValidConstraintLine(text: string): boolean {
   const trimmed = text.trim();
-  if (trimmed.length < 5 || trimmed.length > 300) return false;
+  // #433: no upper-bound check here. This predicate runs on the READ path
+  // (parseCurrentFile / syncConstraints), where rejecting a long line DELETED a
+  // constraint that setCurrent had already accepted and stored. The cap lives
+  // in setCurrent(); a line already on disk is kept regardless of its length.
+  if (trimmed.length < 5) return false;
   if (trimmed.includes("\n")) return false;
   if (/expect\(/i.test(trimmed) || /Ran\s+\d+\s+tests/i.test(trimmed)) return false;
   if (trimmed.startsWith("Showing lines") || trimmed.startsWith("Created At:") || trimmed.startsWith("File Path:")) return false;
