@@ -8,7 +8,7 @@ import { AgentMemoryAdapter } from "../src/migrator/adapters/agentmemory.ts";
 import { GenericAdapter } from "../src/migrator/adapters/generic.ts";
 import { runMigration, detectProviders } from "../src/migrator/index.ts";
 import { expandPath } from "../src/migrator/detect.ts";
-import { VERIFICATION_BONUS } from "../src/types.ts";
+import { VERIFICATION_BONUS, type MemoryStatus } from "../src/types.ts";
 
 function temp(): string {
   return mkdtempSync(join(tmpdir(), "migrator-quarantine-test-"));
@@ -311,6 +311,49 @@ describe("T-366: Migrator Quarantine & Schema Intake Validation", () => {
     expect(normalizeMemoryStatus("unknown-status-val")).toBe("candidate");
     expect(normalizeMemoryStatus(undefined)).toBe("candidate");
     expect(normalizeMemoryStatus("active", true)).toBe("superseded"); // isArchived overrides
+
+    // #442: every MemoryStatus member must survive normalization. The valid-status
+    // set hand-listed 11 of the 12 members and omitted "expired", so an imported
+    // expired memory fell through to "candidate" and came back as a live entry.
+    // Two members have deliberate aliases that predate this table ("active" means
+    // confirmed, "archived" collapses to superseded); everything else round-trips.
+    const NORMALIZED: Array<[MemoryStatus, MemoryStatus]> = [
+      ["candidate", "candidate"],
+      ["active", "confirmed"],
+      ["confirmed", "confirmed"],
+      ["superseded", "superseded"],
+      ["stale", "stale"],
+      ["disputed", "disputed"],
+      ["rejected", "rejected"],
+      ["conflicted", "conflicted"],
+      ["cold", "cold"],
+      ["dormant", "dormant"],
+      ["archived", "superseded"],
+      ["expired", "expired"],
+    ];
+    // Exhaustiveness is enforced by the type, not by the table: a new union
+    // member makes this object literal fail to compile until it is covered.
+    const EVERY_STATUS: Record<MemoryStatus, true> = {
+      candidate: true,
+      active: true,
+      confirmed: true,
+      superseded: true,
+      stale: true,
+      disputed: true,
+      rejected: true,
+      conflicted: true,
+      cold: true,
+      dormant: true,
+      archived: true,
+      expired: true,
+    };
+    expect(NORMALIZED.map(([raw]) => raw).sort().join(",")).toBe(Object.keys(EVERY_STATUS).sort().join(","));
+    for (const [raw, expected] of NORMALIZED) {
+      expect(normalizeMemoryStatus(raw)).toBe(expected);
+      expect(normalizeMemoryStatus(raw.toUpperCase())).toBe(expected);
+    }
+    // The one that was missing: an expired memory stays expired.
+    expect(normalizeMemoryStatus("expired")).toBe("expired");
 
     // 2. AgentMemoryAdapter defaults to candidate when isLatest is omitted
     const root = temp();

@@ -369,6 +369,26 @@ export function resetStoreDirtyState(memoryDir?: string): void {
   }
 }
 
+const degradedOpenWarnedFor = new Set<string>();
+
+/**
+ * #432: a failed SQLite open leaves `store.db` undefined and every read falls
+ * back to the YAML mirror. That fallback is load-bearing (it keeps the CLI
+ * usable on filesystems without SQLite), so it stays — but it used to be
+ * completely silent, so an fd-exhausted server answered every tool from YAML
+ * while reporting success. Say it once per database path, loudly.
+ */
+function warnDegradedStore(dbPath: string, err: unknown): void {
+  if (degradedOpenWarnedFor.has(dbPath)) return;
+  degradedOpenWarnedFor.add(dbPath);
+  const reason = err instanceof Error ? err.message : String(err);
+  console.error(
+    `[musememory] WARNING: could not open the SQLite database at ${dbPath}. ` +
+      `This store is running in DEGRADED YAML-ONLY mode: FTS search, the graph index and vector retrieval are unavailable ` +
+      `and every query is served from the YAML mirror. Reason: ${reason}`,
+  );
+}
+
 /**
  * Open the memories directory & SQLite primary database for a memory dir, creating it if missing.
  * T-153: Supports multi-DB topologies (e.g. options.tenantId, options.isTeam, options.dbName).
@@ -390,7 +410,9 @@ export function openStore(memoryDir: string, options?: StoreOptions): Store {
     } catch {}
     db = opened;
   } catch (err) {
-    // If SQLite initialization fails on unusual environment, fallback gracefully
+    // If SQLite initialization fails on unusual environment, fallback gracefully.
+    // The fallback stays; only its silence is gone (#432).
+    warnDegradedStore(layout.dbPath, err);
   }
 
   // T-153: Key cache and circuit breaker by dbPath to isolate per-tenant and team databases
