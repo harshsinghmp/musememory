@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openStore, propose, confirm, get, deleteEntry, type Store } from "../src/store.ts";
+import { openStore, propose, confirm, get, deleteEntry, expireEntry, type Store } from "../src/store.ts";
 import {
   queryContext,
   formatPromptContext,
@@ -462,6 +462,132 @@ describe("T-098: progressive wikilink expansion after fusion", () => {
       expect(expanded).toBeDefined();
       expect(expanded!.entry?.title).toBe("Deploy Freeze Window");
       expect(expanded!.entry?.content).toContain("No deploys between Friday");
+    });
+  });
+
+  describe("issue #436: lifecycle gates on wikilink expansion", () => {
+    it("does not expand an expired target the primary path already hid", () => {
+      const expiredTarget = confirm(
+        store,
+        propose(store, {
+          title: "Legacy Token Format",
+          content: "Bearer tokens are base64 blobs with no audience check.",
+          project: "test-proj",
+          type: "constraint",
+        }).id,
+      )!;
+
+      confirm(
+        store,
+        propose(store, {
+          title: "Token Format Rotation Runbook",
+          content: `Retire the old format, see [[${expiredTarget.id}]].`,
+          project: "test-proj",
+          type: "decision",
+        }).id,
+      );
+
+      expect(expireEntry(store, expiredTarget.id, { rule: "manual_retirement", force: true })).not.toBeNull();
+
+      const res = queryContext(store, "Token Format Rotation Runbook", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+
+      const expandedIds = res.expanded_wikilinks?.map((w) => w.entry?.id) ?? [];
+      const expandedTargets = res.expanded_wikilinks?.map((w) => w.target) ?? [];
+      expect(expandedIds).not.toContain(expiredTarget.id);
+      expect(expandedTargets).not.toContain(expiredTarget.id);
+      expect(res.hidden_count ?? 0).toBeGreaterThanOrEqual(1);
+
+      // The whole point of the gate: the same call must not print it in full.
+      const ctx = formatPromptContext(store, tmpDir, "Token Format Rotation Runbook", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+      expect(ctx.markdown).not.toContain("Bearer tokens are base64 blobs");
+    });
+
+    it("expands a superseded target only when includeSuperseded is true", () => {
+      const oldMem = confirm(
+        store,
+        propose(store, {
+          title: "Legacy Session Store",
+          content: "Sessions are held in a single Redis instance.",
+          project: "test-proj",
+          type: "architecture",
+        }).id,
+      )!;
+
+      confirm(
+        store,
+        propose(store, {
+          title: "Clustered Session Store",
+          content: "Sessions are held in a sharded Redis cluster.",
+          project: "test-proj",
+          type: "architecture",
+          supersedes: oldMem.id,
+        }).id,
+      );
+
+      const runbook = confirm(
+        store,
+        propose(store, {
+          title: "Session Store Cutover Runbook",
+          content: `Cut over following [[${oldMem.id}]].`,
+          project: "test-proj",
+          type: "decision",
+        }).id,
+      )!;
+
+      const gated = queryContext(store, "Session Store Cutover Runbook", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+      expect(gated.results[0].entry.id).toBe(runbook.id);
+      expect(gated.expanded_wikilinks?.map((w) => w.target) ?? []).not.toContain(oldMem.id);
+
+      const relaxed = queryContext(store, "Session Store Cutover Runbook", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+        includeSuperseded: true,
+      });
+      expect(relaxed.expanded_wikilinks?.map((w) => w.target) ?? []).toContain(oldMem.id);
+    });
+
+    it("still expands a live target with nothing hidden", () => {
+      const liveTarget = confirm(
+        store,
+        propose(store, {
+          title: "Audit Log Retention Window",
+          content: "Audit logs are retained for 400 days.",
+          project: "test-proj",
+          type: "constraint",
+        }).id,
+      )!;
+
+      confirm(
+        store,
+        propose(store, {
+          title: "Compliance Evidence Checklist",
+          content: `Attach the audit window from [[${liveTarget.id}]].`,
+          project: "test-proj",
+          type: "decision",
+        }).id,
+      );
+
+      const res = queryContext(store, "Compliance Evidence Checklist", {
+        project: "test-proj",
+        expand_wikilinks: true,
+        limit: 1,
+      });
+
+      expect(res.expanded_wikilinks?.map((w) => w.entry?.id) ?? []).toContain(liveTarget.id);
+      expect(res.hidden_count ?? 0).toBe(0);
     });
   });
 });
