@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
 import { list, get, slugifyId as slugify, noteAccess } from "./store.ts";
@@ -1416,6 +1416,11 @@ export function expandFusedWikilinks(
     maxHops?: number;
     depth?: DisclosureDepth;
     includeSuperseded?: boolean;
+    includeConflicted?: boolean;
+    includeArchived?: boolean;
+    includeExpired?: boolean;
+    /** Explicit status filter from the caller, mirroring queryContext's gate bypasses. */
+    status?: string;
     memoryDir?: string;
   } = {},
 ): {
@@ -1486,8 +1491,23 @@ export function expandFusedWikilinks(
           visited.add(resolvedEntry.id);
           if (resolvedEntry.title) visited.add(resolvedEntry.title);
 
-          if (!options.includeSuperseded && (resolvedEntry.status === "superseded" || resolvedEntry.valid_to)) {
-            if (resolvedEntry.status === "superseded") continue;
+          // Issue #436: expanded targets must obey the same lifecycle gates the
+          // primary path applies, or a memory the same call counted in
+          // `hidden_count` is handed back here in full. The old guard read
+          // `status === "superseded" || valid_to` and then only acted on the
+          // superseded disjunct, so the `valid_to` half could never change the
+          // outcome and `expired` was never consulted at all.
+          //
+          // `valid_to` is deliberately NOT an expiry rule: it is valid-time,
+          // not expiry (#441). Supersession and `isExpired` cover the shapes
+          // that actually retire a memory.
+          if (
+            (!options.includeSuperseded && (resolvedEntry.status === "superseded" || resolvedEntry.status === "rejected")) ||
+            (!options.includeConflicted && options.status !== "conflicted" && resolvedEntry.status === "conflicted") ||
+            (!options.includeArchived && options.status !== "archived" && resolvedEntry.status === "archived") ||
+            (!options.includeExpired && isExpired(resolvedEntry, Date.now()))
+          ) {
+            continue;
           }
 
           const entryTokens = estimateEntryTokens(resolvedEntry);
@@ -1991,6 +2011,10 @@ export function queryContext(
       maxHops: options.max_wikilink_hops,
       depth: options.depth,
       includeSuperseded: options.includeSuperseded,
+      includeConflicted: options.includeConflicted,
+      includeArchived: options.includeArchived,
+      includeExpired: options.includeExpired,
+      status: options.status,
       memoryDir: store.memoryDir || store.dir,
     });
     if (expansion.expanded.length > 0) {
@@ -2190,6 +2214,35 @@ export function searchTemporal(
 }
 
 /**
+ * Cheap fingerprint of the workspace runtime files whose contents are embedded
+ * in the formatted markdown: `USER.md` (via `getUserProfile`), `CORE.md` (via
+ * `formatCoreBlock`), and `CURRENT.md` (constraints, workstreams, handoff).
+ *
+ * Issue #437: the L1 cache was keyed on the query and its options only, while
+ * the cached markdown carried these files verbatim. Writers such as
+ * `memory_set_user_profile` and `memory_core` do not invalidate `store.cache`,
+ * so a second `get_context` inside the 30s TTL served the old profile with
+ * `fromCache: true, stale: false`.
+ *
+ * `mtimeMs` + `size` from `statSync` is enough to notice a rewrite and far
+ * cheaper than reading the contents; a missing file maps to a constant, so
+ * "absent" is just another state in the key.
+ */
+function runtimeFilesFingerprint(memoryDir?: string): string {
+  if (!memoryDir) return "-";
+  const parts: string[] = [];
+  for (const name of ["USER.md", "CORE.md", "CURRENT.md"]) {
+    try {
+      const st = statSync(join(memoryDir, name));
+      parts.push(`${name}:${st.mtimeMs}:${st.size}`);
+    } catch {
+      parts.push(`${name}:-`);
+    }
+  }
+  return parts.join("|");
+}
+
+/**
  * Formats top-ranked context into a clean Markdown block ready for LLM prompt injection.
  * Integrates active constraints from CURRENT.md if memoryDir is available.
  */
@@ -2204,9 +2257,11 @@ export function formatPromptContext(
   // different snapshot of the store (bi-temporal queries, T-083): omitting it
   // made a "what did we believe in Q1?" query return today's answer from the
   // 30s TTL cache. The include* / types / tags flags have the same problem.
-  const cacheKey = store.cache
-    ? `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}:${options.as_of || ""}:${options.includeSuperseded ? "1" : "0"}:${options.includeConflicted ? "1" : "0"}:${options.includeArchived ? "1" : "0"}:${options.includeUntrusted ? "1" : "0"}:${options.types?.join(",") || ""}:${options.tags?.join(",") || ""}`
-    : undefined;
+  // Issue #437: the runtime-file fingerprint is part of the key for the same
+  // reason — all three files are embedded in the markdown verbatim.
+  const buildCacheKey = (filesFingerprint: string) =>
+    `ctx:${query}:${options.project || ""}:${options.depth || "L2"}:${options.limit ?? 5}:${options.tokenBudget ?? ""}:${options.type || ""}:${options.status || ""}:${options.verified ? "1" : "0"}:${options.minVeracity ?? ""}:${options.as_of || ""}:${options.includeSuperseded ? "1" : "0"}:${options.includeConflicted ? "1" : "0"}:${options.includeArchived ? "1" : "0"}:${options.includeUntrusted ? "1" : "0"}:${options.types?.join(",") || ""}:${options.tags?.join(",") || ""}:${filesFingerprint}`;
+  const cacheKey = store.cache ? buildCacheKey(runtimeFilesFingerprint(memoryDir)) : undefined;
 
   if (cacheKey && store.cache) {
     const cached = store.cache.getContext(cacheKey);
@@ -2428,7 +2483,11 @@ export function formatPromptContext(
   };
 
   if (cacheKey && store.cache) {
-    store.cache.setContext(cacheKey, formatted);
+    // `syncConstraints()` above rewrites CURRENT.md on a cache miss, so the
+    // file state this markdown actually reflects is the one *after* the call.
+    // Filing the entry under the pre-call fingerprint would miss on every
+    // later call and turn the L1 cache into a no-op.
+    store.cache.setContext(buildCacheKey(runtimeFilesFingerprint(memoryDir)), formatted);
   }
 
   return formatted;

@@ -465,4 +465,40 @@ describe("R1 Core Speed: L0 Hot Cache, L1 Context Cache & SQLite FTS5", () => {
       expect(d2).toBeLessThanOrEqual(d1 + 1); // Substantially faster or near-zero
     });
   });
+
+  describe("issue #437: L1 context cache is keyed on its runtime file inputs", () => {
+    it("invalidates the cached context when USER.md is rewritten", () => {
+      const store = openStore(memoryDir);
+      const userFile = join(memoryDir, "USER.md");
+      writeFileSync(userFile, "# User Profile\n\n- Preferred stack: ALPHA-MARKER\n", "utf8");
+
+      const first = formatPromptContext(store, memoryDir, "q");
+      expect(first.fromCache).toBe(false);
+      expect(first.markdown).toContain("ALPHA-MARKER");
+
+      writeFileSync(userFile, "# User Profile\n\n- Preferred stack: BETA-MARKERX\n", "utf8");
+      // Same key length is not assumed: force a distinct mtime as well, so the
+      // fingerprint changes even where mtime resolution is coarse.
+      const bumped = new Date(Date.now() + 5_000);
+      utimesSync(userFile, bumped, bumped);
+
+      const second = formatPromptContext(store, memoryDir, "q");
+      expect(second.fromCache).not.toBe(true);
+      expect(second.markdown).toContain("BETA-MARKERX");
+      expect(second.markdown).not.toContain("ALPHA-MARKER");
+    });
+
+    it("still serves an unchanged context from the cache", () => {
+      const store = openStore(memoryDir);
+      writeFileSync(join(memoryDir, "USER.md"), "# User Profile\n\n- Preferred stack: STABLE-MARKER\n", "utf8");
+
+      const first = formatPromptContext(store, memoryDir, "q");
+      expect(first.fromCache).toBe(false);
+      expect(first.markdown).toContain("STABLE-MARKER");
+
+      const second = formatPromptContext(store, memoryDir, "q");
+      expect(second.fromCache).toBe(true);
+      expect(second.markdown).toBe(first.markdown);
+    });
+  });
 });
