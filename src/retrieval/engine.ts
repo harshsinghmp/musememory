@@ -1,11 +1,13 @@
 import type { Store } from "../store.ts";
-import { list, countMemories } from "../store.ts";
+import { list, countMemories, isTombstoned } from "../store.ts";
+import { getMemoryById } from "../sqlite.ts";
 import {
   queryContext,
   searchTemporal,
   formatPromptContext,
   clampLimit,
   expandFusedWikilinks,
+  isExpired,
   type ContextQueryOptions,
   type FormattedContext,
   type ScoredEntry,
@@ -145,19 +147,24 @@ export class RetrievalEngine {
           });
 
           if (treeRes.nodes.length > 0) {
-            const mapped: ScoredEntry[] = treeRes.nodes.map((sn) => ({
-              entry: {
-                id: sn.node.id,
-                title: sn.node.title,
-                content: sn.node.content ?? sn.node.summary,
-                project: sn.node.project,
-                status: (sn.node.status as any) ?? "active",
-                type: sn.node.type,
-                created_at: sn.node.metadata.createdAt,
-                updated_at: sn.node.metadata.updatedAt,
-              },
-              score: sn.score,
-            }));
+            // #435: the persisted tree index is a stale projection — deleteEntry does not
+            // rewrite it — so a node is only a candidate. Resolve each hit against the live
+            // store and return the live entry: tree nodes carry a synthetic `node_…` id and a
+            // copied status, which made `memory_read` miss and served erased/superseded rows.
+            const now = Date.now();
+            const mapped: ScoredEntry[] = [];
+            for (const sn of treeRes.nodes) {
+              const memoryId = sn.node.memoryIds[0];
+              if (!memoryId) continue;
+              const live = store.db ? getMemoryById(store.db, memoryId) : null;
+              if (!live) continue;
+              if (isTombstoned(store, memoryId)) continue;
+              if (!options.includeSuperseded && (live.status === "superseded" || live.status === "rejected")) continue;
+              if (!options.includeConflicted && live.status === "conflicted") continue;
+              if (!options.includeArchived && live.status === "archived") continue;
+              if (!options.includeExpired && isExpired(live, now)) continue;
+              mapped.push({ entry: live, score: sn.score });
+            }
 
             const minScore = options.minScoreThreshold ?? 0.45;
             const confident_answers = mapped.filter((r) => (!query.trim() || r.score >= minScore) && !isDraftMemory(r.entry));

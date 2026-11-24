@@ -483,7 +483,15 @@ export function startUiServer(opts: UiServerOptions): Promise<{ port: number; cl
         try {
           const body = await parseJsonBody(req);
           if (body.text) {
-            const lines = setCurrent(opts.memoryDir, String(body.text), String(body.project || "default"));
+            // #433: an over-length constraint is a bad request, not a server fault.
+            let lines: string[];
+            try {
+              lines = setCurrent(opts.memoryDir, String(body.text), String(body.project || "default"));
+            } catch (err: unknown) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+              return;
+            }
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ lines }));
             return;

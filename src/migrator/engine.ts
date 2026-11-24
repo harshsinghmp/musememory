@@ -133,7 +133,16 @@ export async function runMigration(
             const currentLines = getCurrent(memoryDir);
             const line = `- [${provider.name}] ${record.title}: ${finalContent.replace(/[\r\n]+/g, " ")}`;
             if (!currentLines.includes(line)) {
-              addConstraint(memoryDir, line, record.project || options.project || "default");
+              try {
+                addConstraint(memoryDir, line, record.project || options.project || "default");
+              } catch (err: unknown) {
+                // #433: one over-length constraint must not abort the whole provider
+                // batch. Skip this line, keep every other record, and report it.
+                report.errors.push(
+                  `[${provider.id}] constraint skipped (${record.title}): ${err instanceof Error ? err.message : String(err)}`,
+                );
+                continue;
+              }
             }
           }
           providerReport.constraintsCount++;
