@@ -1,11 +1,23 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  unlinkSync,
+  openSync,
+  readSync,
+  statSync,
+  closeSync,
+  realpathSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Store } from "./store.ts";
 import { list, save, get, extractEntryText } from "./store.ts";
 import { validateEntry } from "./schema.ts";
-import { scanSecrets } from "./secrets.ts";
+import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent } from "./audit.ts";
 import type { MemoryEntry } from "./types.ts";
 import { getSettings } from "./settings.ts";
@@ -107,10 +119,96 @@ export interface ExecutionSnapshot {
   metadata?: Record<string, any>;
 }
 
+/** A frozen task brief is a short instruction, never a data dump. */
+const MAX_TASK_FILE_BYTES = 64 * 1024;
+
+interface TaskFileContent {
+  content: string;
+  path: string;
+  truncated: boolean;
+  redacted: boolean;
+}
+
+/**
+ * Reads a file-backed task brief, confined to `workspaceRoot`.
+ *
+ * Issue #451: `freeze_run` used to read whatever path arrived in `task`, which
+ * turned a documented "task string" parameter into an arbitrary file read (the
+ * contents landed in `.memory/runs/<id>/snapshot.json` and came back out of
+ * `memory_freeze_list`). A file-backed task is now opt-in through `task_file`,
+ * and that option is contained, size-capped and redacted here.
+ */
+function readTaskFile(workspaceRoot: string, taskFile: string): TaskFileContent {
+  // Rejects absolute paths, NUL bytes and lexical traversal (`../outside.md`).
+  const resolved = resolveWithin(workspaceRoot, taskFile);
+
+  // resolveWithin is lexical only, so a symlink inside the workspace could
+  // still resolve to /etc/passwd. Re-check containment on the real paths.
+  let realRoot: string;
+  let realPath: string;
+  try {
+    realRoot = realpathSync(workspaceRoot);
+    realPath = realpathSync(resolved);
+  } catch {
+    throw new Error(`task_file not found: ${taskFile}`);
+  }
+  try {
+    resolveWithin(realRoot, relative(realRoot, realPath));
+  } catch {
+    throw new Error(`task_file "${taskFile}" resolves outside the workspace (${realPath})`);
+  }
+
+  let stat;
+  try {
+    stat = statSync(realPath);
+  } catch {
+    throw new Error(`task_file not found: ${taskFile}`);
+  }
+  // A FIFO or device inside the workspace would block or stream forever.
+  if (!stat.isFile()) throw new Error(`task_file is not a regular file: ${taskFile}`);
+
+  let fd: number;
+  try {
+    fd = openSync(realPath, "r");
+  } catch {
+    throw new Error(`task_file cannot be read: ${taskFile}`);
+  }
+
+  let raw = "";
+  let truncated = false;
+  try {
+    // Cap the read so a huge file cannot be pulled into a snapshot.
+    const buffer = Buffer.alloc(MAX_TASK_FILE_BYTES);
+    const bytesRead = readSync(fd, buffer, 0, MAX_TASK_FILE_BYTES, 0);
+    truncated = stat.size > bytesRead;
+    raw = buffer.subarray(0, bytesRead).toString("utf-8");
+  } finally {
+    closeSync(fd);
+  }
+
+  // Secrets never enter a snapshot: the same redaction the write gates use.
+  const content = redactSecrets(raw);
+  return {
+    content,
+    path: relative(workspaceRoot, resolved),
+    truncated,
+    redacted: content !== raw,
+  };
+}
+
+/**
+ * Captures an immutable execution snapshot.
+ *
+ * `task` is opaque instruction text and is recorded verbatim — it is never
+ * interpreted as a path (issue #451). Pass `taskFile` for a file-backed brief:
+ * it is resolved inside `workspaceRoot`, capped at 64 KiB and redacted.
+ */
 export function freezeExecutionSnapshot(options: {
   workspaceRoot: string;
   memoryDir: string;
   task: string;
+  /** Optional workspace-relative path to a task brief file. */
+  taskFile?: string;
   runId?: string;
   store?: Store;
   metadata?: Record<string, any>;
@@ -119,15 +217,22 @@ export function freezeExecutionSnapshot(options: {
   const runId = options.runId ?? `run_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const timestamp = new Date().toISOString();
 
-  // 1. Task instruction
+  // 1. Task instruction. A plain instruction is stored exactly as given: the
+  // old `existsSync(task)` probe made every string a potential file read.
   let task = options.task;
-  if (existsSync(task)) {
-    try {
-      task = readFileSync(task, "utf-8").trim();
-    } catch {
-      // Keep as string
-    }
+  let taskMeta: Record<string, unknown> | undefined;
+  if (options.taskFile) {
+    const file = readTaskFile(workspaceRoot, options.taskFile);
+    task = file.content.trim();
+    taskMeta = {
+      task_file: file.path,
+      task_file_truncated: file.truncated,
+      task_file_redacted: file.redacted,
+    };
+    // Keep the caller's label instead of silently discarding it.
+    if (options.task.trim()) taskMeta.task_label = options.task.trim();
   }
+  const metadata = taskMeta ? { ...(options.metadata ?? {}), ...taskMeta } : options.metadata;
 
   // 2. Git commit hash (if available)
   let gitCommit: string | undefined;
@@ -192,7 +297,7 @@ export function freezeExecutionSnapshot(options: {
     constraints,
     memory_hashes,
     file_inventory,
-    metadata: options.metadata,
+    metadata,
   };
 
   const safeRunId = runId.replace(/[^a-zA-Z0-9_\-\.]/g, "_");

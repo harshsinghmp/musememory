@@ -5,6 +5,7 @@ import { getGlobalMemoryDir } from "../root.ts";
 import { userFilePath, initUserProfile } from "../user.ts";
 import { detectProviders, runMigration } from "../migrator/index.ts";
 import { getGraphStatus, indexGraph } from "../graph.ts";
+import { isLoopbackHost } from "../net.ts";
 import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export const MUSE_MEMORY_DIRECTIVE = `<!-- musememory:start -->
@@ -568,14 +569,42 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
     const allowedOrigins = flags["allowed-origins"]
       ? flags["allowed-origins"].split(",").map((o: string) => o.trim())
       : undefined;
-    const allowedHosts = flags["allowed-hosts"]
+    const explicitAllowedHosts = flags["allowed-hosts"]
       ? flags["allowed-hosts"].split(",").map((h: string) => h.trim())
       : undefined;
+
+    const hasConfiguredToken = Boolean(bearerToken || (bearerTokens && bearerTokens.length > 0));
+    const insecure = flags["insecure"] === "true";
+    const loopback = isLoopbackHost(host);
+
+    // Issue #453: `--host 0.0.0.0` used to publish every tool anonymously,
+    // because the transport only required auth when a token happened to be
+    // configured. Refuse the bind unless the operator authenticates it or
+    // explicitly accepts the exposure. Exit 2 = usage error, no server.
+    if (!loopback && !hasConfiguredToken && !insecure) {
+      console.error(
+        `Error: refusing to bind the MCP HTTP server to "${host}" without authentication — every tool would be reachable by anyone who can reach this port.`,
+      );
+      console.error(
+        `Pass --token <token> or --tokens <peer:token,...> (or set MUSE_BEARER_TOKEN / MUSE_AUTH_TOKENS), or re-run with --insecure to bind unauthenticated.`,
+      );
+      console.error(`Loopback binds (127.0.0.1, ::1, localhost) stay unauthenticated by default.`);
+      return 2;
+    }
+
+    // Issue #453: DNS-rebinding validation is on by default — derive the Host
+    // allowlist from the bind host plus loopback so a rebinding page cannot
+    // reach the server through a Host it controls.
+    const allowedHosts = explicitAllowedHosts ?? [...new Set([host, "localhost", "127.0.0.1", "[::1]"])];
 
     const { startHttpMcpServer } = await import("../mcp.ts");
     const handle = await startHttpMcpServer({
       port,
       host,
+      bindHost: host,
+      // --insecure is the operator's explicit acknowledgement; the transport
+      // guard still requires auth for every non-loopback bind without it.
+      allowInsecureBind: insecure,
       bearerToken,
       bearerTokens,
       allowedPeers,
@@ -583,8 +612,16 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
       allowedHosts,
     });
     console.log(`Muse Memory MCP Streamable HTTP Server listening at ${handle.url}`);
-    if (bearerToken || bearerTokens) {
+    console.log(`[Auth] Allowed hosts: ${allowedHosts.join(", ")}`);
+    if (hasConfiguredToken) {
       console.log(`[Auth] Bearer authentication active (${allowedPeers ? `${allowedPeers.length} allowed peers` : "allowlist open"})`);
+    } else if (insecure) {
+      console.warn(
+        `\n!!! WARNING: MCP HTTP server bound to ${host} with --insecure — EVERY tool is reachable WITHOUT authentication.`,
+      );
+      console.warn(`!!! Anyone who can reach port ${handle.port} can read, write and delete memories. Do not use this on an untrusted network.\n`);
+    } else if (loopback) {
+      console.log(`[Auth] Loopback bind (${host}); no bearer token required for local clients.`);
     }
     return new Promise<number>((resolve) => {
       const shutdown = async () => {

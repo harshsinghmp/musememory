@@ -160,7 +160,7 @@ export async function handleFreezeCommand({ positional, flags }: ParsedArgs): Pr
 
   const task = flags["task"] || positional.join(" ");
   if (!task || !task.trim()) {
-    return usageError("freeze requires --task <task.md|text>");
+    return usageError("freeze requires --task <text> (the task is instruction text, never a file path)");
   }
 
   const snap = freezeExecutionSnapshot({

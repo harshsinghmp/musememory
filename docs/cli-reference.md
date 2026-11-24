@@ -109,7 +109,10 @@ Ecosystem, Migration & Connectivity:
   terrain [--workspace] [--out]  Machine terrain, or --workspace for the six workspace maps
   code-impact <file> [--symbol] Synthesize code callers, ADRs, negative warnings & risk score
   pr-context [--base B] [--out] Generate memory-verified PR description from git diff
-  mcp                           Run stdio MCP server for agent platforms
+  mcp [--http] [--host H] [--port N] MCP server: stdio by default, Streamable HTTP with --http/--port
+                                 Non-loopback --host requires --token/--tokens (or MUSE_BEARER_TOKEN/
+                                 MUSE_AUTH_TOKENS) unless --insecure is passed; Host allowlist is derived
+                                 from the bind host + loopback unless --allowed-hosts is given
 
 Version Control (R23):
   branch <id> --path <path> [--label L] Tag a memory with semantic dotted-path addressing
