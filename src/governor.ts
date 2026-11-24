@@ -409,6 +409,19 @@ export function getCurrent(memoryDir: string): string[] {
  */
 export const MAX_CONSTRAINT_CHARS = 300;
 
+/**
+ * #452: the refusal message for an over-length constraint, shared by every
+ * caller that must reject one *before* it writes the memory. Returned to the
+ * caller instead of thrown so the wording cannot drift between the write path
+ * (`setCurrent`) and the pre-write validation in the MCP capture/propose tool.
+ */
+export function constraintLengthError(trimmedLength: number): string {
+  return (
+    `Constraint rejected: ${trimmedLength} characters exceeds the ${MAX_CONSTRAINT_CHARS}-character limit for CURRENT.md constraints. ` +
+    `Shorten it to ${MAX_CONSTRAINT_CHARS} characters or fewer and retry.`
+  );
+}
+
 export function setCurrent(memoryDir: string, text: string, project = "default"): string[] {
   // T-110: strip injected context blocks at the sink, not only at the store.
   // CURRENT.md is replayed verbatim into every later prompt (see
@@ -424,10 +437,7 @@ export function setCurrent(memoryDir: string, text: string, project = "default")
   // so the constraint vanished from CURRENT.md with no error anywhere.
   // Length is measured on what would be stored (post-sanitisation, trimmed).
   if (trimmed.length > MAX_CONSTRAINT_CHARS) {
-    throw new Error(
-      `Constraint rejected: ${trimmed.length} characters exceeds the ${MAX_CONSTRAINT_CHARS}-character limit for CURRENT.md constraints. ` +
-        `Shorten it to ${MAX_CONSTRAINT_CHARS} characters or fewer and retry.`,
-    );
+    throw new Error(constraintLengthError(trimmed.length));
   }
   const current = parseCurrentFile(memoryDir);
   const stamp = `[${new Date().toISOString()}] (${project}) ${trimmed}`;

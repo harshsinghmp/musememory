@@ -415,7 +415,7 @@ describe("R16: Multi-Repo & Monorepo Cross-Project Mesh", () => {
       // 4. muse_mesh_link
       const linkRes = await handler({
         method: "tools/call",
-        params: { name: "muse_mesh_link", arguments: { action: "link", path: fixture.extDir, dir: fixture.appDir } },
+        params: { name: "muse_mesh_link", arguments: { action: "link", path: fixture.extDir, confirm: true, dir: fixture.appDir } },
       });
       const linkData = JSON.parse(linkRes.content[0].text);
       expect(linkData.success).toBe(true);
