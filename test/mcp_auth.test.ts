@@ -92,6 +92,51 @@ describe("T-386: Bearer-token authentication & per-peer allowlist", () => {
       expect(resFail.authenticated).toBe(false);
       expect(resFail.status).toBe(403);
     });
+
+    // Issue #453: the transport failed open whenever no token was configured,
+    // so a non-loopback bind published every tool anonymously.
+    test("requires authentication on a non-loopback bind even with no token configured (issue #453)", () => {
+      const res = validateHttpAuth(mockReq({}), { bindHost: "0.0.0.0" });
+      expect(res.authenticated).toBe(false);
+      expect(res.status).toBe(401);
+      expect(res.errorMessage).toContain("non-loopback bind");
+    });
+
+    test("treats the plain `host` option as the bind host for programmatic callers (issue #453)", () => {
+      const res = validateHttpAuth(mockReq({}), { host: "0.0.0.0" });
+      expect(res.authenticated).toBe(false);
+      expect(res.status).toBe(401);
+
+      // A request that presents *a* token cannot authenticate either when the
+      // operator configured none: non-loopback binds fail closed.
+      const resWithHeader = validateHttpAuth(mockReq({ authorization: "Bearer anything" }), { bindHost: "192.168.1.10" });
+      expect(resWithHeader.authenticated).toBe(false);
+      expect(resWithHeader.status).toBe(403);
+    });
+
+    test("keeps the loopback fail-open path so local clients need no token (issue #453)", () => {
+      for (const bindHost of ["127.0.0.1", "::1", "localhost", "[::1]", " 127.0.0.1 "]) {
+        const res = validateHttpAuth(mockReq({}), { bindHost });
+        expect(res.authenticated).toBe(true);
+      }
+      // No bind information at all keeps the historical default (loopback).
+      expect(validateHttpAuth(mockReq({}), {}).authenticated).toBe(true);
+    });
+
+    test("only an explicit allowInsecureBind opts out of the non-loopback guard (issue #453)", () => {
+      expect(validateHttpAuth(mockReq({}), { bindHost: "0.0.0.0" }).authenticated).toBe(false);
+      expect(
+        validateHttpAuth(mockReq({}), { bindHost: "0.0.0.0", allowInsecureBind: true }).authenticated,
+      ).toBe(true);
+      // The opt-out does not disable a configured token.
+      const withToken = validateHttpAuth(mockReq({}), {
+        bindHost: "0.0.0.0",
+        allowInsecureBind: true,
+        bearerToken: "tok",
+      });
+      expect(withToken.authenticated).toBe(false);
+      expect(withToken.status).toBe(401);
+    });
   });
 
   describe("Integration: HTTP server authentication", () => {
@@ -207,6 +252,62 @@ describe("T-386: Bearer-token authentication & per-peer allowlist", () => {
         expect(listResp.status).toBe(200);
         const listJson = (await listResp.json()) as any;
         expect(listJson.result?.tools).toBeDefined();
+      } finally {
+        await handle.close();
+      }
+    });
+
+    // Issue #453: a programmatic caller cannot expose the server by binding a
+    // non-loopback address and simply not configuring a token.
+    test("rejects unauthenticated requests when bindHost is non-loopback (issue #453)", async () => {
+      const handle = await startHttpMcpServer({
+        port: 0,
+        host: "127.0.0.1",
+        bindHost: "0.0.0.0",
+      });
+
+      try {
+        const resp = await fetch(handle.url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "accept": "application/json, text/event-stream",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+          }),
+        });
+
+        expect(resp.status).toBe(401);
+        const json = (await resp.json()) as any;
+        expect(json.error.message).toContain("non-loopback bind");
+      } finally {
+        await handle.close();
+      }
+    });
+
+    test("still serves loopback requests without a token (issue #453)", async () => {
+      const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1", bindHost: "127.0.0.1" });
+
+      try {
+        const resp = await fetch(handle.url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "accept": "application/json, text/event-stream",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+          }),
+        });
+
+        expect(resp.status).toBe(200);
       } finally {
         await handle.close();
       }

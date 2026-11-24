@@ -34,6 +34,7 @@ import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
 import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
 import { stripInjectedContextBlocks } from "./security/strip.ts";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
+import { isLoopbackHost } from "./net.ts";
 import { consolidateScenes } from "./consolidate.ts";
 import { traceGraph } from "./trace.ts";
 import { collectLoops } from "./loops.ts";
@@ -1037,7 +1038,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         inputSchema: {
           type: "object",
           properties: {
-            task: { type: "string", description: "Task description or path to task markdown file" },
+            task: { type: "string", description: "Task instruction text (recorded verbatim, never read as a path)" },
+            task_file: {
+              type: "string",
+              description: "Optional workspace-relative path to a task brief file: confined to the workspace, capped at 64 KiB and secret-redacted. When set, its content becomes the snapshot task.",
+            },
             run_id: { type: "string", description: "Optional unique run identifier" },
             dir: { type: "string", description: "Optional project workspace directory path" },
           },
@@ -2781,6 +2786,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           workspaceRoot: activeRoot,
           memoryDir: activeMemoryDir,
           task: String(a.task),
+          taskFile: a.task_file ? String(a.task_file) : undefined,
           runId: a.run_id ? String(a.run_id) : undefined,
           store: activeStore,
         });
@@ -3717,6 +3723,19 @@ export interface HttpMcpServerOptions {
   allowedPeers?: string[];
   /** T-386: Require authentication even if tokens are passed via env or settings. */
   requireAuth?: boolean;
+  /**
+   * Issue #453: the address the server actually binds. Authentication is
+   * required whenever this is not loopback, even without `requireAuth` or a
+   * configured token, so a programmatic caller cannot expose every tool by
+   * binding `0.0.0.0`. Defaults to `host`.
+   */
+  bindHost?: string;
+  /**
+   * Issue #453: explicit opt-out for an *unauthenticated* non-loopback bind.
+   * Only the CLI's `--insecure` flag sets it, and only after printing the
+   * exposure warning. With a token configured, auth is enforced regardless.
+   */
+  allowInsecureBind?: boolean;
 }
 
 export interface HttpAuthResult {
@@ -3781,7 +3800,16 @@ export function validateHttpAuth(
     }
   }
 
-  const isAuthRequired = options.requireAuth || validTokens.size > 0;
+  // Issue #453: the HTTP transport used to fail open whenever no token was
+  // configured, so `--host 0.0.0.0` (or any programmatic non-loopback bind)
+  // exposed every tool anonymously. A non-loopback bind now always requires
+  // authentication; the loopback fail-open path is kept intact so local MCP
+  // clients keep working without configuration.
+  const bindHost = options.bindHost ?? options.host;
+  const authRequiredByBind =
+    bindHost !== undefined && !isLoopbackHost(bindHost) && options.allowInsecureBind !== true;
+
+  const isAuthRequired = options.requireAuth || validTokens.size > 0 || authRequiredByBind;
   if (!isAuthRequired) {
     return { authenticated: true };
   }
@@ -3791,7 +3819,10 @@ export function validateHttpAuth(
     return {
       authenticated: false,
       status: 401,
-      errorMessage: "Unauthorized: Missing Bearer token in Authorization header",
+      errorMessage:
+        authRequiredByBind && validTokens.size === 0 && !options.requireAuth
+          ? `Unauthorized: Missing Bearer token in Authorization header (authentication is mandatory on the non-loopback bind "${bindHost}")`
+          : "Unauthorized: Missing Bearer token in Authorization header",
     };
   }
 
