@@ -597,7 +597,7 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
     // reach the server through a Host it controls.
     const allowedHosts = explicitAllowedHosts ?? [...new Set([host, "localhost", "127.0.0.1", "[::1]"])];
 
-    const { startHttpMcpServer } = await import("../mcp.ts");
+    const { startHttpMcpServer } = await import("../mcp/http.ts");
     const handle = await startHttpMcpServer({
       port,
       host,
