@@ -6,6 +6,20 @@ import { resolveExternal } from "../paths.ts";
 const MESH_LINKS_FILE = "mesh_links.json";
 
 /**
+ * #452: auto-discovery is opt-in.
+ *
+ * Walking the parent directory and adopting every sibling that happens to have
+ * `.git`, `package.json` or `.memory` means a routine `muse_mesh_query` in
+ * `~/projects/<clientA>` reads `~/projects/<clientB>`'s memory store — another
+ * tenant's data, with no consent anywhere in the chain. Consent is now either
+ * an explicit `mesh_links.json` entry (the documented linking path, unchanged)
+ * or this environment flag. Default: off.
+ */
+export function meshAutoDiscoverEnabled(): boolean {
+  return process.env.MUSE_MESH_AUTO_DISCOVER === "1";
+}
+
+/**
  * Load explicitly linked external repository or package paths from .memory/mesh_links.json
  */
 export function listMeshLinks(memoryDir: string): string[] {
@@ -233,9 +247,10 @@ export function discoverWorkspaceMesh(currentDir: string, currentMemoryDir: stri
     nodes.push(rootNode);
     visitedPaths.add(rootNode.path);
 
-    // Inspect parent directory for sibling git repositories
+    // Inspect parent directory for sibling git repositories.
+    // #452: opt-in only — a sibling is not consent to read its memory store.
     const parentDir = path.dirname(resolvedCurrent);
-    if (parentDir && parentDir !== resolvedCurrent) {
+    if (parentDir && parentDir !== resolvedCurrent && meshAutoDiscoverEnabled()) {
       try {
         const siblings = fs.readdirSync(parentDir, { withFileTypes: true });
         for (const sib of siblings) {

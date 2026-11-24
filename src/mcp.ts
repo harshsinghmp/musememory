@@ -9,6 +9,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
+import { resolveExternal } from "./paths.ts";
 import {
   openStore,
   get,
@@ -31,7 +32,7 @@ import {
   type Store,
 } from "./store.ts";
 import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
-import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
+import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff, MAX_CONSTRAINT_CHARS, constraintLengthError } from "./governor.ts";
 import { stripInjectedContextBlocks } from "./security/strip.ts";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
 import { isLoopbackHost } from "./net.ts";
@@ -1872,6 +1873,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           properties: {
             action: { type: "string", enum: ["link", "unlink"], description: "Action to perform ('link' or 'unlink')" },
             path: { type: "string", description: "Absolute or relative target directory path to link/unlink" },
+            confirm: { type: "boolean", description: "Set to true to apply the link change (required: linking grants this workspace read access to the target's memory store)" },
             dir: { type: "string", description: "Optional workspace directory" },
           },
           required: ["path"],
@@ -2252,6 +2254,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         case "propose":
         case "memory_capture": {
           const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
+          // #433 follow-up: CURRENT.md refuses an over-length constraint inside
+          // setCurrent(), which runs *after* propose() has already written the
+          // memory — the tool then reported an error for a capture that succeeded.
+          // Measure what setCurrent would measure (post-sanitisation, trimmed) and
+          // refuse before the write, so a rejected proposal leaves nothing behind.
+          if (a.type === "constraint") {
+            const projected = stripInjectedContextBlocks(String(a.content)).trim();
+            if (projected.length > MAX_CONSTRAINT_CHARS) {
+              return toolError(constraintLengthError(projected.length));
+            }
+          }
           try {
             const entry = propose(activeStore, {
               content: String(a.content),
@@ -3482,13 +3495,49 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const targetPath = a.path as string;
         if (!targetPath) return toolError("Missing required 'path' argument");
         const action = (a.action as string) || "link";
-        if (action === "unlink") {
-          removeMeshLink(activeMemoryDir, targetPath);
-          return toolResult({ success: true, action: "unlinked", path: targetPath });
-        } else {
-          addMeshLink(activeMemoryDir, targetPath);
-          return toolResult({ success: true, action: "linked", path: targetPath });
+        const verb = action === "unlink" ? "unlink" : "link";
+        // #452: a link is consent to read another project's memory store and it
+        // changes what every later muse_mesh_query can see. Mirror memory_delete:
+        // nothing is written until the caller passes confirm: true.
+        if (a.confirm !== true) {
+          return toolError(
+            `muse_mesh_link requires confirm: true to ${verb} '${targetPath}'. ` +
+              `Linking grants this workspace read access to the target's memory store; ` +
+              `re-issue the call with confirm: true once that is intended.`,
+          );
         }
+        let resolvedPath: string;
+        try {
+          resolvedPath = resolveExternal(targetPath);
+          if (action === "unlink") {
+            removeMeshLink(activeMemoryDir, targetPath);
+          } else {
+            addMeshLink(activeMemoryDir, targetPath);
+          }
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+        // The audit ledger is where consent is provable after the fact, so the
+        // linked path and the actor are recorded on every link change.
+        let audited = true;
+        try {
+          recordAuditEvent(activeMemoryDir, {
+            operation: "link",
+            entry_id: `mesh:${resolvedPath}`,
+            project: basename(activeRoot) || "default",
+            actor: "mcp",
+            reason: action === "unlink" ? "mesh_unlink" : "mesh_link",
+            details: { action: verb, path: resolvedPath, tool: "muse_mesh_link" },
+          });
+        } catch {
+          audited = false;
+        }
+        return toolResult({
+          success: true,
+          action: action === "unlink" ? "unlinked" : "linked",
+          path: resolvedPath,
+          audited,
+        });
       }
       case "muse_code_impact": {
         const filePath = a.file_path as string;
