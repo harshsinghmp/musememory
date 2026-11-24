@@ -63,7 +63,17 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
           </p>
         </div>
 
-        <div class="table-wrap reveal">
+        {/* This wrapper is the element that scrolls, so it must be a tab stop
+            with a name: without them a keyboard-only user can tab through the
+            page and never reach the columns that overflow (axe
+            scrollable-region-focusable, WCAG 2.1.1). It keeps the global
+            :focus-visible ring — no outline is removed here. */}
+        <div
+          class="table-wrap reveal"
+          role="group"
+          aria-label="Comparison table, scrollable horizontally"
+          tabindex="0"
+        >
           <table class="compare">
             <caption class="sr-only">
               Capability comparison between Muse Memory, dense vector stores,
@@ -133,6 +143,18 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
     .no { color: var(--text-tertiary); }
     .legend { margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); display: flex; gap: 1.2rem; flex-wrap: wrap; }
     .table-note { margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-tertiary); max-width: 70ch; }
+
+    /* Below 768px the 760px floor is what forced the overflow in the first
+       place: on a phone it turned a four-column table into a scroll trap. Drop
+       it and tighten the cells so every column stays on screen and wraps
+       instead of hiding. 768px and up keeps the wide layout unchanged. */
+    @media (max-width: 767px) {
+      .compare { min-width: 0; font-size: 0.82rem; }
+      .compare th, .compare td { padding: 0.6rem 0.55rem; }
+      .compare th[scope="row"] { overflow-wrap: anywhere; }
+      .th-sub { font-size: 0.68rem; }
+      .compare td:not(:first-child) { font-size: 0.95rem; }
+    }
     .cta-final {
       padding: clamp(3rem, 8vw, 5.5rem) 0;
       text-align: center;

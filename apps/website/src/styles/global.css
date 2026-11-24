@@ -25,6 +25,41 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ─────────────────────────────────────────────────────────────────────────
+   0. Typefaces
+   ─────────────────────────────────────────────────────────────────────────
+   Inter is self-hosted. The vendored variable subset lives at
+   `public/fonts/inter-var.woff2` (public/, not src/assets/, because Astro does
+   not copy imported assets on its own) and is served from the site base, so
+   `dev` and production resolve the same URL. No request leaves the origin.
+
+   `font-display: swap` paints immediately, and `Inter-Fallback` is a
+   size-adjusted stand-in with Arial's metrics, so the swap cannot shift
+   layout: both faces claim the same advance widths and the same ascent /
+   descent. The numbers are Inter's metrics scaled against Arial's (107.4%
+   width, 90.2% ascent, 22.48% descent) — the published pair for this exact
+   substitution. Liberation Sans and Arimo are Arial-metric clones, listed
+   because many Linux boxes carry them but not Arial itself. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/musememory/fonts/inter-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter-Fallback";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local("Arial"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 107.4%;
+  ascent-override: 90.2%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    1. Tokens
    ───────────────────────────────────────────────────────────────────────── */
 :root {
@@ -129,7 +164,7 @@
   --z-overlay: 100;
 
   /* ── Typeface ───────────────────────────────────────────────────────── */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter", "Inter-Fallback", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 
   color-scheme: dark;
