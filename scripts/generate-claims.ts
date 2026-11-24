@@ -30,9 +30,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const OUT = join(ROOT, "claims.json");
 
-/** Every MCP tool name registered in src/mcp.ts. */
+/** Every MCP tool name registered in the catalog at src/mcp/catalog.ts. */
 function registeredMcpTools(): string[] {
-  const src = readFileSync(join(ROOT, "src/mcp.ts"), "utf8");
+  const src = readFileSync(join(ROOT, "src/mcp/catalog.ts"), "utf8");
   return [
     ...new Set([...src.matchAll(/name:\s*"([a-z0-9_]+)"/g)].map((m) => m[1]!)),
   ]
