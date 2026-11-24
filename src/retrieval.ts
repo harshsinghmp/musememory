@@ -1692,7 +1692,11 @@ export function queryContext(
 
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
-  let entries = list(store);
+  // `raw` skips the clone: the scorer only reads content and mutates access
+  // telemetry, and stable object identities are what let the per-entry token,
+  // symbol and path WeakMaps survive across queries. Results are copied before
+  // they leave this function, so callers still cannot poison the cache (#409).
+  let entries = list(store, undefined, { raw: true });
   const withheld: Array<{ id: string; reason: string }> = [];
 
   // T-075: Untrusted provenance filter (default excluded, opt-in with includeUntrusted: true)
@@ -1954,6 +1958,14 @@ export function queryContext(
       totalTokensUsed += estimateEntryTokens(item.entry);
       if (options.recordAccess !== false) recordAccessFor(store, item.entry);
     }
+  }
+
+  // The scorer read the cache's own entry objects. Copy the selected results
+  // before anything else touches them, so a caller mutating a returned entry
+  // cannot change what the next query sees (#409's contract, now applied to the
+  // scored path as well).
+  for (let i = 0; i < results.length; i++) {
+    results[i] = { ...results[i], entry: { ...results[i].entry } };
   }
 
   if (options.autoRehydrate) {

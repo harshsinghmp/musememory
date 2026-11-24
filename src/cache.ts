@@ -143,6 +143,32 @@ export class MemoryStoreCache {
    * under an older generation is dropped instead of served.
    */
   public getQuery(key: string, currentDirMtime?: number, currentGeneration?: number): MemoryEntry[] | undefined {
+    const item = this.lookupQuery(key, currentDirMtime, currentGeneration);
+    if (!item) return undefined;
+    // Issue #409: match getEntry's contract — hand back copies, never the cached
+    // array or its entries. A caller that mutates an entry in place otherwise
+    // poisons every later cached list() with state that was never persisted.
+    return item.value.map((e) => ({ ...e }));
+  }
+
+  /**
+   * Non-cloning counterpart of `getQuery`, for the internal scorer only.
+   *
+   * The ranking path reads every entry and mutates nothing but access telemetry,
+   * and cloning the array on each read defeated the per-entry token/symbol
+   * WeakMaps (new object identities every query, so every cache missed and the
+   * whole store was re-tokenized). Callers of this method must treat the result
+   * as read-only; public reads keep using `getQuery`.
+   */
+  public getQueryRefs(key: string, currentDirMtime?: number, currentGeneration?: number): MemoryEntry[] | undefined {
+    return this.lookupQuery(key, currentDirMtime, currentGeneration)?.value;
+  }
+
+  private lookupQuery(
+    key: string,
+    currentDirMtime?: number,
+    currentGeneration?: number,
+  ): CacheItem<MemoryEntry[]> | undefined {
     const item = this.queryCache.get(key);
     if (!item) return undefined;
 
@@ -165,10 +191,7 @@ export class MemoryStoreCache {
     }
 
     this.stats.hits++;
-    // Issue #409: match getEntry's contract — hand back copies, never the cached
-    // array or its entries. A caller that mutates an entry in place otherwise
-    // poisons every later cached list() with state that was never persisted.
-    return item.value.map((e) => ({ ...e }));
+    return item;
   }
 
   public setQuery(

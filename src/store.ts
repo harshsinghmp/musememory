@@ -747,6 +747,7 @@ function readEntry(store: Store, id: string): MemoryEntry | null {
 export function list(
   store: Store,
   filters?: { project?: string; type?: string; status?: string },
+  options: { raw?: boolean } = {},
 ): MemoryEntry[] {
   const cacheKey = filters
     ? `filter:${filters.project || ""}:${filters.type || ""}:${filters.status || ""}`
@@ -759,16 +760,24 @@ export function list(
     } catch {}
   }
 
+  // `raw` is the internal scorer's read: it must not clone, so the per-entry
+  // token/symbol WeakMaps survive across queries. Public callers keep the
+  // cloning path, which is the #409 contract.
+  const readCache = (gen?: number) =>
+    options.raw
+      ? store.cache?.getQueryRefs(cacheKey, dirMtime, gen)
+      : store.cache?.getQuery(cacheKey, dirMtime, gen);
+
   // T-055: If circuit breaker is open (degraded mode), return cache without crashing
   if (store.circuit?.isDegraded()) {
-    const cached = store.cache?.getQuery(cacheKey, dirMtime);
+    const cached = readCache();
     return withAccessOverlay(store, cached ?? []);
   }
 
   // 1. Check L0 query cache. T-020: the write generation guards against writes the
   // dir mtime cannot see (coarse mtimes, SQLite-only writes).
   if (store.cache) {
-    const cached = store.cache.getQuery(cacheKey, dirMtime, contentGenerationOf(store));
+    const cached = readCache(contentGenerationOf(store));
     if (cached) return withAccessOverlay(store, cached);
   }
 
