@@ -12,6 +12,7 @@ import {
   restoreEntry,
   replayFromAudit,
   searchMemories,
+  checkFtsParity,
 } from "../src/store.ts";
 import { getAuditTrail } from "../src/audit.ts";
 import { queryContext } from "../src/retrieval.ts";
@@ -167,6 +168,42 @@ describe("T-031 restore", () => {
     ).toThrow(/memory_restore/);
     expect(get(store, entry.id)).toBeNull();
     expect(restoreEntry(store, entry.id).ok).toBe(true);
+    cleanup(root);
+  });
+
+  // #434: the tombstone was cleared AFTER save(), where insertOrReplaceMemory's tombstone
+  // guard made the INSERT a no-op — restore reported success while the row stayed erased.
+  test("restore re-indexes the memory so searchMemories finds it again and FTS parity holds", () => {
+    const { root, store } = newStore();
+    const entry = propose(store, {
+      title: "Zebra reindex subject",
+      content: "zebra reindex marker body for restore coverage",
+      project: "tombstones",
+      type: "architecture",
+      tags: ["tombstone"],
+      confirmed: true,
+    });
+
+    expect(deleteEntry(store, entry.id, "gdpr erasure", "cli_user")).toBe(true);
+    expect(searchMemories(store, "zebra").map((h) => h.entry.id)).toEqual([]);
+
+    const out = restoreEntry(store, entry.id, "cli_user");
+    expect(out.ok).toBe(true);
+    expect(searchMemories(store, "zebra").map((h) => h.entry.id)).toContain(entry.id);
+
+    // The FTS row must exist again, not merely be filtered by the tombstone read gate.
+    const indexed = store.db?.query<{ c: number }>(`SELECT count(*) AS c FROM memories_fts WHERE id = ?`).get([entry.id]);
+    expect(indexed?.c).toBe(1);
+    expect(checkFtsParity(store).missingCount).toBe(0);
+    expect(checkFtsParity(store).ok).toBe(true);
+
+    cleanup(root);
+  });
+
+  test("restore of a live (never deleted) entry still reports not_deleted", () => {
+    const { root, store } = newStore();
+    const entry = seed(store, "Never deleted");
+    expect(restoreEntry(store, entry.id)).toEqual({ ok: false, reason: "not_deleted" });
     cleanup(root);
   });
 });

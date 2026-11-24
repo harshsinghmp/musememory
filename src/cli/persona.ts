@@ -64,7 +64,14 @@ export async function handleCurrentCommand({ positional, flags }: ParsedArgs): P
     const text = positional[1];
     const project = flags["project"];
     if (!text || !project) return usageError("current set requires <text> --project P");
-    const lines = setCurrent(ctx.memoryDir, text, project);
+    // #433: the write path rejects over-length constraints; report it and fail the command.
+    let lines: string[];
+    try {
+      lines = setCurrent(ctx.memoryDir, text, project);
+    } catch (err: unknown) {
+      console.error(`[!] ${err instanceof Error ? err.message : String(err)}`);
+      return 1;
+    }
     syncConstraints(ctx.memoryDir, ctx.store);
     console.log(`CURRENT.md now has ${lines.length} lines`);
     return 0;

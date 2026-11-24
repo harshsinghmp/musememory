@@ -263,8 +263,11 @@ export function isTombstoned(store: Store, id: string): boolean {
 }
 
 /**
- * Write or clear the marker. Must run AFTER `save()` in the same transaction: INSERT OR
- * REPLACE rewrites the row and drops any column the writer does not know about.
+ * Write or clear the marker. Ordering differs by direction: SET it AFTER `save()`
+ * (INSERT OR REPLACE rewrites the row and drops any column the writer does not know
+ * about), but CLEAR it BEFORE `save()` — the tombstone guard in insertOrReplaceMemory
+ * refuses a write to a tombstoned row, so clearing afterwards would skip the INSERT and
+ * its FTS sync entirely (#434).
  */
 function setTombstone(store: Store, id: string, marker: { at: string; by: string } | null): void {
   if (!store.db) return;
@@ -2013,10 +2016,15 @@ export function restoreEntry(store: Store, id: string, actor = "agent"): Restore
   if (!entry) return { ok: false, reason: "not_found" };
   if (!isTombstoned(store, id)) return { ok: false, reason: "not_deleted" };
 
-  // Same ordering rule as deleteEntry: save() re-adds the FTS row, then the marker clears.
+  // #434: clear the marker FIRST, inside the same transaction. `save()` →
+  // insertOrReplaceMemory returns early while the row is tombstoned (T-030 guard), so
+  // clearing afterwards skipped both the INSERT and its FTS sync: the restore reported
+  // success while the memory stayed absent from memories_fts forever. Clearing first lets
+  // INSERT OR REPLACE recreate the row and re-index it; if save() throws, withTransaction
+  // rolls the clear back with it.
   withTransaction(store.db, () => {
-    save(store, entry);
     setTombstone(store, id, null);
+    save(store, entry);
   });
   if (store.cache) store.cache.deleteEntry(id);
 
