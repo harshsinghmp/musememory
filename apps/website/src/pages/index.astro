@@ -621,7 +621,16 @@ const jsonLd = [
             and that never passes off a stale fact as current.
           </p>
         </div>
-        <div class="table-wrap reveal">
+        {/* The scroll container itself has to be focusable and named, or a
+            keyboard-only user cannot reach the overflowed columns (axe
+            scrollable-region-focusable, WCAG 2.1.1). The global
+            :focus-visible ring supplies the visible focus indicator. */}
+        <div
+          class="table-wrap reveal"
+          role="group"
+          aria-label="Comparison table, scrollable horizontally"
+          tabindex="0"
+        >
           <table class="compare">
             <caption class="sr-only">
               Capability comparison between Muse Memory, dense vector stores,
