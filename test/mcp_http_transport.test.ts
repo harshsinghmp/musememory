@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { startHttpMcpServer } from "../src/mcp.ts";
+import { startHttpMcpServer } from "../src/mcp/http.ts";
 
 describe("T-150: MCP Streamable HTTP Transport (2025-06-18 spec)", () => {
   test("starts HTTP server on ephemeral port and handles initialize request", async () => {
