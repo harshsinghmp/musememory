@@ -141,6 +141,41 @@ describe("real-time agency hub (SSE)", () => {
     cleanup(root);
   });
 
+  test("#439: rejects event types that would inject an SSE frame", async () => {
+    const root = makeTempRoot();
+    const hub = await startHub(0);
+
+    // A subscriber is attached for the whole attack so a forged frame would be seen.
+    const framesPromise = collectFrames(hub.port, 400);
+    await new Promise((r) => setTimeout(r, 100));
+
+    const injected = await publish(hub.port, {
+      type: "agent.joined\n\nevent: memory.exfiltrated\ndata: {\"stolen\":\"client-b\"}",
+      payload: { ok: false },
+    });
+    expect(injected.status).toBe(400);
+    expect(injected.json.error).toContain("invalid 'type' field");
+
+    // CRLF and over-length names are refused for the same reason.
+    expect((await publish(hub.port, { type: "agent.joined\r\nevent: forged" })).status).toBe(400);
+    expect((await publish(hub.port, { type: "a".repeat(65) })).status).toBe(400);
+    expect((await publish(hub.port, { type: "" })).status).toBe(400);
+
+    const frames = await framesPromise;
+    expect(frames.some((f) => f.includes("memory.exfiltrated"))).toBe(false);
+    expect(frames.some((f) => f.includes("forged"))).toBe(false);
+    // Only the greeting arrived — no frame was broadcast for either attempt.
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toContain('"type":"hello"');
+
+    // A dotted/dashed name from the allowlist still publishes.
+    const legit = await publish(hub.port, { type: "memory.changed" });
+    expect(legit.status).toBe(200);
+
+    await hub.close();
+    cleanup(root);
+  });
+
   test("unknown paths 404 and port 0 assigns an ephemeral port", async () => {
     const root = makeTempRoot();
     const hub = await startHub(0);

@@ -1,10 +1,11 @@
 import { describe, test, expect } from "bun:test";
-import { openStore, propose, confirm, supersede, get } from "../src/store.ts";
+import { openStore, propose, confirm, supersede, get, list } from "../src/store.ts";
 import { queryContext } from "../src/retrieval.ts";
 import { validateStore } from "../src/schema.ts";
 import { getGraphStatus } from "../src/graph.ts";
+import { MAX_CONSTRAINT_CHARS } from "../src/governor.ts";
 import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 describe("mcp tool handlers logic", () => {
@@ -415,6 +416,60 @@ describe("mcp tool handlers logic", () => {
     expect(recallPayload.stale).toBe(false);
     expect(typeof recallPayload.from_cache).toBe("boolean");
     expect(recallPayload.from_cache).toBe(false);
+
+    cleanup(root);
+  });
+
+  test("an over-length constraint proposal is refused before it writes", async () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    const { createServer } = await import("../src/mcp.ts");
+    const server = createServer(root);
+    const callTool = (server as any)._requestHandlers.get("tools/call");
+
+    // One character past the CURRENT.md cap: setCurrent() would throw, so the
+    // only acceptable outcome is an error with nothing written.
+    const tooLong = "Always hand the release checklist to the on-call engineer " + "z".repeat(MAX_CONSTRAINT_CHARS);
+    const rejected = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          title: "Over-length constraint probe",
+          content: tooLong,
+          type: "constraint",
+          dir: root,
+        },
+      },
+    });
+
+    expect(rejected.isError).toBe(true);
+    expect(rejected.content[0].text).toContain(String(MAX_CONSTRAINT_CHARS));
+    expect(rejected.content[0].text).toContain("Constraint rejected");
+
+    const store = openStore(memoryDir);
+    const landed = list(store).filter(
+      (e) => e.content === tooLong || e.title === "Over-length constraint probe",
+    );
+    expect(landed).toEqual([]);
+    expect(readFileSync(join(memoryDir, "CURRENT.md"), "utf8")).not.toContain(tooLong);
+
+    // Exactly at the cap is legal and lands in CURRENT.md.
+    const atCap = "y".repeat(MAX_CONSTRAINT_CHARS);
+    const accepted = await callTool({
+      method: "tools/call",
+      params: {
+        name: "memory_capture",
+        arguments: {
+          title: "At-cap constraint probe",
+          content: atCap,
+          type: "constraint",
+          dir: root,
+        },
+      },
+    });
+    expect(accepted.isError).toBeFalsy();
+    expect(JSON.parse(accepted.content[0].text).title).toBe("At-cap constraint probe");
+    expect(readFileSync(join(memoryDir, "CURRENT.md"), "utf8")).toContain(atCap);
 
     cleanup(root);
   });

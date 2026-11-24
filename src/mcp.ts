@@ -9,6 +9,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { findOrCreateProjectRoot, getGlobalMemoryDir } from "./root.ts";
+import { resolveExternal } from "./paths.ts";
 import {
   openStore,
   get,
@@ -31,7 +32,7 @@ import {
   type Store,
 } from "./store.ts";
 import { queryContext, formatPromptContext, clampLimit } from "./retrieval.ts";
-import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff } from "./governor.ts";
+import { getCurrent, setCurrent, syncConstraints, updateSessionHandoff, MAX_CONSTRAINT_CHARS, constraintLengthError } from "./governor.ts";
 import { stripInjectedContextBlocks } from "./security/strip.ts";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
 import { isLoopbackHost } from "./net.ts";
@@ -197,18 +198,40 @@ function enqueueWrites(writes: Array<() => void>): void {
 
 process.on("exit", flushPendingWrites);
 
+// --- #432: one Store per memory directory, for the life of the process --------
+// `resolveStoreForRequest` used to open a brand-new Store for every request that
+// carried a `dir`, and nothing ever closed it: each call leaked the SQLite
+// handle (plus its WAL), so a long-lived MCP server walked into the fd limit.
+// At that limit `openDatabase` throws EMFILE, which `openStore` degrades past,
+// and every tool then silently answers from the YAML mirror while reporting
+// success. Caching by memory directory bounds the fds, and makes every handler
+// for a directory share one cache and one circuit breaker instead of a fresh,
+// permanently-cold pair per request.
+const storeByMemoryDir = new Map<string, Store>();
+
+/** Return the cached Store for `memoryDir`, opening and caching it on first use. */
+export function getCachedStore(memoryDir: string): Store {
+  const cached = storeByMemoryDir.get(memoryDir);
+  if (cached) return cached;
+  const opened = openStore(memoryDir);
+  storeByMemoryDir.set(memoryDir, opened);
+  return opened;
+}
+
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
   const { root, memoryDir } = findOrCreateProjectRoot(resolvedTarget);
-  const store = openStore(memoryDir);
+  // #432: the server's own store goes through the cache too, so a request that
+  // names this project's directory reuses it rather than opening a second one.
+  const store = getCachedStore(memoryDir);
 
   function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
     const dir = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
     if (typeof dir === "string" && dir.trim()) {
       const resolved = findOrCreateProjectRoot(dir.trim());
       return {
-        activeStore: openStore(resolved.memoryDir),
+        activeStore: getCachedStore(resolved.memoryDir),
         activeMemoryDir: resolved.memoryDir,
         activeRoot: resolved.root,
       };
@@ -1850,6 +1873,7 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
           properties: {
             action: { type: "string", enum: ["link", "unlink"], description: "Action to perform ('link' or 'unlink')" },
             path: { type: "string", description: "Absolute or relative target directory path to link/unlink" },
+            confirm: { type: "boolean", description: "Set to true to apply the link change (required: linking grants this workspace read access to the target's memory store)" },
             dir: { type: "string", description: "Optional workspace directory" },
           },
           required: ["path"],
@@ -2230,6 +2254,17 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         case "propose":
         case "memory_capture": {
           const projectName = a.project ? String(a.project) : basename(activeRoot) || "default";
+          // #433 follow-up: CURRENT.md refuses an over-length constraint inside
+          // setCurrent(), which runs *after* propose() has already written the
+          // memory — the tool then reported an error for a capture that succeeded.
+          // Measure what setCurrent would measure (post-sanitisation, trimmed) and
+          // refuse before the write, so a rejected proposal leaves nothing behind.
+          if (a.type === "constraint") {
+            const projected = stripInjectedContextBlocks(String(a.content)).trim();
+            if (projected.length > MAX_CONSTRAINT_CHARS) {
+              return toolError(constraintLengthError(projected.length));
+            }
+          }
           try {
             const entry = propose(activeStore, {
               content: String(a.content),
@@ -3460,13 +3495,49 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
         const targetPath = a.path as string;
         if (!targetPath) return toolError("Missing required 'path' argument");
         const action = (a.action as string) || "link";
-        if (action === "unlink") {
-          removeMeshLink(activeMemoryDir, targetPath);
-          return toolResult({ success: true, action: "unlinked", path: targetPath });
-        } else {
-          addMeshLink(activeMemoryDir, targetPath);
-          return toolResult({ success: true, action: "linked", path: targetPath });
+        const verb = action === "unlink" ? "unlink" : "link";
+        // #452: a link is consent to read another project's memory store and it
+        // changes what every later muse_mesh_query can see. Mirror memory_delete:
+        // nothing is written until the caller passes confirm: true.
+        if (a.confirm !== true) {
+          return toolError(
+            `muse_mesh_link requires confirm: true to ${verb} '${targetPath}'. ` +
+              `Linking grants this workspace read access to the target's memory store; ` +
+              `re-issue the call with confirm: true once that is intended.`,
+          );
         }
+        let resolvedPath: string;
+        try {
+          resolvedPath = resolveExternal(targetPath);
+          if (action === "unlink") {
+            removeMeshLink(activeMemoryDir, targetPath);
+          } else {
+            addMeshLink(activeMemoryDir, targetPath);
+          }
+        } catch (err: unknown) {
+          return toolError(err instanceof Error ? err.message : String(err));
+        }
+        // The audit ledger is where consent is provable after the fact, so the
+        // linked path and the actor are recorded on every link change.
+        let audited = true;
+        try {
+          recordAuditEvent(activeMemoryDir, {
+            operation: "link",
+            entry_id: `mesh:${resolvedPath}`,
+            project: basename(activeRoot) || "default",
+            actor: "mcp",
+            reason: action === "unlink" ? "mesh_unlink" : "mesh_link",
+            details: { action: verb, path: resolvedPath, tool: "muse_mesh_link" },
+          });
+        } catch {
+          audited = false;
+        }
+        return toolResult({
+          success: true,
+          action: action === "unlink" ? "unlinked" : "linked",
+          path: resolvedPath,
+          audited,
+        });
       }
       case "muse_code_impact": {
         const filePath = a.file_path as string;

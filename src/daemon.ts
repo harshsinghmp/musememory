@@ -22,6 +22,13 @@ export interface HubHandle {
 const DEBOUNCE_MS = 300;
 
 /**
+ * #439: the only event types `POST /publish` may put on the wire. `type` is
+ * written into the SSE `event:` field verbatim, so CR/LF (or any separator)
+ * would inject arbitrary frames into every subscriber's stream.
+ */
+export const EVENT_TYPE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+/**
  * Real-Time Agency Hub.
  *
  * ponytail: SSE instead of WebSockets — one-way event fanout is all peers need,
@@ -76,6 +83,19 @@ export function startHub(port: number, memoryDir?: string): Promise<HubHandle> {
         if (!parsed.type || typeof parsed.type !== "string") {
           res.writeHead(400, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "missing 'type' field" }));
+          return;
+        }
+        // #439: `type` is interpolated straight into `event: ${type}\n` in the SSE
+        // frame, so a value containing CR/LF forges a second event for every
+        // subscriber and truncates the legitimate one. Event names are opaque
+        // labels, not free text — constrain them to the SSE identifier alphabet.
+        if (!EVENT_TYPE_PATTERN.test(parsed.type)) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "invalid 'type' field: expected 1-64 characters from [A-Za-z0-9._-]",
+            }),
+          );
           return;
         }
         const delivered = broadcast(parsed.type, parsed.payload, "publisher");
