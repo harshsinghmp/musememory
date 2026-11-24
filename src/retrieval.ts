@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Store } from "./store.ts";
-import { list, get, slugifyId as slugify } from "./store.ts";
+import { list, get, slugifyId as slugify, noteAccess } from "./store.ts";
 import { getCurrent, syncConstraints, getSessionHandoff, parseCurrentFile } from "./governor.ts";
 import { listWikiPages, getWikiPage } from "./wiki/compiler.ts";
 import { getUserProfile } from "./user.ts";
@@ -1908,6 +1908,9 @@ export function queryContext(
         );
       } catch {}
     }
+    // T-020 (revised): access writes no longer invalidate the list cache, so the
+    // increment is carried in an overlay that cached listings apply on read.
+    noteAccess(store, entry.id, now, entry.access_count);
   };
 
   if (options.tokenBudget !== undefined) {

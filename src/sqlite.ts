@@ -473,6 +473,32 @@ export function insertOrReplaceMemory(db: SqliteDatabase, entry: MemoryEntry): v
       [entry.id, redactSecrets(entry.title), redactSecrets(entry.content), (entry.tags ?? []).join(" ")],
     );
   } catch {}
+
+  // T-020 (revised): move the read-cache generation on CONTENT writes only.
+  bumpContentGeneration(db);
+}
+
+/**
+ * Content-write generation, keyed by database connection.
+ *
+ * T-020 used SQLite's `total_changes()`, which also counts the access-telemetry
+ * UPDATE that every ranked query issues for its top results. The effect was
+ * self-defeating: each query invalidated the list cache it had just filled, so
+ * the next query re-read and re-parsed every row (measured at 2,000 entries:
+ * 47ms per query with access recording, 26ms without). This counter moves only
+ * when a memory row is written — the event the read cache actually cares about.
+ *
+ * `total_changes()` is per-connection, so another process's write never moved it
+ * either; the memory-directory mtime guard still covers YAML drops.
+ */
+const dbContentGeneration = new WeakMap<SqliteDatabase, number>();
+
+export function getContentGeneration(db: SqliteDatabase): number {
+  return dbContentGeneration.get(db) ?? 0;
+}
+
+function bumpContentGeneration(db: SqliteDatabase): void {
+  dbContentGeneration.set(db, getContentGeneration(db) + 1);
 }
 
 export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | null {
