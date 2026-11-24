@@ -82,11 +82,18 @@ const motionScript = initMotion();
     <link rel="apple-touch-icon" sizes="180x180" href={`${base}/apple-touch-icon.png`} />
     <link rel="manifest" href={`${base}/site.webmanifest`} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    {/* Inter is self-hosted from `public/fonts/`, so no page load touches a
+        third-party origin — which is what makes the site's "nothing is
+        uploaded" claim true. Preloading the vendored subset lets the swap land
+        on first paint instead of after a round trip. `crossorigin` is required
+        even same-origin: font fetches are always CORS-mode, and a preload
+        without it does not match the real request and is fetched twice. */}
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="preload"
+      href={`${base}/fonts/inter-var.woff2`}
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
 
     {jsonLd.map((block) => (
