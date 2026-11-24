@@ -132,5 +132,38 @@ describe("Wave 3 - Task 2: FTS5 Query Injection Safety & Compound Token Splittin
       expect(typeof resDegraded.error).toBe("string");
       expect(resDegraded.error!.length).toBeGreaterThan(0);
     });
+
+    test("Fix #457: a throwing query is redacted and stripped of control characters in the log", () => {
+      const db = openDatabase(":memory:");
+      db.close();
+
+      const token = "sk-live-abcdef12345678901234567890";
+      const query = `auth ${token}\r\nFORGED-LOG-LINE\u001b[2J`;
+
+      const logged: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => {
+        logged.push(args.map((a) => String(a)).join(" "));
+      };
+      let resDegraded;
+      try {
+        resDegraded = searchMemoriesFts(db, query);
+      } finally {
+        console.error = originalError;
+      }
+
+      expect(resDegraded!.degraded).toBe(true);
+      const captured = logged.join("\n");
+      expect(captured).toContain("[FTS5_DEGRADED]");
+      // The token-shaped string never reaches the log.
+      expect(captured).not.toContain(token);
+      expect(captured).toContain("[REDACTED_SECRET]");
+      // CRLF / ANSI bytes are stripped, so one failure stays one log line.
+      expect(captured).not.toContain("\r");
+      expect(captured).not.toContain("\u001b");
+      expect(captured.split("\n").length).toBe(1);
+      // The degraded signal itself still names the failure for the caller.
+      expect(resDegraded!.error!.length).toBeGreaterThan(0);
+    });
   });
 });

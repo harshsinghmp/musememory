@@ -19,6 +19,93 @@ import type {
   GossipSupersession,
 } from "./types.ts";
 import { buildSyncPacket, validateSyncPacket } from "./packet.ts";
+import {
+  verifyAttestation,
+  verifyAttestationChain,
+  type Attestation,
+} from "./attestation.ts";
+
+/** Env var holding a PEM public key trusted to sign incoming gossip packets. */
+export const ATTESTATION_TRUST_KEY_ENV = "MUSE_ATTESTATION_PUBLIC_KEY";
+
+/** `<memory_dir>/sync/attestation.pub`, the file `memory attest keygen` writes. */
+const TRUSTED_PUBLIC_KEY_FILE = "attestation.pub";
+
+/**
+ * Loads the operator-configured attestation trust anchor, if any.
+ *
+ * Order: the inline `MUSE_ATTESTATION_PUBLIC_KEY` PEM, then
+ * `<memory_dir>/sync/attestation.pub`. A packet's own key material is never
+ * consulted — a signature verifies against what the operator installed.
+ */
+export function loadAttestationTrustAnchor(memoryDir: string): string | undefined {
+  const inline = process.env[ATTESTATION_TRUST_KEY_ENV];
+  if (inline && inline.trim()) return inline.trim();
+  const file = join(memoryDir, "sync", TRUSTED_PUBLIC_KEY_FILE);
+  if (!existsSync(file)) return undefined;
+  try {
+    const pem = readFileSync(file, "utf-8").trim();
+    return pem || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A packet may carry a single attestation or a full chain. */
+type PacketWithAttestation = SyncPacket & {
+  attestation?: Attestation | Attestation[] | null;
+};
+
+/** The signed body: the packet as it stood before the attestation was attached. */
+function attestedBody(packet: PacketWithAttestation): unknown {
+  const { attestation: _attestation, ...body } = packet;
+  return body;
+}
+
+/**
+ * Verifies a packet's embedded attestation against the operator trust anchor.
+ *
+ * `attested` reports whether the packet claimed authenticity at all; `error` is
+ * set when that claim could not be verified (bad signature, tampered payload, or
+ * no trust anchor configured — an unverifiable claim is not evidence).
+ */
+export function verifyPacketAttestation(
+  packet: SyncPacket,
+  memoryDir: string
+): { attested: boolean; error?: string } {
+  const attestation = (packet as PacketWithAttestation).attestation;
+  if (attestation === undefined || attestation === null) return { attested: false };
+
+  const trustAnchor = loadAttestationTrustAnchor(memoryDir);
+  if (!trustAnchor) {
+    return {
+      attested: true,
+      error:
+        `Rejected packet from ${packet.sender_id}: it carries an attestation but no trusted key is configured ` +
+        `(set ${ATTESTATION_TRUST_KEY_ENV} or install <memory_dir>/sync/${TRUSTED_PUBLIC_KEY_FILE})`,
+    };
+  }
+
+  const body = attestedBody(packet as PacketWithAttestation);
+  let valid = false;
+  try {
+    valid = Array.isArray(attestation)
+      ? verifyAttestationChain(attestation, trustAnchor)
+      : verifyAttestation(body, attestation, trustAnchor);
+  } catch {
+    // Malformed attestation (bad base64, bad PEM, wrong shape) is a failed check.
+    valid = false;
+  }
+
+  if (!valid) {
+    return {
+      attested: true,
+      error: `Rejected packet from ${packet.sender_id}: attestation verification failed against the configured trust anchor`,
+    };
+  }
+  return { attested: true };
+}
+
 
 /**
  * Returns the default agent ID based on environment or machine context.
@@ -135,6 +222,35 @@ export function broadcastKnowledge(
 }
 
 /**
+ * Preserves an incoming copy that may not overwrite the stored one.
+ *
+ * Both versions collide on the same id, so the incoming copy is filed under a
+ * derived id — deterministic, so re-ingesting the same packet does not pile up
+ * duplicate conflict rows — and the pair is flagged as a conflict. The stored
+ * entry keeps its content; only its conflict bookkeeping changes.
+ */
+function preserveAsConflict(
+  store: Store,
+  existing: MemoryEntry,
+  incoming: MemoryEntry,
+  packet: SyncPacket,
+  reason: string,
+  options: { conflict_type: string; confidence: number },
+): void {
+  const disputedId = `${incoming.id}__conflict_${packet.sender_id}`;
+  if (!get(store, disputedId)) {
+    save(store, {
+      ...incoming,
+      id: disputedId,
+      // Mark it disputed rather than confirmed: it is evidence of a divergence,
+      // not an established fact.
+      status: "candidate",
+    });
+  }
+  flagConflict(store, existing.id, disputedId, reason, options);
+}
+
+/**
  * Ingests a peer gossip packet with Vibeguard secret inspection, deduplication, and contradiction resolution.
  */
 export function ingestKnowledge(
@@ -169,7 +285,19 @@ export function ingestKnowledge(
     return result;
   }
 
-  // 2. Vibeguard secret scan across incoming memories
+  const memoryDir = store.memoryDir || join(workspaceRoot, ".memory");
+
+  // 2. Fix #456: authenticate the sender before a single byte is written. A
+  //    packet that claims authenticity must prove it against the operator's
+  //    trust anchor; if it cannot, the whole packet is rejected untouched.
+  const attestation = verifyPacketAttestation(packet, memoryDir);
+  if (attestation.error) {
+    result.success = false;
+    result.errors.push(attestation.error);
+    return result;
+  }
+
+  // 3. Vibeguard secret scan across incoming memories
   for (const mem of packet.payload.memories) {
     const combined = `${mem.title} ${mem.content}`;
     const secrets = scanSecrets(combined);
@@ -182,13 +310,14 @@ export function ingestKnowledge(
     }
   }
 
-  const memoryDir = store.memoryDir || join(workspaceRoot, ".memory");
-
   // R31: the peer's last-sync timestamp is the concurrency signal below, so
   // it must be read before this packet updates it.
   const senderPeers = loadPeers(memoryDir);
+  // A known peer, or a packet whose signature we just verified, is trusted to
+  // use newer-wins. Everyone else may only add knowledge, never rewrite ours.
+  const trustedSender = attestation.attested || Boolean(senderPeers[packet.sender_id]);
 
-  // 3. Process each incoming memory
+  // 4. Process each incoming memory
   for (const incoming of packet.payload.memories) {
     const existing = get(store, incoming.id);
 
@@ -212,25 +341,11 @@ export function ingestKnowledge(
         existing.content.trim() !== incoming.content.trim();
 
       if (concurrent) {
-        // Never clobber. Both versions are legitimate, and they collide on the
-        // same id, so the incoming copy is preserved under a derived id —
-        // deterministic, so re-ingesting the same packet does not pile up
-        // duplicate conflict rows.
-        const disputedId = `${incoming.id}__conflict_${packet.sender_id}`;
-        const existingDisputed = get(store, disputedId);
-        if (!existingDisputed) {
-          save(store, {
-            ...incoming,
-            id: disputedId,
-            // Mark it disputed rather than confirmed: it is evidence of a
-            // divergence, not an established fact.
-            status: "candidate",
-          });
-        }
-        flagConflict(
+        preserveAsConflict(
           store,
-          existing.id,
-          disputedId,
+          existing,
+          incoming,
+          packet,
           `Concurrent write during sync from ${packet.sender_id}: both sides changed this memory after the last sync`,
           { conflict_type: "concurrent_write", confidence: 0.9 },
         );
@@ -244,6 +359,26 @@ export function ingestKnowledge(
         result.details.duplicate_ids.push(incoming.id);
         continue;
       }
+
+      // Fix #456: "incoming is newer" is only a licence to overwrite when the
+      // sender has earned it. An unattested packet from an agent we have never
+      // synced with cannot rewrite a confirmed memory just by claiming a later
+      // timestamp — it is quarantined as a conflict and the stored content
+      // stands. Known peers and verified packets keep newer-wins unchanged.
+      if (existing.status === "confirmed" && !trustedSender) {
+        preserveAsConflict(
+          store,
+          existing,
+          incoming,
+          packet,
+          `Untrusted sync overwrite from ${packet.sender_id}: unattested packet from an unknown peer targeted a confirmed memory`,
+          { conflict_type: "untrusted_overwrite", confidence: 0.9 },
+        );
+        result.conflict_count++;
+        result.details.conflicted_ids.push(incoming.id);
+        continue;
+      }
+
       // Incoming is strictly newer: update
       save(store, incoming);
       result.ingested_count++;
@@ -286,7 +421,7 @@ export function ingestKnowledge(
     result.details.ingested_ids.push(incoming.id);
   }
 
-  // 4. Ingest constraints
+  // 5. Ingest constraints
   if (Array.isArray(packet.payload.constraints)) {
     const currentData = parseCurrentFile(memoryDir);
     let constraintsModified = false;
@@ -301,7 +436,7 @@ export function ingestKnowledge(
     }
   }
 
-  // 5. Ingest supersessions
+  // 6. Ingest supersessions
   if (Array.isArray(packet.payload.supersessions)) {
     for (const s of packet.payload.supersessions) {
       const oldMem = get(store, s.old_id);
@@ -314,7 +449,7 @@ export function ingestKnowledge(
     }
   }
 
-  // 6. Update peer registry
+  // 7. Update peer registry
   const peers = loadPeers(memoryDir);
   const peerRecord: PeerRecord = peers[packet.sender_id] || {
     agent_id: packet.sender_id,
