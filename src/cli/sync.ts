@@ -84,7 +84,12 @@ export async function handleSyncCommand(parsed: ParsedArgs): Promise<number> {
     console.log(`New Ingested:    ${report.total_ingested}`);
     console.log(`Duplicates:      ${report.total_duplicates}`);
     console.log(`Conflicts:       ${report.total_conflicts}`);
-    console.log(`Broadcasted As:  ${report.broadcast_packet_id}`);
+    console.log(`Packets Dir:     ${report.packets_dir}`);
+    console.log(
+      report.broadcast_skipped
+        ? `Broadcasted As:  skipped (${report.broadcast_packet_id} not written: packet file already exists)`
+        : `Broadcasted As:  ${report.broadcast_packet_id}`
+    );
     return 0;
   }
 

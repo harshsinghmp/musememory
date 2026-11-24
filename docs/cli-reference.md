@@ -254,7 +254,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_sync_broadcast` | `packet` | Exports a portable, signed SyncPacket containing confirmed memories, active constraints, and supersessions for P2P gossip sync across peer agents |
 | `muse_sync_ingest` | `packet` | Ingests a peer agent's SyncPacket with Vibeguard secret inspection, deduplication, and contradiction resolution |
 | `muse_sync_status` | `path` | Inspects peer synchronization status, known peer agents, vector clocks, and pending outgoing knowledge |
-| `muse_sync_pool` | `path` | Performs two-way P2P gossip synchronization with an in-process filesystem shared pool folder |
+| `muse_sync_pool` | `path` | Performs two-way P2P gossip synchronization with the operator-configured sync pool folder (MUSE_SYNC_POOL_DIR, default <memory_dir>/sync/pool); pool_dir is confined to that root, broadcasts are written to its packets/ subdirectory and never overwrite an existing packet |
 | `muse_mesh_status` | `path` | Inspects multi-repo and monorepo cross-project mesh topology, workspace type, and discovered package stores |
 | `muse_mesh_query` | `path` | Queries memories across the entire monorepo or multi-repo cross-project mesh with origin package provenance |
 | `muse_mesh_audit` | `path` | Audits monorepo cross-package dependency contracts, entrypoint exports, and cross-repo code anchors |
