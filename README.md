@@ -144,35 +144,42 @@ memory optimize
 > One flat list of what is current. Historical releases live in the
 > [Changelog](./CHANGELOG.md) and the [GitHub Releases](https://github.com/harshsinghmp/musememory/releases) pages.
 
-- **Deleted memories stay deleted.** A link pointing at a memory you had erased
-  used to be enough to pull it back into an agent's context. Erased memories are
-  now unreachable from every direction, including links between memories.
-- **Reads no longer share one mutable copy.** A caller that edited an entry it
-  had just listed could silently corrupt what every later read of that page
-  saw. Each reader now gets its own copy, so one caller cannot change another's
-  results.
-- **Filtered lists say how much they hid.** When a listing withholds memories,
-  it now reports how many instead of implying that nothing was hidden.
-- **Errors you can act on.** A database fallback that could never succeed has
-  been removed, so a genuine problem with an old-format store now reports the
-  real cause rather than a misleading one.
-- **Imported memories cannot award themselves trust.** A migrated record can no
-  longer claim a higher verification level, or a "confirmed" status, on its own
-  say-so: verification now needs real test evidence, and confirmation needs the
-  record to be the current version.
-- **Pinned memories stay in the loop.** Knowledge you deliberately pin is exempt
-  from the "do not repeat this too soon" rule, so it keeps reaching the agent
-  instead of going quiet for several turns.
-- **Ending a session finishes its work.** `memory session end` now flushes the
-  promotions that were staged during the session, instead of leaving them for
-  some unrelated later command to pick up.
-- **Queries with nothing to search for cost nothing.** A greeting, a
-  punctuation-only query or a handful of filler words now returns "no confident
-  match" immediately instead of scanning and scoring the entire memory store.
-- **Proof behind seven past fixes, and a steadier build.** Seven fixes that had
-  only ever been guarded by tests that passed with or without the fix now have
-  tests that fail when the fix is removed, and two tests that failed at random
-  in the build pipeline now pass or fail for a real reason.
+- **Search is much faster.** Questions against a large memory store now come
+  back in roughly a quarter of the time — about 75% faster on a 2,000-memory
+  store — because the read path no longer copies the whole cache before every
+  lookup.
+- **The cache stopped throwing away its own work.** Recording which memories a
+  search touched used to look like a change to the stored data, so each search
+  discarded the cache it had just filled and the next one re-read everything.
+  Only real writes refresh the cache now.
+- **Freezing a run can no longer read arbitrary files.** The task text you pass
+  is stored exactly as written; attaching a file is now a separate, explicit
+  option that stays inside the project, is size-capped, and has secrets redacted.
+- **A networked server refuses to start without a password.** Exposing the
+  memory server on a network address now stops before it listens unless a token
+  is configured, with a conspicuous opt-out for anyone who really wants it.
+  Local-only use is unchanged.
+- **Expired knowledge stays expired.** An imported record marked expired can no
+  longer come back as a live memory, and code-context recall now applies the
+  same expiry rule as every other read path.
+- **Discovering other projects is opt-in.** Neighbouring projects are no longer
+  swept into a shared mesh without consent; links you create yourself keep
+  working, now require explicit confirmation, and are recorded in the audit log.
+- **Forged live updates are rejected.** The realtime endpoint checks an event's
+  name before broadcasting it, so a subscriber can no longer receive a frame
+  that looks like it came from the server.
+- **A long-running server no longer leaks a handle per request.** Memory stores
+  are reused per directory instead of opened on every request, so file handles
+  stop piling up, and a store that has fallen back to plain files now says so.
+- **Restored memories are searchable again.** Restoring a deleted memory used to
+  report success while leaving it out of the search index; the restore now
+  re-indexes it in the same step.
+- **Erased memories stay out of every index.** The tree view of the store now
+  checks each hit against the live data instead of trusting an index that is one
+  step behind, so deleted and superseded memories cannot reappear.
+- **The website is readable again.** Its active tab uses real theme colours, the
+  comparison table works from a keyboard and on a phone, and the font is served
+  from the site itself rather than fetched from Google.
 
 ---
 
