@@ -118,20 +118,35 @@ export function initMotion(): string {
   // A <button data-copy="#selector"> copies the text of the matching element.
   // The button reports success in its own label rather than a toast, so the
   // confirmation lives where the eye already is.
+  //
+  // The visible label is NOT the accessible name: the button carries a static
+  // aria-label, which wins the name computation, so swapping the label text is
+  // silent to a screen reader. The result is written to the [data-copy-status]
+  // live region as well, and cleared a few seconds later.
   document.querySelectorAll("[data-copy]").forEach(function (btn) {
     var sel = btn.getAttribute("data-copy");
     var source = sel ? document.querySelector(sel) : null;
     if (!source) return;
     var label = btn.querySelector("[data-copy-label]") || btn;
+    var status = btn.querySelector("[data-copy-status]");
     var idle = label.textContent || "Copy";
 
     // The manual-copy hint must name the right modifier for the platform.
     var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
     var manualHint = isMac ? "Press \u2318C" : "Press Ctrl+C";
+    var statusTimer = 0;
 
     var flash = function (text, tone) {
       label.textContent = text;
       btn.setAttribute("data-copied", tone);
+      if (status) {
+        // Clear first so repeating the same action re-announces: a live
+        // region only speaks when its content actually changes.
+        window.clearTimeout(statusTimer);
+        status.textContent = "";
+        status.textContent = text;
+        statusTimer = window.setTimeout(function () { status.textContent = ""; }, 4000);
+      }
       window.setTimeout(function () {
         label.textContent = idle;
         btn.removeAttribute("data-copied");

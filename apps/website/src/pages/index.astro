@@ -347,8 +347,13 @@ const jsonLd = [
 
         <div class="hero-install">
           <pre class="term" aria-label="Terminal: install command"><code id="install-cmd">npx musememory connect</code></pre>
+          {/* The button keeps one stable accessible name. Swapping the visible
+              label is not enough on its own: aria-label wins the name
+              computation, so an assistive-tech user never hears the result.
+              The live region below is what actually announces it. */}
           <button class="copy" type="button" data-copy="#install-cmd" aria-label="Copy the install command">
             <span data-copy-label>Copy</span>
+            <span class="sr-only" role="status" aria-live="polite" data-copy-status></span>
           </button>
         </div>
 
@@ -412,7 +417,15 @@ const jsonLd = [
 
         <div class="demo-grid">
           <figure class="reel panel reveal">
+            {/* width/height are the real dimensions of the poster frame
+                (1280×720, 16:9). They give the element an intrinsic aspect
+                ratio so the demo box is reserved before metadata arrives and
+                the page below it does not jump. ffprobe is not a dependency of
+                this repo, so the poster — rendered from the same reel — is the
+                source of truth for the ratio. */}
             <video
+              width="1280"
+              height="720"
               controls
               muted
               loop
@@ -967,7 +980,9 @@ const jsonLd = [
       .demo-grid { grid-template-columns: 1fr; }
     }
     .reel { overflow: hidden; margin: 0; }
-    .reel video { inline-size: 100%; }
+    /* block-size: auto keeps the intrinsic 16:9 ratio from the width/height
+       attributes while the inline size follows the column. */
+    .reel video { inline-size: 100%; block-size: auto; aspect-ratio: 16 / 9; }
     .reel figcaption,
     .figure figcaption {
       padding: var(--space-sm) var(--space-md);
