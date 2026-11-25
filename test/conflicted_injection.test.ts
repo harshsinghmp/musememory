@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, save } from "../src/store.ts";
 import { searchMemoriesFts } from "../src/sqlite.ts";
@@ -28,19 +29,22 @@ import type { MemoryStatus } from "../src/types.ts";
  * telemetry — T-143 promotion discipline).
  */
 
-const TEST_DIR = join(import.meta.dir, ".tmp_conflicted_injection_test");
-
 describe("T-405: conflicted memories are withheld from prompt-serving paths by default", () => {
   let root: string;
+  let testDir: string | undefined;
   let store: ReturnType<typeof openStore>;
 
   const ACTIVE_ID = "t405_active_port";
   const CONFLICTED_ID = "t405_conflicted_port";
 
+  // A per-test temp directory: the corpus used to live at a fixed path under
+  // `test/`, so a crash between tests left rows behind and the next run opened a
+  // store that already had them — which is how this file produced a one-off
+  // bm25-window failure that never reproduced in isolation.
   const newStore = () => {
-    mkdirSync(TEST_DIR, { recursive: true });
-    root = TEST_DIR;
-    store = openStore(TEST_DIR);
+    testDir = mkdtempSync(join(tmpdir(), "muse-t405-"));
+    root = testDir;
+    store = openStore(testDir);
 
     const now = new Date().toISOString();
     save(store, {
@@ -69,7 +73,8 @@ describe("T-405: conflicted memories are withheld from prompt-serving paths by d
   };
 
   afterEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    if (testDir) rmSync(testDir, { recursive: true, force: true });
+    testDir = undefined;
   });
 
   it("FTS store query hides conflicted rows and counts them as hidden", () => {
