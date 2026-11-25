@@ -40,6 +40,7 @@
  *   1  at least one required check failed — the work is not provably delivered
  */
 import { spawnSync } from "node:child_process";
+import { pullRequestVerdict } from "./lib/pull-request.ts";
 
 interface Check {
   ok: boolean;
@@ -223,25 +224,34 @@ if (PR_MODE) {
       detail: `no pull request found for ${branch}. The work cannot be reviewed until it has one.`,
     });
   } else {
+    const verdict = pullRequestVerdict(pr.state);
     checks.push({
-      ok: pr.state === "OPEN",
+      ok: verdict.ok,
+      skipped: verdict.skipped || undefined,
       label: "pull request",
-      detail: `#${pr.number} is ${pr.state} (${pr.url})`,
+      detail: `#${pr.number} is ${pr.state} (${pr.url})${verdict.note}`,
     });
-    const cs = prChecks(branch);
-    if (!cs) {
-      checks.push({
-        ok: false,
-        skipped: true,
-        label: "pull request checks",
-        detail: "could not read the PR check rollup (gh unavailable or not authenticated)",
-      });
+    // A terminal state settles the question this gate asks. Reading the check
+    // rollup afterwards is what produced "0 passing, 0 failing" beside a red
+    // verdict on an already-merged PR.
+    if (verdict.skipped) {
+      // Nothing further to review.
     } else {
-      checks.push({
-        ok: cs.failing === 0,
-        label: "pull request checks",
-        detail: `${cs.passing} passing, ${cs.failing} failing`,
-      });
+      const cs = prChecks(branch);
+      if (!cs) {
+        checks.push({
+          ok: false,
+          skipped: true,
+          label: "pull request checks",
+          detail: "could not read the PR check rollup (gh unavailable or not authenticated)",
+        });
+      } else {
+        checks.push({
+          ok: cs.failing === 0,
+          label: "pull request checks",
+          detail: `${cs.passing} passing, ${cs.failing} failing`,
+        });
+      }
     }
   }
 } else {
