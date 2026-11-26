@@ -11,6 +11,12 @@ export interface SqliteDatabase {
     get(params?: unknown[] | Record<string, unknown>): T | null | undefined;
   };
   close(): void;
+  /**
+   * Issue #497: load a SQLite extension (sqlite-vec) on this connection.
+   * Optional — a driver that cannot load extensions simply leaves it undefined
+   * and the vector path falls back to the index.json cosine scan.
+   */
+  loadExtension?(path: string): void;
 }
 
 let sqliteDriver: "bun" | "node" | "none" = "none";
@@ -80,6 +86,12 @@ export function openDatabase(dbPath: string): SqliteDatabase {
           },
         };
       },
+      // Issue #497: sqlite-vec is loaded per connection. bun:sqlite exposes
+      // loadExtension directly; the caller wraps this in try/catch and falls
+      // back to the JSON index when the extension is missing or refused.
+      loadExtension(path: string) {
+        rawDb.loadExtension(path);
+      },
       close() {
         rawDb.close();
       },
@@ -129,6 +141,17 @@ export function openDatabase(dbPath: string): SqliteDatabase {
             return stmt.get() as T;
           },
         };
+      },
+      // Issue #497: node:sqlite only grants extension loading when the handle
+      // opted in. Best-effort: any refusal throws and the caller falls back.
+      loadExtension(path: string) {
+        try {
+          rawDb.enableLoadExtension?.(true);
+        } catch {}
+        if (typeof rawDb.loadExtension !== "function") {
+          throw new Error("node:sqlite does not support loadExtension");
+        }
+        rawDb.loadExtension(path);
       },
       close() {
         rawDb.close();
