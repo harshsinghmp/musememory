@@ -276,6 +276,8 @@ export async function dispatchToolCall(
           status: a.status ? String(a.status) : undefined,
           verified: a.verified === true,
           minVeracity: a.min_veracity as any,
+          // Issue #502: opt-in only — absent means the full-store scan.
+          prefilter: a.prefilter === true,
         });
         if (res.results.length > 0) {
           const ids = res.results.map((r) => r.entry.id);
@@ -307,6 +309,8 @@ export async function dispatchToolCall(
         verified: a.verified === true,
         as_of: a.as_of ? String(a.as_of) : undefined,
         minVeracity: a.min_veracity as any,
+        // Issue #502: opt-in only — absent means the full-store scan.
+        prefilter: a.prefilter === true,
       });
       // T-028: Record retrievals to update utility stats and salience
       if (res.results.length > 0) {

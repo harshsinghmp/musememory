@@ -52,6 +52,13 @@ export interface GradeOptions {
   k?: number;
   recallFloor?: number;
   distractorTolerance?: number;
+  /**
+   * Issue #502: forward the opt-in candidate prefilter to `queryContext`.
+   * Exists so the same fixture can be graded on both paths; the thresholds
+   * above are untouched, which is the point — the prefilter must be measured
+   * against the full scan, not given its own floor.
+   */
+  prefilter?: boolean;
 }
 
 function calculatePercentiles(samples: number[], unit: "ms" | "µs"): LatencyMetric {
@@ -97,7 +104,7 @@ export function gradeRecallSet(
 
   for (const q of queries) {
     const t0 = performance.now();
-    const results = queryContext(store, q.query, { limit: 10 });
+    const results = queryContext(store, q.query, { limit: 10, prefilter: options.prefilter });
     latencies.push(performance.now() - t0);
 
     const topK = new Set(results.results.slice(0, k).map((r) => r.entry.id));

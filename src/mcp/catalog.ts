@@ -57,7 +57,8 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "search",
-    description: "Ranked search over memory entries",
+    description:
+      "Ranked search over memory entries. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need",
     inputSchema: {
       type: "object",
       properties: {
@@ -75,6 +76,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
         at_time: { type: "string", description: "Temporal point-in-time timestamp (default-excludes superseded entries)" },
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
+        prefilter: { type: "boolean", description: "Opt-in candidate prefilter (default false): score only FTS5 + vector candidates instead of the whole store. Faster on large stores, but a memory neither index surfaces is ranked as a zero-match (baseApplicability 0, -0.35 penalty) and can be missed — a recall/latency trade-off, not an exact optimisation" },
       },
       required: ["query"],
     },
@@ -183,7 +185,8 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "memory_recall",
-    description: "Recall active and confirmed memories for a query, with verification levels and related graph links",
+    description:
+      "Recall active and confirmed memories for a query, with verification levels and related graph links. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need",
     inputSchema: {
       type: "object",
       properties: {
@@ -198,6 +201,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         status: { type: "string" },
         verified: { type: "boolean" },
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
+        prefilter: { type: "boolean", description: "Opt-in candidate prefilter (default false): score only FTS5 + vector candidates instead of the whole store. Faster on large stores, but a memory neither index surfaces is ranked as a zero-match (baseApplicability 0, -0.35 penalty) and can be missed — a recall/latency trade-off, not an exact optimisation" },
       },
       required: ["query"],
     },
