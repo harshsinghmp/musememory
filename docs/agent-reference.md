@@ -127,7 +127,11 @@ Full matrix: [`cli-reference.md`](./cli-reference.md).
 ## 5. MCP
 
 The server speaks MCP over stdio. Protocol versions accepted:
-`2024-11-05`, `2025-06-18`.
+`2025-11-25` (current), `2025-06-18`, `2025-03-26`, `2024-11-05`, `2024-10-07`.
+
+The server advertises the versions its installed SDK supports. The
+`2026-07-28` revision is not implemented: `@modelcontextprotocol/sdk@1.32.2`
+does not know it.
 
 `claims.json` records the live totals; read them rather than trusting prose:
 
