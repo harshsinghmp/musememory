@@ -161,7 +161,20 @@ export function validateHttpAuth(
 
   const mappedPeer = tokenToPeer.get(token);
   const headerPeer = (req.headers["mcp-peer-id"] || req.headers["x-peer-id"]) as string | undefined;
-  const peerId = headerPeer || mappedPeer || "default";
+  // A single shared token maps to the synthetic identity "default": it says
+  // "authenticated", not "this is peer X". Only an explicit `peer:token` mapping
+  // is an identity, and a conflicting header against one is an attempt to
+  // borrow another peer's name — rejected rather than resolved in favour of
+  // either side.
+  const identityPeer = mappedPeer && mappedPeer !== "default" ? mappedPeer : undefined;
+  if (identityPeer && headerPeer && headerPeer !== identityPeer) {
+    return {
+      authenticated: false,
+      status: 403,
+      errorMessage: "Forbidden: peer header does not match the token identity",
+    };
+  }
+  const peerId = identityPeer ?? headerPeer ?? mappedPeer ?? "default";
 
   if (options.allowedPeers && options.allowedPeers.length > 0) {
     const isPeerAllowed =

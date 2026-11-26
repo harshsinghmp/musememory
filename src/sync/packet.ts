@@ -82,6 +82,22 @@ export function validateSyncPacket(packet: unknown): { valid: boolean; error?: s
   if (!p.sender_id || typeof p.sender_id !== "string") {
     return { valid: false, error: "Missing or invalid sender_id" };
   }
+  // `sender_id` is used as an object key when resolving peer trust. JavaScript's
+  // own prototype names ("__proto__", "constructor", "prototype") must never be
+  // accepted as identities: before the null-prototype lookup in loadPeers they
+  // resolved to inherited truthy values and made an unsigned packet look like a
+  // known peer. Reject them at intake as well, so no future plain-object lookup
+  // can reintroduce the bypass. Control characters and absurd lengths are
+  // rejected on the same pass.
+  if (
+    p.sender_id === "__proto__" ||
+    p.sender_id === "constructor" ||
+    p.sender_id === "prototype" ||
+    p.sender_id.length > 128 ||
+    /[\u0000-\u001f\u007f]/.test(p.sender_id)
+  ) {
+    return { valid: false, error: "Invalid sender_id" };
+  }
 
   if (!p.packet_id || typeof p.packet_id !== "string") {
     return { valid: false, error: "Missing or invalid packet_id" };
