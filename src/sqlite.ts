@@ -530,6 +530,42 @@ export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | nul
   return rowToMemoryEntry(row);
 }
 
+/**
+ * Issue #502: batch id lookup for the opt-in candidate prefilter.
+ *
+ * The prefilter derives a bounded id set from FTS5/vec0, so the rest of the
+ * pipeline needs only *those* rows — one `IN (...)` query instead of a
+ * full-table scan. Chunked because SQLite caps host parameters (999 by
+ * default) and the over-fetch window can exceed that. Tombstoned rows are
+ * excluded here, matching `list()`'s tombstone gate, so a candidate id that
+ * outlives its row (vec0 is derived data) never re-enters the page.
+ */
+export function getMemoriesByIds(db: SqliteDatabase, ids: string[]): MemoryEntry[] {
+  const unique = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  if (unique.length === 0) return [];
+
+  const CHUNK = 500;
+  const rows: DbMemoryRow[] = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    try {
+      rows.push(
+        ...db
+          .query<DbMemoryRow>(
+            `SELECT * FROM memories WHERE id IN (${placeholders}) AND (deleted_at IS NULL OR deleted_at = '')`,
+          )
+          .all(chunk),
+      );
+    } catch {
+      // A driver without the column (or a transient error) degrades to "no
+      // candidates"; the caller then falls back to the full-store path.
+      return rows.map(rowToMemoryEntry);
+    }
+  }
+  return rows.map(rowToMemoryEntry);
+}
+
 export function getMemoryByIdempotencyKey(db: SqliteDatabase, key: string): MemoryEntry | null {
   try {
     const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE idempotency_key = ? AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1`).get([key]);

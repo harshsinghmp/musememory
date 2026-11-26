@@ -133,8 +133,8 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | --- | --- | --- |
 | `memory_read` | `id` | Read a full memory entry by id |
 | `get_context` | `query` | MANDATORY ON SESSION START: Fetch Top-K relevant memories, active user profile (USER.md), and active hard constraints (CURRENT.md) for prompt injection. MUST be called on the first turn of any task or session. |
-| `search` | `query` | Ranked search over memory entries |
-| `memory_recall` | `query` | Recall active and confirmed memories for a query, with verification levels and related graph links |
+| `search` | `query` | Ranked search over memory entries. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need |
+| `memory_recall` | `query` | Recall active and confirmed memories for a query, with verification levels and related graph links. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need |
 | `memory_get_user_profile` | `content` | Read the active user profile and preferences (USER.md) |
 | `memory_search_transcripts` | `query`, `transcript` | Full-text search over conversation transcripts (.jsonl or text) with conversation bookends (start/end) and context window |
 | `memory_tree_search` | `query` | Hierarchical tree-indexed reasoning search across partitioned memory shards |

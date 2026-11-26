@@ -11,8 +11,15 @@ import { STATUS_PENALTY, VERIFICATION_BONUS } from "./types.ts";
 import { nowIso } from "./store.ts";
 import { hasSecret } from "./secrets.ts";
 import { verifyRuntimeFiles, type RuntimeVerificationVerdict } from "./graph.ts";
-import { buildSafeFtsQuery, rowToMemoryEntry, type DbMemoryRow } from "./sqlite.ts";
+import {
+  buildSafeFtsQuery,
+  rowToMemoryEntry,
+  searchMemoriesFts,
+  getMemoriesByIds,
+  type DbMemoryRow,
+} from "./sqlite.ts";
 import { expandAssociativeDetailed, type AssociativeNode } from "./associative.ts";
+import { getVecIndex, vecCount, vecKnn } from "./vector/vec-index.ts";
 import { computeDecayScore } from "./retention.ts";
 import { computeJaccardSimilarity } from "./quality/dedup.ts";
 import { isDraftMemory } from "./drafts.ts";
@@ -283,6 +290,19 @@ export interface ContextQueryOptions extends SearchOptions {
   loosened_threshold?: number;
   /** T-135: Whether to relax project scope to include global memories in Rung 3. */
   allow_scope_relaxation?: boolean;
+  /**
+   * Issue #502: opt-in candidate prefilter. Default **false**.
+   *
+   * When true (and the query tokenizes to at least one term) candidates come
+   * from FTS5 + the sqlite-vec KNN index instead of the whole store, and only
+   * those rows are scored. This is a latency/recall **trade-off, not an exact
+   * optimisation**: a memory that neither index surfaces is never scored, so it
+   * contributes `baseApplicability = 0` and takes the `-0.35` zero-match
+   * penalty even though it may still carry path, graph, verification or access
+   * bonuses. The page is only prefiltered when the candidates fill `limit`;
+   * otherwise the call falls back to the full-store path.
+   */
+  prefilter?: boolean;
 }
 
 export interface SearchResult {
@@ -340,6 +360,14 @@ export interface SearchResult {
   expanded_count?: number;
   /** T-121: Typed evaluation outcomes (keep/drop with structured reasons) for all evaluated candidates. */
   candidate_evaluations?: CandidateEvaluation[];
+  /**
+   * Issue #502: whether this call actually ran on prefiltered candidates.
+   * False whenever the prefilter was off (the default), yielded no candidates,
+   * or fell back because the candidates could not fill `limit`.
+   */
+  prefilter_used?: boolean;
+  /** Issue #502: size of the candidate set the prefilter produced, after the lifecycle/project gates. */
+  prefilter_candidate_count?: number;
 }
 
 export interface FormattedContext {
@@ -1679,6 +1707,60 @@ export function evaluateAsOf(entry: MemoryEntry, asOfTime: string | number): AsO
   return { status: "undetermined", reason: "inexact_boundary_observation_lag" };
 }
 
+/** Issue #502: candidates pulled per query before the gates narrow the page. */
+const PREFILTER_OVERFETCH_MULTIPLIER = 20;
+const PREFILTER_MIN_CANDIDATES = 200;
+
+/**
+ * Issue #502: gather the opt-in prefilter's candidate rows.
+ *
+ * Candidate generation is deliberately permissive: both retrievers are asked
+ * for superseded and conflicted rows as well, because every lifecycle,
+ * project, veracity and read-path gate still runs afterwards in `narrow()`.
+ * What this function must NOT do is drop a memory the gates would have kept —
+ * which is exactly the recall risk the option is opt-in for.
+ *
+ * Returns an empty array when no index can answer, which is what makes the
+ * caller fall back to the full-store scan.
+ */
+function collectPrefilterCandidates(store: Store, query: string, limit: number): MemoryEntry[] {
+  const overfetch = Math.max(
+    Math.floor(limit * PREFILTER_OVERFETCH_MULTIPLIER),
+    PREFILTER_MIN_CANDIDATES,
+  );
+  const ids = new Set<string>();
+
+  // 1. FTS5/BM25 lexical candidates.
+  if (store.db) {
+    try {
+      const hits = searchMemoriesFts(store.db, query, {
+        limit: overfetch,
+        includeSuperseded: true,
+        includeConflicted: true,
+      });
+      for (const hit of hits) ids.add(hit.entry.id);
+    } catch {}
+  }
+
+  // 2. vec0 KNN semantic candidates, when the sqlite-vec index is live.
+  //
+  // The embedder is loaded lazily on purpose: `vector.ts` imports `tokenize`
+  // from this module, so a static import here would close a module cycle at
+  // evaluation time. An absent or empty vec0 table simply contributes nothing
+  // — no backfill, because a read path must not write (#497 made the backfill
+  // a first-search side effect of hybridSearch, not of recall).
+  try {
+    const vector = require("./vector.ts") as typeof import("./vector.ts");
+    const vec = getVecIndex(store.db ?? null, vector.DIMS);
+    if (vec && vecCount(vec) > 0) {
+      for (const hit of vecKnn(vec, vector.embed(query), overfetch)) ids.add(hit.id);
+    }
+  } catch {}
+
+  if (!store.db || ids.size === 0) return [];
+  return getMemoriesByIds(store.db, [...ids]);
+}
+
 export function queryContext(
   store: Store,
   query: string = "",
@@ -1712,135 +1794,194 @@ export function queryContext(
 
   const queryTokens = tokenize(query);
   const now = options.now ?? Date.now();
+  // R23 / Issue #502: the page size is needed before scoring, because the
+  // prefilter only replaces the candidate scan when its candidates can fill
+  // this page.
+  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 500, 1) : 10;
+
+  // Issue #502 (pushdown): `list()` maps project/type/status onto indexed
+  // equality predicates and caches its result per filter key, so the scan
+  // itself now returns exactly the rows the JavaScript filters below used to
+  // discard one by one. The same three predicates are still applied in
+  // `narrow()` because the prefilter fetches its candidate rows by id, and a
+  // candidate set is not pre-filtered by anything.
+  //
   // `raw` skips the clone: the scorer only reads content and mutates access
   // telemetry, and stable object identities are what let the per-entry token,
   // symbol and path WeakMaps survive across queries. Results are copied before
   // they leave this function, so callers still cannot poison the cache (#409).
-  let entries = list(store, undefined, { raw: true });
+  const readStoreEntries = () =>
+    list(
+      store,
+      {
+        project: options.project,
+        type: options.type as string | undefined,
+        status: options.status as string | undefined,
+      },
+      { raw: true },
+    );
   const withheld: Array<{ id: string; reason: string }> = [];
 
-  // T-075: Untrusted provenance filter (default excluded, opt-in with includeUntrusted: true)
-  if (!options.includeUntrusted) {
+  /**
+   * Issue #502: every gate between "an entry exists" and "an entry is scored",
+   * in one place — so the full store and the opt-in prefiltered candidate set
+   * run through exactly the same filters, in the same order. Returns the
+   * survivors, the hidden count, the as_of `undetermined` partition and the
+   * ids it withheld, because a candidate probe that is thrown away must not
+   * leak its withheld ids into the answer.
+   */
+  const narrow = (input: MemoryEntry[]) => {
+    let entries = input;
+    const withheld: Array<{ id: string; reason: string }> = [];
+    let hidden_count = 0;
+
+    // T-075: Untrusted provenance filter (default excluded, opt-in with includeUntrusted: true)
+    if (!options.includeUntrusted) {
+      entries = entries.filter((e) => {
+        if (e.trust === "untrusted") {
+          withheld.push({ id: e.id, reason: "untrusted_source" });
+          return false;
+        }
+        return true;
+      });
+    }
+
+    // T-058: Defense-in-depth read-path revalidation
     entries = entries.filter((e) => {
-      if (e.trust === "untrusted") {
-        withheld.push({ id: e.id, reason: "untrusted_source" });
+      const val = validateRecalledEntry(e);
+      if (!val.valid) {
+        if (!loggedRevalidationWarnings.has(e.id)) {
+          loggedRevalidationWarnings.add(e.id);
+          console.warn(`[ReadPathValidation] Withheld memory ${e.id}: detected ${val.reason}`);
+        }
+        withheld.push({ id: e.id, reason: val.reason! });
         return false;
       }
       return true;
     });
-  }
 
-  // T-058: Defense-in-depth read-path revalidation
-  entries = entries.filter((e) => {
-    const val = validateRecalledEntry(e);
-    if (!val.valid) {
-      if (!loggedRevalidationWarnings.has(e.id)) {
-        loggedRevalidationWarnings.add(e.id);
-        console.warn(`[ReadPathValidation] Withheld memory ${e.id}: detected ${val.reason}`);
-      }
-      withheld.push({ id: e.id, reason: val.reason! });
-      return false;
+    // T-089: Minimum provenance veracity filter
+    if (options.minVeracity !== undefined) {
+      const minThreshold =
+        typeof options.minVeracity === "number"
+          ? options.minVeracity
+          : (VERACITY_RANK_WEIGHTS[options.minVeracity] ?? 0);
+      entries = entries.filter((e) => {
+        const weight = getVeracityWeight(e);
+        if (weight < minThreshold) {
+          withheld.push({ id: e.id, reason: "low_veracity_source" });
+          return false;
+        }
+        return true;
+      });
     }
-    return true;
-  });
 
-  // T-089: Minimum provenance veracity filter
-  if (options.minVeracity !== undefined) {
-    const minThreshold =
-      typeof options.minVeracity === "number"
-        ? options.minVeracity
-        : (VERACITY_RANK_WEIGHTS[options.minVeracity] ?? 0);
+    if (options.project) {
+      entries = entries.filter((e) => e.project === options.project);
+    }
+    // Audit F2: these gates apply ALWAYS, not only to current-state reads.
+    // They used to be nested under `as_of === undefined`, so setting as_of
+    // silently re-admitted conflicted, archived and TTL-expired memories into
+    // prompt-serving reads — known-contradictory pairs injected as if both were
+    // true. A retracted belief is not valid at any timestamp, and expiry is a
+    // wall-clock fact, not a hypothesis about the past.
     entries = entries.filter((e) => {
-      const weight = getVeracityWeight(e);
-      if (weight < minThreshold) {
-        withheld.push({ id: e.id, reason: "low_veracity_source" });
+      if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
+        hidden_count++;
+        return false;
+      }
+      // T-405: conflicted memories are known potential falsehoods — withheld
+      // from prompts by default (badgeless injection defect #313). A caller
+      // that explicitly asks for the conflicted status (audits, conflicts
+      // listings) still receives them — same guard as the archived gate.
+      if (!options.includeConflicted && options.status !== "conflicted" && e.status === "conflicted") {
+        hidden_count++;
+        return false;
+      }
+      if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
+        hidden_count++;
+        return false;
+      }
+      // Expiry is a WALL-CLOCK fact for current reads, but a historical read must
+      // judge it at the queried instant: a memory that expired last month was
+      // perfectly valid three months ago, and hoisting this gate unchanged made
+      // every such history query return nothing (caught by the gauntlet critic).
+      const expiryReference = options.as_of !== undefined ? Date.parse(String(options.as_of)) : now;
+      if (!options.includeExpired && isExpired(e, Number.isFinite(expiryReference) ? expiryReference : now)) {
+        hidden_count++;
+        return false;
+      }
+      // Superseded entries are also excluded from as_of reads unless asked for:
+      // a superseded belief was replaced, so it is not the answer at any point
+      // after supersession, and its replacement carries the valid window.
+      if (options.as_of !== undefined && !options.includeSuperseded && e.status === "superseded") {
+        hidden_count++;
         return false;
       }
       return true;
     });
-  }
+    if (options.type) {
+      entries = entries.filter((e) => e.type === options.type);
+    }
+    if (options.types?.length) {
+      entries = entries.filter((e) => e.type !== undefined && options.types!.includes(e.type));
+    }
+    if (options.tags?.length) {
+      entries = entries.filter((e) => (e.tags ?? []).some((t) => options.tags!.includes(t)));
+    }
+    if (options.status) {
+      entries = entries.filter((e) => e.status === options.status);
+    }
+    if (options.verified) {
+      entries = entries.filter(
+        (e) =>
+          e.verification?.level &&
+          e.verification.level !== "unverified" &&
+          e.status !== "candidate",
+      );
+    }
 
-  if (options.project) {
-    entries = entries.filter((e) => e.project === options.project);
-  }
-  let hidden_count = 0;
-  // Audit F2: these gates apply ALWAYS, not only to current-state reads.
-  // They used to be nested under `as_of === undefined`, so setting as_of
-  // silently re-admitted conflicted, archived and TTL-expired memories into
-  // prompt-serving reads — known-contradictory pairs injected as if both were
-  // true. A retracted belief is not valid at any timestamp, and expiry is a
-  // wall-clock fact, not a hypothesis about the past.
-  entries = entries.filter((e) => {
-    if (!options.includeSuperseded && (e.status === "superseded" || e.status === "rejected")) {
-      hidden_count++;
-      return false;
-    }
-    // T-405: conflicted memories are known potential falsehoods — withheld
-    // from prompts by default (badgeless injection defect #313). A caller
-    // that explicitly asks for the conflicted status (audits, conflicts
-    // listings) still receives them — same guard as the archived gate.
-    if (!options.includeConflicted && options.status !== "conflicted" && e.status === "conflicted") {
-      hidden_count++;
-      return false;
-    }
-    if (!options.includeArchived && options.status !== "archived" && e.status === "archived") {
-      hidden_count++;
-      return false;
-    }
-    // Expiry is a WALL-CLOCK fact for current reads, but a historical read must
-    // judge it at the queried instant: a memory that expired last month was
-    // perfectly valid three months ago, and hoisting this gate unchanged made
-    // every such history query return nothing (caught by the gauntlet critic).
-    const expiryReference = options.as_of !== undefined ? Date.parse(String(options.as_of)) : now;
-    if (!options.includeExpired && isExpired(e, Number.isFinite(expiryReference) ? expiryReference : now)) {
-      hidden_count++;
-      return false;
-    }
-    // Superseded entries are also excluded from as_of reads unless asked for:
-    // a superseded belief was replaced, so it is not the answer at any point
-    // after supersession, and its replacement carries the valid window.
-    if (options.as_of !== undefined && !options.includeSuperseded && e.status === "superseded") {
-      hidden_count++;
-      return false;
-    }
-    return true;
-  });
-  if (options.type) {
-    entries = entries.filter((e) => e.type === options.type);
-  }
-  if (options.types?.length) {
-    entries = entries.filter((e) => e.type !== undefined && options.types!.includes(e.type));
-  }
-  if (options.tags?.length) {
-    entries = entries.filter((e) => (e.tags ?? []).some((t) => options.tags!.includes(t)));
-  }
-  if (options.status) {
-    entries = entries.filter((e) => e.status === options.status);
-  }
-  if (options.verified) {
-    entries = entries.filter(
-      (e) =>
-        e.verification?.level &&
-        e.verification.level !== "unverified" &&
-        e.status !== "candidate",
-    );
-  }
-
-  // T-083: Bi-temporal point-in-time partitioning
-  let undeterminedEntries: MemoryEntry[] = [];
-  if (options.as_of !== undefined) {
-    const validEntries: MemoryEntry[] = [];
-    for (const e of entries) {
-      const evaluation = evaluateAsOf(e, options.as_of);
-      if (evaluation.status === "valid") {
-        validEntries.push(e);
-      } else if (evaluation.status === "undetermined") {
-        undeterminedEntries.push(e);
+    // T-083: Bi-temporal point-in-time partitioning
+    const undeterminedEntries: MemoryEntry[] = [];
+    if (options.as_of !== undefined) {
+      const validEntries: MemoryEntry[] = [];
+      for (const e of entries) {
+        const evaluation = evaluateAsOf(e, options.as_of);
+        if (evaluation.status === "valid") {
+          validEntries.push(e);
+        } else if (evaluation.status === "undetermined") {
+          undeterminedEntries.push(e);
+        }
+        // "invalid" entries are dropped
       }
-      // "invalid" entries are dropped
+      entries = validEntries;
     }
-    entries = validEntries;
+
+    return { entries, hidden_count, undetermined: undeterminedEntries, withheld };
+  };
+
+  // Issue #502: the opt-in candidate prefilter. Candidates come from the two
+  // index-backed retrievers (FTS5 bm25 and the sqlite-vec KNN) with a wide
+  // over-fetch, so the work is bounded by the indexes rather than the store.
+  // Off by default: only an explicit `prefilter: true` pays the recall risk.
+  const prefilterCandidates =
+    options.prefilter === true && queryTokens.length > 0
+      ? collectPrefilterCandidates(store, query, limit)
+      : undefined;
+
+  let narrowed = prefilterCandidates ? narrow(prefilterCandidates) : undefined;
+  const prefilterCandidateCount = narrowed?.entries.length ?? 0;
+  // A candidate set that cannot fill the page is a guess, not a page: fall back
+  // to the full-store scan so the caller still receives `limit` results.
+  const prefilterUsed = prefilterCandidateCount >= limit;
+  if (!narrowed || !prefilterUsed) {
+    narrowed = narrow(readStoreEntries());
   }
+
+  const entries = narrowed.entries;
+  const hidden_count = narrowed.hidden_count;
+  const undeterminedEntries = narrowed.undetermined;
+  withheld.push(...narrowed.withheld);
 
   const scored = sortCandidates(entries, queryTokens, now, options.semanticScores, options.workspaceRoot);
   const scoredUndetermined =
@@ -1848,8 +1989,8 @@ export function queryContext(
       ? sortCandidates(undeterminedEntries, queryTokens, now, options.semanticScores, options.workspaceRoot)
       : [];
 
-  // R23: Record access for top results (updates last_accessed_at and access_count)
-  const limit = options.limit !== undefined ? clampLimit(options.limit, 10, 500, 1) : 10;
+  // R23: Record access for top results (updates last_accessed_at and access_count).
+  // `limit` is resolved above the candidate scan (issue #502).
   const results: ScoredEntry[] = [];
   let totalTokensUsed = 0;
 
@@ -2120,6 +2261,8 @@ export function queryContext(
     deduped_count: preferObs ? deduped_count : undefined,
     expanded_wikilinks,
     expanded_count: expanded_count > 0 ? expanded_count : undefined,
+    prefilter_used: prefilterUsed,
+    prefilter_candidate_count: prefilterCandidateCount,
   };
 }
 
