@@ -1,9 +1,19 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "@modelcontextprotocol/sdk/types.js";
 import { MCP_TOOL_CATALOG } from "./mcp/catalog.ts";
 import { dispatchToolCall } from "./mcp/dispatch.ts";
 import { toolError } from "./mcp/tool-result.ts";
+import { STATIC_MCP_RESOURCES, readMcpResource } from "./mcp/resources.ts";
+import { getMcpPrompt, listMcpPrompts } from "./mcp/prompts.ts";
 import { findOrCreateProjectRoot } from "./root.ts";
 import { openStore, type Store } from "./store.ts";
 import { getSettings } from "./settings.ts";
@@ -83,7 +93,7 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
   const server = new Server(
     { name: PACKAGE_NAME, version: PACKAGE_VERSION },
     {
-      capabilities: { tools: {}, logging: {} },
+      capabilities: { tools: {}, resources: {}, prompts: {}, logging: {} },
       instructions: `MUSE MEMORY PROTOCOL:
 You are equipped with Muse Memory, an autonomous persistent cognitive memory system.
 1. SESSION START / FIRST TURN: You MUST call 'get_context' on your very first turn in any conversation or task. This loads the user's role profile (USER.md), active working constraints (CURRENT.md), and relevant past decisions/fixes.
@@ -136,6 +146,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
     }
   });
 
+  // --- #494: resources -------------------------------------------------------
+  // `resources/list` advertises only the four stable documents. Enumerating
+  // every memory entry here would be an unbounded token cost for a client that
+  // asked for an index; entries stay reachable by id via `memory://entry/<id>`.
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: STATIC_MCP_RESOURCES.map((resource) => ({ ...resource })),
+  }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    // `readMcpResource` throws McpError(-32602) for an unknown or malformed URI
+    // and for an entry id the store does not hold, so the rejection reaches the
+    // client as a JSON-RPC error instead of an empty document.
+    const resource = readMcpResource(store, memoryDir, request.params.uri);
+    return { contents: [resource] };
+  });
+
+  // --- #494: prompts ---------------------------------------------------------
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: listMcpPrompts(),
+  }));
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: promptArgs } = request.params;
+    return getMcpPrompt(memoryDir, name, (promptArgs ?? {}) as Record<string, string>);
+  });
+
   return server;
 }
 
@@ -150,4 +186,18 @@ export async function runMcpServer(): Promise<void> {
   });
 }
 
-export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ["2024-11-05", "2025-06-18"];
+/**
+ * #494: the protocol revisions this server accepts, newest first.
+ *
+ * Bound to the installed SDK's own list rather than duplicated, because the SDK
+ * is what actually negotiates: it answers `initialize` with the client's version
+ * when that version is in `SUPPORTED_PROTOCOL_VERSIONS` and falls back to
+ * `LATEST_PROTOCOL_VERSION` otherwise. A hand-maintained copy here could only
+ * drift from the negotiation it is supposed to describe. The installed
+ * `@modelcontextprotocol/sdk@1.32.2` list is
+ * `['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07']`.
+ *
+ * This is also the HTTP transport's `mcp-protocol-version` allowlist, so a
+ * header naming anything else is rejected with 400 (see `src/mcp/http.ts`).
+ */
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS: readonly string[] = [...SUPPORTED_PROTOCOL_VERSIONS];

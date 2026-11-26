@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { startHttpMcpServer } from "../src/mcp/http.ts";
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from "../src/mcp.ts";
 
 describe("T-150: MCP Streamable HTTP Transport (2025-06-18 spec)", () => {
   test("starts HTTP server on ephemeral port and handles initialize request", async () => {
@@ -281,6 +282,70 @@ describe("T-151: Origin validation, session ID enforcement, and protocol version
       expect(defaultResp.headers.get("mcp-protocol-version")).toBe("2024-11-05");
     } finally {
       await defaultHandle.close();
+    }
+  });
+
+  test("#494: accepts every advertised protocol version and still rejects 2026-07-28 with 400", async () => {
+    // The allowlist is the installed SDK's own list, newest first.
+    expect([...SUPPORTED_MCP_PROTOCOL_VERSIONS]).toEqual([
+      "2025-11-25",
+      "2025-06-18",
+      "2025-03-26",
+      "2024-11-05",
+      "2024-10-07",
+    ]);
+
+    // 1. The newest version the SDK negotiates is accepted and echoed back.
+    const currentHandle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+    try {
+      const resp = await fetch(currentHandle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-11-25",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(resp.status).toBe(200);
+      expect(resp.headers.get("mcp-protocol-version")).toBe("2025-11-25");
+      const payload = (await resp.json()) as any;
+      expect(payload.result.protocolVersion).toBe("2025-11-25");
+    } finally {
+      await currentHandle.close();
+    }
+
+    // 2. The 2026-07-28 revision is not supported by the installed SDK, so the
+    //    transport must reject the header outright rather than half-negotiate it.
+    const futureHandle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+    try {
+      const badResp = await fetch(futureHandle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-protocol-version": "2026-07-28",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "initialize",
+          params: { protocolVersion: "2026-07-28", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        }),
+      });
+
+      expect(badResp.status).toBe(400);
+      const badJson = (await badResp.json()) as any;
+      expect(badJson.error.message).toContain("Unsupported protocol version: 2026-07-28");
+      expect(badJson.error.message).toContain("2025-11-25");
+    } finally {
+      await futureHandle.close();
     }
   });
 
