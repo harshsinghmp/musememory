@@ -15,7 +15,7 @@
 ![Node.js](https://img.shields.io/badge/Node.js-≥18.0.0-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 
-![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
+![MCP Protocol](https://img.shields.io/badge/MCP-2025--11--25-green?style=for-the-badge&logo=anthropic)
 ![SQLite Engine](https://img.shields.io/badge/SQLite-Primary_DB-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
@@ -562,7 +562,7 @@ If you installed the pre-commit transcript harvester hook or injected agent prom
 
 ## 👥 Team & Multi-Member Setup
 
-Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-06-18)** with Bearer token authentication.
+Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-11-25, with 2025-06-18 compatibility)** with Bearer token authentication.
 
 ```
                     Central Team Server (`team.db` + `CURRENT.md`)

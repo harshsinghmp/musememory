@@ -14,7 +14,7 @@ When deploying Muse Memory for a multi-developer team, the storage topology is c
 
 ### The Production Standard: Single Host + MCP Streamable HTTP
 
-Exactly **one machine or VM acts as the team host server**, owning `team.db` and the repository's shared constraints in-process. All team members connect remotely over LAN, VPN, or HTTPS via the **MCP Streamable HTTP Transport (2025-06-18 spec)** with **Bearer token authentication**.
+Exactly **one machine or VM acts as the team host server**, owning `team.db` and the repository's shared constraints in-process. All team members connect remotely over LAN, VPN, or HTTPS via the **MCP Streamable HTTP Transport (2025-11-25 spec)** with **Bearer token authentication**.
 
 ```
                         ┌────────────────────────────────────────────────────────┐
@@ -27,7 +27,7 @@ Exactly **one machine or VM acts as the team host server**, owning `team.db` and
                         │   └────────────────────┘   └───────────────────────┘   │
                         └───────────────────────────▲────────────────────────────┘
                                                     │
-                   MCP Streamable HTTP (2025-06-18) │ Authorization: Bearer <token>
+                   MCP Streamable HTTP (2025-11-25) │ Authorization: Bearer <token>
         ┌───────────────────────────┬───────────────┴───────────────┬───────────────────────────┐
         │                           │                               │                           │
  ┌──────┴──────┐             ┌──────┴──────┐                 ┌──────┴──────┐             ┌──────┴──────┐
@@ -225,5 +225,5 @@ Muse Memory enforces 4 built-in defense gates:
 | :--- | :--- | :--- |
 | `401 Unauthorized` | Missing or malformed `Authorization` header | Ensure your editor config includes `"headers": { "Authorization": "Bearer <token>" }`. |
 | `403 Forbidden` | Invalid token or peer not in `--allowed-peers` | Check that your token matches the server startup arguments and that your peer name is allowlisted. |
-| `400 Bad Request` missing accept header | Client did not send MCP Streamable HTTP accept header | Verify your client supports MCP 2025-06-18 spec (`Accept: application/json, text/event-stream`). |
+| `400 Bad Request` missing accept header | Client did not send MCP Streamable HTTP accept header | Verify your client supports MCP 2025-11-25 spec (`Accept: application/json, text/event-stream`). |
 | Connection refused | Server not listening on `0.0.0.0` or firewall blocking port | Ensure server is started with `--host 0.0.0.0` and port `31338` (or your chosen port) is open in the firewall. |
