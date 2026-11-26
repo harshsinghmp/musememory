@@ -153,7 +153,7 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
   return 0;
 }
 
-export async function promptOrNotifyGitHook(targetDir: string, autoInstall = false): Promise<boolean> {
+async function promptOrNotifyGitHook(targetDir: string, autoInstall = false): Promise<boolean> {
   const gitDir = join(targetDir, ".git");
   if (!existsSync(gitDir)) return false;
   const hookPath = join(gitDir, "hooks", "pre-commit");
@@ -597,7 +597,7 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
     // reach the server through a Host it controls.
     const allowedHosts = explicitAllowedHosts ?? [...new Set([host, "localhost", "127.0.0.1", "[::1]"])];
 
-    const { startHttpMcpServer } = await import("../mcp.ts");
+    const { startHttpMcpServer } = await import("../mcp/http.ts");
     const handle = await startHttpMcpServer({
       port,
       host,

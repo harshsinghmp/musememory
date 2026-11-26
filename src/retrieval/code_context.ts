@@ -40,7 +40,7 @@ const PRIORITY: Record<string, number> = {
 
 const HIDDEN_STATUSES = new Set(["superseded", "rejected", "conflicted"]);
 
-export function normalizeCodePath(value: string): string {
+function normalizeCodePath(value: string): string {
   return value.replace(/\\/g, "/").replace(/^\.?\//, "").toLowerCase();
 }
 

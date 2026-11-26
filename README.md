@@ -144,42 +144,28 @@ memory optimize
 > One flat list of what is current. Historical releases live in the
 > [Changelog](./CHANGELOG.md) and the [GitHub Releases](https://github.com/harshsinghmp/musememory/releases) pages.
 
-- **Search is much faster.** Questions against a large memory store now come
-  back in roughly a quarter of the time — about 75% faster on a 2,000-memory
-  store — because the read path no longer copies the whole cache before every
-  lookup.
-- **The cache stopped throwing away its own work.** Recording which memories a
-  search touched used to look like a change to the stored data, so each search
-  discarded the cache it had just filled and the next one re-read everything.
-  Only real writes refresh the cache now.
-- **Freezing a run can no longer read arbitrary files.** The task text you pass
-  is stored exactly as written; attaching a file is now a separate, explicit
-  option that stays inside the project, is size-capped, and has secrets redacted.
-- **A networked server refuses to start without a password.** Exposing the
-  memory server on a network address now stops before it listens unless a token
-  is configured, with a conspicuous opt-out for anyone who really wants it.
-  Local-only use is unchanged.
-- **Expired knowledge stays expired.** An imported record marked expired can no
-  longer come back as a live memory, and code-context recall now applies the
-  same expiry rule as every other read path.
-- **Discovering other projects is opt-in.** Neighbouring projects are no longer
-  swept into a shared mesh without consent; links you create yourself keep
-  working, now require explicit confirmation, and are recorded in the audit log.
-- **Forged live updates are rejected.** The realtime endpoint checks an event's
-  name before broadcasting it, so a subscriber can no longer receive a frame
-  that looks like it came from the server.
-- **A long-running server no longer leaks a handle per request.** Memory stores
-  are reused per directory instead of opened on every request, so file handles
-  stop piling up, and a store that has fallen back to plain files now says so.
-- **Restored memories are searchable again.** Restoring a deleted memory used to
-  report success while leaving it out of the search index; the restore now
-  re-indexes it in the same step.
-- **Erased memories stay out of every index.** The tree view of the store now
-  checks each hit against the live data instead of trusting an index that is one
-  step behind, so deleted and superseded memories cannot reappear.
-- **The website is readable again.** Its active tab uses real theme colours, the
-  comparison table works from a keyboard and on a phone, and the font is served
-  from the site itself rather than fetched from Google.
+- **A merged pull request no longer turns a green check red.** The delivery gate
+  used to ask whether a PR was still open, so a run that finished after the merge
+  failed a release check even though its tests passed. A finished run now reports
+  what actually happened.
+- **Syncing with a peer stays inside the folder you name.** The sync pool used to
+  read and write wherever a path pointed; it is now confined to the directory you
+  give it. Incoming gossip packets must also prove who sent them, so a forged
+  sender can no longer overwrite your memories.
+- **The memory server is easier to maintain and harder to break.** The protocol
+  surface was split into three focused modules — the tool catalog, the request
+  dispatch table and the HTTP transport — and the main server file shrank from
+  4,119 lines to 153. The Studio page's scripts, stylesheet and markup are now
+  real files too, so a syntax error fails the build instead of shipping a broken
+  page.
+- **Dead code no longer looks like public API.** Twelve exported functions that
+  nothing called were removed, and 92 helpers used only inside their own file
+  stopped advertising themselves as part of the surface.
+- **The website behaves the way visitors expect.** Copying the install command is
+  announced out loud for screen readers, every navigation link lands on a real
+  section, the Agents and Playground pages are linked and listed for search
+  engines, the demo video reserves its space so the page no longer jumps while it
+  loads, and a content security policy now limits what the site may load.
 
 ---
 

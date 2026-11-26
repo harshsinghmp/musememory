@@ -77,7 +77,7 @@ export function scanCodeDriftFromDiff(
 /**
  * Retrieves git-modified file list from the local repository.
  */
-export function getGitChangedFiles(workspaceRoot?: string): string[] {
+function getGitChangedFiles(workspaceRoot?: string): string[] {
   const root = workspaceRoot || process.cwd();
   try {
     const stdout = execSync("git status --porcelain", {

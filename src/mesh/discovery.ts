@@ -15,7 +15,7 @@ const MESH_LINKS_FILE = "mesh_links.json";
  * an explicit `mesh_links.json` entry (the documented linking path, unchanged)
  * or this environment flag. Default: off.
  */
-export function meshAutoDiscoverEnabled(): boolean {
+function meshAutoDiscoverEnabled(): boolean {
   return process.env.MUSE_MESH_AUTO_DISCOVER === "1";
 }
 
@@ -75,7 +75,7 @@ export function removeMeshLink(memoryDir: string, targetPath: string): boolean {
 /**
  * Find monorepo root by looking upward for pnpm-workspace.yaml, lerna.json, or package.json with workspaces
  */
-export function findMonorepoRoot(startDir: string): { root: string; type: WorkspaceType; patterns: string[] } | null {
+function findMonorepoRoot(startDir: string): { root: string; type: WorkspaceType; patterns: string[] } | null {
   let curr = path.resolve(startDir);
   const rootAnchor = path.parse(curr).root;
 
@@ -173,7 +173,7 @@ function resolvePackageDirs(rootDir: string, patterns: string[]): string[] {
 /**
  * Inspect a directory and build a MeshNode description
  */
-export function inspectNode(dirPath: string, nodeType: MeshNodeType, currentDir: string): MeshNode {
+function inspectNode(dirPath: string, nodeType: MeshNodeType, currentDir: string): MeshNode {
   const absPath = path.resolve(dirPath);
   const isCurrent = absPath === path.resolve(currentDir);
   let name = path.basename(absPath);

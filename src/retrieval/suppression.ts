@@ -1,6 +1,6 @@
 import type { MemoryEntry } from "../types.ts";
 
-export const DEFAULT_REINJECTION_WINDOW = 6;
+const DEFAULT_REINJECTION_WINDOW = 6;
 
 export interface InjectedRecord {
   turn: number;

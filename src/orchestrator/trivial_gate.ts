@@ -6,7 +6,7 @@
 
 import type { MuseContextInput } from "./types.ts";
 
-export const TRIVIAL_PROMPT_GREETINGS = new Set([
+const TRIVIAL_PROMPT_GREETINGS = new Set([
   "hi",
   "hi there",
   "hello",

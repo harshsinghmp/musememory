@@ -78,6 +78,19 @@ describe("R31: concurrent write detection during sync ingest", () => {
       save(storeB, entry("m_newer", "old content", new Date(Date.now() - 120_000).toISOString()));
       save(storeA, entry("m_newer", "newer content", new Date().toISOString()));
 
+      // Fix #456: newer-wins is a trust decision, so the sender has to be a peer
+      // B has already synced with (unattested packets from strangers are quarantined).
+      const peers = loadPeers(join(rootB, ".memory"));
+      peers["agent_sol"] = {
+        agent_id: "agent_sol",
+        last_seen_at: new Date().toISOString(),
+        last_packet_id: "pkt_prev",
+        vector_clock: { agent_sol: 1 },
+        total_packets_received: 1,
+        total_memories_ingested: 1,
+      };
+      savePeers(join(rootB, ".memory"), peers);
+
       const packet = broadcastKnowledge(storeA, rootA, { agentId: "agent_sol" });
       const result = ingestKnowledge(storeB, rootB, packet, "agent_nexus");
 

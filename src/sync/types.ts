@@ -96,6 +96,8 @@ export interface SyncStatusReport {
  */
 export interface PoolSyncReport {
   pool_dir: string;
+  /** Owner-only `packets/` subdirectory the broadcast was written to. */
+  packets_dir: string;
   agent_id: string;
   peers_contacted: string[];
   packets_processed: number;
@@ -103,6 +105,8 @@ export interface PoolSyncReport {
   total_duplicates: number;
   total_conflicts: number;
   broadcast_packet_id: string;
+  /** True when a packet for this agent already existed and was left untouched. */
+  broadcast_skipped: boolean;
   timestamp: string;
 }
 

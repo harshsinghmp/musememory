@@ -357,7 +357,7 @@ export function noteAccess(store: Store, id: string, at: string, count: number):
 }
 
 /** Drop an overlay entry when the row itself is rewritten from content. */
-export function clearAccessOverlay(store: Store, id: string): void {
+function clearAccessOverlay(store: Store, id: string): void {
   accessOverlay.get(store)?.delete(id);
 }
 
@@ -580,7 +580,7 @@ export function fileForId(store: Store, id: string): string {
   return target;
 }
 
-export function listIds(store: Store): string[] {
+function listIds(store: Store): string[] {
   const ids = new Set<string>();
   if (store.db) {
     for (const e of listMemories(store.db)) {

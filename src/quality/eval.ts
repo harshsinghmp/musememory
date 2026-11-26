@@ -22,7 +22,7 @@ export const P99_BUDGET_MS = 100;
 export const MIN_PROMOTION_USAGE = 3;
 
 /** Frozen benchmark corpus deterministic checksum (T-141) */
-export const FROZEN_CORPUS_HASH = "33d5e6dc3ff2767ee9411496bea6b535ecf38e5c5d8eadc469b074782a06138d";
+const FROZEN_CORPUS_HASH = "33d5e6dc3ff2767ee9411496bea6b535ecf38e5c5d8eadc469b074782a06138d";
 
 export interface GoldenQueryTelemetry {
   query_count: number;
@@ -143,7 +143,7 @@ export function gradeRecallSet(
 /**
  * T-141: Compute deterministic SHA-256 checksum of the test fixtures corpus.
  */
-export function computeCorpusChecksum(fixturesDir: string): string {
+function computeCorpusChecksum(fixturesDir: string): string {
   const files = readdirSync(fixturesDir)
     .filter((f) => f.endsWith(".yaml") || f.endsWith(".json"))
     .sort();

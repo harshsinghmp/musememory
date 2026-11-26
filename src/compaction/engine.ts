@@ -13,8 +13,8 @@ import { propose } from "../store.ts";
 import { verifyMutationSafety } from "../quality/guards.ts";
 import { captureSnapshotRing } from "../snapshot.ts";
 
-export const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
-export const COMPACTION_THRESHOLD_PERCENT = 70;
+const DEFAULT_CONTEXT_MAX_TOKENS = 200_000;
+const COMPACTION_THRESHOLD_PERCENT = 70;
 
 /**
  * Validates that compaction invariants conform to the never-empty contract.
@@ -145,7 +145,7 @@ export function evaluateContextUsage(
 /**
  * Renders the 5 mandatory compaction invariants into canonical CURRENT.md format.
  */
-export function renderCurrentMdContent(
+function renderCurrentMdContent(
   invariants: CompactionInvariants,
   options?: { agent?: string; sessionId?: string; project?: string },
 ): string {
@@ -224,7 +224,7 @@ export function renderCurrentMdContent(
 /**
  * Generates an ultra-compact resumption prompt injection string for the subsequent session.
  */
-export function generateResumptionPrompt(invariants: CompactionInvariants): string {
+function generateResumptionPrompt(invariants: CompactionInvariants): string {
   const parts: string[] = [
     `[SESSION HANDOFF RESUMPTION]`,
     `Goal: ${invariants.highLevelGoal}`,

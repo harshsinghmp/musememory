@@ -26,7 +26,7 @@ const DEBOUNCE_MS = 300;
  * written into the SSE `event:` field verbatim, so CR/LF (or any separator)
  * would inject arbitrary frames into every subscriber's stream.
  */
-export const EVENT_TYPE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const EVENT_TYPE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
 /**
  * Real-Time Agency Hub.

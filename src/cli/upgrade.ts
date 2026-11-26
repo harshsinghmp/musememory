@@ -65,7 +65,7 @@ export interface PandaLoaderResult {
   failedSteps: Array<{ step: UpgradeStep; error: any }>;
 }
 
-export const DEFAULT_PANDA_FRAMES = [
+const DEFAULT_PANDA_FRAMES = [
   "ʕ•ᴥ•ʔ",
   "ʕ •ᴥ•ʔ",
   "ʕ-ᴥ-ʔ",
@@ -589,7 +589,7 @@ export function compareVersions(a: string, b: string): number {
  * Heals ~/.local/bin/memory symlink if it points to an obsolete directory
  * or shadows the active global package manager installation.
  */
-export function healLocalBinSymlinks(): boolean {
+function healLocalBinSymlinks(): boolean {
   try {
     const home = homedir();
     const localBin = join(home, ".local", "bin");
@@ -620,7 +620,7 @@ export function healLocalBinSymlinks(): boolean {
 /**
  * Executes a package manager update command.
  */
-export function executePackageUpgrade(
+function executePackageUpgrade(
   pm: "bun" | "npm" | "pnpm" | "yarn",
   dryRun: boolean = false,
   options: { healBunConfig?: boolean; targetVersion?: string } = {},

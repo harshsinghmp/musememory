@@ -564,15 +564,15 @@ export function listMemories(
   return rows.map(rowToMemoryEntry);
 }
 
-export function deleteMemoryById(db: SqliteDatabase, id: string): boolean {
-  const existing = getMemoryById(db, id);
-  if (!existing) return false;
-  try {
-    db.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
-  } catch {}
-  db.run(`DELETE FROM memories WHERE id = ?`, [id]);
-  return true;
-}
+
+
+
+
+
+
+
+
+
 
 /**
  * T-060: Safely escapes and quotes an individual FTS5 token.
@@ -733,7 +733,11 @@ export function searchMemoriesFts(
   } catch (err) {
     // T-312: Surface FTS failure with loud log and degraded: true signal instead of silent swallow
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[FTS5_DEGRADED] FTS query execution failed for "${query}": ${errorMsg}`);
+    // Fix #457: the query is attacker-controlled text and may hold a credential,
+    // so it never reaches the log verbatim — redact secrets, strip control
+    // characters (log injection via CRLF/ANSI) and bound the echoed length.
+    const loggedQuery = redactSecrets(query).replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, 200);
+    console.error(`[FTS5_DEGRADED] FTS query execution failed for "${loggedQuery}": ${redactSecrets(errorMsg)}`);
     const empty: FtsSearchHits = [];
     empty.degraded = true;
     empty.error = errorMsg;

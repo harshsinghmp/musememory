@@ -9,7 +9,7 @@ import { createCodeAnchor } from "../anchors/resolver.ts";
 /**
  * Assigns the next sequential ADR number within the repository.
  */
-export function getNextAdrNumber(store: Store): number {
+function getNextAdrNumber(store: Store): number {
   const entries = list(store);
   let maxNum = 0;
 
@@ -25,7 +25,7 @@ export function getNextAdrNumber(store: Store): number {
 /**
  * Formats structured ADR metadata into readable Markdown content.
  */
-export function formatAdrContent(
+function formatAdrContent(
   adrNum: number,
   options: RecordAdrOptions
 ): string {

@@ -34,7 +34,7 @@ export function detectProvider(projectRoot: string): GraphProviderType {
   return "none";
 }
 
-export const detectGraphProvider = detectProvider;
+
 
 /**
  * Check provider status and availability.
@@ -105,7 +105,7 @@ export function getGraphStatus(projectRoot: string): GraphStatus {
 }
 
 /** Path to cached symbol index in .memory/ */
-export function graphSymbolsPath(memoryDir: string): string {
+function graphSymbolsPath(memoryDir: string): string {
   return join(memoryDir, "graph-symbols.json");
 }
 

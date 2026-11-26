@@ -62,7 +62,7 @@ export function initiateFederationHandshake(
 /**
  * Validates the checksum and structure of an incoming federation handshake packet.
  */
-export function validateHandshakePacket(packet: FederationHandshakePacket): { valid: boolean; error?: string } {
+function validateHandshakePacket(packet: FederationHandshakePacket): { valid: boolean; error?: string } {
   if (packet.protocol_version !== "2.0.0") {
     return { valid: false, error: `Unsupported protocol version: ${packet.protocol_version}` };
   }

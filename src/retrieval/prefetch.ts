@@ -7,7 +7,7 @@
 import { computeJaccardSimilarity } from "../quality/dedup.ts";
 
 export const DEFAULT_TOPIC_OVERLAP_THRESHOLD = 0.6;
-export const DEFAULT_PREFETCH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_PREFETCH_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface PrefetchSkipDecision {
   skip: boolean;

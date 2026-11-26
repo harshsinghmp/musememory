@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { startHttpMcpServer, validateHttpAuth } from "../src/mcp.ts";
+import { startHttpMcpServer, validateHttpAuth } from "../src/mcp/http.ts";
 import type { IncomingMessage } from "node:http";
 
 function mockReq(headers: Record<string, string>): IncomingMessage {

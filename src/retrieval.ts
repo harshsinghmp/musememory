@@ -637,15 +637,15 @@ export function safeMin(arr: number[], defaultValue: number = 0): number {
   return min === Infinity ? defaultValue : min;
 }
 
-/** Compute token overlap ratio: matched non-stopword query tokens / total non-stopword query tokens. */
-export function computeApplicability(entryTokens: Set<string>, queryTokens: string[]): number {
-  if (queryTokens.length === 0) return 0.5; // neutral when no query
-  let matched = 0;
-  for (const t of queryTokens) {
-    if (entryTokens.has(t)) matched++;
-  }
-  return matched / queryTokens.length;
-}
+
+
+
+
+
+
+
+
+
 
 /**
  * T-062: Safely parse and clamp model-supplied limit values within [minVal, maxVal].
@@ -758,7 +758,7 @@ export function graphSymbolOverlapBonus(entry: MemoryEntry, queryTokens: string[
 }
 
 /** Default deterministic relevance cutoff threshold (SOW-202). Entries below this score are dropped from prompt injection. */
-export const DEFAULT_MIN_RELEVANCE_SCORE = 0.45;
+const DEFAULT_MIN_RELEVANCE_SCORE = 0.45;
 
 /**
  * Filters scored entries by minimum relevance threshold (SOW-202).

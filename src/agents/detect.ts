@@ -6,12 +6,12 @@ import type { DetectedAgent, AgentDefinition } from "./types.ts";
 
 const BINARY_CACHE = new Map<string, string | null>();
 
-/**
- * Clear cached binary paths (useful for test isolation).
- */
-export function clearBinaryCache(): void {
-  BINARY_CACHE.clear();
-}
+
+
+
+
+
+
 
 /**
  * Fast, pure TypeScript check for binary existence in home bins, PATH, and system bins.

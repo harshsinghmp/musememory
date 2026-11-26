@@ -1592,11 +1592,16 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "muse_sync_pool",
-    description: "Performs two-way P2P gossip synchronization with an in-process filesystem shared pool folder",
+    description:
+      "Performs two-way P2P gossip synchronization with the operator-configured sync pool folder (MUSE_SYNC_POOL_DIR, default <memory_dir>/sync/pool); pool_dir is confined to that root, broadcasts are written to its packets/ subdirectory and never overwrite an existing packet",
     inputSchema: {
       type: "object",
       properties: {
-        pool_dir: { type: "string", description: "Optional custom shared pool directory path" },
+        pool_dir: {
+          type: "string",
+          description:
+            "Optional pool directory confined to the configured sync pool root; paths outside it are rejected",
+        },
         agent_id: { type: "string", description: "Optional local agent identity" },
         dir: { type: "string", description: "Optional workspace directory" },
       },

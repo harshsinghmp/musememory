@@ -4,7 +4,7 @@ import { list } from "../store.ts";
 /**
  * T-406: sorted unique project names present in the store, canonical casing.
  */
-export function listProjectNames(store: Store): string[] {
+function listProjectNames(store: Store): string[] {
   return [
     ...new Set(
       list(store)
