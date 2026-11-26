@@ -24,6 +24,7 @@ import {
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { RetrievalEngine } from "../src/retrieval/engine.ts";
 import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
+import { setVecLoaderMode } from "../src/vector/vec-index.ts";
 import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
 
 describe("unified context & retrieval engine", () => {
@@ -458,10 +459,18 @@ describe("unified context & retrieval engine", () => {
     expect(engineRes.explanation).toContain("Degraded read: requested tree search");
 
     // Requesting hybrid search when no vector index exists falls back to exact with stale: true
-    const hybridRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "hybrid" });
-    expect(hybridRes.mode).toBe("exact");
-    expect(hybridRes.stale).toBe(true);
-    expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
+    // Issue #497: the vec0 index is maintained on every write, so a store that
+    // never ran a reindex still has one. "No vector index" is therefore produced
+    // by an unavailable extension, not by a missing index.json.
+    setVecLoaderMode("disabled");
+    try {
+      const hybridRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "hybrid" });
+      expect(hybridRes.mode).toBe("exact");
+      expect(hybridRes.stale).toBe(true);
+      expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
+    } finally {
+      setVecLoaderMode("auto");
+    }
 
     cleanup(root);
   });

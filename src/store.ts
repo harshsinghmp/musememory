@@ -969,11 +969,13 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       store.cache.setEntry(entry, undefined, mtimeMs);
     }
 
-    // T-304: Incrementally upsert into vector index.json if present
+    // T-304 / Issue #497: keep the vector index in step with this write. With
+    // sqlite-vec loaded this is one vec0 row upsert; without it, the previous
+    // index.json read-modify-write runs unchanged as the fallback.
     if (store.memoryDir) {
       try {
         const { upsertIndexEntry } = require("./vector.ts");
-        upsertIndexEntry(entry, store.memoryDir);
+        upsertIndexEntry(entry, store.memoryDir, store.db);
       } catch {}
     }
   };
@@ -2047,11 +2049,11 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
     store.cache.deleteEntry(id);
   }
 
-  // T-304: Remove from vector index.json if present
+  // T-304 / Issue #497: drop the vector row on tombstone (vec0 or index.json).
   if (store.memoryDir) {
     try {
       const { removeIndexEntry } = require("./vector.ts");
-      removeIndexEntry(id, store.memoryDir);
+      removeIndexEntry(id, store.memoryDir, store.db);
     } catch {}
   }
 
@@ -2657,7 +2659,7 @@ export function forget(
     if (store.memoryDir) {
       try {
         const { removeIndexEntry } = require("./vector.ts");
-        removeIndexEntry(id, store.memoryDir);
+        removeIndexEntry(id, store.memoryDir, store.db);
       } catch {}
       recordAuditEvent(store.memoryDir, {
         operation: "lifecycle_forget",

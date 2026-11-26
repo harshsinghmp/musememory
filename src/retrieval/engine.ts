@@ -14,7 +14,7 @@ import {
   type ExpandedWikilink,
 } from "../retrieval.ts";
 import { searchTree, buildTreeIndex, loadTreeIndex, type TreeSearchResult, type TreeIndex } from "./tree-index.ts";
-import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex } from "../vector.ts";
+import { hybridSearch, rebuildIndex, saveIndex, indexFilePath, loadIndex, hasVectorIndex, vectorIndexSize } from "../vector.ts";
 import { searchPageIndex, listPageIndexes } from "../pageindex/engine.ts";
 import { isDraftMemory } from "../drafts.ts";
 import { existsSync } from "node:fs";
@@ -197,8 +197,9 @@ export class RetrievalEngine {
     }
 
     // 3. Fused Hybrid Vector Search
-    const vecPath = indexFilePath(memoryDir);
-    const hasVec = existsSync(vecPath);
+    // Issue #497: the index is a vec0 table now, so "is there an index" is a
+    // backend question, not an index.json file existence check.
+    const hasVec = hasVectorIndex(store, memoryDir);
 
     if (mode === "hybrid" || (mode === "auto" && hasVec && memCount > 100)) {
       try {
@@ -221,10 +222,11 @@ export class RetrievalEngine {
           }));
 
           // T-064 / T-304: check if vector index is stale compared to store memory count
+          // Issue #497: read the size from whichever backend is live (vec0 or the snapshot).
           let isVectorStale = false;
           try {
-            const idx = loadIndex(memoryDir);
-            if (idx && Object.keys(idx.entries).length !== memCount) {
+            const indexed = vectorIndexSize(store, memoryDir);
+            if (indexed !== null && indexed !== memCount) {
               isVectorStale = true;
             }
           } catch {}
