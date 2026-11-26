@@ -1,0 +1,583 @@
+  <nav class="rail" aria-label="Studio sections">
+    <div class="rail-brand" aria-hidden="true">M</div>
+    <button type="button" class="rail-section nav-tab active" data-view="graph" aria-current="page"><span class="rail-num">01</span><span class="rail-name">Overview</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="health"><span class="rail-num">02</span><span class="rail-name">Health</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="wiki"><span class="rail-num">03</span><span class="rail-name">Knowledge</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="cognition"><span class="rail-num">04</span><span class="rail-name">Cognition</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="current"><span class="rail-num">05</span><span class="rail-name">Governance</span></button>
+    <button type="button" class="rail-section nav-tab" data-view="about"><span class="rail-num">06</span><span class="rail-name">About</span></button>
+    <div class="rail-tools" role="group" aria-label="Tools">
+      <button type="button" class="rail-tool nav-tab" data-view="adrs">ADRs</button>
+      <button type="button" class="rail-tool nav-tab" data-view="sync">P2P</button>
+      <button type="button" class="rail-tool nav-tab" data-view="mesh">Mesh</button>
+      <button type="button" class="rail-tool nav-tab" data-view="persona">Persona</button>
+      <button type="button" class="rail-tool nav-tab" data-view="sandbox">Sandbox</button>
+      <button type="button" class="rail-tool nav-tab" data-view="audit">Audit</button>
+      <button type="button" class="rail-tool nav-tab" data-view="activity">Activity</button>
+      <button type="button" class="rail-tool nav-tab" data-view="terrain">Terrain</button>
+      <button type="button" class="rail-tool nav-tab" data-view="agents">Agents</button>
+    </div>
+  </nav>
+
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-title">
+        Muse Memory
+        <span class="brand-tag">Visual Inspector & Studio</span>
+      </div>
+    </div>
+
+    <div class="scope-switch" id="scopeSwitch" role="group" aria-label="Memory scope">
+      <button type="button" class="scope-btn active" data-scope="project" aria-pressed="true" title="Local project scope: ./.memory">Local Project</button>
+      <button type="button" class="scope-btn" data-scope="global" aria-pressed="false" title="Global user scope: ~/.memory">Global User</button>
+      <button type="button" class="scope-btn" data-scope="mesh" aria-pressed="false" title="Cross-project mesh">Mesh</button>
+    </div>
+    <span class="scope-badge" id="scopeBadge">./.memory</span>
+
+    <div class="header-actions">
+      <div class="scope-filter">
+        <label class="scope-filter-label" for="projectFilter">Project Filter</label>
+        <input type="text" id="projectFilter" class="scope-filter-input" placeholder="all projects" autocomplete="off" spellcheck="false" title="Leave empty to audit the whole memory store, or enter a project name to scope the health gate, drift, bug cluster and technical debt audits." />
+      </div>
+      <button class="btn-icon btn-refresh" id="refreshBtn" onclick="refreshMemories()" title="Refresh and sync active constraints, handoff state, and prior memories">
+        <span class="refresh-icon" id="refreshIcon" aria-hidden="true"></span>
+        <span id="refreshLabel">Refresh</span>
+      </button>
+      <button class="btn-icon btn-optimize write-action" id="optimizeBtn" onclick="optimizeStoreDashboard()" title="Clean test noise, prune junk, deduplicate candidates, and defragment SQLite storage">
+        <span class="optimize-icon" id="optimizeIcon" aria-hidden="true"></span>
+        <span id="optimizeLabel">Optimize</span>
+      </button>
+      <div class="status-badge"><div class="status-dot"></div>[LIVE] Active</div>
+      <button class="btn-icon" onclick="exportDataHtml()">Export HTML</button>
+    </div>
+  </header>
+  <div class="scope-banner" id="scopeBanner" hidden></div>
+  
+  <div class="layout">
+    <!-- Sidebar List -->
+    <div class="sidebar">
+      <div class="search-box">
+        <div class="search-input-wrap">
+          <span class="search-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></span>
+          <input type="text" id="searchInput" placeholder="Search memories (Cmd+K / '/')..." />
+        </div>
+      </div>
+      <div class="filters" id="filterBar">
+        <button type="button" class="chip active" data-type="all" aria-pressed="true">All</button>
+        <button type="button" class="chip" data-type="fix" aria-pressed="false">Fixes</button>
+        <button type="button" class="chip" data-type="decision" aria-pressed="false">Decisions</button>
+        <button type="button" class="chip" data-type="constraint" aria-pressed="false">Constraints</button>
+        <button type="button" class="chip" data-type="failure" aria-pressed="false">Failures</button>
+        <button type="button" class="chip" data-type="architecture" aria-pressed="false">Architecture</button>
+        <button type="button" class="chip" data-type="operation" aria-pressed="false">Operations</button>
+      </div>
+      <div class="stats-strip" id="statsStrip">
+        <div class="stat-item"><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">Memories</div></div>
+        <div class="stat-item"><div class="stat-val" id="statConfirmed">0%</div><div class="stat-lbl">Confirmed</div></div>
+        <div class="stat-item"><div class="stat-val" id="statConstraints">0</div><div class="stat-lbl">Constraints</div></div>
+        <div class="stat-item"><div class="stat-val" id="statLinks">0</div><div class="stat-lbl">Links</div></div>
+      </div>
+      <div class="list" id="memoryList"></div>
+    </div>
+    
+    <!-- View 1: 3D Force Graph -->
+    <div class="view-panel active" id="panel-graph">
+      <div class="graph-controls" id="graphControls">
+        <div class="control-row">
+          <div class="studio-view-switch" id="studioViewSwitch" role="group" aria-label="Studio view">
+            <button type="button" class="view-btn active" data-studio-view="graph" aria-pressed="true">Graph</button>
+            <button type="button" class="view-btn" data-studio-view="list" aria-pressed="false">List</button>
+          </div>
+          <span class="control-label" id="studioViewLabel">Canvas graph</span>
+        </div>
+        <div id="graphOnlyControls" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="control-row">
+            <span class="control-label">Timeline</span>
+            <input type="range" id="timelineSlider" min="0" max="1000" value="1000" />
+            <span class="control-label" id="timelineLabel">all</span>
+          </div>
+          <div class="control-row" id="clusterFilters"><span class="control-label">Clusters</span></div>
+        </div>
+      </div>
+      <div class="graph-container" id="graphContainer">
+        <canvas id="graphCanvas"></canvas>
+        <div class="graph-hud">
+          <span class="graph-hud-key">Drag</span> Rotate 3D &bull;
+          <span class="graph-hud-key">Scroll</span> Zoom &bull;
+          <span class="graph-hud-key">Click</span> Inspect
+        </div>
+      </div>
+      <div class="studio-list-view" id="studioListView" hidden>
+        <div class="studio-list-toolbar">
+          <input type="text" id="studioListSearch" placeholder="Filter by title, content or tag..." autocomplete="off" spellcheck="false" />
+          <span class="control-label" id="studioListCount">0 rows</span>
+        </div>
+        <table class="studio-table">
+          <thead>
+            <tr>
+              <th data-sort="title">Title</th>
+              <th data-sort="type">Type</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="project">Project</th>
+              <th data-sort="created_at" aria-sort="descending">Created</th>
+            </tr>
+          </thead>
+          <tbody id="studioTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- View 2: Active Constraints & Session Handoff -->
+    <div class="view-panel" id="panel-current">
+      <div class="content-view-wrap">
+        <div class="handoff-box">
+          <div class="card-title-lg">
+            <span>⚡ In-Flight Session State & Handoff</span>
+            <span class="brand-tag" id="handoffStatus">[IDLE]</span>
+          </div>
+          <div class="handoff-grid">
+            <div class="handoff-cell"><div class="handoff-lbl">Active Agent</div><div class="handoff-val" id="handoffAgent">None</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Session ID</div><div class="handoff-val mono" id="handoffSessionId">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Last Updated</div><div class="handoff-val" id="handoffUpdated">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Active Task</div><div class="handoff-val" id="handoffTask">No active task</div></div>
+          </div>
+          <div style="margin-top:14px;" id="handoffProgressBox"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🛡️ Active Working Invariants & Hard Constraints</span>
+            <button class="btn-primary write-action" onclick="quickAddConstraint()">+ Add Constraint</button>
+          </div>
+          <div id="constraintsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 3: Obsidian Knowledge Wiki -->
+    <div class="view-panel" id="panel-wiki">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📚 Compiled Knowledge Wiki Pages</span>
+            <span class="brand-tag" id="wikiCountBadge">0 Pages</span>
+          </div>
+          <div id="wikiPagesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;"></div>
+        </div>
+        <div class="view-card" id="wikiViewerCard" style="display:none;">
+          <div class="card-title-lg" id="wikiPageTitle">Wiki Page</div>
+          <div class="content-box" id="wikiPageContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 4: Persona Studio -->
+    <div class="view-panel" id="panel-persona">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">👤 Persona & Working Preference Studio (USER.md)</div>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+            Switch active agent archetypes to steer communication tone, coding depth, and design rules across all connected platforms.
+          </p>
+          <div class="archetype-grid" id="archetypeGrid">
+            <button type="button" class="archetype-card" data-arch="developer"><span class="archetype-icon">💻</span><span class="archetype-title">Developer</span></button>
+            <button type="button" class="archetype-card" data-arch="designer"><span class="archetype-icon">🎨</span><span class="archetype-title">Designer</span></button>
+            <button type="button" class="archetype-card" data-arch="marketer"><span class="archetype-icon">🚀</span><span class="archetype-title">Marketer</span></button>
+            <button type="button" class="archetype-card" data-arch="casual"><span class="archetype-icon">☕</span><span class="archetype-title">Casual</span></button>
+            <button type="button" class="archetype-card" data-arch="custom"><span class="archetype-icon">⚙️</span><span class="archetype-title">Custom</span></button>
+          </div>
+          <div style="margin-top:20px;">
+            <div class="card-title-lg">Active USER.md Instructions</div>
+            <textarea id="userProfileText" style="width:100%; height:200px; background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); color:#fff; padding:12px; font-family:'JetBrains Mono', monospace; font-size:12px; line-height:1.5; outline:none;"></textarea>
+            <button class="btn-primary write-action" style="margin-top:10px;" onclick="saveUserProfile()">Save Preferences</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 5: Knapsack Retrieval Sandbox -->
+    <div class="view-panel" id="panel-sandbox">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">🔍 Real-Time Knapsack Retrieval Sandbox</div>
+          <div class="sandbox-input-grid">
+            <input type="text" id="sandboxQuery" placeholder="Enter query (e.g., 'auth token refresh invariant', 'cors headers')..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
+            <button class="btn-primary" onclick="testRetrieval()">Simulate Prompt Context</button>
+          </div>
+          <div class="control-row" style="margin-bottom:16px;">
+            <span class="control-label">Token Budget:</span>
+            <input type="range" id="sandboxBudgetSlider" min="500" max="6000" step="250" value="2000" oninput="document.getElementById('sandboxBudgetVal').textContent = this.value + ' tokens'" />
+            <span class="control-label mono" id="sandboxBudgetVal">2000 tokens</span>
+          </div>
+          <div class="card-title-lg" style="margin-top:16px;">
+            <span>Simulated Prompt Context Injection</span>
+            <button class="btn-icon" onclick="navigator.clipboard.writeText(document.getElementById('promptContextOut').textContent); flash('Copied prompt context!');">📋 Copy</button>
+          </div>
+          <div class="code-preview" id="promptContextOut">// Enter a query above and click simulate to inspect the rendered context...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 6: Audit Ledger -->
+    <div class="view-panel" id="panel-audit">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📜 Append-Only Compliance Audit Trail</span>
+            <button class="btn-icon" onclick="loadAudit()">🔄 Refresh</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Timestamp</th><th>Operation</th><th>Entry ID</th><th>Actor</th><th>Details</th></tr>
+            </thead>
+            <tbody id="auditTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 7: Project Health Gate & Observability -->
+    <div class="view-panel" id="panel-health">
+      <div class="content-view-wrap">
+        <div class="view-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(99,102,241,0.06) 100%);">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+            <div style="display:flex; align-items:center; gap:18px;">
+              <div class="grade-circle grade-a" id="healthGrade">A</div>
+              <div>
+                <div style="font-size:20px; font-weight:800; color:#fff; display:flex; align-items:center; gap:10px;">
+                  <span>5-Pillar Project Health Scorecard</span>
+                  <span class="gate-badge gate-pass" id="healthGate">[PASS]</span>
+                </div>
+                <div style="font-size:13px; color:var(--text-muted); margin-top:3px;" id="healthSummary">Comprehensive project cognitive health evaluation.</div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:6px; display:flex; gap:14px; flex-wrap:wrap;">
+                  <span id="healthScopeProject">Project: --</span>
+                  <span id="healthScope">Scope: --</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Composite Health Score</div>
+              <div style="font-size:28px; font-weight:800; color:#fff;" id="healthScore">95/100</div>
+            </div>
+          </div>
+
+          <div class="pillars-grid">
+            <!-- Pillar 1: Store Integrity -->
+            <div class="pillar-card">
+              <div class="pillar-title">1. Memory Store Integrity</div>
+              <div class="pillar-score" id="pStoreScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pStoreBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Contradictions: <strong id="pStoreContradictions">0</strong></span>
+                <span>Expired: <strong id="pStoreExpired">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 2: Code Anchors -->
+            <div class="pillar-card">
+              <div class="pillar-title">2. Native Code Anchors</div>
+              <div class="pillar-score" id="pAnchorsScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pAnchorsBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Valid: <strong id="pAnchorsValid">0</strong></span>
+                <span>Drifted: <strong id="pAnchorsDrifted">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 3: Documentation Alignment -->
+            <div class="pillar-card">
+              <div class="pillar-title">3. Doc-Code Alignment</div>
+              <div class="pillar-score" id="pDocScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pDocBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Documented: <strong id="pDocDoc">0</strong></span>
+                <span>Missing: <strong id="pDocMissing">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 4: Anti-Pattern Sentry -->
+            <div class="pillar-card">
+              <div class="pillar-title">4. Anti-Pattern Sentry</div>
+              <div class="pillar-score" id="pLessonsScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pLessonsBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>Total Lessons: <strong id="pLessonsTotal">0</strong></span>
+                <span>Active Traps: <strong id="pLessonsActive">0</strong></span>
+              </div>
+            </div>
+            <!-- Pillar 5: Tech Debt & Fragility -->
+            <div class="pillar-card">
+              <div class="pillar-title">5. Technical Debt & Friction</div>
+              <div class="pillar-score" id="pDebtScore">--</div>
+              <div class="p-bar-bg"><div class="p-bar-fill" id="pDebtBar" style="width:0%;"></div></div>
+              <div class="pillar-meta">
+                <span>TODOs/Bypasses: <strong id="pDebtTodos">0</strong></span>
+                <span>Fragile Subsystems: <strong id="pDebtFragile">0</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📋 Prioritized Remediation Action Checklist</span>
+            <button class="btn-icon" onclick="fetchHealth()">🔄 Re-Audit</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th style="width:110px;">Priority</th><th>Issue Detected</th><th>Recommended Action</th></tr>
+            </thead>
+            <tbody id="healthChecklistBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 8: ADRs & Documentation Drift -->
+    <div class="view-panel" id="panel-adrs">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🏛️ Architecture Decision Records (ADRs)</span>
+            <button class="btn-icon" onclick="fetchAdrs()">🔄 Refresh</button>
+          </div>
+          <div id="adrsListGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🔍 Code ↔ Documentation Bi-Directional Drift Inspector</span>
+            <button class="btn-icon" onclick="fetchDrift()">🔄 Audit Drift</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Symbol</th><th>Status</th><th>File Path</th><th>Explanation</th></tr>
+            </thead>
+            <tbody id="driftTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 9: Engineering Cognition & "Why" Reasoner -->
+    <div class="view-panel" id="panel-cognition">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">🤔 Engineering Cognition: Autonomous "Why" Reasoner</div>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+            Traces code evolution backwards through past bug fixes, architectural trade-offs, and ADRs to explain why code was written this way.
+          </p>
+          <div class="sandbox-input-grid">
+            <input type="text" id="whyInput" placeholder="Enter symbol or path (e.g., 'computeFingerprint', 'openStore', 'src/sync/engine.ts')..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
+            <button class="btn-primary" onclick="explainWhyCode()">Explain Why</button>
+          </div>
+          <div id="whyOutput" style="display:none; margin-top:14px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid var(--panel-border); border-radius:var(--radius-md);"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">🔥 Recurring Bugs & Friction Clusters (Fragility Heatmap)</div>
+          <div id="clustersGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-bottom:20px;"></div>
+          
+          <div class="card-title-lg" style="margin-top:20px;">⚠️ Technical Debt & Risk Hotspots</div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>File</th><th>TODOs</th><th>FIXMEs</th><th>Risk Level</th></tr>
+            </thead>
+            <tbody id="debtTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 10: P2P Gossip Mesh Sync -->
+    <div class="view-panel" id="panel-sync">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🤝 Cross-Agent Knowledge Sync & P2P Gossip Mesh</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-primary write-action" onclick="broadcastSyncPacket()">📡 Broadcast Packet</button>
+              <button class="btn-primary write-action" style="background:#059669;" onclick="syncPool()">🔄 Sync with Pool</button>
+            </div>
+          </div>
+          <div class="handoff-grid" style="margin-top:10px;">
+            <div class="handoff-cell"><div class="handoff-lbl">Local Agent ID</div><div class="handoff-val mono" id="syncLocalAgent">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Known Peers</div><div class="handoff-val" id="syncTotalPeers">0</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Outgoing Memories Ready</div><div class="handoff-val" id="syncPendingMemories">0</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Last Sync Time</div><div class="handoff-val" id="syncLastAt">Never</div></div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>👥 Known Peer Agents & Vector Clocks</span>
+            <button class="btn-icon" onclick="fetchSyncStatus()">🔄 Refresh Status</button>
+          </div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Peer Agent ID</th><th>Last Seen</th><th>Total Packets</th><th>Memories Ingested</th></tr>
+            </thead>
+            <tbody id="syncPeersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 11: Multi-Repo & Monorepo Mesh -->
+    <div class="view-panel" id="panel-mesh">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🕸️ Monorepo & Multi-Repo Cross-Project Mesh Topology</span>
+            <button class="btn-icon" onclick="fetchMeshStatus()">🔄 Refresh Mesh</button>
+          </div>
+          <div class="handoff-grid" style="margin-top:10px;">
+            <div class="handoff-cell"><div class="handoff-lbl">Workspace Root</div><div class="handoff-val mono" style="font-size:12px;" id="meshRoot">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Workspace Type</div><div class="handoff-val" id="meshType">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Monorepo Mode</div><div class="handoff-val" id="meshIsMono">--</div></div>
+            <div class="handoff-cell"><div class="handoff-lbl">Discovered Nodes</div><div class="handoff-val" id="meshNodeCount">0</div></div>
+          </div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>📦 Discovered Package & Subproject Nodes</span>
+          </div>
+          <div id="meshNodesGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🔍 Cross-Project Mesh Memory Query</span>
+          </div>
+          <div class="sandbox-input-grid">
+            <input type="text" id="meshQueryInput" placeholder="Search across all linked packages & repos..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
+            <button class="btn-primary" onclick="searchMesh()">Search Mesh</button>
+          </div>
+          <div id="meshQueryResults" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>🛡️ Cross-Package Contract & Dependency Audit</span>
+            <button class="btn-icon" onclick="fetchMeshAudit()">🔄 Run Audit</button>
+          </div>
+          <div id="meshAuditSummary" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
+          <table class="audit-table">
+            <thead>
+              <tr><th>Source</th><th>Target</th><th>Symbol</th><th>Status</th><th>Details</th></tr>
+            </thead>
+            <tbody id="meshAuditTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- View 12: About poster (T-463) -->
+    <div class="view-panel" id="panel-about">
+      <div class="content-view-wrap">
+        <div class="view-card about-poster">
+          <div class="about-kicker">MUSE MEMORY</div>
+          <h2 class="about-title">Autonomous persistent cognitive memory</h2>
+          <p class="about-lede">
+            Local-first memory for coding agents. Every memory lives in your own <code>.memory/</code>
+            directory, served by an in-process SQLite + FTS5 engine.
+          </p>
+          <div class="about-grid">
+            <div class="about-fact"><span>Engine</span><strong>SQLite + FTS5</strong></div>
+            <div class="about-fact"><span>Scope</span><strong id="aboutScope">./.memory</strong></div>
+            <div class="about-fact"><span>Memories</span><strong id="aboutTotal">0</strong></div>
+            <div class="about-fact"><span>Constraints</span><strong id="aboutConstraints">0</strong></div>
+            <div class="about-fact"><span>Wiki pages</span><strong id="aboutWiki">0</strong></div>
+            <div class="about-fact"><span>Audit events</span><strong id="aboutAudit">0</strong></div>
+          </div>
+          <div class="about-privacy">PRIVACY — local files only. No cloud, no telemetry, no background daemon.</div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Quick Start</span>
+            <span class="brand-tag">wire an agent in one command</span>
+          </div>
+          <div class="quickstart-grid" id="quickStartGrid"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Command Deck</span>
+            <span class="brand-tag">copy any one-liner</span>
+          </div>
+          <input type="text" id="commandDeckSearch" placeholder="Filter commands..." autocomplete="off" spellcheck="false" style="width:100%; max-width:420px; background:#0a0806; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:9px 12px; color:#fff; font:inherit; font-size:12px; margin-bottom:12px;" />
+          <div class="command-deck" id="commandDeck"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 13: Activity heatmap + agent sessions (T-456) -->
+    <div class="view-panel" id="panel-activity">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Memory Activity — 52 Weeks</span>
+            <span class="brand-tag" id="activityMutations">0 mutations</span>
+          </div>
+          <div class="heatmap-legend">
+            <span>Less</span>
+            <span class="hm-cell level-0"></span><span class="hm-cell level-1"></span><span class="hm-cell level-2"></span><span class="hm-cell level-3"></span><span class="hm-cell level-4"></span>
+            <span>More</span>
+          </div>
+          <div class="heatmap" id="activityHeatmap"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Agent Session Log</span>
+            <button type="button" class="btn-icon" onclick="fetchActivity()">Refresh</button>
+          </div>
+          <div class="session-grid" id="activitySessions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View 15: Workspace terrain vault (T-458) -->
+    <div class="view-panel" id="panel-terrain">
+      <div class="terrain-split">
+        <aside class="terrain-tree" id="terrainTree" aria-label="Terrain maps"></aside>
+        <section class="terrain-viewer">
+          <div class="terrain-toolbar">
+            <span class="mono" id="terrainFileName">Select a map</span>
+            <button type="button" class="btn-icon" id="terrainReindex" onclick="reindexTerrain()">REINDEX</button>
+          </div>
+          <div class="terrain-content" id="terrainContent"><p class="activity-empty">Compile the terrain maps to inspect them.</p></div>
+          <div class="terrain-scanline" id="terrainScanline" aria-hidden="true"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- View 16: Universal agents hub (T-460) -->
+    <div class="view-panel" id="panel-agents">
+      <div class="content-view-wrap">
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>Universal Agents Hub</span>
+            <span class="brand-tag" id="agentsCounts">0 wired</span>
+          </div>
+          <div class="agents-grid" id="agentsGrid"></div>
+        </div>
+        <div class="view-card">
+          <div class="card-title-lg">
+            <span>"Point Any Agent" Manifest</span>
+            <button type="button" class="btn-icon" onclick="copyAgentSnippet()">Copy snippet</button>
+          </div>
+          <p class="agent-meta">Point any MCP-capable agent at the server below. Paths are local to this machine.</p>
+          <div class="agent-meta mono" id="agentManifestPaths">Loading...</div>
+          <pre class="code-preview" id="agentManifestSnippet">Loading...</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Pane -->
+    <div class="detail-pane" id="detailPane">
+      <div class="detail-header">
+        <div class="detail-title" id="dTitle">Select a memory</div>
+        <button class="close-btn" onclick="document.getElementById('detailPane').classList.remove('open')">✕</button>
+      </div>
+      <div class="meta-row" id="dMeta"></div>
+      <div class="content-box" id="dContent"></div>
+      <div class="actions" id="dActions"></div>
+    </div>
+  </div>
