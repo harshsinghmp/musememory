@@ -101,7 +101,7 @@ export function isWriteTool(toolName: string): boolean {
 /**
  * Validates whether a target identifier or path refers to constitutional rules.
  */
-export function isConstitutionalTarget(target?: string): boolean {
+function isConstitutionalTarget(target?: string): boolean {
   if (!target) return false;
   const lower = target.toLowerCase();
   return (

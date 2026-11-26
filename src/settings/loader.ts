@@ -43,7 +43,7 @@ export function loadSettings(memoryDir?: string): SettingsStore {
   }
 }
 
-export function saveSettings(store: SettingsStore, memoryDir: string): void {
+function saveSettings(store: SettingsStore, memoryDir: string): void {
   mkdirSync(memoryDir, { recursive: true });
   const filePath = getSettingsFilePath(memoryDir);
   writeFileSync(filePath, JSON.stringify(store, null, 2), "utf8");

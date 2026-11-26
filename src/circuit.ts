@@ -114,9 +114,9 @@ export function getStoreCircuitBreaker(key = "default", config?: CircuitBreakerC
   return cb;
 }
 
-export function resetAllCircuitBreakers(): void {
-  for (const cb of breakers.values()) {
-    cb.reset();
-  }
-  breakers.clear();
-}
+
+
+
+
+
+

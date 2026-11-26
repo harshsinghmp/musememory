@@ -95,7 +95,7 @@ export const PROFILE_TOOL_DEFINITIONS: Record<McpProfile, string[]> = {
   full: [], // empty list means include all registered tools
 };
 
-export const PROFILE_DESCRIPTIONS: Record<McpProfile, string> = {
+const PROFILE_DESCRIPTIONS: Record<McpProfile, string> = {
   core: "Minimal footprint for lightweight context injection and rapid capture",
   coding: "Optimized for active development, code anchors, and contextual fusion",
   debugging: "Optimized for bug diagnosis, error message resolution, observations, and negative lessons",

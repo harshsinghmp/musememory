@@ -495,25 +495,25 @@ export function loadTreeIndex(memoryDir: string): TreeIndex | null {
   }
 }
 
-export function loadPartition(memoryDir: string, project: string, type: MemoryType): TreePartition | null {
-  const path = partitionIndexFilePath(partitionDir(indexDir(memoryDir), project, type));
-  if (!existsSync(path)) return null;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as TreePartition;
-  } catch {
-    return null;
-  }
-}
 
-export function loadShard(memoryDir: string, project: string, type: MemoryType, shardId: string): TreeShard | null {
-  const path = shardFilePath(partitionDir(indexDir(memoryDir), project, type), shardId);
-  if (!existsSync(path)) return null;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as TreeShard;
-  } catch {
-    return null;
-  }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function selectPartitions(index: TreeIndex, options: TreeSearchOptions): TreePartition[] {
   const result: TreePartition[] = [];
@@ -819,11 +819,11 @@ export function rebuildTreeIndex(
   return buildTreeIndex(store, memoryDir, config);
 }
 
-export function deleteTreeIndex(memoryDir: string): void {
-  const dir = indexDir(memoryDir);
-  if (existsSync(dir)) {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+
+
+
+
+
+
 
 export { DEFAULT_CONFIG, indexDir, partitionDir, shardFilePath };

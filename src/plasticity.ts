@@ -30,7 +30,7 @@ export function loadHebbianGraph(memoryDir: string): HebbianGraph {
   }
 }
 
-export function saveHebbianGraph(memoryDir: string, graph: HebbianGraph): void {
+function saveHebbianGraph(memoryDir: string, graph: HebbianGraph): void {
   const p = getPlasticityPath(memoryDir);
   const tmp = `${p}.tmp`;
   try {

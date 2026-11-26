@@ -34,7 +34,7 @@ export interface PreflightResult {
 }
 
 /** T-433: changed files from git, empty when not in a repository. */
-export function detectChangedFiles(cwd: string = process.cwd()): string[] {
+function detectChangedFiles(cwd: string = process.cwd()): string[] {
   try {
     return execFileSync("git", ["diff", "--name-only", "HEAD"], {
       cwd,

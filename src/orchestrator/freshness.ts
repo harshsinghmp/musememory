@@ -135,7 +135,7 @@ function worstStatus(statuses: AnchorStatus[]): AnchorStatus {
  * Splits a candidate memory pool into fresh / withheld / warned-by-drift,
  * verifying anchors against the live workspace with per-file memoization.
  */
-export function applyFreshnessGate(
+function applyFreshnessGate(
   store: Store,
   workspaceRoot: string,
   candidates: MemoryEntry[],
@@ -221,7 +221,7 @@ export function clearFreshnessCache(): void {
  * Builds the provenance block appended to fused context when memories were
  * withheld — visible accountability instead of silent drops.
  */
-export function formatWithheldNotice(result: FreshnessGateResult): string | null {
+function formatWithheldNotice(result: FreshnessGateResult): string | null {
   if (result.withheld.length === 0) return null;
   const lines = result.withheld.slice(0, 3).map((w) => {
     const loc = `${w.file_path}${w.symbol_name ? `#${w.symbol_name}` : ""}`;

@@ -142,7 +142,7 @@ export function semanticCosine(a: Float32Array, b: Float32Array): number {
  * Prevents sub-threshold embedding noise from polluting exact matches.
  */
 export const SEMANTIC_COSINE_MIN_THRESHOLD = 0.30;
-export const SEMANTIC_COSINE_MAX_THRESHOLD = 0.75;
+
 export const BM25_MIN_THRESHOLD = 0.25;
 
 export function calibrateSemanticScore(score: number): number {

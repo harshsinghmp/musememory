@@ -7,7 +7,7 @@ export type UserArchetype = "developer" | "designer" | "marketer" | "casual" | "
 
 export const LOCAL_USER_INHERIT_MARKER = "<!-- INHERIT: GLOBAL -->";
 
-export const LOCAL_USER_TEMPLATE = `# Local Project User Profile (USER.md)
+const LOCAL_USER_TEMPLATE = `# Local Project User Profile (USER.md)
 > Inherits from global \`~/.memory/USER.md\`. Add local project-specific overrides, role preferences, or rules below.
 
 ${LOCAL_USER_INHERIT_MARKER}
@@ -109,7 +109,7 @@ export function userFilePath(memoryDir: string): string {
   return join(memoryDir, "USER.md");
 }
 
-export function getDefaultProfile(archetype: UserArchetype = "developer"): string {
+function getDefaultProfile(archetype: UserArchetype = "developer"): string {
   return ARCHETYPE_TEMPLATES[archetype] ?? ARCHETYPE_TEMPLATES.developer;
 }
 

@@ -564,15 +564,15 @@ export function listMemories(
   return rows.map(rowToMemoryEntry);
 }
 
-export function deleteMemoryById(db: SqliteDatabase, id: string): boolean {
-  const existing = getMemoryById(db, id);
-  if (!existing) return false;
-  try {
-    db.run(`DELETE FROM memories_fts WHERE id = ?`, [id]);
-  } catch {}
-  db.run(`DELETE FROM memories WHERE id = ?`, [id]);
-  return true;
-}
+
+
+
+
+
+
+
+
+
 
 /**
  * T-060: Safely escapes and quotes an individual FTS5 token.

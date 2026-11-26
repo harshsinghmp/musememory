@@ -7,10 +7,10 @@ import { ensureWikiStructure } from "./wiki/index.ts";
 export type MarkerKind = "memory" | "git" | "global" | "env" | "auto" | null;
 
 /** Recognized memory storage directory names. */
-export const MEMORY_DIR_NAMES = [".memory", ".musememory", ".muse-memory"] as const;
+const MEMORY_DIR_NAMES = [".memory", ".musememory", ".muse-memory"] as const;
 
 /** True when path points at a memory storage dir (.memory/.musememory/.muse-memory suffix). */
-export function isMemoryDirPath(path: string): boolean {
+function isMemoryDirPath(path: string): boolean {
   return MEMORY_DIR_NAMES.some((n) => path.endsWith(n));
 }
 

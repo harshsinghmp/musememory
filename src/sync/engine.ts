@@ -26,7 +26,7 @@ import {
 } from "./attestation.ts";
 
 /** Env var holding a PEM public key trusted to sign incoming gossip packets. */
-export const ATTESTATION_TRUST_KEY_ENV = "MUSE_ATTESTATION_PUBLIC_KEY";
+const ATTESTATION_TRUST_KEY_ENV = "MUSE_ATTESTATION_PUBLIC_KEY";
 
 /** `<memory_dir>/sync/attestation.pub`, the file `memory attest keygen` writes. */
 const TRUSTED_PUBLIC_KEY_FILE = "attestation.pub";
@@ -38,7 +38,7 @@ const TRUSTED_PUBLIC_KEY_FILE = "attestation.pub";
  * `<memory_dir>/sync/attestation.pub`. A packet's own key material is never
  * consulted — a signature verifies against what the operator installed.
  */
-export function loadAttestationTrustAnchor(memoryDir: string): string | undefined {
+function loadAttestationTrustAnchor(memoryDir: string): string | undefined {
   const inline = process.env[ATTESTATION_TRUST_KEY_ENV];
   if (inline && inline.trim()) return inline.trim();
   const file = join(memoryDir, "sync", TRUSTED_PUBLIC_KEY_FILE);
@@ -69,7 +69,7 @@ function attestedBody(packet: PacketWithAttestation): unknown {
  * set when that claim could not be verified (bad signature, tampered payload, or
  * no trust anchor configured — an unverifiable claim is not evidence).
  */
-export function verifyPacketAttestation(
+function verifyPacketAttestation(
   packet: SyncPacket,
   memoryDir: string
 ): { attested: boolean; error?: string } {

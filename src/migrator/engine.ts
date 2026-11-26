@@ -19,7 +19,7 @@ const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   letta: LettaAdapter,
 };
 
-export function getAdapter(providerId: string): ProviderAdapter {
+function getAdapter(providerId: string): ProviderAdapter {
   return ADAPTER_REGISTRY[providerId] || GenericAdapter;
 }
 

@@ -9,7 +9,7 @@ import { generalizeContent, isContentGeneralizable } from "./generalization.ts";
 import { evaluateCorroboration, isSyntheticSource } from "../quality/corroboration.ts";
 
 /** Minimum successful reuse applications required for automatic global promotion */
-export const MIN_PROMOTION_SUCCESSFUL_USES = 5;
+const MIN_PROMOTION_SUCCESSFUL_USES = 5;
 
 /**
  * Determines current scope for an entry.

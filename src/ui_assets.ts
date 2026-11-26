@@ -11,7 +11,7 @@ import { gzipSync } from "node:zlib";
 import type { Store } from "./store.ts";
 import { list } from "./store.ts";
 
-export const STUDIO_CSS = `    :root {
+const STUDIO_CSS = `    :root {
       --bg: #0c0a09;
       --bg-alt: #12100d;
       --panel: #17130f;
@@ -379,7 +379,7 @@ export const STUDIO_CSS = `    :root {
     }
 `;
 
-export const STUDIO_JS = `    let allMemories = [];
+const STUDIO_JS = `    let allMemories = [];
     let studioScope = 'project';
     let scopeGeneration = 0;
     let studioView = 'graph';
@@ -2130,7 +2130,7 @@ export const STUDIO_JS = `    let allMemories = [];
 
     loadData();`;
 
-export const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
+const STUDIO_BODY = `  <nav class="rail" aria-label="Studio sections">
     <div class="rail-brand" aria-hidden="true">M</div>
     <button type="button" class="rail-section nav-tab active" data-view="graph" aria-current="page"><span class="rail-num">01</span><span class="rail-name">Overview</span></button>
     <button type="button" class="rail-section nav-tab" data-view="health"><span class="rail-num">02</span><span class="rail-name">Health</span></button>
@@ -2719,7 +2719,7 @@ const FONT_LINKS =
   '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
   '<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
-export function renderStudioHtml(): string {
+function renderStudioHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

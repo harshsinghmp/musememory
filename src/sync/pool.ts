@@ -6,10 +6,10 @@ import { broadcastKnowledge, ingestKnowledge, resolveLocalAgentId, loadPeers } f
 import { resolveExternal, resolveWithin } from "../paths.ts";
 
 /** Operator-owned root for shared sync pools. Never derived from a tool argument. */
-export const SYNC_POOL_ROOT_ENV = "MUSE_SYNC_POOL_DIR";
+const SYNC_POOL_ROOT_ENV = "MUSE_SYNC_POOL_DIR";
 
 /** Broadcasts are written into a dedicated, owner-only subdirectory of the pool. */
-export const SYNC_POOL_PACKETS_DIRNAME = "packets";
+const SYNC_POOL_PACKETS_DIRNAME = "packets";
 
 /**
  * Resolves the pool root the operator configured.
@@ -18,7 +18,7 @@ export const SYNC_POOL_PACKETS_DIRNAME = "packets";
  * caller-supplied `pool_dir` may only narrow this root (see `confinePoolDir`) — it
  * can never relocate it, because the model, not the operator, chooses that argument.
  */
-export function resolveSyncPoolRoot(memoryDir: string): { root: string; configuredByEnv: boolean } {
+function resolveSyncPoolRoot(memoryDir: string): { root: string; configuredByEnv: boolean } {
   const defaultRoot = join(memoryDir, "sync", "pool");
   const override = process.env[SYNC_POOL_ROOT_ENV];
   if (override !== undefined && override.trim() !== "") {
