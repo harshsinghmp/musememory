@@ -7,15 +7,15 @@ import { appendJsonlWithFsync } from "./lock.ts";
 export const GENESIS_HASH = "0".repeat(64);
 
 /** Default active-segment ceiling (5 MiB) before rollover. */
-export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
 /** Default number of archived segments retained alongside the active file. */
-export const AUDIT_MAX_SEGMENTS = 5;
+const AUDIT_MAX_SEGMENTS = 5;
 
 export function auditFilePath(memoryDir: string): string {
   return join(memoryDir, "audit.jsonl");
 }
 
-export function auditArchiveDir(memoryDir: string): string {
+function auditArchiveDir(memoryDir: string): string {
   return join(memoryDir, "audit-archive");
 }
 
@@ -44,7 +44,7 @@ export function listAuditArchives(memoryDir: string): string[] {
 }
 
 /** Every ledger segment in chain order: archives oldest-first, then the active file. */
-export function listAuditSegments(memoryDir: string): string[] {
+function listAuditSegments(memoryDir: string): string[] {
   const segments = listAuditArchives(memoryDir);
   const active = auditFilePath(memoryDir);
   if (existsSync(active)) segments.push(active);
@@ -157,11 +157,11 @@ export function pruneAuditLedger(memoryDir: string, options: { maxSegments?: num
   return removed;
 }
 
-export function auditSaltsFilePath(memoryDir: string): string {
+function auditSaltsFilePath(memoryDir: string): string {
   return join(memoryDir, "audit_salts.json");
 }
 
-export function checkpointsFilePath(memoryDir: string): string {
+function checkpointsFilePath(memoryDir: string): string {
   return join(memoryDir, "checkpoints.jsonl");
 }
 
@@ -201,7 +201,7 @@ export function getDailySalt(memoryDir: string, dateStr?: string): string {
  * T-102: Computes a deterministic SHA-256 hash for an audit entry incorporating
  * the prior entry's hash, entry fields, and the daily salt.
  */
-export function computeAuditEntryHash(
+function computeAuditEntryHash(
   entry: {
     prev_hash: string;
     timestamp: string;
@@ -238,7 +238,7 @@ export function computeAuditEntryHash(
  * segment wins; after a rollover the newest archive is read; otherwise the
  * retained-window anchor is the chain head.
  */
-export function getLastAuditHash(memoryDir: string): string {
+function getLastAuditHash(memoryDir: string): string {
   const active = auditFilePath(memoryDir);
   const fromActive = existsSync(active) ? lastHashInFile(active) : null;
   if (fromActive) return fromActive;

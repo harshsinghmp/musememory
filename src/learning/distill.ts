@@ -32,7 +32,7 @@ const INFORMATIONAL_COMMAND_PREFIXES = [
   "whoami",
 ];
 
-export function normalizeErrorSignature(error: string): string {
+function normalizeErrorSignature(error: string): string {
   return error
     .replace(/:\d+:\d+/g, "") // strip line:column numbers
     .replace(/:\d+/g, "") // strip line numbers

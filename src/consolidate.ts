@@ -112,7 +112,7 @@ export function consolidateScenes(store: Store, options: ConsolidateOptions = {}
   return report;
 }
 
-/** Slug for a skill/scene topic derived from dominant tokens. */
-export function topicSlug(topicTokens: string[], fallback = "scene"): string {
-  return slugifyId(topicTokens.join("-") || fallback);
-}
+
+
+
+

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { MemoryEntry } from "../types.ts";
 import type { Entity, EntityType, EntityExtractionResult, EntityExtractionConfig } from "./types.ts";
 
-export const DEFAULT_ENTITY_PATTERNS = {
+const DEFAULT_ENTITY_PATTERNS = {
   person: [
     /@([a-zA-Z0-9_-]+)/g,
     /\b(?:authored|reviewed|fixed|reported by)\s+([a-zA-Z0-9_-]+)/gi,

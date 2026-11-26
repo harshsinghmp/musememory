@@ -72,7 +72,7 @@ Period: {{period}}
   },
 ];
 
-export function getPromptsDir(memoryDir?: string): string | null {
+function getPromptsDir(memoryDir?: string): string | null {
   if (!memoryDir) return null;
   return join(memoryDir, "prompts");
 }

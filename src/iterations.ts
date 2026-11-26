@@ -5,7 +5,7 @@ import type { IterationEntry, CriticVerdict } from "./types.ts";
 
 export type { IterationEntry, CriticVerdict };
 
-export function getIterationsFilePath(memoryDir: string): string {
+function getIterationsFilePath(memoryDir: string): string {
   return join(memoryDir, "iterations.jsonl");
 }
 

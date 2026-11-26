@@ -99,7 +99,7 @@ function isGlobalStandardPath(path: string): boolean {
  * A harness path is never auto-selected: a pre-existing `~/.claude/settings.json`
  * does not opt the user in.
  */
-export function resolveHookSettingsPath(
+function resolveHookSettingsPath(
   home: string = homedir(),
   options: HookPackOptions = {},
 ): string {

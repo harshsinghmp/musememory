@@ -153,7 +153,7 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
   return 0;
 }
 
-export async function promptOrNotifyGitHook(targetDir: string, autoInstall = false): Promise<boolean> {
+async function promptOrNotifyGitHook(targetDir: string, autoInstall = false): Promise<boolean> {
   const gitDir = join(targetDir, ".git");
   if (!existsSync(gitDir)) return false;
   const hookPath = join(gitDir, "hooks", "pre-commit");

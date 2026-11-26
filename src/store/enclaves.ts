@@ -63,7 +63,7 @@ export function enclavePath(memoryDir: string, client: string, division: string 
 }
 
 /** Maximum entries in one vault; bounds listing and decrypt cost. */
-export const MAX_ENCLAVE_ENTRIES = 5000;
+const MAX_ENCLAVE_ENTRIES = 5000;
 /** Maximum serialized size of one entry; bounds a single vault record. */
 export const MAX_ENCLAVE_ENTRY_BYTES = 1024 * 1024;
 

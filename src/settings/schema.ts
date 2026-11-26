@@ -2,7 +2,7 @@ import type { GlobalSettings } from "./types.ts";
 
 const SAFE_PATH_REGEX = /^[a-zA-Z0-9_\/\.-]+$/;
 
-export function validateSafePath(path: string, context = "Path"): void {
+function validateSafePath(path: string, context = "Path"): void {
   if (!path || typeof path !== "string") {
     throw new Error(`${context}: invalid or missing path`);
   }

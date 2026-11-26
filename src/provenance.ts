@@ -5,7 +5,7 @@ import type { SourceEntry, SourceType } from "./types.ts";
 
 export type { SourceEntry, SourceType };
 
-export function getSourcesFilePath(memoryDir: string): string {
+function getSourcesFilePath(memoryDir: string): string {
   return join(memoryDir, "sources.json");
 }
 
@@ -23,7 +23,7 @@ export function loadSources(memoryDir: string): SourceEntry[] {
   }
 }
 
-export function saveSources(memoryDir: string, sources: SourceEntry[]): void {
+function saveSources(memoryDir: string, sources: SourceEntry[]): void {
   mkdirSync(memoryDir, { recursive: true });
   const filePath = getSourcesFilePath(memoryDir);
   writeFileSync(filePath, JSON.stringify(sources, null, 2), "utf-8");

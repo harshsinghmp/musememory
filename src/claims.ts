@@ -6,7 +6,7 @@ import type { ClaimEntry, ClaimConfidence } from "./types.ts";
 
 export type { ClaimEntry, ClaimConfidence };
 
-export function getClaimsFilePath(memoryDir: string): string {
+function getClaimsFilePath(memoryDir: string): string {
   return join(memoryDir, "claims.json");
 }
 
@@ -24,7 +24,7 @@ export function loadClaims(memoryDir: string): ClaimEntry[] {
   }
 }
 
-export function saveClaims(memoryDir: string, claims: ClaimEntry[]): void {
+function saveClaims(memoryDir: string, claims: ClaimEntry[]): void {
   mkdirSync(memoryDir, { recursive: true });
   const filePath = getClaimsFilePath(memoryDir);
   writeFileSync(filePath, JSON.stringify(claims, null, 2), "utf-8");

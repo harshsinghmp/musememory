@@ -233,7 +233,7 @@ export function listAbstractSidecars(memoryDir: string): AbstractSidecar[] {
 /**
  * Initializes SQLite table for caching abstract sidecars.
  */
-export function initSidecarTable(db: SqliteDatabase): void {
+function initSidecarTable(db: SqliteDatabase): void {
   db.run(`
     CREATE TABLE IF NOT EXISTS abstract_sidecars (
       id TEXT PRIMARY KEY,

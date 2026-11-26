@@ -5,7 +5,7 @@ import type { SyncPacket, GossipSupersession, VectorClock } from "./types.ts";
 /**
  * Computes deterministic SHA-256 fingerprint for a memory entry payload.
  */
-export function computeEntryHash(entry: MemoryEntry): string {
+function computeEntryHash(entry: MemoryEntry): string {
   const normalized = JSON.stringify({
     title: entry.title.trim().toLowerCase(),
     content: entry.content.trim(),
@@ -18,7 +18,7 @@ export function computeEntryHash(entry: MemoryEntry): string {
 /**
  * Computes SHA-256 checksum for an entire SyncPacket payload.
  */
-export function computePacketChecksum(payload: SyncPacket["payload"]): string {
+function computePacketChecksum(payload: SyncPacket["payload"]): string {
   const content = JSON.stringify({
     memories: payload.memories.map((m) => m.id).sort(),
     constraints: payload.constraints.slice().sort(),

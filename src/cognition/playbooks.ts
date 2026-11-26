@@ -30,7 +30,7 @@ export interface Playbook {
   failureCount: number;
 }
 
-export class PlaybookStoreError extends Error {}
+class PlaybookStoreError extends Error {}
 
 export interface PlaybookInput {
   id?: string;

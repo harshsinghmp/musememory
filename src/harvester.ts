@@ -51,7 +51,7 @@ export interface TranscriptLedgerEntry {
 /**
  * Returns common host directories where AI coding agents store session transcripts.
  */
-export function getStandardAgentTranscriptDirs(home: string = homedir()): string[] {
+function getStandardAgentTranscriptDirs(home: string = homedir()): string[] {
   return [
     // 1. Antigravity / Gemini CLI Brain logs
     join(home, ".gemini", "antigravity-cli", "brain"),
@@ -168,7 +168,7 @@ export function getHarvestedTranscriptLedger(memoryDir: string): Record<string, 
 /**
  * Saves the persistent transcript hash ledger.
  */
-export function saveHarvestedTranscriptLedger(
+function saveHarvestedTranscriptLedger(
   memoryDir: string,
   ledger: Record<string, TranscriptLedgerEntry>,
 ): void {

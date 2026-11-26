@@ -7,7 +7,7 @@
 
 export type EpisodePhase = "goal" | "hypothesis" | "trajectory" | "verification" | "retrospective";
 
-export const EPISODE_PHASES: EpisodePhase[] = ["goal", "hypothesis", "trajectory", "verification", "retrospective"];
+const EPISODE_PHASES: EpisodePhase[] = ["goal", "hypothesis", "trajectory", "verification", "retrospective"];
 
 export interface EpisodeObservation {
   id?: string;

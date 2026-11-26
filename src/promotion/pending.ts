@@ -12,7 +12,7 @@ import type {
 } from "./types.ts";
 import { evaluatePromotion, getEntryScope, promoteMemory } from "./engine.ts";
 
-export function getPendingFilePath(memoryDir: string): string {
+function getPendingFilePath(memoryDir: string): string {
   return path.join(memoryDir, "pending_promotions.json");
 }
 
@@ -30,7 +30,7 @@ export function loadPendingPromotions(memoryDir: string): PendingPromotionEntry[
   }
 }
 
-export function savePendingPromotions(memoryDir: string, entries: PendingPromotionEntry[]): void {
+function savePendingPromotions(memoryDir: string, entries: PendingPromotionEntry[]): void {
   if (!fs.existsSync(memoryDir)) {
     fs.mkdirSync(memoryDir, { recursive: true });
   }
