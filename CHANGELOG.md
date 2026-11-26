@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.4.5] - 2026-11-25
+## [3.4.5] - 2026-11-26
 
 **Full Changelog**: https://github.com/harshsinghmp/musememory/compare/v3.4.4...v3.4.5
 
