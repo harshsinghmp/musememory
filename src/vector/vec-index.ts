@@ -179,6 +179,66 @@ export function vecDelete(index: VecIndex, id: string): boolean {
   }
 }
 
+/** SQL predicate for "this vector's memory is gone". */
+const ORPHAN_PREDICATE = `memory_id NOT IN (SELECT id FROM memories WHERE deleted_at IS NULL)`;
+
+/**
+ * Issue #519 — delete every `memory_vec` row whose `memory_id` has no live row
+ * in `memories` (`deleted_at IS NULL`).
+ *
+ * `deleteEntry` removes the vector row itself, but three other paths leave an
+ * **orphan vector**: a crash between the `memories` write and the vec delete (two
+ * statements, no shared transaction), a restored YAML export (the row comes back
+ * through `save()`, the tombstone does not), and a store written by an older
+ * build that predates the vec0 table. An orphan is still returned by the KNN,
+ * then dropped by the row fetch in `scoreVecCandidates`, which silently shrinks
+ * the page — a caller asking for 10 gets 9 results with no explanation.
+ *
+ * Guarded twice: a null index means the extension never loaded (the JSON
+ * fallback owns the index and has no orphans), and the `memories` table must
+ * exist before the subquery is legal. The count is read before the delete so
+ * this can report what it removed — `SqliteDatabase.run()` reports nothing, and
+ * the caller logs the number.
+ *
+ * Never throws: reconciliation is housekeeping on a read path, so a failure is
+ * logged and the store keeps working with the orphans in place.
+ */
+export function reconcileVecIndex(index: VecIndex | null | undefined): number {
+  if (!index) return 0;
+  try {
+    const memoriesTable = index.db
+      .query<{ name: string }>(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memories' LIMIT 1`)
+      .get();
+    if (!memoriesTable) return 0;
+    const counted = index.db
+      .query<{ c: number }>(`SELECT count(*) AS c FROM ${index.table} WHERE ${ORPHAN_PREDICATE}`)
+      .get();
+    const orphans = Number(counted?.c ?? 0);
+    if (orphans <= 0) return 0;
+    index.db.run(`DELETE FROM ${index.table} WHERE ${ORPHAN_PREDICATE}`);
+    return orphans;
+  } catch (err) {
+    console.error(
+      `[VEC0_RECONCILE_FAILED] ${errorMessage(err).replace(/[\u0000-\u001f\u007f-\u009f]/g, "")} — orphan vectors stay until the next attempt`,
+    );
+    return 0;
+  }
+}
+
+/**
+ * Issue #519 — run `reconcileVecIndex` **once per connection** ("store open"),
+ * before that connection's first KNN. A WeakMap keyed on the database handle
+ * means a reopened store reconciles again; a process that only searches once
+ * still pays for it exactly once, not per query.
+ */
+const reconciledConnections = new WeakSet<SqliteDatabase>();
+
+function ensureVecReconciled(index: VecIndex): number {
+  if (reconciledConnections.has(index.db)) return 0;
+  reconciledConnections.add(index.db);
+  return reconcileVecIndex(index);
+}
+
 /**
  * Batch upsert inside a SAVEPOINT: a backfill of a large store is one commit
  * instead of one fsync per row, and it nests safely inside a caller's
@@ -214,6 +274,11 @@ export interface VecKnnHit {
 export function vecKnn(index: VecIndex, query: ArrayLike<number>, k: number): VecKnnHit[] {
   const limit = Math.max(0, Math.floor(k));
   if (limit === 0) return [];
+  // Issue #519: this is the first KNN of this connection, so this is the last
+  // moment an orphan can still reach a caller and shrink its page. The call is
+  // once-per-connection and swallows its own failures, so a search never fails
+  // because housekeeping did.
+  ensureVecReconciled(index);
   try {
     const rows = index.db
       .query<{ memory_id: string; distance: number }>(
