@@ -288,7 +288,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_remediation_playbooks` | `client` | Read-only: synthesize remediation playbook candidates from recurring, resolved test failures (nothing is persisted) |
 | `muse_enclave_recall` | `client` | Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged. |
 | `muse_overlay_status` | `public_key` | Read-only: list branch memory overlays and their entry counts, or inspect one branch overlay's entries |
-| `muse_attestation_verify` | `public_key` | Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key |
+| `muse_attestation_verify` | `public_key` | Read-only: verify a packet attestation (registry-dispatched; Ed25519 today) or an attestation chain against an inline public key |
 
 ---
 

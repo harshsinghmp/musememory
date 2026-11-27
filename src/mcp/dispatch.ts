@@ -94,7 +94,7 @@ import { evaluateProjectHealth, reconcileCodeAnchors, resolveProjectName, format
 import { analyzeMemoryCodeImpact } from "../intelligence/index.ts";
 import { generatePrContext } from "../compaction/index.ts";
 import { broadcastKnowledge, ingestKnowledge, getSyncStatus, syncWithSharedPool } from "../sync/index.ts";
-import { keyIdFromPublicKey, verifyAttestation, verifyAttestationChain, type Attestation } from "../sync/attestation.ts";
+import { keyIdFromPublicKey, verifyAttestationChain, verifyAttestationDetailed, type Attestation } from "../sync/attestation.ts";
 import { currentGitBranch, listBranchOverlays, loadBranchOverlay } from "../store/branch.ts";
 import { listEnclaveEntries } from "../store/enclaves.ts";
 import { redactSecrets } from "../secrets.ts";
@@ -1825,11 +1825,15 @@ export async function dispatchToolCall(
       ? a.key_id.trim()
       : keyIdFromPublicKey(publicKey);
     const expectedAudience = typeof a.audience === "string" && a.audience.trim() ? a.audience.trim() : undefined;
+    // Opt-in revocation proxy: reject a record whose signed timestamp is older
+    // than the caller's bound, without needing a release.
+    const maxAgeDays = typeof a.max_age_days === "number" ? a.max_age_days : undefined;
     if (Array.isArray(a.chain)) {
       const chain = a.chain as Attestation[];
       const valid = verifyAttestationChain(chain, publicKey, {
         expectedKeyId,
         expectedAudience,
+        maxAgeDays,
         requireHead: a.require_head !== false,
       });
       const last = chain[chain.length - 1];
@@ -1845,14 +1849,20 @@ export async function dispatchToolCall(
     if (!attestation || typeof attestation !== "object") {
       return toolError("muse_attestation_verify requires an attestation or a chain");
     }
-    const valid = verifyAttestation(a.packet, attestation, publicKey, { expectedKeyId, expectedAudience });
+    const result = verifyAttestationDetailed(a.packet, attestation, publicKey, { expectedKeyId, expectedAudience, maxAgeDays });
     return toolResult({
-      valid,
+      valid: result.valid,
       signer: attestation.signer,
       seq: attestation.seq,
       key_id: attestation.key_id,
       packet_hash: attestation.packet_hash,
-      reason: valid ? undefined : "signature, packet hash, key id or audience mismatch",
+      algorithm: result.algorithm,
+      age_days: result.ageDays,
+      // A distinct code, not a generic signature failure: "unsupported_algorithm"
+      // tells the caller to try a newer verifier, "signature_invalid" that the
+      // bytes do not match. `message` names the check that failed.
+      reason: result.reason,
+      message: result.message,
     });
   }
   default:

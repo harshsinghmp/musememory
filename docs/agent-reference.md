@@ -191,6 +191,25 @@ DNS-rebinding protection is unchanged.
 | Import formats | `src/migrator/detect.ts` |
 | Credential rule families | `src/secrets.ts` |
 
+### Sync attestations and crypto agility
+
+Sync packets are attested with a signature over `SHA-256(canonicalJson(packet))`.
+Verification is **registry-dispatched**: `sig_scheme` (optional — absent means
+`"ed25519"`) selects a verifier in `src/sync/attestation.ts`, so an identifier
+this build does not know comes back as `unsupported_algorithm` — distinct from a
+bad signature — and a new scheme can be added without changing any caller.
+Nothing about the v2 envelope changed: existing packets and chains still verify
+byte for byte.
+
+`muse_attestation_verify` takes an inline `public_key` only (never a path), and
+its optional `max_age_days` rejects a record whose signed `created_at` is older
+than the bound — the practical way to stop trusting a compromised key without a
+release. `memory attest verify … --max-age-days N` is the same knob on the CLI.
+The per-use inventory, the NIST IR 8547 dates (deprecated **2030-12-31**,
+disallowed **2035-12-31**, risk acceptance from **2031-01-01**), the owner and
+the ML-DSA migration plan live in the
+[crypto inventory](crypto-inventory.md).
+
 ### Profiles
 
 Tools are exposed through task-focused profiles so an agent is never handed

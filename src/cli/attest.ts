@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { requireRoot, usageError } from "./shared.ts";
 import type { ParsedArgs } from "./shared.ts";
-import { generateAttestationKeypair, keyIdFromPublicKey, signPacket, verifyAttestation, verifyAttestationChain, type Attestation } from "../sync/attestation.ts";
+import { generateAttestationKeypair, keyIdFromPublicKey, signPacket, verifyAttestationChain, verifyAttestationDetailed, type Attestation } from "../sync/attestation.ts";
 import { recordAuditEvent } from "../audit.ts";
 
 export async function handleAttestCommand({ positional, flags }: ParsedArgs): Promise<number> {
@@ -63,12 +63,19 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
       const packet = JSON.parse(readFileSync(packetPath, "utf8"));
       const attestation = JSON.parse(readFileSync(attestationPath, "utf8")) as Attestation;
       const publicKey = readFileSync(pubPath, "utf8");
-      const ok = verifyAttestation(packet, attestation, publicKey, {
+      const maxAgeDays = parseMaxAgeDays(flags["max-age-days"]);
+      if (maxAgeDays instanceof Error) return usageError(maxAgeDays.message);
+      const result = verifyAttestationDetailed(packet, attestation, publicKey, {
         expectedKeyId: flags["key-id"] ?? keyIdFromPublicKey(publicKey),
         expectedAudience: flags["audience"],
+        maxAgeDays,
       });
-      console.log(ok ? `valid (signer ${attestation.signer}, seq ${attestation.seq})` : "invalid");
-      return ok ? 0 : 1;
+      console.log(
+        result.valid
+          ? `valid (signer ${attestation.signer}, seq ${attestation.seq}, ${result.algorithm})`
+          : `invalid (${result.reason}: ${result.message})`,
+      );
+      return result.valid ? 0 : 1;
     }
     case "verify-chain": {
       const chainPath = positional[1];
@@ -76,10 +83,13 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
       if (!chainPath || !pubPath) return usageError("attest verify-chain <chain.json> --pub <public.pem>");
       const chain = JSON.parse(readFileSync(chainPath, "utf8")) as Attestation[];
       const publicKey = readFileSync(pubPath, "utf8");
+      const maxAgeDays = parseMaxAgeDays(flags["max-age-days"]);
+      if (maxAgeDays instanceof Error) return usageError(maxAgeDays.message);
       const ok = verifyAttestationChain(chain, publicKey, {
         requireHead: flags["no-head"] === undefined,
         expectedKeyId: flags["key-id"] ?? keyIdFromPublicKey(publicKey),
         expectedAudience: flags["audience"],
+        maxAgeDays,
       });
       console.log(ok ? `valid (${chain.length} record(s))` : "invalid");
       return ok ? 0 : 1;
@@ -87,4 +97,15 @@ export async function handleAttestCommand({ positional, flags }: ParsedArgs): Pr
     default:
       return usageError(`unknown attest subcommand '${sub}' (expected keygen | sign | verify | verify-chain)`);
   }
+}
+
+/**
+ * `--max-age-days N` — the revocation proxy from issue #518: verify only against
+ * a key whose attestation is at most N days old, without shipping a release.
+ */
+function parseMaxAgeDays(raw: string | undefined): number | undefined | Error {
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return new Error("--max-age-days must be a non-negative number of days");
+  return value;
 }
