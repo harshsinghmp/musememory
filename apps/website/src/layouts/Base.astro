@@ -40,7 +40,11 @@ const {
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
-const ogAbs = new URL(ogImage.replace(/^\//, ""), new URL(base, Astro.site ?? "https://harshsinghmp.github.io")).href;
+// `BASE_URL` has no trailing slash, so resolving "brand/og.png" against it
+// treats "musememory" as a file and drops it: /brand/og.png. Force the
+// directory form before resolving, or every social card URL 404s.
+const baseUrl = new URL(base.endsWith("/") ? base : `${base}/`, Astro.site ?? "https://harshsinghmp.github.io");
+const ogAbs = new URL(ogImage.replace(/^\//, ""), baseUrl).href;
 const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site ?? "https://harshsinghmp.github.io").href;
 const motionScript = initMotion();
 ---
