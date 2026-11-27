@@ -15,6 +15,7 @@ import { toolError } from "./mcp/tool-result.ts";
 import { STATIC_MCP_RESOURCES, readMcpResource } from "./mcp/resources.ts";
 import { getMcpPrompt, listMcpPrompts } from "./mcp/prompts.ts";
 import { findOrCreateProjectRoot } from "./root.ts";
+import { isWithinRoot, realishPath } from "./paths.ts";
 import { openStore, type Store } from "./store.ts";
 import { getSettings } from "./settings.ts";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
@@ -69,6 +70,23 @@ export function getCachedStore(memoryDir: string): Store {
   return opened;
 }
 
+/**
+ * #512: the operator's opt-in for a server that deliberately serves more than
+ * one project. Unset (the default) means a request-supplied directory must stay
+ * inside the workspace root `createServer` resolved.
+ */
+export const ALLOW_EXTERNAL_DIR_ENV = "MUSE_MCP_ALLOW_EXTERNAL_DIR";
+
+/** True when the operator opted into request directories outside the root. */
+export function allowsExternalRequestDirs(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[ALLOW_EXTERNAL_DIR_ENV] === "1";
+}
+
+/** Either the store a call should use, or the reason it was refused. */
+type StoreResolution =
+  | { ok: true; activeStore: Store; activeMemoryDir: string; activeRoot: string }
+  | { ok: false; reason: string };
+
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
@@ -77,17 +95,59 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
   // names this project's directory reuses it rather than opening a second one.
   const store = getCachedStore(memoryDir);
 
-  function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
-    const dir = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
-    if (typeof dir === "string" && dir.trim()) {
-      const resolved = findOrCreateProjectRoot(dir.trim());
+  /**
+   * Resolve the store a tool call addresses.
+   *
+   * #512: `dir`/`workspace`/`project_dir`/`cwd` come from the model, and this
+   * function used to hand them straight to `findOrCreateProjectRoot`, which
+   * creates `.memory/` wherever it is told. A prompt-injected agent could
+   * therefore point the store at `/`, at `$HOME`, or at another tenant's
+   * checkout and read or write there. The request directory is now confined to
+   * the workspace root this server was started for — resolved through
+   * `realishPath` so a symlinked prefix cannot launder an escape — and a
+   * directory outside it is rejected *before* `findOrCreateProjectRoot`, so no
+   * store is created for a rejected path. `MUSE_MCP_ALLOW_EXTERNAL_DIR=1` is the
+   * operator's opt-in for the deliberate multi-project workflow.
+   */
+  function resolveStoreForRequest(
+    a?: Record<string, unknown>,
+  ): StoreResolution {
+    const requested = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
+    if (typeof requested === "string" && requested.trim()) {
+      const raw = requested.trim();
+
+      if (!allowsExternalRequestDirs()) {
+        let candidate: string;
+        let configuredRoot: string;
+        try {
+          candidate = realishPath(raw);
+          configuredRoot = realishPath(root);
+        } catch (err: unknown) {
+          return {
+            ok: false,
+            reason: `Invalid directory '${raw}': ${err instanceof Error ? err.message : String(err)}.`,
+          };
+        }
+        if (!isWithinRoot(configuredRoot, candidate)) {
+          return {
+            ok: false,
+            reason:
+              `Directory '${raw}' resolves to '${candidate}', which is outside the MCP workspace root ` +
+              `'${configuredRoot}'. Omit 'dir' to use the configured store, or start the server with ` +
+              `${ALLOW_EXTERNAL_DIR_ENV}=1 to permit external directories.`,
+          };
+        }
+      }
+
+      const resolved = findOrCreateProjectRoot(raw);
       return {
+        ok: true,
         activeStore: getCachedStore(resolved.memoryDir),
         activeMemoryDir: resolved.memoryDir,
         activeRoot: resolved.root,
       };
     }
-    return { activeStore: store, activeMemoryDir: memoryDir, activeRoot: root };
+    return { ok: true, activeStore: store, activeMemoryDir: memoryDir, activeRoot: root };
   }
 
   const server = new Server(
@@ -119,7 +179,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
-    const { activeStore, activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+    const resolution = resolveStoreForRequest(a);
+    // #512: a rejected directory is a tool error, not a crash and not a silent
+    // fallback to the configured store — the caller must see which root bounds it.
+    if (!resolution.ok) return toolError(resolution.reason);
+    const { activeStore, activeMemoryDir, activeRoot } = resolution;
 
     // T-394: Reject disabled tools per mcp.enabledTools
     const settings = getSettings(activeMemoryDir);

@@ -133,6 +133,39 @@ The server advertises the versions its installed SDK supports. The
 `2026-07-28` revision is not implemented: `@modelcontextprotocol/sdk@1.32.2`
 does not know it.
 
+### Request directories and the workspace root
+
+Every tool accepts an optional `dir` (`workspace`, `project_dir` and `cwd` are
+aliases) naming the project the call applies to. That value is **confined**: it
+is resolved, then it must be the server's workspace root or live beneath it. The
+workspace root is the one the server resolved at startup — the `mcp` argument,
+else `MUSE_MEMORY_PROJECT_DIR`, else `PROJECT_ROOT`, else the working directory.
+A directory outside it is refused with a tool error that names the root, and the
+refusal happens **before** any `.memory/` is created, so a rejected call leaves
+the filesystem untouched. Containment is resolved through `realpath`, so a
+symlink inside the root cannot point the store outside it.
+
+The multi-project workflow — one server, several checkouts — is an **operator**
+decision, not a model one. Start the server with `MUSE_MCP_ALLOW_EXTERNAL_DIR=1`
+to lift the confinement for that process; unset (the default) is the confined
+behaviour.
+
+The store is private by construction: memory directories are created `0700` and
+`CURRENT.md`, `USER.md`, `CORE.md`, the audit trail and its salt file are
+`0600` (the modes are re-applied on write, so a store created by an older
+version is tightened on first use).
+
+### Prompt and resource output is data
+
+`prompts/get` text and the markdown resources (`memory://current`,
+`memory://user`, `memory://core`, `memory://handoff`) are served inside
+`<muse-memory data-not-instructions="true"> … </muse-memory>`. The fence tokens
+are stripped from the content first, so a memory cannot close the wrapper early,
+and `</muse-memory>`, `<muse-memory …>`, `<system>`, `<instructions>` and
+`<system-message>` never reach the client as tags. `memory://entry/<id>` stays
+valid JSON and is **not** wrapped; the same fence tokens are stripped from its
+string fields instead.
+
 ### Browser origins on the HTTP transport
 
 `muse mcp --http` binds loopback and stays usable without a token, but it now

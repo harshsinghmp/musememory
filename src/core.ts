@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { scanSecrets } from "./secrets.ts";
 
@@ -36,9 +36,17 @@ export function readCore(memoryDir: string): Record<CoreTier, string[]> {
 }
 
 function writeCore(memoryDir: string, tiers: Record<CoreTier, string[]>): void {
-  if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
+  mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   const blocks = CORE_TIERS.map((tier) => [`## ${tier}`, ...tiers[tier]].join("\n"));
-  writeFileSync(coreFilePath(memoryDir), `# CORE MEMORY\n\n${blocks.join("\n\n")}\n`, "utf8");
+  const path = coreFilePath(memoryDir);
+  // #512: CORE.md is the permanent operating contract. Create it 0o600 and
+  // tighten an existing file — `mode` only applies when the file is created.
+  writeFileSync(path, `# CORE MEMORY\n\n${blocks.join("\n\n")}\n`, { encoding: "utf8", mode: 0o600 });
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Best effort: a read-only mount keeps the mode it has.
+  }
 }
 
 /** Replace a tier's content in place with the given text. Throws on detected secrets. */

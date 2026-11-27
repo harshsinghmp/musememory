@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { getGlobalMemoryDir } from "./root.ts";
 import { scanSecrets } from "./secrets.ts";
@@ -197,11 +197,18 @@ export function setUserProfile(memoryDir: string, content: string): void {
   }
 
   if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
+    mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   }
 
   const targetPath = userFilePath(memoryDir);
-  writeFileSync(targetPath, content.trim() + "\n", "utf8");
+  // #512: USER.md describes the person, not the project. Create it 0o600 and
+  // tighten an existing file — `mode` only applies when the file is created.
+  writeFileSync(targetPath, content.trim() + "\n", { encoding: "utf8", mode: 0o600 });
+  try {
+    chmodSync(targetPath, 0o600);
+  } catch {
+    // Best effort: a read-only mount keeps the mode it has.
+  }
 }
 
 /**
@@ -224,7 +231,7 @@ export function initUserProfile(
   }
 
   if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
+    mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   }
 
   const content = isLocal ? LOCAL_USER_TEMPLATE : getDefaultProfile(archetype);
