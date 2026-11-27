@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **js-yaml 5 is ESM-only, and the default import broke every CLI command (dependency bump #562)**: v5 ships `dist/js-yaml.mjs` with named exports and no default, so the eleven modules using `import yaml from "js-yaml"` failed at runtime with *“Missing 'default' export”* — including the YAML mirror, routines, connect and every migrator adapter. They now use a namespace import (`import * as yaml`), which exposes `load`/`dump` under both v4 and v5. This nearly shipped green: the first local run passed because `node_modules` still held v4, and the failure only appeared after a clean install — the verification below is against the installed 5.5.0. Verified: `bun test` 1885 pass / 0 fail, `tsc` clean, build green.
 - **Social link previews pointed at `/brand/og.png`, which does not exist under the `/musememory` base path**: `BASE_URL` has no trailing slash, so resolving `brand/og.png` against it treated `musememory` as a file and dropped it — every `og:image` and `twitter:image` 404'd in previews while the page itself rendered fine. The layout now forces the directory form before resolving, and `site:qa` gained a static check that fails when any absolute social-image URL omits the base path (mutation-verified by rewriting the built HTML and seeing it BLOCK). Verified: `site:build` 6 pages, `site:qa` 18/18 SHIP.
 
 ## [3.4.7] - 2026-11-27

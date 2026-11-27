@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 describe("Agent Skills Validation (.agents/skills/)", () => {
   const skillsDir = join(process.cwd(), ".agents", "skills");
