@@ -38,6 +38,7 @@ import {
   supersede,
 } from "../store.ts";
 import { getGlobalMemoryDir } from "../root.ts";
+import { constantTimeEqual } from "../security/timing.ts";
 import { writeWorkspaceTerrain } from "../vault/index.ts";
 import { discoverAgentHub } from "../agents/hub.ts";
 import { connectAgent, disconnectSingleAgent } from "../connect.ts";
@@ -920,7 +921,11 @@ add("POST", "/api/optimize", async (req, res, ctx) => {
     const providedToken = (typeof headerToken === "string" ? headerToken : undefined) || bearerToken;
 
     if (expectedToken) {
-      if (providedToken !== expectedToken) {
+      // Issue #513: `providedToken !== expectedToken` stops at the first
+      // differing character, so the response time described a prefix of the
+      // configured Studio token. The comparison is now constant-time; the gate
+      // itself (403 on mismatch, loopback fallback otherwise) is unchanged.
+      if (!constantTimeEqual(providedToken ?? "", expectedToken)) {
         res.writeHead(403, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Forbidden: Invalid or missing authentication token" }));
         return;

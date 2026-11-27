@@ -20,7 +20,7 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-1828%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1844%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -188,6 +188,7 @@ memory optimize
 - [🧠 Shipped agent skills](#-shipped-agent-skills)
 - [👤 5 role archetypes](#-5-role-archetypes-usermd)
 - [🧪 Testing & verification](#-testing--verification)
+- [🔐 Security](#-security)
 - [🔮 Roadmap](#-roadmap)
 - [📜 License](#-license)
 
@@ -780,12 +781,37 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 1828 pass, 0 fail, 8702 assertions across 275 files
+bun test          # 1844 pass, 0 fail, 8769 assertions across 277 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch/PR model, the per-commit gate, and the post-merge sequence.
+
+---
+
+## 🔐 Security
+
+Security fixes land on **3.4.x**; 3.3 and older are unsupported. The full policy —
+supported versions, scope, response targets, coordinated disclosure and safe
+harbour — is in [**SECURITY.md**](./SECURITY.md).
+
+**Reporting a vulnerability:** open the repository's [Security tab](https://github.com/harshsinghmp/musememory/security)
+and choose **"Report a vulnerability"** (GitHub private vulnerability reporting).
+There is no security email address, and please do not open a public issue or pull
+request for a suspected vulnerability.
+
+| Stage | Target |
+| :--- | :--- |
+| Acknowledgement | 72 hours |
+| Triage | 7 days |
+| Fix or mitigation plan | 30 days |
+
+Disclosure is coordinated: 90 days from the report or the release that fixes it,
+whichever comes first. Already hardened: the MCP HTTP origin gate, request
+directory confinement, fenced prompt/resource output, the Studio CSP and
+same-origin gate, signature-first sync trust, constant-time token checks and
+deletion reconciliation for the vector index — each with its evidence in [SECURITY.md](./SECURITY.md#hardening-already-in-place).
 
 ---
 
