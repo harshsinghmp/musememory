@@ -36,7 +36,10 @@ describe("Secure Code Guardian — Security Controls & Hardening Verification", 
 
         expect(res.headers.get("x-content-type-options")).toBe("nosniff");
         expect(res.headers.get("x-frame-options")).toBe("DENY");
-        expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+        // Issue #520: a loopback dashboard that renders stored content sends no
+        // referrer at all, and every /api response is uncacheable.
+        expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+        expect(res.headers.get("cache-control")).toBe("no-store");
         expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
       } finally {
         serverInstance.close();
@@ -62,8 +65,10 @@ describe("Secure Code Guardian — Security Controls & Hardening Verification", 
         const errJson = (await maliciousRes.json()) as { error: string };
         expect(errJson.error).toContain("Forbidden");
 
-        // 2. Legitimate localhost origin is allowed
-        const legitRes = await fetch(`http://127.0.0.1:${port}/api/propose`, {
+        // 2. The page's own origin is allowed — issue #520 requires the Origin to
+      // match the Host the request was addressed to, so this one is addressed to
+      // `localhost` as well.
+      const legitRes = await fetch(`http://localhost:${port}/api/propose`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

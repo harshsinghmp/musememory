@@ -313,3 +313,20 @@ The same `project` filter is available on every audit surface: the
 `/api/cognition/clusters` and `/api/cognition/debt` endpoints
 (`?project=P`). Code-side metrics stay workspace-wide by design — source code
 is shared between projects — so `scope.code_scope` always reads `workspace`.
+
+### The Studio dashboard is a loopback surface
+
+`memory ui` binds `127.0.0.1` only and has no remote-bind option, so the
+dashboard is reachable from the machine that started it and nowhere else. Every
+API call must be same-origin: a request to `/api/*` carrying an `Origin` header
+is served only when that origin's host equals the `Host` the request was
+addressed to (`http://localhost:2222` for a page on `localhost:2222`; another
+loopback port, `127.0.0.1` versus `localhost`, or any other site is refused with
+`403` and no CORS headers). Requests with no `Origin` — curl, scripts, native
+clients — are still allowed. Because the dashboard renders stored memory content
+into a browser, every response also carries a content-security policy scoped to
+`'self'` (no CDN, no webfonts, no inline scripts), plus `X-Content-Type-Options:
+nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and
+`Cache-Control: no-store` on `/api/*`. Do not proxy or port-forward the Studio
+to a network interface; a browser on that network would satisfy the bind while
+still being a third party.

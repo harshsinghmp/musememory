@@ -60,7 +60,24 @@ describe("T-344: CORS & CSRF Defense Against Origin: null", () => {
     expect(res.headers.get("access-control-allow-origin")).not.toBe("null");
   });
 
-  it("allows requests from legitimate localhost origin", async () => {
+  it("allows requests from the page's own origin (issue #520: Host must match)", async () => {
+    expect(serverInstance).toBeDefined();
+    const port = serverInstance!.port;
+
+    // The request is addressed to `localhost`, so `localhost` is the only origin
+    // that can match it. The pre-#520 rule accepted any loopback origin, which is
+    // what let another local port drive this store.
+    const res = await fetch(`http://localhost:${port}/api/memories`, {
+      headers: {
+        Origin: `http://localhost:${port}`,
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe(`http://localhost:${port}`);
+  });
+
+  it("refuses a loopback origin that is not the request's own host", async () => {
     expect(serverInstance).toBeDefined();
     const port = serverInstance!.port;
 
@@ -70,7 +87,7 @@ describe("T-344: CORS & CSRF Defense Against Origin: null", () => {
       },
     });
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get("access-control-allow-origin")).toBe(`http://localhost:${port}`);
+    expect(res.status).toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 });

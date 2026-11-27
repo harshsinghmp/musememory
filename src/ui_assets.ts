@@ -19,11 +19,15 @@ import STUDIO_CSS from "./ui/assets/studio.css" with { type: "text" };
 import STUDIO_JS from "./ui/assets/studio.js" with { type: "text" };
 import STUDIO_BODY from "./ui/assets/studio.html" with { type: "text" };
 
-const FONT_LINKS =
-  '<link rel="preconnect" href="https://fonts.googleapis.com">' +
-  '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
-  '<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">';
-
+/**
+ * Issue #520: the shell used to pull Archivo Black and JetBrains Mono from
+ * `fonts.googleapis.com` / `fonts.gstatic.com`. A dashboard can no longer reach
+ * a third-party origin — the CSP is `'self'` for styles and fonts (see
+ * `STUDIO_CSP` in `src/ui.ts`) — so the links are gone and the stylesheet's own
+ * fallback stacks (`ui-monospace, monospace`) render instead. Nothing on the
+ * page depends on the webfonts, and the dashboard now makes zero external
+ * requests.
+ */
 function renderStudioHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -31,7 +35,6 @@ function renderStudioHtml(): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Muse Memory -- Visual Inspector & Cognitive Studio</title>
-  ${FONT_LINKS}
   <link rel="stylesheet" href="/assets/studio.css">
 </head>
 <body>
@@ -70,7 +73,6 @@ export function renderStandaloneHtml(store: Store): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Muse Memory -- Visual Inspector & Cognitive Studio</title>
-  ${FONT_LINKS}
   <style>
 ${STUDIO_CSS}
   </style>
