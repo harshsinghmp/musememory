@@ -35,3 +35,23 @@
 ### ADR-008: Agent Workspace Tracking Boundary (T-450)
 - **Decision** (2026-11-09): keep `.agents/standards/`, `.agents/skills/`, `.agents/context/`, `.agents/brand/`, `.agents/artifacts/` and `.agents/research/` tracked. Ignore new ephemeral state under `.agents/plans/`, `.agents/archive/`, `.agents/worktree-leases/` and `.agents/scratch/`. Already-tracked files stay tracked for history; the rule applies to new files.
 - **Rationale**: standards, skills, decisions, evidence and audit artifacts are collaborator-facing truth. Plans, leases and scratch are per-agent working state that causes churn and merge noise. Removing already-tracked history would break links in prior tickets, so the boundary moves forward only.
+
+### ADR-009: Browser Origins Are Denied by Default (v3.4.6)
+- **Decision** (2026-11-27): the loopback MCP HTTP server refuses any request carrying an `Origin` header unless that exact origin is listed in `--allowed-origins`, on both the preflight and the actual request. Native clients — which send no `Origin` — remain tokenless-capable on loopback.
+- **Rationale**: a tokenless loopback server is reachable by any page the user visits; the browser is the only caller that reliably identifies itself, so the header is the boundary. Default-deny keeps the local developer workflow intact while closing the drive-by case. Revisit only with a per-session nonce issued through a native handshake.
+
+### ADR-010: Instruction-Bearing Writes Wait as Candidates (v3.4.6)
+- **Decision** (2026-11-27): a write whose title+content trips the instruction classifier is persisted as `candidate` unless the caller passes `confirmed: true`, and it never reaches CURRENT.md from that path. `provenance` records channel, agent and capture time; no prompt hash is invented.
+- **Rationale**: OWASP LLM01:2026 treats memory persistence as an injection path, and ASI06 names the same failure. A false positive costs one confirmation; a false negative replays an attacker's rule as knowledge in every later session. The classifier is deliberately conservative (strong idioms, or two of four weak signals, prose only).
+
+### ADR-011: Release Assets Are Signed and Verified In-Job (v3.4.6)
+- **Decision** (2026-11-27): publishing a release triggers `release-assets.yml`, which signs the SBOM and `SHA256SUMS` keyless with cosign and runs `verify-blob` against this workflow's identity at the tag before uploading. A signature nobody checks is not shipped.
+- **Rationale**: build provenance says who built an artefact, not what is inside it, and the 2026 incident class defeated provenance. The SBOM is the only place the `--external` native binary appears with a hash. Keyless avoids a long-lived signing key in the repository; the identity check makes another workflow's signature fail.
+
+### ADR-012: 3.x Is a Compatibility Line; Surface and Retrieval Changes Wait for 4.0
+- **Decision** (2026-11-27): tool names, ranking inputs and the on-disk format are frozen for 3.x. Concretely:
+  - **#496 — no 126 → ~20 verb consolidation in 3.x.** Profiles (`core`, `coding`, `debugging`, `review`, `architecture`, `maintenance`, `full`) remain the token-control surface; `full` is opt-in. A 4.0 release may introduce the verb core plus a `memory_query` long tail, with an alias table and at least one 3.x release of deprecation warnings.
+  - **#502 — `prefilter` stays opt-in.** Flipping the default changes which memories can enter the candidate set, and the zero-match penalty is not equivalent to a full scan. It becomes the default only after a benchmark on ≥2,000 entries shows a p95 improvement with recall@5 unchanged; the SQL candidate union is the 4.0 path.
+  - **#497 — no in-process embedder in 3.x.** `vec0` KNN already replaced `index.json`, but shipping ONNX/llama.cpp means a new native dependency and model distribution. The HTTP embedder remains the semantic path; the local embedder is a 4.0 workstream.
+  - **#494 — `server/discover` stays blocked.** Resources and prompts shipped in 3.4.5; the 2026-07-28 revision is absent from the installed SDK's `SUPPORTED_PROTOCOL_VERSIONS`, and the server will not claim a revision it cannot negotiate.
+- **Rationale**: every one of these is a client-visible contract change. A 3.x patch that renames a tool or narrows a candidate set breaks prompts and scripts that users already wrote, for an efficiency gain they did not ask for. The compatibility line is what makes the security fixes shippable in patch releases. The 4.0 release must ship a migration table, not just new names.

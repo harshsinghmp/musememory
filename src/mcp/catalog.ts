@@ -23,6 +23,16 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 // `memory_core` advertises the tier enum, so the catalog needs the
 // canonical list rather than a copy that could drift from src/core.ts.
 import { CORE_TIERS } from "../core.ts";
+import {
+  SEARCH_OUTPUT_SCHEMA,
+  CONTEXT_OUTPUT_SCHEMA,
+  HEALTH_OUTPUT_SCHEMA,
+  MEMORY_READ_OUTPUT_SCHEMA,
+  GRAPH_STATUS_OUTPUT_SCHEMA,
+  MEMORY_AUDIT_OUTPUT_SCHEMA,
+  LIFECYCLE_STATUS_OUTPUT_SCHEMA,
+  MEMORY_ROI_OUTPUT_SCHEMA,
+} from "./output-schemas.ts";
 
 export const MCP_TOOL_CATALOG: Tool[] = [
   {
@@ -33,6 +43,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       properties: { id: { type: "string" } },
       required: ["id"],
     },
+    outputSchema: MEMORY_READ_OUTPUT_SCHEMA,
   },
   {
     name: "get_context",
@@ -54,6 +65,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
       },
     },
+    outputSchema: CONTEXT_OUTPUT_SCHEMA,
   },
   {
     name: "search",
@@ -80,6 +92,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       },
       required: ["query"],
     },
+    outputSchema: SEARCH_OUTPUT_SCHEMA,
   },
   {
     name: "memory_capture",
@@ -205,6 +218,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       },
       required: ["query"],
     },
+    outputSchema: SEARCH_OUTPUT_SCHEMA,
   },
   {
     name: "memory_harvest",
@@ -347,6 +361,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         limit: { type: "number" },
       },
     },
+    outputSchema: MEMORY_AUDIT_OUTPUT_SCHEMA,
   },
   {
     name: "memory_import_transcript",
@@ -590,6 +605,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       type: "object",
       properties: {},
     },
+    outputSchema: GRAPH_STATUS_OUTPUT_SCHEMA,
   },
   {
     name: "graph_index",
@@ -987,6 +1003,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         dir: { type: "string", description: "Optional project workspace directory path" },
       },
     },
+    outputSchema: MEMORY_ROI_OUTPUT_SCHEMA,
   },
   {
     name: "memory_observe",
@@ -1260,6 +1277,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         dir: { type: "string", description: "Optional project workspace directory path" },
       },
     },
+    outputSchema: LIFECYCLE_STATUS_OUTPUT_SCHEMA,
   },
   {
     name: "memory_anchor_create",
@@ -1489,6 +1507,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         project: { type: "string", description: "Optional memory project scope filter" },
       },
     },
+    outputSchema: HEALTH_OUTPUT_SCHEMA,
   },
   {
     name: "muse_preflight",

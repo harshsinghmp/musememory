@@ -26,6 +26,15 @@
  *   public/brand/og.svg|og.png        1200x630 social card
  *   public/brand/twitter-card.svg|png 1200x628 social card
  *   public/brand/banner.svg|banner.png 1280x640 README banner
+ *   public/brand/readme-banner.svg|png  1280x400 README body banner
+ *   public/brand/social/post-1080.svg|png        1080x1080  (1:1)
+ *   public/brand/social/banner-1500x500.svg|png  1500x500   (3:1)
+ *   public/brand/social/story-1080x1920.svg|png  1080x1920  (9:16)
+ *   public/brand/social/avatar-400.svg|png       400x400    (app tile)
+ *
+ * The copy on every card is the landing page's hero, held in the constants
+ * below so a brand asset cannot drift into saying something the site no
+ * longer says.
  */
 import { Resvg } from "@resvg/resvg-js";
 import { mkdirSync } from "node:fs";
@@ -38,6 +47,7 @@ import claims from "../../../claims.json";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = resolve(__dirname, "../public");
 const BRAND_DIR = join(PUBLIC_DIR, "brand");
+const SOCIAL_DIR = join(BRAND_DIR, "social");
 const FONT_DIR = resolve(__dirname, "../src/assets/fonts");
 
 /* ── Brand tokens ─────────────────────────────────────────────────────────
@@ -145,13 +155,90 @@ function mesh(w: number, h: number): string {
   </g>`;
 }
 
-/** The four proof chips that ride under the wordmark on every card. */
+/* ── Copy ─────────────────────────────────────────────────────────────────
+   One source for every card: the landing page's hero. A brand asset that says
+   something the site no longer says is worse than no brand asset, so the
+   headline lives here as three constants and nothing else restates it. */
+const EYEBROW = "LOCAL-FIRST MEMORY FOR AI CODING AGENTS";
+const HERO_L1 = "Your agent forgets everything.";
+const HERO_L2 = "Give it a memory that lasts.";
+const HERO_H1 = `${HERO_L1} ${HERO_L2}`;
+const MONO_CMD = "npx musememory connect";
+
+/** The four proof chips that ride under the headline on every card. Every
+ *  figure is interpolated from claims.json, so a card can never advertise a
+ *  number the code does not produce. */
 const PROOF: Array<[string, string]> = [
-  ["sub-2ms recall", T.cyan],
-  ["0 background daemons", T.violet],
-  ["majority of coding agents", T.green],
-  ["MIT · no account", T.amber],
+  [`sub-${claims.latency.recallMillis}ms recall`, T.cyan],
+  ["runs offline", T.violet],
+  ["MIT", T.green],
+  [`${claims.tests.count.toLocaleString("en-US")} tests`, T.amber],
 ];
+
+/* ── Text helpers ─────────────────────────────────────────────────────────
+   resvg has no text measurement API, so every layout below works from a
+   character budget and an explicit baseline. That is what keeps the output
+   deterministic: the same string always breaks into the same lines. */
+
+/** Greedy word wrap at a character budget. */
+function wrap(text: string, maxChars: number): string[] {
+  const lines: string[] = [];
+  let current = "";
+  for (const word of text.split(/\s+/)) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** XML-escape the three characters that would break an SVG text node. */
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+interface TextOpts {
+  size: number;
+  weight?: number;
+  fill?: string;
+  family?: string;
+  anchor?: "start" | "middle";
+  tracking?: number;
+}
+
+/** One line of text at an exact baseline. */
+function textLine(x: number, y: number, str: string, o: TextOpts): string {
+  const anchor = o.anchor === "middle" ? ' text-anchor="middle"' : "";
+  const tracking = o.tracking !== undefined ? ` letter-spacing="${o.tracking}"` : "";
+  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${anchor} font-family="${o.family ?? SANS}" font-size="${o.size.toFixed(1)}" font-weight="${o.weight ?? 500}"${tracking} fill="${o.fill ?? T.text}">${escapeXml(str)}</text>`;
+}
+
+/** A centred stack of headline lines. `leading` is a multiple of the size. */
+function headline(
+  cx: number,
+  y: number,
+  size: number,
+  lines: string[],
+  opts: { leading?: number; weight?: number; fill?: string } = {},
+): string {
+  const { leading = 1.16, weight = 800, fill = T.text } = opts;
+  return lines
+    .map((l, i) =>
+      textLine(cx, y + i * size * leading, l, {
+        size,
+        weight,
+        fill,
+        anchor: "middle",
+        tracking: -size * 0.02,
+      }),
+    )
+    .join("\n");
+}
 
 function proofRow(x: number, y: number, gap: number, size: number): string {
   const widths = PROOF.map(([label]) => label.length * size * 0.62 + size * 2.2);
@@ -171,35 +258,102 @@ function proofRow(x: number, y: number, gap: number, size: number): string {
   }).join("\n");
 }
 
-/** Wordmark + headline lockup used by every card size. */
-function lockup(x: number, y: number, scale: number, tagline: string): string {
-  const wordmark = `<text x="${x}" y="${y}" font-family="${SANS}" font-size="${(56 * scale).toFixed(1)}"
-    font-weight="800" letter-spacing="-2" fill="${T.text}">Muse<tspan fill="${T.cyan}">Memory</tspan></text>`;
-  const tag = `<text x="${x}" y="${(y + 40 * scale).toFixed(1)}" font-family="${SANS}"
-    font-size="${(23 * scale).toFixed(1)}" font-weight="500" fill="${T.textDim}">${tagline}</text>`;
-  return `  ${wordmark}\n  ${tag}`;
+/** Wordmark: "Muse" in the text colour, "Memory" in cyan. */
+function wordmark(x: number, y: number, size: number, anchor: "start" | "middle" = "start"): string {
+  const at = anchor === "middle" ? ' text-anchor="middle"' : "";
+  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${at} font-family="${SANS}" font-size="${size.toFixed(1)}" font-weight="800" letter-spacing="${(-size * 0.036).toFixed(1)}" fill="${T.text}">Muse<tspan fill="${T.cyan}">Memory</tspan></text>`;
 }
 
 /**
- * A social card / README banner.
- * Layout: wordmark block on the left, the mark on the right, proof chips
- * centred under the wordmark, and a monospace install line at the foot.
+ * The landscape card behind OG, the Twitter card and every banner.
+ *
+ * Layout: wordmark, the eyebrow, the hero headline over two lines, the proof
+ * chips, then the install line as a monospace foot — with the mark on the
+ * right as the only graphic. Everything scales off `h`, so 1200x630,
+ * 1200x628, 1280x640, 1280x400 and 1500x500 all come out of this one function.
  */
-function card(w: number, h: number, opts: { tagline: string; mono: string }): string {
+function card(w: number, h: number): string {
   const scale = h / 630;
-  const headY = h * 0.42;
+  const x = w * 0.075;
+  const headSize = 36 * scale;
   return canvas(
     w,
     h,
     `${mesh(w, h)}
-  <rect x="0" y="0" width="${w}" height="${h}" fill="url(#meshA)" opacity="0.10"/>
-${lockup(w * 0.075, headY, scale, opts.tagline)}
-${proofRow(w * 0.5, h * 0.66, 14 * scale, 17 * scale)}
-  <rect x="${(w * 0.075).toFixed(1)}" y="${(h * 0.80).toFixed(1)}" width="${(w * 0.85).toFixed(1)}" height="${(2 * scale).toFixed(1)}" fill="url(#rule)" opacity="0.55"/>
-  <text x="${(w * 0.075).toFixed(1)}" y="${(h * 0.90).toFixed(1)}" font-family="${MONO_FAMILY}" font-size="${(19 * scale).toFixed(1)}" fill="${T.textDim}">${opts.mono}</text>
-${mark(w * 0.845, h * 0.42, h * 0.20, { stroke: h * 0.023 })}
+${wordmark(x, h * 0.17, 52 * scale)}
+${textLine(x, h * 0.27, EYEBROW, { size: 13 * scale, family: MONO_FAMILY, fill: T.cyan, tracking: 1.4 * scale })}
+${textLine(x, h * 0.44, HERO_L1, { size: headSize, weight: 800, tracking: -headSize * 0.02 })}
+${textLine(x, h * 0.44 + headSize * 1.18, HERO_L2, { size: headSize, weight: 800, tracking: -headSize * 0.02 })}
+${proofRow(w * 0.5, h * 0.70, 14 * scale, 17 * scale)}
+  <rect x="${x.toFixed(1)}" y="${(h * 0.80).toFixed(1)}" width="${(w * 0.85).toFixed(1)}" height="${(2 * scale).toFixed(1)}" fill="url(#rule)" opacity="0.55"/>
+${textLine(x, h * 0.90, MONO_CMD, { size: 19 * scale, family: MONO_FAMILY, fill: T.textDim })}
+${mark(w * 0.845, h * 0.34, h * 0.17, { stroke: h * 0.0195 })}
 `,
   );
+}
+
+/**
+ * 1:1 social post (1080x1080). Centred: mark, wordmark, eyebrow, headline,
+ * chips, install line. The square placement is the one a link preview falls
+ * back to, so it repeats the hero rather than inventing a second message.
+ */
+function socialPost(): string {
+  const w = 1080;
+  const h = 1080;
+  const cx = w / 2;
+  const headSize = 60;
+  return canvas(
+    w,
+    h,
+    `${mesh(w, h)}
+${mark(cx, 232, 96, { stroke: 16 })}
+${wordmark(cx, 400, 46, "middle")}
+${textLine(cx, 452, EYEBROW, { size: 17, family: MONO_FAMILY, fill: T.cyan, tracking: 1.8, anchor: "middle" })}
+${headline(cx, 600, headSize, wrap(HERO_H1, 20))}
+${proofRow(cx, 850, 16, 18)}
+  <rect x="90" y="910" width="900" height="2" fill="url(#rule)" opacity="0.55"/>
+${textLine(cx, 972, MONO_CMD, { size: 24, family: MONO_FAMILY, fill: T.textDim, anchor: "middle" })}
+`,
+  );
+}
+
+/**
+ * 9:16 story (1080x1920). The same content as the post, but the headline is
+ * wrapped to a narrower budget so it stays inside the safe area once a story
+ * UI is drawn on top and bottom of the frame.
+ */
+function socialStory(): string {
+  const w = 1080;
+  const h = 1920;
+  const cx = w / 2;
+  return canvas(
+    w,
+    h,
+    `${mesh(w, h)}
+${mark(cx, 300, 150, { stroke: 24 })}
+${wordmark(cx, 500, 54, "middle")}
+${textLine(cx, 556, EYEBROW, { size: 18, family: MONO_FAMILY, fill: T.cyan, tracking: 2, anchor: "middle" })}
+${headline(cx, 700, 84, wrap(HERO_H1, 17), { leading: 1.14 })}
+${proofRow(cx, 1300, 18, 20)}
+  <rect x="90" y="1450" width="900" height="2" fill="url(#rule)" opacity="0.55"/>
+${textLine(cx, 1520, MONO_CMD, { size: 28, family: MONO_FAMILY, fill: T.textDim, anchor: "middle" })}
+${textLine(cx, 1600, "Runs on your machine. MIT. No account.", { size: 22, fill: T.textFaint, anchor: "middle" })}
+`,
+  );
+}
+
+/**
+ * Profile avatar (400x400): the app tile, the mark, nothing else. Same
+ * construction as the favicon, scaled — an avatar is read at 48px, so any
+ * type in it would be a smear.
+ */
+function avatar(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+${DEFS}
+  <rect width="400" height="400" rx="88" fill="${T.bgRaised}"/>
+  <rect x="3" y="3" width="394" height="394" rx="85" fill="none" stroke="${T.violet}" stroke-opacity="0.28" stroke-width="3"/>
+${mark(200, 212, 96, { stroke: 20 })}
+</svg>`;
 }
 
 /** The favicon: app tile + mark, nothing else. */
@@ -245,9 +399,6 @@ async function emit(dir: string, name: string, svg: string, w: number, h: number
   console.log(`  ${name}  ${w}x${h}  ${(png.length / 1024).toFixed(1)} KB`);
 }
 
-const TAGLINE = "Persistent memory for AI coding agents that verifies itself";
-const MONO_CMD = "npx musememory connect";
-
 async function main(): Promise<void> {
   console.log("Building Muse Memory brand assets\n");
 
@@ -256,18 +407,30 @@ async function main(): Promise<void> {
   await emit(PUBLIC_DIR, "icon-192.png", favicon(), 192, 192, false);
   await emit(PUBLIC_DIR, "icon-512.png", favicon(), 512, 512, false);
 
-  await emit(BRAND_DIR, "og.png", card(1200, 630, { tagline: TAGLINE, mono: MONO_CMD }), 1200, 630);
-  await emit(BRAND_DIR, "twitter-card.png", card(1200, 628, { tagline: TAGLINE, mono: MONO_CMD }), 1200, 628);
-  await emit(BRAND_DIR, "banner.png", card(1280, 640, { tagline: TAGLINE, mono: MONO_CMD }), 1280, 640);
+  await emit(BRAND_DIR, "og.png", card(1200, 630), 1200, 630);
+  await emit(BRAND_DIR, "twitter-card.png", card(1200, 628), 1200, 628);
+  await emit(BRAND_DIR, "banner.png", card(1280, 640), 1280, 640);
 
-  // A wide, quiet variant for the README body: the wordmark plus a one-line
-  // promise, no chips — README banners sit next to a heading, not alone.
+  // ── Social kit ─────────────────────────────────────────────────────────
+  // One shape per placement, all from the same mark, tokens and copy. A
+  // placement that is not covered here gets the OG card instead, which is
+  // why the square post repeats the hero rather than inventing a message.
+  await emit(SOCIAL_DIR, "post-1080.png", socialPost(), 1080, 1080);
+  await emit(SOCIAL_DIR, "banner-1500x500.png", card(1500, 500), 1500, 500);
+  await emit(SOCIAL_DIR, "story-1080x1920.png", socialStory(), 1080, 1920);
+  await emit(SOCIAL_DIR, "avatar-400.png", avatar(), 400, 400);
+
+  // A wide, quiet variant for the README body: the wordmark, the eyebrow, the
+  // headline on one line and the install command — no chips, because a README
+  // banner sits next to a heading rather than alone.
   const readme = canvas(
     1280,
     400,
     `${mesh(1280, 400)}
-${lockup(64, 210, 1.35, TAGLINE)}
-  <text x="64" y="290" font-family="${MONO_FAMILY}" font-size="24" fill="${T.textDim}">${MONO_CMD}</text>
+${wordmark(64, 132, 44)}
+${textLine(64, 182, EYEBROW, { size: 12, family: MONO_FAMILY, fill: T.cyan, tracking: 1.4 })}
+${textLine(64, 250, HERO_H1, { size: 28, weight: 800, tracking: -0.6 })}
+${textLine(64, 326, MONO_CMD, { size: 22, family: MONO_FAMILY, fill: T.textDim })}
 ${mark(1130, 190, 78, { stroke: 9 })}
 `,
   );
@@ -285,7 +448,7 @@ ${mark(1130, 190, 78, { stroke: 9 })}
   const legacyDir = resolve(__dirname, "../../../assets");
   try {
     mkdirSync(legacyDir, { recursive: true });
-    const legacyBanner = card(1280, 640, { tagline: TAGLINE, mono: MONO_CMD });
+    const legacyBanner = card(1280, 640);
     await Bun.write(join(legacyDir, "banner.svg"), legacyBanner);
     const legacyPng = rasterize(legacyBanner, 1280, 640);
     await Bun.write(join(legacyDir, "banner.png"), legacyPng);

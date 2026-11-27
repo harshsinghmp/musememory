@@ -158,6 +158,22 @@ untrusted server); a tool name that is not in the map is still served with the
 conservative default — not read-only, destructive, not idempotent — so nothing
 ships unannotated.
 
+A read tool whose payload is already a stable object also publishes an
+`outputSchema` (`src/mcp/output-schemas.ts`) and returns that object as
+`structuredContent` beside the untouched text block — `search`, `memory_recall`,
+`get_context`, `muse_health`, `memory_read`, `graph_status`, `memory_audit`,
+`memory_lifecycle_status` and `memory_roi` today — so a host can render and
+validate a result without re-parsing JSON out of a string, while a client that
+ignores `structuredContent` still sees byte-identical `content`. The envelope is
+closed (`additionalProperties: false`) everywhere the server builds one; a
+memory entry keeps its open `schema.json` shape with a required core of `id`,
+`title`, `content`, `project`, `status`, `created_at` and `updated_at`, including
+at the root of `memory_read`, whose payload is the entry itself.
+`memory_settings_get` stays text-only on purpose: its payload is a user-authored
+`settings.json` shallow-merged over the defaults, so a section can be partial and
+an unknown key survives the merge — a closed schema would reject a real settings
+file, and an open one would describe nothing.
+
 ### Request directories and the workspace root
 
 Every tool accepts an optional `dir` (`workspace`, `project_dir` and `cwd` are

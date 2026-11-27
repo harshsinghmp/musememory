@@ -20,11 +20,8 @@
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-<<<<<<< HEAD
-![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
-=======
-![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
->>>>>>> origin/dev
+![CI Tests](https://img.shields.io/badge/Tests-1885%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1885%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -785,11 +782,8 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-<<<<<<< HEAD
-bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
-=======
-bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
->>>>>>> origin/dev
+bun test          # 1885 pass, 0 fail, 10633 assertions across 282 files
+bun test          # 1885 pass, 0 fail, 10633 assertions across 282 files
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```

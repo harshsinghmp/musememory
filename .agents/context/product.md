@@ -1,7 +1,7 @@
 # 📦 Muse Memory Product Scope & Capabilities
 
 > **Binary Names**: `memory` (primary), `musememory` (alias), `npx musememory` (zero-install)
-> **MCP Protocol**: MCP `2024-11-05`, `2025-06-18` (stdio transport)
+> **MCP Protocol**: `2025-11-25` (SDK-negotiated; `2025-06-18`, `2025-03-26`, `2024-11-05` and `2024-10-07` still accepted), stdio + loopback HTTP with origin gating
 > **Runtime**: Bun / TypeScript (Node-compatible bundle)
 > **Authoritative counts**: [`claims.json`](../../claims.json) — generated from `src/` by `scripts/generate-claims.ts`.
 > **Authoritative tool list**: [`docs/mcp-tool-matrix.json`](../../docs/mcp-tool-matrix.json) — generated, never hand-typed.
@@ -27,6 +27,22 @@ across sessions — without an external database daemon, an account, or a cloud 
 - **External memory formats importable**: `claims.json → migratorProviders`
 - **Credential rule families**: `claims.json → credentialRuleFamilies`
 - **Background daemons**: `claims.json → backgroundDaemons`
+
+### Security posture (v3.4.6)
+
+- **Browser origins are denied by default** on the loopback HTTP transport; `--allowed-origins`
+  is the explicit allowlist, and native clients (no `Origin` header) are unaffected.
+- **Request directories are confined** to the server's workspace root; cross-root access needs
+  `MUSE_MCP_ALLOW_EXTERNAL_DIR=1`. Stores are `0700`, memory files `0600`.
+- **Memory output is data**: prompts and markdown resources are fenced, and fence tokens are
+  stripped from content first. Instruction-bearing writes are classified, held as `candidate`
+  without an explicit `confirmed: true`, and record provenance (channel, agent, timestamp).
+- **Tokens are compared in constant time.** `SECURITY.md` defines scope, reporting and SLAs.
+- **Every tool carries safety hints** (69 read-only, 6 destructive, 0 open-world), and
+  `search`, `memory_recall`, `get_context` and `muse_health` return typed `structuredContent`
+  alongside the unchanged text channel.
+- **Releases are signed**: CycloneDX 1.7 SBOM (including the native `sqlite-vec` binary's
+  hash), `SHA256SUMS`, keyless cosign bundles, verified in-job before upload.
 
 ---
 
