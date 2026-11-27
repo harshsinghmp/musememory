@@ -1788,7 +1788,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "muse_attestation_verify",
-    description: "Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key",
+    description: "Read-only: verify a packet attestation (registry-dispatched; Ed25519 today) or an attestation chain against an inline public key",
     inputSchema: {
       type: "object",
       properties: {
@@ -1799,6 +1799,11 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         key_id: { type: "string", description: "Optional pinned key id" },
         audience: { type: "string", description: "Optional expected audience" },
         require_head: { type: "boolean", description: "Require a signed head in a chain (default true)" },
+        max_age_days: {
+          type: "number",
+          description:
+            "Opt-in revocation proxy: reject a record whose signed created_at is older than this many days (default off)",
+        },
       },
       required: ["public_key"],
     },
