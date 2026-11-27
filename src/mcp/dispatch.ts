@@ -132,7 +132,8 @@ export async function dispatchToolCall(
     case "memory_read": {
       const entry = get(activeStore, String(a.id));
       if (!entry) return toolError(`no entry with id ${a.id}`);
-      return toolResult(entry);
+      // #495: the stored entry is the payload — one object, both channels.
+      return toolResultStructured(entry);
     }
     case "get_context": {
       const queryStr = String(a.query ?? "");
@@ -594,7 +595,8 @@ export async function dispatchToolCall(
       entryId: a.entry_id ? String(a.entry_id) : undefined,
       limit: clampLimit(a.limit, 50, 500, 1),
     });
-    return toolResult({ total: trail.length, entries: trail });
+    // #495: same object, both channels.
+    return toolResultStructured({ total: trail.length, entries: trail });
   }
   case "memory_export": {
     const snapshot = exportSnapshot(activeStore);
@@ -695,7 +697,10 @@ export async function dispatchToolCall(
   }
   case "graph_status": {
     const status = getGraphStatus(activeRoot);
-    return toolResult(status);
+    // #495: `graphRevision`/`symbolCount` stay undefined on the `none` branch,
+    // which the validator reads as absent and `JSON.stringify` drops from the
+    // text channel — so the two channels still describe the same object.
+    return toolResultStructured(status);
   }
   case "graph_index": {
     const index = indexGraph(activeRoot, activeMemoryDir);
@@ -864,6 +869,10 @@ export async function dispatchToolCall(
     return toolResult({ success: true, deletedIndexes: res.deletedCount });
   }
   case "memory_settings_get": {
+    // Text-only on purpose (#495): the payload is a user-authored settings.json
+    // shallow-merged over the defaults, so a section can be partial and an
+    // unknown top-level key survives the merge. A closed schema would reject a
+    // real file; an open one would describe nothing. See output-schemas.ts.
     const settings = a.project
       ? getProjectSettings(activeMemoryDir, String(a.project))
       : getSettings(activeMemoryDir);
@@ -1011,7 +1020,8 @@ export async function dispatchToolCall(
     const report = computeMemoryRoi(activeStore, {
       project: a.project ? String(a.project) : undefined,
     });
-    return toolResult(report);
+    // #495: same object, both channels.
+    return toolResultStructured(report);
   }
   case "memory_observe": {
     const obs = recordObservation(activeStore, {
@@ -1220,7 +1230,9 @@ export async function dispatchToolCall(
       sweepResult = autoArchiveSweep(activeStore);
     }
     const stats = getLifecycleStats(activeStore);
-    return toolResult({
+    // #495: `sweep` is absent unless a sweep ran, so the schema keeps it
+    // optional rather than inventing a placeholder value here.
+    return toolResultStructured({
       stats,
       sweep: sweepResult,
     });
