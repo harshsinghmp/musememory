@@ -1,6 +1,6 @@
 # ⚡ Retrieval Performance, Store Hot-Paths & Guardrails Guide
 
-> **Audience**: AI Engineers, Platform Architects, and Full-Stack Developers building production agent swarms with Muse Memory.  
+> **Audience**: AI Engineers, Platform Architects, and Full-Stack Developers building production agent swarms with aimm.  
 > **Copywriting Framework**: QUEST (*Qualify · Understand · Educate · Stimulate · Transition*)  
 > **Release Target**: v2.1.0 (Wave 13)
 
@@ -10,7 +10,7 @@
 
 If your AI agents or MCP client tools experience turn latency spikes when recalling memories, if your disk I/O churns during pure read queries, or if you worry about models requesting reckless `limit: 999999` parameters or issuing accidental bulk deletes—this architectural reference is for you.
 
-Muse Memory Wave 13 introduces hot-path memoization, dirty-gated store loads, input clamping, read-purity deferred writes, and dry-run safety gates across both CLI and MCP interfaces.
+aimm Wave 13 introduces hot-path memoization, dirty-gated store loads, input clamping, read-purity deferred writes, and dry-run safety gates across both CLI and MCP interfaces.
 
 ---
 
@@ -27,7 +27,7 @@ In multi-agent ecosystems, retrieval hot-paths run tens of times every turn. Tra
 
 ## 🏛️ 3. Educate (The 5-Layer Hot-Path Architecture)
 
-Muse Memory solves these issues with layered zero-cost abstractions:
+aimm solves these issues with layered zero-cost abstractions:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -143,7 +143,7 @@ In your agent configuration (`claude_desktop_config.json`, Cursor, Windsurf, or 
   }
 }
 ```
-*Tip: Models calling `get_context` can pass `limit` freely without crashing your memory budget; Muse Memory clamps limits automatically.*
+*Tip: Models calling `get_context` can pass `limit` freely without crashing your memory budget; aimm clamps limits automatically.*
 
 ### 3. Check Staleness & Degraded Flags in Tool Responses
 When processing responses from `get_context` or `memory_recall`, inspect `response.stale`:

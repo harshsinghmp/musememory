@@ -1,4 +1,4 @@
-# Design System: Muse Memory
+# Design System: aimm
 
 ## 1. Visual Theme & Atmosphere
 A restrained, cockpit-dense interface engineered for cognitive memory inspection, real-time agent handoffs, and knowledge compounding. The atmosphere is clinical, tactile, and high-agency — reminiscent of a modern developer observatory or mission-control dashboard. Layouts favor dense spatial structure, monospaced metadata hierarchy, and fluid spring-physics micro-interactions over decorative fluff.

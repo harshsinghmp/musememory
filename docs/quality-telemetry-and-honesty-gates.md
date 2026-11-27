@@ -8,7 +8,7 @@
 
 ## 📌 Executive Summary
 
-Wave 20 introduces rigorous truthfulness, honesty gates, and fault observability throughout the Muse Memory cognitive engine. Rather than silently degrading, swallowing errors, or presenting ambiguous retrieval results, Muse Memory provides end-to-end transparency:
+Wave 20 introduces rigorous truthfulness, honesty gates, and fault observability throughout the aimm cognitive engine. Rather than silently degrading, swallowing errors, or presenting ambiguous retrieval results, aimm provides end-to-end transparency:
 1. **Telemetry & Feedback Honesty**: Joins recall history with actual usage outcomes (`usage_rate`) to calculate real return-on-investment (ROI) for stored memories.
 2. **Draft & Confident Segregation**: Explicitly separates unverified draft answers from confident knowledge using `[DRAFT]` markers and segregated response keys.
 3. **AST Config-Honesty**: Audits configuration keys across TypeScript source code, classifying every key as `WIRED`, `DORMANT`, or `UNREAD`, failing builds if configuration invariants drift.

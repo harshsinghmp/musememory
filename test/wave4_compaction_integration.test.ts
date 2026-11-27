@@ -148,7 +148,7 @@ describe("Wave 4 - Task 5: Context-Pack Compaction, Manifest TOC & Truncation Hi
     });
 
     const packedText = formatCompactContextPack(context);
-    expect(packedText).toContain("# 🧠 Muse Memory Context Pack");
+    expect(packedText).toContain("# 🧠 aimm Context Pack");
     expect(packedText).toContain("## 📋 Manifest Table of Contents (TOC)");
     expect(packedText).toContain("Cache invalidation rule");
   });

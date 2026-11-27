@@ -1,6 +1,6 @@
 # @musememory/website
 
-Marketing site for Muse Memory, built with Astro 7 (static output).
+Marketing site for aimm, built with Astro 7 (static output).
 
 ```bash
 bun install            # from repo root (workspaces)

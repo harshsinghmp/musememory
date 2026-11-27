@@ -48,7 +48,7 @@ to a 2 MiB autocheckpoint interval and a 64 MiB journal size limit, and
 
 ## 3. Mandatory session protocol
 
-An agent integrating Muse must follow this order.
+An agent integrating aimm must follow this order.
 
 1. **First turn of any session** — call `get_context`. It returns the `USER.md`
    persona profile, the `CURRENT.md` active constraints, and the top-K ranked

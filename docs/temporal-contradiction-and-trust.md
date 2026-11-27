@@ -15,7 +15,7 @@ Production AI agents and multi-agent agency teams face four critical failure mod
 4. **Destructive Conflict Resolution**: When two distributed subagents arrive at conflicting recommendations, deleting or overwriting one recommendation destroys historical auditability and causes oscillation. Both perspectives must be preserved in a durable conflicts ledger until explicitly resolved.
 5. **Agent Inbreeding & Poisoning**: Agent-generated inferences competing on equal footing with direct human principal instructions lead to model drift. High-veracity user directives must deterministically break ties and outrank autonomous inferences.
 
-**Muse Memory Wave 16** solves these challenges with a zero-daemon, mathematically grounded engine for **Bi-Temporal Transitions, Five-Verb Lifecycles, Keep-Both Conflict Tables, Scoped Invalidation, Federation Mesh Handshakes, Veracity Rank Weights, and Evidence-Age Stamping**.
+**aimm Wave 16** solves these challenges with a zero-daemon, mathematically grounded engine for **Bi-Temporal Transitions, Five-Verb Lifecycles, Keep-Both Conflict Tables, Scoped Invalidation, Federation Mesh Handshakes, Veracity Rank Weights, and Evidence-Age Stamping**.
 
 ---
 
@@ -53,7 +53,7 @@ Production AI agents and multi-agent agency teams face four critical failure mod
 
 ### A. Bi-Temporal Transitions & Exact Boundary Flags (`T-082`, `T-083`, `T-085`)
 
-Every memory entry in Muse Memory records two independent temporal dimensions:
+Every memory entry in aimm records two independent temporal dimensions:
 1. **Assertion / Record Time** (`created_at`, `updated_at`): When the agent recorded or revised the memory.
 2. **Valid Time** (`valid_from`, `valid_to`): When the fact was genuinely true in the real-world software system.
 
@@ -89,7 +89,7 @@ No arbitrary dates are invented. Callers receive `{ results, undetermined }` all
 
 ### B. The Five Canonical Lifecycle Verbs (`T-084`)
 
-Memory modifications must carry explicit semantics rather than generic overwrites. Muse Memory provides five typed lifecycle verbs:
+Memory modifications must carry explicit semantics rather than generic overwrites. aimm provides five typed lifecycle verbs:
 
 ```typescript
 export type LifecycleVerb = "change" | "end" | "correct" | "revert" | "forget";
@@ -109,7 +109,7 @@ Exposed via the `memory_lifecycle` MCP tool and `store.ts` APIs.
 
 ### C. Keep-Both Conflicts Ledger (`T-086`)
 
-Following the Graphiti and Mnemosyne architecture principles, **Muse Memory never deletes conflicting memories**. Contradictions are first-class data citizens.
+Following the Graphiti and Mnemosyne architecture principles, **aimm never deletes conflicting memories**. Contradictions are first-class data citizens.
 
 #### SQLite `conflicts` Table (Migration v6)
 ```sql
@@ -147,7 +147,7 @@ A major defect in earlier agent memory engines is false-positive contradiction a
 > *Memory B: "Production server binds to port 443"*  
 > *Naive Engine: "Conflict detected on port! Invalidate Memory A!"*
 
-Muse Memory enforces **Semantic Fact Triple Alignment** before asserting contradiction:
+aimm enforces **Semantic Fact Triple Alignment** before asserting contradiction:
 
 $$\text{Conflict} \iff (E_1 = E_2) \land (R_1 = R_2) \land (\text{Scope}_1 = \text{Scope}_2) \land (T_1 \ne T_2)$$
 

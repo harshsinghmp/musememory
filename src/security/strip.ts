@@ -13,7 +13,7 @@ const INJECTED_TAG_REGEXES = [
 ];
 
 const MARKDOWN_CONTEXT_PACK_REGEX =
-  /(?:^|\n)# 🧠 Muse Memory Context Pack[\s\S]*?(?=\n\n(?![#>*\-\s])|\n# [^#]|\n---|(?:\n\s*){3,}|$)/gi;
+  /(?:^|\n)# 🧠 aimm Context Pack[\s\S]*?(?=\n\n(?![#>*\-\s])|\n# [^#]|\n---|(?:\n\s*){3,}|$)/gi;
 
 // Base64 data URI payload pattern (>= 50 chars of base64 data)
 const BASE64_DATA_URI_REGEX =

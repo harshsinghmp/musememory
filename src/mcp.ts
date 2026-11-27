@@ -18,7 +18,7 @@ import { findOrCreateProjectRoot } from "./root.ts";
 import { isWithinRoot, realishPath } from "./paths.ts";
 import { openStore, type Store } from "./store.ts";
 import { getSettings } from "./settings.ts";
-import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
+import { PACKAGE_NAME, PACKAGE_VERSION, PRODUCT_NAME, PRODUCT_TAGLINE } from "./version.ts";
 import { filterToolsForProfile, getActiveMcpProfile, type McpProfile } from "./orchestrator/index.ts";
 
 // --- T-301: in-process async write queue -------------------------------------
@@ -151,11 +151,13 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
   }
 
   const server = new Server(
-    { name: PACKAGE_NAME, version: PACKAGE_VERSION },
+    // `name` is the protocol identifier (`musememory`) and must not change;
+    // `title`/`description` are the human-readable product label (aimm).
+    { name: PACKAGE_NAME, title: PRODUCT_NAME, version: PACKAGE_VERSION, description: PRODUCT_TAGLINE },
     {
       capabilities: { tools: {}, resources: {}, prompts: {}, logging: {} },
-      instructions: `MUSE MEMORY PROTOCOL:
-You are equipped with Muse Memory, an autonomous persistent cognitive memory system.
+      instructions: `aimm PROTOCOL:
+You are equipped with aimm, an autonomous persistent cognitive memory system.
 1. SESSION START / FIRST TURN: You MUST call 'get_context' on your very first turn in any conversation or task. This loads the user's role profile (USER.md), active working constraints (CURRENT.md), and relevant past decisions/fixes.
 2. WORKING CONSTRAINTS: When hard constraints, open loops, or project invariants are established or modified, immediately record them to CURRENT.md via 'memory_capture' (type='constraint') or 'memory_current'.
 3. CONTINUOUS KNOWLEDGE CAPTURE: Whenever you resolve a bug, make an architectural decision, or establish a project convention, immediately call 'memory_capture' to persist it.

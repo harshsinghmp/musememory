@@ -23,7 +23,7 @@ describe("embedded web UI server", () => {
     const htmlRes = await fetch(`http://localhost:${srv.port}/`);
     expect(htmlRes.status).toBe(200);
     const htmlText = await htmlRes.text();
-    expect(htmlText).toContain("Muse Memory");
+    expect(htmlText).toContain("aimm");
     expect(htmlText).toContain("Visual Inspector");
 
     // 2. Check /api/memories

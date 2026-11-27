@@ -24,7 +24,7 @@ function getAdapter(providerId: string): ProviderAdapter {
 }
 
 /**
- * Runs multi-provider memory auto-detection and migration into Muse Memory.
+ * Runs multi-provider memory auto-detection and migration into aimm.
  * Preserves active vs archived/superseded state, seeds CURRENT.md with constraints,
  * and passes all records through Vibeguard zero-leakage secret filtering.
  */

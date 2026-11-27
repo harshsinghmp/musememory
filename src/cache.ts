@@ -28,7 +28,7 @@ interface CacheItem<T> {
 }
 
 /**
- * High-performance, zero-dependency in-process L0 Hot Cache for MuseMemory.
+ * High-performance, zero-dependency in-process L0 Hot Cache for aimm.
  * Provides microsecond-level O(1) entry lookups, query result caching,
  * and L1 prompt context caching with store-version invalidation.
  */

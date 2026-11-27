@@ -1,4 +1,4 @@
-# 👥 Muse Memory — Team Quickstart & Deployment Guide
+# 👥 aimm — Team Quickstart & Deployment Guide
 
 > **Audience**: Engineering Leads, Technical Directors, Team Heads, and Developers.  
 > **Goal**: Deploy a central, persistent cognitive memory server for your engineering team and connect all team members' AI coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) in under 5 minutes.
@@ -7,7 +7,7 @@
 
 ## 1. Architecture Overview: Single Host vs. Corrupted Mounts
 
-When deploying Muse Memory for a multi-developer team, the storage topology is critical:
+When deploying aimm for a multi-developer team, the storage topology is critical:
 
 > [!CAUTION]
 > **The Networked SQLite Trap**: Never mount SQLite database files over networked filesystems (NFS, SMB, CIFS, Google Drive, or Dropbox). SQLite Write-Ahead Logging (`-wal`) requires atomic POSIX shared-memory synchronization (`-shm`) and OS-level file locking. Network mounts lack these primitives and **will corrupt database headers and cause split-brain cache states**.
@@ -18,7 +18,7 @@ Exactly **one machine or VM acts as the team host server**, owning `team.db` and
 
 ```
                         ┌────────────────────────────────────────────────────────┐
-                        │             Central Muse Memory Host Server            │
+                        │             Central aimm Host Server            │
                         │           `musememory serve --port 31338 ...`          │
                         │                                                        │
                         │   ┌────────────────────┐   ┌───────────────────────┐   │
@@ -40,7 +40,7 @@ Exactly **one machine or VM acts as the team host server**, owning `team.db` and
 
 ## 2. Team Head: Server Deployment (5 Minutes)
 
-### Step 2.1: Install Muse Memory on the Host Machine
+### Step 2.1: Install aimm on the Host Machine
 
 On your shared internal server, VM, or developer bastion:
 
@@ -211,7 +211,7 @@ In a shared multi-agent workspace, **memory hygiene is non-negotiable**. If one 
 
 Because `CURRENT.md` is injected into every teammate's prompt on turn 1 (`get_context`), an unauthorized or malicious write acts as a prompt injection across the entire engineering department.
 
-Muse Memory enforces 4 built-in defense gates:
+aimm enforces 4 built-in defense gates:
 1. **Peer Attribution**: Every memory operation is stamped with the verified `mcp-peer-id` derived from their Bearer token.
 2. **Audit Ledger**: All insertions, updates, and deletions append to `audit.jsonl` with cryptographic timestamps and actor identities.
 3. **Vibeguard Secret Defense**: The server automatically blocks any write containing API keys, private keys, or passwords.
