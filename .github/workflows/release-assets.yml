@@ -1,0 +1,77 @@
+name: release-assets
+
+# Runs when a GitHub release is published. It rebuilds the exact tagged commit,
+# regenerates the CycloneDX SBOM and checksums, signs them keyless (Sigstore
+# OIDC — no long-lived key), verifies its own signatures, and only then attaches
+# the files to the release. Verification is part of the job so a broken signing
+# setup fails here instead of shipping an unverifiable asset.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup Bun
+        # Deliberately latest: a pinned Bun has broken this project before.
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Generate SBOM and checksums
+        run: |
+          bun run sbom
+          bun run checksums
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: Sign the release assets (keyless)
+        run: |
+          cosign sign-blob --yes --bundle dist/bom.cdx.json.bundle dist/bom.cdx.json
+          cosign sign-blob --yes --bundle dist/SHA256SUMS.bundle dist/SHA256SUMS
+
+      - name: Verify the signatures before uploading
+        # The identity is this workflow at the release tag: a signature made by
+        # anything else — another workflow, another repo, a local key — fails.
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          for f in dist/bom.cdx.json dist/SHA256SUMS; do
+            cosign verify-blob --bundle "$f.bundle" \
+              --certificate-identity-regexp "^https://github.com/${REPO}/.github/workflows/release-assets.yml@refs/tags/${TAG}$" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$f"
+          done
+
+      - name: Attach the assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$TAG" \
+            dist/bom.cdx.json \
+            dist/SHA256SUMS \
+            dist/bom.cdx.json.bundle \
+            dist/SHA256SUMS.bundle \
+            --clobber
