@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Dependabot could not update a single dependency**: the first scheduled run after the workflow was added failed with the runner's own diagnosis — *“This project has a `bun.lock` file but no `package-lock.json`, `yarn.lock` or `pnpm-lock.yaml` … Set `package-ecosystem: "bun"`”*. The repository is Bun-managed, so the `npm` entry could never have worked; it is now `package-ecosystem: "bun"`. The weekly schedule, grouping and the five-PR cap are unchanged, and the GitHub Actions entry was already correct.
+
 ## [3.4.6] - 2026-11-27
 
 ### Added
