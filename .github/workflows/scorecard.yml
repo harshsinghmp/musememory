@@ -40,7 +40,7 @@ jobs:
     steps:
       # persist-credentials: false — the checkout token is not needed after
       # this step, and leaving it in .git/config hands it to every later step.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -52,12 +52,12 @@ jobs:
           # the id-token permission above and is what makes the badge truthful.
           publish_results: true
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: scorecard-results
           path: results.sarif
           retention-days: 5
 
-      - uses: github/codeql-action/upload-sarif@74c1aea9df7c0f02e9b7bfe4a8935abf2e5e3aa6 # v3
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: results.sarif
