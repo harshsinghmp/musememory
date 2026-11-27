@@ -106,7 +106,7 @@ import { recordIteration, detectIterationStatus } from "../iterations.ts";
 import { verifyStrictIntegrity } from "../verify.ts";
 import { queryTieredContext, type RetrievalTier, rankAndRetrieveMemories } from "../retrieval/index.ts";
 import type { MemoryEntry, MemoryType, TrustTier } from "../types.ts";
-import { toolResult, toolError, type ToolResultLike } from "./tool-result.ts";
+import { toolResult, toolResultStructured, toolError, type ToolResultLike } from "./tool-result.ts";
 
 export type { ToolResultLike };
 
@@ -215,7 +215,11 @@ export async function dispatchToolCall(
 
       enqueueWrites(deferredWrites);
 
-      return toolResult({
+      // #495: one object, two channels. `toolResultStructured` serialises this
+      // payload into `content[0].text` exactly as `toolResult` did before, and
+      // returns the same object as `structuredContent`, so the typed result and
+      // the text block can never drift apart.
+      return toolResultStructured({
         markdown: finalMarkdown,
         entries: formatted.entries.map((r) => ({ ...r.entry, score: r.score })),
         total_tokens_used: formatted.totalTokensUsed,
@@ -283,7 +287,9 @@ export async function dispatchToolCall(
           const ids = res.results.map((r) => r.entry.id);
           enqueueWrites([() => recordRetrievals(activeStore, ids)]);
         }
-        return toolResult({
+        // #495: the `at_time` branch returns the same object shape minus
+        // `withheld`, so it shares the search output schema.
+        return toolResultStructured({
           results: res.results.map((r) => ({ ...r.entry, score: r.score })),
           source: res.mode,
           stale: res.stale ?? false,
@@ -318,7 +324,10 @@ export async function dispatchToolCall(
         enqueueWrites([() => recordRetrievals(activeStore, ids)]);
       }
 
-      return toolResult({
+      // #495: the full-store branch also reports the memories the trust gates
+      // withheld; `withheld` is optional in the output schema for exactly this
+      // reason (the `at_time` branch above does not set it).
+      return toolResultStructured({
         results: res.results.map((r) => ({ ...r.entry, score: r.score })),
         source: res.mode,
         stale: res.stale ?? false,
@@ -1426,7 +1435,9 @@ export async function dispatchToolCall(
     const report = evaluateProjectHealth(activeStore, activeRoot, {
       project: canonicalProject,
     });
-    return toolResult(report);
+    // #495: the report is already a single object; the text block and
+    // `structuredContent` are the same instance.
+    return toolResultStructured(report);
   }
   case "muse_preflight": {
     const files = Array.isArray(a.files) ? a.files.map(String) : undefined;

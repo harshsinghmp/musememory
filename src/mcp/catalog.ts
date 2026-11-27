@@ -23,6 +23,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 // `memory_core` advertises the tier enum, so the catalog needs the
 // canonical list rather than a copy that could drift from src/core.ts.
 import { CORE_TIERS } from "../core.ts";
+import { SEARCH_OUTPUT_SCHEMA, CONTEXT_OUTPUT_SCHEMA, HEALTH_OUTPUT_SCHEMA } from "./output-schemas.ts";
 
 export const MCP_TOOL_CATALOG: Tool[] = [
   {
@@ -54,6 +55,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
       },
     },
+    outputSchema: CONTEXT_OUTPUT_SCHEMA,
   },
   {
     name: "search",
@@ -80,6 +82,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       },
       required: ["query"],
     },
+    outputSchema: SEARCH_OUTPUT_SCHEMA,
   },
   {
     name: "memory_capture",
@@ -205,6 +208,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
       },
       required: ["query"],
     },
+    outputSchema: SEARCH_OUTPUT_SCHEMA,
   },
   {
     name: "memory_harvest",
@@ -1489,6 +1493,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         project: { type: "string", description: "Optional memory project scope filter" },
       },
     },
+    outputSchema: HEALTH_OUTPUT_SCHEMA,
   },
   {
     name: "muse_preflight",
