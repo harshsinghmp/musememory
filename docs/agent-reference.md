@@ -133,6 +133,21 @@ The server advertises the versions its installed SDK supports. The
 `2026-07-28` revision is not implemented: `@modelcontextprotocol/sdk@1.32.2`
 does not know it.
 
+### Browser origins on the HTTP transport
+
+`muse mcp --http` binds loopback and stays usable without a token, but it now
+decides browser access from the `Origin` header. A request that carries one is
+accepted **only** if the operator listed that exact origin with
+`--allowed-origins` (comma-separated) — the default is deny for every browser
+origin, loopback included — and the same rule runs for the `OPTIONS` preflight
+and for every real request, before authentication and before dispatch. A refused
+request gets `403` and no `access-control-allow-origin`, and that header is only
+ever set to an allowlisted origin (never `*`, never a reflection). Native MCP
+clients send no `Origin` header, so stdio bridges, the SDK, `curl` and
+loopback-without-a-token keep working; an allowlisted origin still has to pass
+`--token` / `--tokens` when those are configured, and the `Host` allowlist behind
+DNS-rebinding protection is unchanged.
+
 `claims.json` records the live totals; read them rather than trusting prose:
 
 | Claim | Source of truth |
