@@ -1,0 +1,63 @@
+name: Scorecard
+
+# Why this exists
+# ---------------
+# Every other supply-chain control in this repo answers a question we asked:
+# is the lockfile frozen, is the action pinned, is the SBOM complete. Scorecard
+# answers the questions nobody on the project remembers to ask — branch
+# protection, code review, dangerous workflow patterns, token permissions,
+# dependency update hygiene — and grades them against an outside standard
+# instead of our own opinion of ourselves.
+#
+# Results go to code scanning as SARIF so a regression is a finding on the
+# Security tab, not a line in a log nobody opens.
+
+on:
+  # Re-scan when the default branch moves: the score describes that commit.
+  push:
+    branches: [main]
+  # The event that makes "branch protection" checkable at all. GitHub only
+  # sends it for the repository's default branch.
+  branch_protection_rule:
+  schedule:
+    # Mondays, 06:28 UTC. Off the hour: GitHub documents a load spike there.
+    - cron: "28 6 * * 1"
+  workflow_dispatch:
+
+# Least privilege, and the whole set Scorecard's published workflow requires:
+# write SARIF to code scanning, mint the OIDC token that signs the published
+# result, read the repo, and read the workflow files it inspects.
+permissions:
+  security-events: write
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    steps:
+      # persist-credentials: false — the checkout token is not needed after
+      # this step, and leaving it in .git/config hands it to every later step.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # publish_results makes the score public on the OpenSSF API; it needs
+          # the id-token permission above and is what makes the badge truthful.
+          publish_results: true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+      - uses: github/codeql-action/upload-sarif@74c1aea9df7c0f02e9b7bfe4a8935abf2e5e3aa6 # v3
+        with:
+          sarif_file: results.sarif

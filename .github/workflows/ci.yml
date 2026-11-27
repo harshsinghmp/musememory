@@ -32,6 +32,13 @@ jobs:
         id: setup-bun
         continue-on-error: true
         with:
+          # Deliberately NOT pinned. Pinning Bun caused a real incident: the
+          # pinned version stopped receiving the runtime fixes the test suite
+          # and `bun build` depend on, and CI went red for reasons that had
+          # nothing to do with the change under review. The workflow tracks
+          # `latest` on purpose — do not "harden" this by adding a version.
+          # The release artefacts are pinned where it actually matters: the
+          # dependency lockfile is frozen, and every action is SHA-pinned.
           bun-version: latest
       # GitHub release-asset downloads intermittently return 504 to Actions
       # runners while the npm registry stays reachable. Fall back to the npm
@@ -84,6 +91,27 @@ jobs:
           bunx playwright-core install chromium-headless-shell firefox
           bun run site:build
           bun run site:qa
+      - name: Build
+        # The bundle the release assets describe. `--external sqlite-vec` is
+        # why the BOM has to ask the native module for its own path below:
+        # the bundler never reads that file.
+        run: bun run build
+      - name: SBOM and checksums
+        # CycloneDX 1.7 over the runtime dependencies plus the sqlite-vec
+        # platform binary, then SHA-256 of the bundle and the BOM. Generated
+        # here and uploaded as an artefact — never committed, because a
+        # committed BOM goes stale silently.
+        run: |
+          bun run sbom
+          bun run checksums
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: |
+            dist/bom.cdx.json
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
       - name: Self Validation
         run: bun run bin/musememory.ts validate --dry-run
       - name: Delivery gate — the branch is pushed and reviewable

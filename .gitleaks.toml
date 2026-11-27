@@ -1,0 +1,37 @@
+# Secret scanning configuration.
+#
+# Why the allowlist exists
+# ------------------------
+# The test suite and the docs deliberately contain secret-shaped strings:
+# fake API keys, fake tokens, fake connection strings sent through the
+# redaction paths to prove they are redacted. The scanner is supposed to flag
+# them — a scanner that stays quiet on `sk-ant-...` inside `test/` would stay
+# quiet on a real one — so the hits are reported by design and reviewed by a
+# human, not silenced globally.
+#
+# This file exempts **synthetic fixtures only**. A real credential committed
+# under `test/` is still a leak: the allowlist stops the scanner from reporting
+# the path, not the leak from existing. Rotation, not an allowlist entry, is
+# the fix for a real credential — and it is never the right answer to widen
+# these patterns to make CI green.
+#
+# Scope
+# -----
+# Paths only, and only these two trees:
+#   ^test/  — fixtures and their expected-hit corpus
+#   ^docs/  — examples written for readers to copy
+# `src/`, `.github/`, `scripts/` and the repo root are audited with the full
+# default ruleset, because that is where a real credential would do damage.
+
+[extend]
+# Build on the default rules rather than replacing them: `useDefault = true`
+# keeps every built-in detector active, so this file can only add exemptions,
+# never remove a rule.
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic, secret-shaped fixtures in the test corpus and documentation examples"
+paths = [
+  '''^test/''',
+  '''^docs/''',
+]

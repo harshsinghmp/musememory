@@ -118,7 +118,10 @@ describe("security audit 2026-11 regressions", () => {
         const uses = text.split("\n").filter((l) => /\buses:/.test(l));
         expect(uses.length).toBeGreaterThan(0);
         for (const line of uses) {
-          expect(line).toMatch(/uses:\s+[\w.-]+\/[\w.-]+@[0-9a-f]{40}\s+#\s+v\d/);
+          // One `org/repo` is not the shape: `github/codeql-action/upload-sarif`
+          // is an action that lives below a repository root, and the old
+          // two-segment pattern let every sub-path action through unchecked.
+          expect(line).toMatch(/uses:\s+[\w.-]+(?:\/[\w.-]+)+@[0-9a-f]{40}\s+#\s+v\d/);
         }
       }
     });

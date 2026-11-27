@@ -1,0 +1,55 @@
+# Dependency update automation.
+#
+# Why this exists
+# ---------------
+# The `sqlite-vec` native extension and `@modelcontextprotocol/sdk` were both
+# updated by hand, and the SDK drifted a whole minor version behind the fix
+# line for the November 2026 CVE cluster. An update nobody schedules is an
+# update that happens after an advisory, during an incident.
+#
+# Shape of the noise: one pull request per ecosystem per week for minor and
+# patch bumps, never five competing PRs for five packages. Major bumps stay
+# ungrouped — they need a human reading the changelog, not a rubber stamp.
+#
+# `open-pull-requests-limit: 5` is deliberately low. A backlog of dependency
+# PRs is how a real security bump gets lost in the list.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      npm-minor-patch:
+        applies-to: "version-updates"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      # Actions are pinned to a full commit SHA here, so Dependabot's job is to
+      # propose a new SHA with its version comment — which is exactly the
+      # review a mutable tag would have skipped.
+      actions-minor-patch:
+        applies-to: "version-updates"
+        update-types:
+          - "minor"
+          - "patch"
