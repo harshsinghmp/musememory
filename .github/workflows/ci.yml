@@ -20,7 +20,7 @@ jobs:
       checks: read
       actions: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The delivery gate at the end of this job proves a commit reached
           # the remote, so the checkout needs the remote's branch refs and the
