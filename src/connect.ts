@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { detectAgents } from "./agents/detect.ts";
 import { AGENT_REGISTRY } from "./agents/registry.ts";
 import type { AgentDefinition, ConnectOptions, ConnectReport, DetectedAgent } from "./agents/types.ts";

@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { classifyInstructionContent } from "../src/security/instruction_classifier.ts";
 import { openStore, propose, get, fileForId } from "../src/store.ts";
 import { syncConstraints } from "../src/governor.ts";

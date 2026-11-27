@@ -8,7 +8,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { MemoryEntry } from "../types.ts";
 import { defaultExpiryDays } from "../retention.ts";
 import { type Store, list, expireEntry, save } from "../store.ts";

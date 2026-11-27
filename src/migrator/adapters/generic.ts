@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { MigratedRecord, ProviderAdapter } from "../types.ts";
 import { normalizeMemoryType, normalizeMemoryStatus } from "../types.ts";
 import type { MemoryStatus } from "../../types.ts";

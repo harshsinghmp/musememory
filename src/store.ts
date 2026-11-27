@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor, MemoryProvenance } from "./types.ts";
 import { MAX_TITLE_LENGTH, MAX_TAGS, MAX_DRAFT_TITLE_LENGTH } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
