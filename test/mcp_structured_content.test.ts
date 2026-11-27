@@ -19,7 +19,9 @@ import { join } from "node:path";
  * `test/mcp_resources_prompts.test.ts` does) and checks the four promises the
  * change makes:
  *   1. `tools/list` advertises an `outputSchema` for every covered read tool and
- *      for no other tool;
+ *      for no other tool, and `COVERED_CALLS` names a call for every one of them
+ *      — the registry, the served schemas and the exercised set are the same
+ *      list, so a new schema cannot ship unexercised;
  *   2. a call's `structuredContent` validates against that very schema (the
  *      installed `ajv`, not a hand-written assertion);
  *   3. `content[0].text` still parses to the same object — the text channel is
@@ -59,6 +61,25 @@ function toolByName(name: string): Tool {
   if (!tool) throw new Error(`tool '${name}' is missing from tools/list`);
   return tool;
 }
+
+/**
+ * One representative call per covered tool, keyed by catalog name.
+ *
+ * `memory_read` needs a real id, so it is filled in by `beforeAll`. The keys are
+ * asserted against `STRUCTURED_OUTPUT_TOOLS`, which is what makes "every tool
+ * with an `outputSchema` is exercised" a test rather than a promise.
+ */
+const COVERED_CALLS: Record<string, Record<string, unknown>> = {
+  search: { query: "structured tool results", limit: 5 },
+  memory_recall: { query: "structured tool results" },
+  get_context: { query: "structured tool results" },
+  muse_health: {},
+  memory_read: {},
+  graph_status: {},
+  memory_audit: { limit: 5 },
+  memory_lifecycle_status: {},
+  memory_roi: {},
+};
 
 /** Validate a schema with ajv and fail with the validator's own errors. */
 function assertValid(schema: unknown, value: unknown, label: string): void {
@@ -111,6 +132,7 @@ beforeAll(async () => {
     tags: ["mcp", "structured-content"],
   });
   seededId = entry.id;
+  COVERED_CALLS.memory_read = { id: seededId };
   propose(store, {
     content: "A second memory so retrieval pages have more than one candidate to rank.",
     project: "musememory",
@@ -141,24 +163,60 @@ afterAll(async () => {
 
 describe("#495: tools/list advertises outputSchema", () => {
   test("every covered read tool carries an object schema", () => {
-    expect([...STRUCTURED_OUTPUT_TOOLS]).toEqual(["get_context", "memory_recall", "muse_health", "search"]);
+    expect([...STRUCTURED_OUTPUT_TOOLS]).toEqual([
+      "get_context",
+      "graph_status",
+      "memory_audit",
+      "memory_lifecycle_status",
+      "memory_read",
+      "memory_recall",
+      "memory_roi",
+      "muse_health",
+      "search",
+    ]);
     for (const name of STRUCTURED_OUTPUT_TOOLS) {
       const schema = toolByName(name).outputSchema as Record<string, unknown> | undefined;
       expect(schema).toBeDefined();
       expect(schema!.type).toBe("object");
       expect(schema!.properties).toBeTypeOf("object");
       expect(Array.isArray(schema!.required)).toBe(true);
-      // The envelope is closed: the handler owns every key it emits.
-      expect(schema!.additionalProperties).toBe(false);
+      if (name === "memory_read") {
+        // The one documented exception: this payload *is* the memory entry, so
+        // its root keeps the open entry rule (`additionalProperties: true`) with
+        // schema.json's required core, not a closed envelope.
+        expect(schema!.additionalProperties).toBe(true);
+        const required = schema!.required as string[];
+        for (const core of ["id", "title", "content", "project", "status", "created_at", "updated_at"]) {
+          expect(required).toContain(core);
+        }
+      } else {
+        // Every other envelope is closed: the handler owns every key it emits.
+        expect(schema!.additionalProperties).toBe(false);
+      }
     }
   });
 
   test("no other tool advertises an outputSchema", () => {
     const advertised = tools.filter((t) => t.outputSchema !== undefined).map((t) => t.name).sort();
     expect(advertised).toEqual([...STRUCTURED_OUTPUT_TOOLS]);
-    // Control tools on both sides of the read/write line stay text-only.
-    for (const control of ["memory_delete", "memory_capture", "memory_read"]) {
+    // Controls on both sides of the read/write line stay text-only, including
+    // `memory_settings_get`, which is skipped on purpose (user-authored payload).
+    for (const control of ["memory_delete", "memory_capture", "memory_settings_get"]) {
       expect(toolByName(control).outputSchema).toBeUndefined();
+    }
+  });
+
+  test("every covered tool has a representative call", () => {
+    // Coverage is data: a schema with no call here fails, and so does a call for
+    // a tool that does not publish one.
+    expect(Object.keys(COVERED_CALLS).sort()).toEqual([...STRUCTURED_OUTPUT_TOOLS]);
+  });
+
+  test("no covered schema accepts an empty object", () => {
+    // A schema that validates `{}` would make the call assertions vacuous.
+    for (const name of STRUCTURED_OUTPUT_TOOLS) {
+      const validate = ajv.compile(toolByName(name).outputSchema as object);
+      expect(validate({})).toBe(false);
     }
   });
 
@@ -220,9 +278,91 @@ describe("#495: calls return validated structuredContent", () => {
     expect(structured.gate_status).toBeTypeOf("string");
     expect(typeof structured.overall_score).toBe("number");
   });
+
+  test("every covered tool is exercised against the real server", async () => {
+    // The loop the requirement is about: for each tool that publishes a schema,
+    // `callStructured` proves tools/list advertises it, the payload validates
+    // with ajv, and the text channel parses to the same object.
+    for (const name of STRUCTURED_OUTPUT_TOOLS) {
+      await callStructured(name, COVERED_CALLS[name]!);
+    }
+  });
+
+  test("memory_read returns the stored entry verbatim", async () => {
+    const { structured } = await callStructured("memory_read", { id: seededId });
+    expect(structured.id).toBe(seededId);
+    expect(structured.title).toBe("Structured tool results slice");
+    expect(structured.status).toBeTypeOf("string");
+    expect(structured.created_at).toBeTypeOf("string");
+    // Open root: fields outside the required core pass through untouched.
+    expect(structured).toHaveProperty("tags");
+  });
+
+  test("graph_status returns the provider probe", async () => {
+    const { structured } = await callStructured("graph_status", {});
+    expect(["codegraph", "graphify", "none"]).toContain(structured.provider as string);
+    expect(typeof structured.available).toBe("boolean");
+    expect(structured.root).toBeTypeOf("string");
+    // The `none` branch leaves these undefined; the text channel omits them.
+    if (structured.provider === "none") expect(structured.available).toBe(false);
+  });
+
+  test("memory_audit returns a page of the trail", async () => {
+    const { structured } = await callStructured("memory_audit", { limit: 5 });
+    const entries = structured.entries as Array<Record<string, unknown>>;
+    expect(typeof structured.total).toBe("number");
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries.length).toBe(structured.total as number);
+    for (const record of entries) {
+      expect(record.timestamp).toBeTypeOf("string");
+      expect(record.operation).toBeTypeOf("string");
+      expect(record.entry_id).toBeTypeOf("string");
+    }
+  });
+
+  test("memory_lifecycle_status returns the counters with no sweep key", async () => {
+    const { structured, text } = await callStructured("memory_lifecycle_status", {});
+    const stats = structured.stats as Record<string, unknown>;
+    expect(typeof stats.total).toBe("number");
+    expect(stats.total as number).toBeGreaterThanOrEqual(2);
+    expect(stats.by_status).toBeTypeOf("object");
+    expect(stats.by_scope).toBeTypeOf("object");
+    // No sweep ran, so the key is absent from the text channel exactly as before.
+    expect(text).not.toContain('"sweep"');
+  });
+
+  test("memory_roi returns the reuse report", async () => {
+    const { structured } = await callStructured("memory_roi", {});
+    expect(structured.totalMemories as number).toBeGreaterThanOrEqual(2);
+    expect(typeof structured.overallReuseSuccessRate).toBe("number");
+    expect(Array.isArray(structured.topPerformingMemories)).toBe(true);
+    expect(Array.isArray(structured.concerningMemories)).toBe(true);
+  });
+
+  test("memory_lifecycle_status reports the sweep when one is requested", async () => {
+    // Last, because a sweep can legitimately change the store: the fresh seeded
+    // entries should not move, but the assertion must not depend on that.
+    const { structured } = await callStructured("memory_lifecycle_status", { sweep: true });
+    const sweep = structured.sweep as Record<string, unknown>;
+    expect(typeof sweep.swept).toBe("number");
+    expect(Array.isArray(sweep.cold)).toBe(true);
+    expect(Array.isArray(sweep.dormant)).toBe(true);
+    expect(Array.isArray(sweep.archived)).toBe(true);
+  });
 });
 
 describe("#495: the error path stays a plain tool error", () => {
+  test("memory_read of an unknown id is a plain tool error", async () => {
+    const tool = toolByName("memory_read");
+    expect(tool.outputSchema).toBeDefined();
+
+    const result = await client.callTool({ name: "memory_read", arguments: { id: "m_0_does_not_exist" } });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    const text = (result.content as Array<{ type: string; text: string }>)[0];
+    expect(text.text).toContain("no entry with id m_0_does_not_exist");
+  });
+
   test("a covered tool that fails returns isError with no structuredContent", async () => {
     const tool = toolByName("muse_health");
     expect(tool.outputSchema).toBeDefined();
