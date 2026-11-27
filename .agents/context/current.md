@@ -1,7 +1,8 @@
 # 📍 Current Shipped State & Active Invariants
 
 > **Version**: `v3.4.6` (npm `latest`, signed release assets)  
-> **Status**: Security hardening + release supply chain shipped; `dev` carries the post-release fixes.
+> **Status**: Security hardening + release supply chain shipped; `dev` carries the post-release fixes.  
+> **Product**: **aimm** (short for AI Memory) — the package, binaries, `.memory/`, `muse_*` tools and `MUSE_*` env vars keep their historical names. Canonical naming rules: [`docs/brand.md`](../../docs/brand.md).
 
 ---
 
@@ -352,7 +353,7 @@ All personal identity, telos, operational rules, and hardware terrain scanning m
 - **Machine Terrain Collector (`T-446`)**: `memory terrain [--out file.md]` compiles deterministic hardware, toolchain, and local agent ecosystem maps into `system.md` (`test/vault_system.test.ts`).
 - **Global Governance Decommissioning (`T-447`)**: Removed all 6 legacy imports and paths from `~/.agents/AGENTS.md` and repository standards, binding truth directly to `~/.memory/USER.md` and `memory` MCP.
 - **Sovereignty Decommissioning Gate (`T-448`)**: Enforces zero external legacy imports, confirms legacy tool removal, and passes 100% cleanly in `test/sovereignty_gate.test.ts`.
-- **Golden Sequence Documentation**: Published the complete 4-phase best-practice sequence for using Muse Memory with AI coding agents in `README.md`, `docs/agent-reference.md`, and `docs/cli-reference.md`.
+- **Golden Sequence Documentation**: Published the complete 4-phase best-practice sequence for using aimm with AI coding agents in `README.md`, `docs/agent-reference.md`, and `docs/cli-reference.md`.
 
 ---
 
@@ -784,6 +785,7 @@ Removed remaining competitor product names and external comparison links from we
 - **Workspace Isolation & Sync Boundary**: Never run repo-mutating scaffolders from a parent directory; nested clones are separate scopes. Never sync `.git` or a live SQLite store (`.memory/`).
 
 ## 1. Verified Shipped Reality
+- **2026-11-27**: **Renamed the product to aimm.** `Muse Memory` → **aimm** in every current guide, page and CLI/MCP display string, because "Muse" collides with Meta's Muse bot. Nothing functional moved: the npm package and repo stay `musememory`, binaries stay `memory`/`musememory`, `.memory/` and every path, `MUSE_*` env var, schema key, JSON field and MCP tool name (`muse_context`, `muse_health`, …) are unchanged, and the MCP `serverInfo.name` is still `musememory` (only the new `title`/`description` read `aimm`). Historical records — `.agents/archive|artifacts|plans|research/**`, `ticket-plan.md`, `docs/launch/**`, `docs/research/**`, released CHANGELOG sections — keep the old name on purpose. Canonical rules and the keep-list: [`docs/brand.md`](../../docs/brand.md).
 - **2026-10-22**: T-321 per-project health gate scope
 - **2026-10-22**: T-320 contradiction engine calibration
 - **2026-10-20**: Wave 21: Ecosystem Distillation, Mutation Safety & Knowledge Routing (T-050, T-177, T-324)

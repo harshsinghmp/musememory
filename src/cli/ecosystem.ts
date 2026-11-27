@@ -9,9 +9,9 @@ import { isLoopbackHost } from "../net.ts";
 import { requireRoot, usageError, fail, type ParsedArgs } from "./shared.ts";
 
 export const MUSE_MEMORY_DIRECTIVE = `<!-- musememory:start -->
-## 🧠 Persistent Cognitive Memory (Muse Memory)
+## 🧠 Persistent Cognitive Memory (aimm)
 
-You are connected to **Muse Memory** via the \`memory\` MCP server.
+You are connected to **aimm** via the \`memory\` MCP server.
 
 ### 🚀 Session Start & Task Lifecycle:
 1. **Session Start / Context Loading**: At the start of a task or session, call \`get_context(query=...)\` to retrieve the active user profile (\`USER.md\`), active hard constraints (\`CURRENT.md\`), and top relevant past architecture decisions/bug fixes before answering or modifying code.
@@ -31,7 +31,13 @@ export function ensureProjectAgentInstructions(targetDir: string): void {
           MUSE_MEMORY_DIRECTIVE,
         );
         writeFileSync(agentsMdPath, updated, "utf8");
-      } else if (!existing.includes("<!-- musememory:start -->") && !existing.includes("Muse Memory")) {
+      } else if (
+        !existing.includes("<!-- musememory:start -->") &&
+        // `Muse Memory` is the legacy marker written by pre-rename installs;
+        // kept so an existing block is recognised instead of duplicated.
+        !existing.includes("Muse Memory") &&
+        !existing.includes("aimm")
+      ) {
         writeFileSync(agentsMdPath, `${existing.trim()}\n\n${MUSE_MEMORY_DIRECTIVE}\n`, "utf8");
       }
     } catch {}
@@ -134,7 +140,7 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     },
   ];
 
-  console.log(`[+] Initialized Muse Memory in ${memoryDir}`);
+  console.log(`[+] Initialized aimm in ${memoryDir}`);
   await playGamifiedLoader(installSteps, { title: "AUTONOMOUS ONBOARDING MATRIX" });
 
   if (reports.length > 0) {
@@ -149,7 +155,7 @@ export async function handleInstallCommand({ positional, flags }: ParsedArgs): P
     console.log(`   -> Run 'memory migrate' to auto-import legacy memories.`);
   }
 
-  console.log(`\n[OK] Muse Memory is initialized and ready! Use 'memory doctor' to verify health.`);
+  console.log(`\n[OK] aimm is initialized and ready! Use 'memory doctor' to verify health.`);
   return 0;
 }
 
@@ -229,7 +235,7 @@ export async function handleUninstallCommand({ positional, flags }: ParsedArgs):
     },
   ];
 
-  console.log(`[CLEAN] Running Muse Memory Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
+  console.log(`[CLEAN] Running aimm Uninstaller${dryRun ? " [DRY RUN]" : ""}...`);
   await playGamifiedLoader(uninstallSteps, { title: `SYSTEM UNINSTALL MATRIX${dryRun ? " [DRY RUN]" : ""}` });
 
   if (unwiredReports.length > 0) {
@@ -327,7 +333,7 @@ export async function handleMigrateCommand({ positional, flags }: ParsedArgs): P
     }
   }
 
-  console.log(`[MIGRATE] Starting Muse Memory Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
+  console.log(`[MIGRATE] Starting aimm Migration Engine${dryRun ? " [DRY RUN]" : ""}...`);
   const report = await runMigration(ctx.store, ctx.memoryDir, {
     provider,
     all: all || !provider,
@@ -375,7 +381,7 @@ export async function handleAgentsCommand(): Promise<number> {
 
   console.log(`\nSummary:`);
   console.log(`  Installed Agents Detected: ${installed.length}`);
-  console.log(`  Connected with Muse Memory: ${connected.length}`);
+  console.log(`  Connected with aimm: ${connected.length}`);
   console.log(`  Uninstalled/Skipped:       ${agents.length - installed.length}`);
   if (installed.length > connected.length) {
     console.log(`\n[TIP] Run 'memory connect --all' to auto-wire the remaining ${installed.length - connected.length} installed agent(s) with zero-permission auto-approval.`);
@@ -392,7 +398,7 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
     const { generateClientConfigRecipe } = await import("../connect.ts");
     const recipes = generateClientConfigRecipe(endpoint, token, peerId);
 
-    console.log(`\n=== Muse Memory Team Server Client Configuration Recipes (T-387) ===`);
+    console.log(`\n=== aimm Team Server Client Configuration Recipes (T-387) ===`);
     console.log(`Endpoint:  ${recipes.endpoint}`);
     console.log(`Transport: MCP Streamable HTTP (2025-06-18 spec)`);
     console.log(`Auth:      Authorization: Bearer <token>\n`);
@@ -421,7 +427,7 @@ export async function handleConnectCommand({ positional, flags }: ParsedArgs): P
     if (detected.length > 0) {
       const { promptMultiSelect } = await import("../prompt.ts");
       const selected = await promptMultiSelect(
-        "[CONNECT] Select Detected Coding Agents & IDEs to Wire with Muse Memory MCP:",
+        "[CONNECT] Select Detected Coding Agents & IDEs to Wire with aimm MCP:",
         detected.map((a) => ({
           id: a.id,
           label: a.name,
@@ -502,7 +508,7 @@ export async function handleUiCommand({ flags }: ParsedArgs): Promise<number> {
     console.error(`Error starting Web Observability Studio: ${err.message || err}`);
     return 1;
   }
-  console.log(`\x1b[36m[Studio] Muse Memory Web Observability Studio running at: http://localhost:${srv.port}\x1b[0m`);
+  console.log(`\x1b[36m[Studio] aimm Web Observability Studio running at: http://localhost:${srv.port}\x1b[0m`);
   console.log(`Press Ctrl+C to stop.`);
 
   // Non-blocking auto-harvest recent un-indexed agent chat transcripts in the background
@@ -611,7 +617,7 @@ export async function handleMcpCommand(args?: ParsedArgs): Promise<number> {
       allowedOrigins,
       allowedHosts,
     });
-    console.log(`Muse Memory MCP Streamable HTTP Server listening at ${handle.url}`);
+    console.log(`aimm MCP Streamable HTTP Server listening at ${handle.url}`);
     console.log(`[Auth] Allowed hosts: ${allowedHosts.join(", ")}`);
     if (hasConfiguredToken) {
       console.log(`[Auth] Bearer authentication active (${allowedPeers ? `${allowedPeers.length} allowed peers` : "allowlist open"})`);

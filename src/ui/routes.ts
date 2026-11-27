@@ -584,7 +584,7 @@ add("GET", "/api/agents", async (req, res, ctx) => {
 add("GET", "/api/agents/manifest", async (req, res, ctx) => {
   const database = ctx.store.layout?.dbPath || join(ctx.memoryDir, "memory.db");
   const snippet = [
-    "You have access to Muse Memory over MCP (stdio).",
+    "You have access to aimm over MCP (stdio).",
     "Server: memory mcp",
     `Memory directory: ${ctx.memoryDir}`,
     `Database: ${database}`,

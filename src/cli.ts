@@ -97,7 +97,7 @@ import { handleTerrainCommand } from "./vault/system.ts";
 export { parseFlags, requireRoot, printEntry, type ParsedArgs };
 
 export const USAGE = `
-Muse Memory (memory / musememory) -- Autonomous Persistent Memory for AI Agents & Agency Networks
+aimm (memory / musememory) -- Autonomous Persistent Memory for AI Agents & Agency Networks
 
 Usage:
   memory <command> [arguments] [options]

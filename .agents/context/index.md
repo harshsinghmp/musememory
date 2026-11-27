@@ -1,8 +1,8 @@
-# 📖 Muse Memory Context Index
+# 📖 aimm Context Index
 
-> **Reading Directive**: Durable project truth for Muse Memory lives in `./.agents/context/`. Start at this index, then load **only** the specific context file your active task requires.
+> **Reading Directive**: Durable project truth for aimm lives in `./.agents/context/`. Start at this index, then load **only** the specific context file your active task requires.
 >
-> **Do not read or write `.memory/**`** — that directory is owned by the MuseMemory engine itself and is out of scope for agent context work.
+> **Do not read or write `.memory/**`** — that directory is owned by the `musememory` engine itself and is out of scope for agent context work.
 
 ---
 

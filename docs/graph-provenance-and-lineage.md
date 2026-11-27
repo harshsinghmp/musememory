@@ -8,11 +8,11 @@
 
 ## 1. Overview & Architectural Principles
 
-Muse Memory v2.7.0 lands **Wave 17 (Packing + Graph + Provenance)**, introducing first-class relational lineage, progressive associative graph expansion, immutable fact provenance, and cryptographic audit security:
+aimm v2.7.0 lands **Wave 17 (Packing + Graph + Provenance)**, introducing first-class relational lineage, progressive associative graph expansion, immutable fact provenance, and cryptographic audit security:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   Muse Memory v2.7.0 Knowledge Fabric                  │
+│                   aimm v2.7.0 Knowledge Fabric                  │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
     ┌───────────────────────────────┴───────────────────────────────┐

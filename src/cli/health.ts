@@ -45,7 +45,7 @@ export async function handleHealthCommand(parsed: ParsedArgs): Promise<number> {
   const reset = "\x1b[0m";
   const bold = "\x1b[1m";
 
-  console.log(`\n${bold}🏥 MUSE MEMORY 5-PILLAR PROJECT HEALTH GATE${reset}`);
+  console.log(`\n${bold}🏥 aimm 5-PILLAR PROJECT HEALTH GATE${reset}`);
   console.log(`${"=".repeat(50)}`);
   console.log(`Project:       ${bold}${report.project}${reset}`);
   console.log(

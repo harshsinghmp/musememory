@@ -64,7 +64,7 @@ export interface GraphContext {
 /**
  * Standard contract for optional code intelligence providers.
  * All external tools (CodeGraph, Graphify, LSP, etc.) implement this interface.
- * MuseMemory MUST operate completely and identically if ZERO providers are present.
+ * aimm MUST operate completely and identically if ZERO providers are present.
  */
 export interface CodeIntelligenceProvider {
   /** Human-readable provider identifier (e.g. "codegraph", "graphify", "lsp", "heuristic") */

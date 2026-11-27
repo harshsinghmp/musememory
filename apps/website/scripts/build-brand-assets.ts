@@ -1,5 +1,5 @@
 /**
- * Builds every Muse Memory brand asset from one source of truth.
+ * Builds every aimm brand asset from one source of truth.
  *
  * Why this exists
  * ---------------
@@ -258,10 +258,10 @@ function proofRow(x: number, y: number, gap: number, size: number): string {
   }).join("\n");
 }
 
-/** Wordmark: "Muse" in the text colour, "Memory" in cyan. */
+/** Wordmark: "aim" in the text colour, the second "m" (the memory) in cyan. */
 function wordmark(x: number, y: number, size: number, anchor: "start" | "middle" = "start"): string {
   const at = anchor === "middle" ? ' text-anchor="middle"' : "";
-  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${at} font-family="${SANS}" font-size="${size.toFixed(1)}" font-weight="800" letter-spacing="${(-size * 0.036).toFixed(1)}" fill="${T.text}">Muse<tspan fill="${T.cyan}">Memory</tspan></text>`;
+  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${at} font-family="${SANS}" font-size="${size.toFixed(1)}" font-weight="800" letter-spacing="${(-size * 0.036).toFixed(1)}" fill="${T.text}">aim<tspan fill="${T.cyan}">m</tspan></text>`;
 }
 
 /**
@@ -400,7 +400,7 @@ async function emit(dir: string, name: string, svg: string, w: number, h: number
 }
 
 async function main(): Promise<void> {
-  console.log("Building Muse Memory brand assets\n");
+  console.log("Building aimm brand assets\n");
 
   await emit(PUBLIC_DIR, "favicon.svg", favicon(), 512, 512, false);
   await emit(PUBLIC_DIR, "apple-touch-icon.png", favicon(), 180, 180, false);

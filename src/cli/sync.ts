@@ -76,7 +76,7 @@ export async function handleSyncCommand(parsed: ParsedArgs): Promise<number> {
       return 0;
     }
 
-    console.log(`\x1b[36m🤝 MUSE MEMORY CROSS-AGENT P2P GOSSIP SYNC\x1b[0m`);
+    console.log(`\x1b[36m🤝 aimm CROSS-AGENT P2P GOSSIP SYNC\x1b[0m`);
     console.log(`Agent ID:        \x1b[1m${report.agent_id}\x1b[0m`);
     console.log(`Shared Pool:     ${report.pool_dir}`);
     console.log(`Peers Contacted: ${report.peers_contacted.length > 0 ? report.peers_contacted.join(", ") : "none (first agent in pool)"}`);
@@ -100,7 +100,7 @@ export async function handleSyncCommand(parsed: ParsedArgs): Promise<number> {
     return 0;
   }
 
-  console.log(`\x1b[36m🌐 MUSE MEMORY PEER TOPOLOGY & SYNC STATUS\x1b[0m`);
+  console.log(`\x1b[36m🌐 aimm PEER TOPOLOGY & SYNC STATUS\x1b[0m`);
   console.log(`Local Agent:     \x1b[1m${status.local_agent_id}\x1b[0m`);
   console.log(`Total Peers:     ${status.total_peers}`);
   console.log(`Outgoing Ready:  ${status.pending_outgoing_memories}`);

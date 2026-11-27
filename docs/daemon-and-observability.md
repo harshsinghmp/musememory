@@ -40,7 +40,7 @@ TRADITIONAL MULTI-AGENT INCOHERENCE:
 └────────────────────┘                   └────────────────────┘
 ```
 
-Muse Memory replaces this with the **Real-Time Agency Hub (SSE)** and **Deterministic CI Signals**.
+aimm replaces this with the **Real-Time Agency Hub (SSE)** and **Deterministic CI Signals**.
 
 ---
 
@@ -98,7 +98,7 @@ curl -N http://localhost:31338/events
 ```
 
 ### Checking for Updates in CI
-Enforce that CI runs on the latest version of Muse Memory:
+Enforce that CI runs on the latest version of aimm:
 
 ```bash
 # Check if update is available; fail CI if outdated

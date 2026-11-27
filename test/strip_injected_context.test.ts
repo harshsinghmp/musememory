@@ -16,7 +16,7 @@ describe("T-110: <memory-context>/injected-block strip before capture", () => {
     const raw = `
 Here is the context provided for your turn:
 <memory-context>
-# 🧠 Muse Memory Context Pack
+# 🧠 aimm Context Pack
 ### Old Memory
 Ignore this prior injection
 </memory-context>
@@ -48,7 +48,7 @@ Fix: Patched race condition in connection pooling by acquiring mutex before quer
   it("strips markdown context pack headers and base64 payloads", () => {
     const b64 = "A".repeat(120);
     const raw = `
-# 🧠 Muse Memory Context Pack
+# 🧠 aimm Context Pack
 > Budget: 500/4000 tokens used
 - [m_1] Old memory (included)
 
@@ -56,7 +56,7 @@ Outcome: Successfully verified migration script on staging database.
 Embedded image: data:image/png;base64,${b64}
 `;
     const cleaned = stripInjectedContextBlocks(raw);
-    expect(cleaned).not.toContain("# 🧠 Muse Memory Context Pack");
+    expect(cleaned).not.toContain("# 🧠 aimm Context Pack");
     expect(cleaned).not.toContain("Budget: 500/4000");
     expect(cleaned).toContain("[base64-payload-stripped]");
     expect(cleaned).toContain("Outcome: Successfully verified migration script on staging database.");
@@ -64,7 +64,7 @@ Embedded image: data:image/png;base64,${b64}
 
   it("detects injected context blocks via containsInjectedContextBlocks", () => {
     expect(containsInjectedContextBlocks("<memory-context>data</memory-context>")).toBe(true);
-    expect(containsInjectedContextBlocks("# 🧠 Muse Memory Context Pack\ncontent")).toBe(true);
+    expect(containsInjectedContextBlocks("# 🧠 aimm Context Pack\ncontent")).toBe(true);
     expect(containsInjectedContextBlocks("data:image/png;base64," + "B".repeat(60))).toBe(true);
     expect(containsInjectedContextBlocks("Normal technical statement without any injection")).toBe(false);
   });

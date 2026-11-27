@@ -190,7 +190,7 @@ describe("R13: Unified 5-Pillar Project Health Gate & Observability", () => {
         });
 
         expect(exitCode).toBe(0);
-        expect(output).toContain("MUSE MEMORY 5-PILLAR PROJECT HEALTH GATE");
+        expect(output).toContain("aimm 5-PILLAR PROJECT HEALTH GATE");
         expect(output).toContain("PILLAR BREAKDOWN");
         expect(output).toContain("Memory Store Integrity");
         expect(output).toContain("Native Code Anchor Validity");

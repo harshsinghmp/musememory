@@ -394,7 +394,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "memory_connect",
-    description: "Auto-wire Muse Memory MCP into installed coding agents or a specified agent",
+    description: "Auto-wire aimm MCP into installed coding agents or a specified agent",
     inputSchema: {
       type: "object",
       properties: {

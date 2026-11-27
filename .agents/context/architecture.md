@@ -1,4 +1,4 @@
-# 🏗️ Muse Memory Architecture & System Design
+# 🏗️ aimm Architecture & System Design
 
 ---
 
@@ -11,7 +11,7 @@
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP stdio / Terminal CLI
 ┌──────────────────────────────▼──────────────────────────────┐
-│                    Muse Memory Core Engine                  │
+│                    aimm Core Engine                  │
 │                                                             │
 │ ┌───────────────────┐ ┌──────────────────┐ ┌──────────────┐ │
 │ │  Retrieval Engine │ │ Vibeguard Secret │ │ Auto-Migrate │ │

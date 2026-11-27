@@ -1,4 +1,4 @@
-# 👥 Muse Memory — Team Slice Wiring & Scoping Architecture (T-387)
+# 👥 aimm — Team Slice Wiring & Scoping Architecture (T-387)
 
 > **Document Scope**: Team topology, MCP Streamable HTTP client recipes, and shared vs personal memory scoping policy for multi-member engineering teams.  
 > **Status**: Production Standard (v2.0.0 — Wave 7: Team Slice)  
@@ -9,7 +9,7 @@
 ## 1. Team Topology Architecture
 
 ### The Networked SQLite Trap (Why Shared Mounts Corrupt)
-SQLite's Write-Ahead Log (WAL) mode relies on POSIX shared memory (`-shm`) and OS-level file locking protocols (`-wal`) for concurrency coordination. Networked filesystems (NFS, SMB, CIFS, Google Drive, Dropbox) do not implement atomic POSIX shared-memory synchronization across different machines. Running multiple concurrent Muse processes against a shared SQLite file over a network mount results in stale cache reads, race conditions, and irreparable database header corruption.
+SQLite's Write-Ahead Log (WAL) mode relies on POSIX shared memory (`-shm`) and OS-level file locking protocols (`-wal`) for concurrency coordination. Networked filesystems (NFS, SMB, CIFS, Google Drive, Dropbox) do not implement atomic POSIX shared-memory synchronization across different machines. Running multiple concurrent aimm processes against a shared SQLite file over a network mount results in stale cache reads, race conditions, and irreparable database header corruption.
 
 ### The Correct Topology: Single Host Process + HTTP MCP
 The team topology designates **one machine or VM as the host server**. 
@@ -19,7 +19,7 @@ The team topology designates **one machine or VM as the host server**.
 
 ```
                            ┌───────────────────────────────────────────────┐
-                           │            Muse Memory Host Server            │
+                           │            aimm Host Server            │
                            │  `musememory serve --port 31338 --token ...`  │
                            │                                               │
                            │  ┌─────────────┐  ┌────────────────────────┐  │
