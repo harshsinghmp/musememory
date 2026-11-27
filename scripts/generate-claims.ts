@@ -22,6 +22,7 @@ import { AGENT_REGISTRY } from "../src/agents/registry.ts";
 import { PROFILE_TOOL_DEFINITIONS } from "../src/orchestrator/profiles.ts";
 import { PROVIDER_DEFINITIONS } from "../src/migrator/detect.ts";
 import { SECRET_RULES } from "../src/secrets.ts";
+import { checkTestClaims } from "./lib/claims-compare.ts";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,38 +154,13 @@ if (checkOnly) {
     }
   }
 
-  // The test count is different: the suite grows every time a test is
-  // added, so an exact match would fail CI on every unrelated test commit.
-  // The failure that actually matters is OVER-claiming — publishing a count
-  // higher than the suite contains. Stale-low is merely imprecise, and the
-  // release process regenerates the manifest so the published figure is exact
-  // at the moment it ships.
-  if (currentClaims.tests.count > claims.tests.count) {
-    stale = true;
-    console.error(
-      `STALE: claims.json — claims ${currentClaims.tests.count} tests but the suite contains ${claims.tests.count}`,
-    );
-  } else if (currentClaims.tests.count < claims.tests.count) {
-    console.log(
-      `note: claims.json reports ${currentClaims.tests.count} tests; the suite now has ${claims.tests.count}. ` +
-        `Run "bun run claims:generate" to publish the exact figure.`,
-    );
-  }
-  if (currentClaims.tests.files > claims.tests.files) {
-    stale = true;
-    console.error(
-      `STALE: claims.json — claims ${currentClaims.tests.files} test files but the suite contains ${claims.tests.files}`,
-    );
-  }
-  // Same rule for assertions. This is not hypothetical: v3.4.3 shipped
-  // `assertions: 7799` while the suite made 7797, because the check compared
-  // only the test count and file count.
-  if (currentClaims.tests.assertions > claims.tests.assertions) {
-    stale = true;
-    console.error(
-      `STALE: claims.json — claims ${currentClaims.tests.assertions} assertions but the suite makes ${claims.tests.assertions}`,
-    );
-  }
+  // Test and file counts are structural: a difference in either direction
+  // means the manifest no longer describes the suite. Assertion totals vary
+  // by a run, so only over-claiming is an error there (see the module comment).
+  const verdict = checkTestClaims(currentClaims.tests, claims.tests);
+  if (verdict.stale) stale = true;
+  for (const error of verdict.errors) console.error(`STALE: claims.json — ${error}`);
+  for (const note of verdict.notes) console.log(`note: ${note}`);
 
   // The tool matrix must match exactly: it is a list, not a statistic.
   const currentMatrix = readFileSync(toolMatrixPath, "utf8");
