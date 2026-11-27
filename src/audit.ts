@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import type { AuditEntry, AuditOperation, MerkleCheckpoint, MerkleProof } from "./types.ts";
@@ -81,7 +81,7 @@ export function readAuditAnchor(memoryDir: string): string {
 }
 
 function writeAuditAnchor(memoryDir: string, anchorHash: string): void {
-  mkdirSync(memoryDir, { recursive: true });
+  mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   const path = auditAnchorFilePath(memoryDir);
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify({ anchor_hash: anchorHash }, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
@@ -185,13 +185,16 @@ export function getDailySalt(memoryDir: string, dateStr?: string): string {
   }
 
   if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
+    mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   }
 
   const newSalt = randomBytes(16).toString("hex");
   salts[dateKey] = newSalt;
   try {
-    writeFileSync(saltsPath, JSON.stringify(salts, null, 2), "utf8");
+    writeFileSync(saltsPath, JSON.stringify(salts, null, 2), { encoding: "utf8", mode: 0o600 });
+    // #512: the salt file is what makes an audit hash unguessable; a
+    // pre-existing copy keeps whatever mode it was created with.
+    chmodSync(saltsPath, 0o600);
   } catch {}
 
   return newSalt;
@@ -270,7 +273,7 @@ export function recordAuditEvent(
 ): AuditEntry {
   const auditPath = auditFilePath(memoryDir);
   if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
+    mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   }
 
   rotateAuditIfNeeded(memoryDir);
@@ -300,6 +303,11 @@ export function recordAuditEvent(
   };
 
   appendJsonlWithFsync(auditPath, JSON.stringify(entry));
+  // #512: `appendJsonlWithFsync` opens with "a", so a new segment is created
+  // 0666 & ~umask and an existing one keeps its mode. Tighten both.
+  try {
+    chmodSync(auditPath, 0o600);
+  } catch {}
   return entry;
 }
 
@@ -571,9 +579,12 @@ export function createSessionMerkleCheckpoint(
 
   const chkPath = checkpointsFilePath(memoryDir);
   if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
+    mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
   }
   appendJsonlWithFsync(chkPath, JSON.stringify(checkpoint));
+  try {
+    chmodSync(chkPath, 0o600);
+  } catch {}
 
   recordAuditEvent(memoryDir, {
     operation: "merkle_checkpoint",

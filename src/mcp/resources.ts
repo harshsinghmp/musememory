@@ -22,6 +22,7 @@ import { CORE_TIERS, readCore } from "../core.ts";
 import { getSessionHandoff, parseCurrentFile } from "../governor.ts";
 import { get as getEntry, type Store } from "../store.ts";
 import { getUserProfile } from "../user.ts";
+import { DOCUMENT_MAX_BYTES, stripFenceTokens, wrapAgentContext } from "../security/context_sanitizer.ts";
 
 /** The four always-present documents, in list order. */
 export const STATIC_MCP_RESOURCES = [
@@ -119,6 +120,36 @@ function invalidResource(message: string): McpError {
   return new McpError(ErrorCode.InvalidParams, message);
 }
 
+/**
+ * #514: a resource body is memory content, so it is served as data inside the
+ * same fence `get_context` uses. Without it a constraint or an imported memory
+ * containing `</muse-memory>` could close the delimiter and speak as the
+ * operator; `wrapAgentContext` strips those tokens before wrapping, so the
+ * fence cannot be forged and does not nest.
+ */
+function asData(markdown: string): string {
+  return wrapAgentContext(markdown, DOCUMENT_MAX_BYTES);
+}
+
+/**
+ * #514: the entry resource must stay valid JSON, so it cannot be wrapped in a
+ * text fence. Instead the fence tokens are stripped from every string it
+ * carries — including keys, which a memory can control through its tags — so
+ * embedding the document in a prompt cannot close an outer fence either.
+ */
+function scrubFenceTokens(value: unknown): unknown {
+  if (typeof value === "string") return stripFenceTokens(value);
+  if (Array.isArray(value)) return value.map(scrubFenceTokens);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      out[stripFenceTokens(key)] = scrubFenceTokens(inner);
+    }
+    return out;
+  }
+  return value;
+}
+
 /** Extract the entry id from `memory://entry/<id>`, or null when the URI lacks one. */
 function entryIdFromUri(uri: string): string | null {
   const raw = uri.slice(ENTRY_RESOURCE_PREFIX.length);
@@ -143,13 +174,13 @@ function entryIdFromUri(uri: string): string | null {
 export function readMcpResource(store: Store, memoryDir: string, uri: string): McpResourceRead {
   switch (uri) {
     case "memory://current":
-      return { uri, mimeType: "text/markdown", text: renderCurrent(memoryDir) };
+      return { uri, mimeType: "text/markdown", text: asData(renderCurrent(memoryDir)) };
     case "memory://user":
-      return { uri, mimeType: "text/markdown", text: renderUser(memoryDir) };
+      return { uri, mimeType: "text/markdown", text: asData(renderUser(memoryDir)) };
     case "memory://core":
-      return { uri, mimeType: "text/markdown", text: renderCore(memoryDir) };
+      return { uri, mimeType: "text/markdown", text: asData(renderCore(memoryDir)) };
     case "memory://handoff":
-      return { uri, mimeType: "text/markdown", text: renderHandoff(memoryDir) };
+      return { uri, mimeType: "text/markdown", text: asData(renderHandoff(memoryDir)) };
     default:
       break;
   }
@@ -167,7 +198,7 @@ export function readMcpResource(store: Store, memoryDir: string, uri: string): M
         `Unknown memory entry '${id}' for resource '${uri}'. Use the search or memory_tree_search tool to find a valid id.`,
       );
     }
-    return { uri, mimeType: "application/json", text: JSON.stringify(entry, null, 2) };
+    return { uri, mimeType: "application/json", text: JSON.stringify(scrubFenceTokens(entry), null, 2) };
   }
 
   throw invalidResource(

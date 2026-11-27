@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { dirname, join, parse, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import { initUserProfile, userFilePath } from "./user.ts";
@@ -41,14 +41,38 @@ export function getGlobalMemoryDir(): string {
   return join(home, ".memory");
 }
 
+/** #512: memory is private. A store is never group- or world-readable. */
+const DIR_MODE = 0o700;
+const FILE_MODE = 0o600;
+
+/**
+ * Create the memory directory tree, or tighten one that already exists.
+ *
+ * #512: this used plain `mkdirSync(..., { recursive: true })` and a default
+ * `writeFileSync`, so a fresh store landed at 0755/0644 — on a shared host any
+ * other user could read the constraints, decisions and audit actors inside it.
+ * `mode` covers creation (filtered through the umask), the `chmodSync` calls
+ * make the result exact and also fix a store created before this change.
+ */
 function ensureMemoryDirectory(memoryDir: string): void {
   const memoriesDir = join(memoryDir, "memories");
-  if (!existsSync(memoriesDir)) {
-    mkdirSync(memoriesDir, { recursive: true });
+  mkdirSync(memoriesDir, { recursive: true, mode: DIR_MODE });
+  for (const dir of [memoryDir, memoriesDir]) {
+    try {
+      chmodSync(dir, DIR_MODE);
+    } catch {
+      // Best effort: a read-only or foreign-owned mount keeps the mode it has.
+    }
   }
+
   const currentPath = join(memoryDir, "CURRENT.md");
   if (!existsSync(currentPath)) {
-    writeFileSync(currentPath, "# Active Project Constraints\n", "utf8");
+    writeFileSync(currentPath, "# Active Project Constraints\n", { encoding: "utf8", mode: FILE_MODE });
+  }
+  try {
+    chmodSync(currentPath, FILE_MODE);
+  } catch {
+    // Same best effort as above.
   }
 
   // Ensure USER.md exists (local points to global; global creates default developer template)

@@ -12,6 +12,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import { BUILTIN_PROMPTS, getPrompt, renderPrompt } from "../prompts.ts";
+import { DOCUMENT_MAX_BYTES, wrapAgentContext } from "../security/context_sanitizer.ts";
 
 export interface McpPromptArgument {
   name: string;
@@ -90,7 +91,13 @@ export function getMcpPrompt(
     normalizedArgs[key] = String(value);
   }
 
-  const text = finishPromptRendering(renderPrompt(memoryDir, name, normalizedArgs), normalizedArgs);
+  const rendered = finishPromptRendering(renderPrompt(memoryDir, name, normalizedArgs), normalizedArgs);
+  // #514: `renderPrompt` substitutes CURRENT.md into the template verbatim, and
+  // a memory is data — a constraint containing `</muse-memory>` or `<system>`
+  // would otherwise close the fence and keep talking with the server's voice.
+  // Substitution itself is untouched: the fence goes on after rendering, so
+  // every `{{var}}` still resolves exactly as it did.
+  const text = wrapAgentContext(rendered, DOCUMENT_MAX_BYTES);
   return {
     description: prompt.description,
     messages: [{ role: "user", content: { type: "text", text } }],
