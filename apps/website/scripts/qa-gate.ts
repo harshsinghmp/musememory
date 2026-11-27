@@ -97,6 +97,38 @@ const PAGES = ["/", "/docs", "/compare"];
 
 async function main() {
   const srv = serve();
+
+  // ── 0. Absolute social-image URLs respect the base path ────────────────
+  // The site is served from /musememory, so an og:image of
+  // https://host/brand/og.png silently 404s in every link preview.
+  {
+    const offenders: string[] = [];
+    const scan = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          scan(full);
+        } else if (full.endsWith(".html")) {
+          const html = readFileSync(full, "utf8");
+          for (const match of html.matchAll(/(?:og:image|twitter:image)"\s+content="([^"]+)"/g)) {
+            const url = match[1]!;
+            if (/^https?:/.test(url) && !url.includes("/musememory/")) {
+              offenders.push(`${full.slice(DIST.length + 1)} -> ${url}`);
+            }
+          }
+        }
+      }
+    };
+    scan(DIST);
+    record(
+      "meta:base-path",
+      "Absolute social images include the site base path",
+      offenders.length === 0,
+      offenders.length ? offenders.slice(0, 3).join("; ") : "all og:image/twitter:image URLs under /musememory/",
+      "P0",
+    );
+  }
+
   const browser = await chromium.launch({ executablePath: chromiumPath(), args: ["--no-sandbox"] });
 
   try {

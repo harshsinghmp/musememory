@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Social link previews pointed at `/brand/og.png`, which does not exist under the `/musememory` base path**: `BASE_URL` has no trailing slash, so resolving `brand/og.png` against it treated `musememory` as a file and dropped it — every `og:image` and `twitter:image` 404'd in previews while the page itself rendered fine. The layout now forces the directory form before resolving, and `site:qa` gained a static check that fails when any absolute social-image URL omits the base path (mutation-verified by rewriting the built HTML and seeing it BLOCK). Verified: `site:build` 6 pages, `site:qa` 18/18 SHIP.
+
 ## [3.4.7] - 2026-11-27
 
 ### Added
