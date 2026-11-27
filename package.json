@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "3.4.7",
+  "version": "3.5.0",
   "description": "aimm — local-first memory for AI coding agents",
   "main": "dist/index.js",
   "type": "module",
