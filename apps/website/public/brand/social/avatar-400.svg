@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4fd6e0" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#4fd6e0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7db1" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#ff7db1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="400" rx="88" fill="#0c1019"/>
+  <rect x="3" y="3" width="394" height="394" rx="85" fill="none" stroke="#8b7cf7" stroke-opacity="0.28" stroke-width="3"/>
+<circle cx="200.00" cy="233.12" r="65.28" fill="url(#halo)"/>
+  <polyline points="104.00,271.52 150.08,148.64 200.00,233.12 249.92,148.64 296.00,271.52" fill="none" stroke="url(#grad)" stroke-width="20.00"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="104.00" cy="271.52" r="10.08" fill="#8b7cf7"/>
+  <circle cx="150.08" cy="148.64" r="10.08" fill="#4fd6e0"/>
+  <circle cx="249.92" cy="148.64" r="10.08" fill="#4fd6e0"/>
+  <circle cx="296.00" cy="271.52" r="10.08" fill="#8b7cf7"/>
+  <circle cx="200.00" cy="233.12" r="13.61" fill="#e8ecf8"/>
+</svg>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cf7"/>
+      <stop offset="1" stop-color="#4fd6e0"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8b7cf7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8b7cf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4fd6e0" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#4fd6e0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7db1" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#ff7db1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="#07090f"/>
+  <g>
+    <ellipse cx="172.8" cy="129.6" rx="496.8" ry="561.6" fill="url(#meshA)"/>
+    <ellipse cx="950.4" cy="86.4" rx="432" ry="496.8" fill="url(#meshB)"/>
+    <ellipse cx="669.6" cy="1058.4" rx="453.59999999999997" ry="475.2" fill="url(#meshC)"/>
+  </g>
+<circle cx="540.00" cy="253.12" r="65.28" fill="url(#halo)"/>
+  <polyline points="444.00,291.52 490.08,168.64 540.00,253.12 589.92,168.64 636.00,291.52" fill="none" stroke="url(#grad)" stroke-width="16.00"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="444.00" cy="291.52" r="10.08" fill="#8b7cf7"/>
+  <circle cx="490.08" cy="168.64" r="10.08" fill="#4fd6e0"/>
+  <circle cx="589.92" cy="168.64" r="10.08" fill="#4fd6e0"/>
+  <circle cx="636.00" cy="291.52" r="10.08" fill="#8b7cf7"/>
+  <circle cx="540.00" cy="253.12" r="13.61" fill="#e8ecf8"/>
+  <text x="540.0" y="400.0" text-anchor="middle" font-family="Inter" font-size="46.0" font-weight="800" letter-spacing="-1.7" fill="#e8ecf8">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="540.0" y="452.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="17.0" font-weight="500" letter-spacing="1.8" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
+  <text x="540.0" y="600.0" text-anchor="middle" font-family="Inter" font-size="60.0" font-weight="800" letter-spacing="-1.2" fill="#e8ecf8">Your agent forgets</text>
+  <text x="540.0" y="669.6" text-anchor="middle" font-family="Inter" font-size="60.0" font-weight="800" letter-spacing="-1.2" fill="#e8ecf8">everything. Give it</text>
+  <text x="540.0" y="739.2" text-anchor="middle" font-family="Inter" font-size="60.0" font-weight="800" letter-spacing="-1.2" fill="#e8ecf8">a memory that lasts.</text>
+  <g>
+    <rect x="213.6" y="823.0" width="195.8" height="54.0"
+      rx="27.0" fill="#101624" fill-opacity="0.85" stroke="#4fd6e0" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="234.3" cy="850.0" r="4.3" fill="#4fd6e0"/>
+    <text x="244.2" y="856.5"
+      font-family="Inter" font-size="18" font-weight="500" fill="#e8ecf8">sub-2ms recall</text>
+  </g>
+  <g>
+    <rect x="425.4" y="823.0" width="173.5" height="54.0"
+      rx="27.0" fill="#101624" fill-opacity="0.85" stroke="#8b7cf7" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="446.1" cy="850.0" r="4.3" fill="#8b7cf7"/>
+    <text x="456.0" y="856.5"
+      font-family="Inter" font-size="18" font-weight="500" fill="#e8ecf8">runs offline</text>
+  </g>
+  <g>
+    <rect x="615.0" y="823.0" width="73.1" height="54.0"
+      rx="27.0" fill="#101624" fill-opacity="0.85" stroke="#5fd39a" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="635.7" cy="850.0" r="4.3" fill="#5fd39a"/>
+    <text x="645.6" y="856.5"
+      font-family="Inter" font-size="18" font-weight="500" fill="#e8ecf8">MIT</text>
+  </g>
+  <g>
+    <rect x="704.0" y="823.0" width="162.4" height="54.0"
+      rx="27.0" fill="#101624" fill-opacity="0.85" stroke="#f5b455" stroke-opacity="0.34" stroke-width="1.2"/>
+    <circle cx="724.7" cy="850.0" r="4.3" fill="#f5b455"/>
+    <text x="734.6" y="856.5"
+      font-family="Inter" font-size="18" font-weight="500" fill="#e8ecf8">1,885 tests</text>
+  </g>
+  <rect x="90" y="910" width="900" height="2" fill="url(#rule)" opacity="0.55"/>
+  <text x="540.0" y="972.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="24.0" font-weight="500" fill="#9aa5c3">npx musememory connect</text>
+
+</svg>

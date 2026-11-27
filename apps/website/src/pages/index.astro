@@ -3,12 +3,17 @@
  * Muse Memory — landing page.
  *
  * Copy framework: AIDA across the page spine (Attention → Interest → Desire
- * → Action) with PAS (Problem → Agitation → Solution) driving the problem
- * block, per the content skill's formula matrix for a developer-vertical
- * landing page read by a problem-aware engineer.
+ * → Action), with PAS (Problem → Agitation → Solution) driving the problem
+ * block.
  *
- * Layout: the design skill's developer anatomy — hero → demo → architecture →
- * code grid → proof → quickstart → licence.
+ * Plain-language rule: second person, short sentences, concrete nouns. The
+ * hero sells the outcome; the technical depth starts below the fold, where a
+ * reader who wants it can find it. Words that cannot be verified are not
+ * used ("world-class", "seamless", "revolutionary" are absent on purpose).
+ *
+ * Shape: a bento landing page. `global.css` owns the 12-column grid, the card
+ * surface and the span scale; this page owns the mosaic — which card claims
+ * how many columns — and the copy.
  *
  * Every countable claim comes from `claims.json`, which is generated from
  * `src/`. Nothing in this file is hand-typed except prose.
@@ -26,27 +31,35 @@ const base = import.meta.env.BASE_URL;
 const repo = "https://github.com/harshsinghmp/musememory";
 const npm = "https://www.npmjs.com/package/musememory";
 
-/* ── The problem: PAS ─────────────────────────────────────────────────── */
+/* The proof chips under the hero. Every figure is interpolated, never typed. */
+const proofChips = [
+  `sub-${claims.latency.recallMillis}ms recall`,
+  "runs offline",
+  "MIT",
+  `${claims.tests.count.toLocaleString("en-US")} tests`,
+];
+
+/* ── The problem: PAS, in the reader's words ───────────────────────────── */
 const problems = [
   {
-    icon: "reset",
+    icon: "clock-history",
     title: "Every session starts from zero",
-    body: "You re-explain the architecture, the auth flow, the one decision nobody else understands. Every morning. The context window is a scratch pad, not a notebook.",
+    body: "You re-explain the architecture, the auth flow, the one decision nobody else remembers. Every morning.",
   },
   {
     icon: "git-branch",
-    title: "Memory that ignores your git state",
-    body: "Check out a hotfix and the agent still applies rules from the branch you abandoned. Stale facts leak into stable code and nobody notices until it ships.",
+    title: "Notes that ignore your branch",
+    body: "Check out a hotfix and the agent still applies rules from the branch you left. Stale facts leak into stable code.",
   },
   {
-    icon: "coin",
-    title: "A flat MEMORY.md is a cache killer",
-    body: "Every edit invalidates the whole prefix. You pay to re-read the same context each session, and the file becomes nobody's source of truth.",
+    icon: "file-tree",
+    title: "One giant notes file kills the cache",
+    body: "Every edit invalidates the whole prefix. You pay to re-read the same context each session, and the file stops being anyone's source of truth.",
   },
   {
-    icon: "blame",
+    icon: "share-network",
     title: "No blame, no rollback",
-    body: "A hallucinated rule poisons every future recall. There is no `git blame` for memory, no checkout, no way back to the state before the mistake.",
+    body: "A wrong note poisons every future session. There is no blame, no checkout, and no way back to the state before the mistake.",
   },
 ];
 
@@ -72,101 +85,114 @@ const outcomes = [
   },
 ];
 
-/* ── The three steps ──────────────────────────────────────────────────── */
+/* ── The bento feature grid: one outcome per card, each with real evidence ─
+   `span` is the card's share of the 12-column track. The mosaic is
+   8+4 / 4+4+4 / 6+6 — three whole rows, no ragged edges. */
+const features = [
+  {
+    icon: "plug",
+    span: 8,
+    title: "One command wires every agent",
+    body: "Run one command in your project. Muse finds the coding agents you already use and connects each one over MCP. There is no config file to hand-edit.",
+    metric: `${claims.agentPlatforms} platforms`,
+    cmd: "npx musememory connect",
+  },
+  {
+    icon: "shield-check",
+    span: 4,
+    title: "Broken citations never land",
+    body: "A note has to point at a real file or function. If the pointer is wrong, the write is refused on the spot — a guess never reaches the store.",
+    metric: "refused before storage",
+    cmd: "memory anchor create --file src/auth.ts --symbol verify",
+  },
+  {
+    icon: "clock-history",
+    span: 4,
+    title: "Stale notes are withheld",
+    body: "At recall, every note is checked against the code again. If the code moved on, the note is held back and you are told why, instead of being served as current.",
+    metric: "withheld + the reason",
+    cmd: 'memory recall "auth token invariant"',
+  },
+  {
+    icon: "git-branch",
+    span: 4,
+    title: "Memory versions like code",
+    body: "Scope a note to a branch, blame it back to the session that wrote it, and check out a state you trust.",
+    metric: "branch · blame · checkout",
+    cmd: "memory branch · memory blame · memory checkout",
+  },
+  {
+    icon: "lock",
+    span: 4,
+    title: "Secrets stop at the door",
+    body: "Every write is scanned before it is stored. A suspected key or token stops the write, and the value is never echoed back.",
+    metric: "value never echoed",
+    cmd: 'memory capture "auth uses jose" --project core',
+  },
+  {
+    icon: "wand",
+    span: 6,
+    title: "Failures become permanent lessons",
+    body: "Muse watches error → fix → no-recurrence in your session and distils a negative note, so the same mistake does not come back next week.",
+    metric: "captured as a negative",
+    cmd: 'memory capture --negative "AVOID: jwt.sign without an explicit algorithm"',
+  },
+  {
+    icon: "layers",
+    span: 6,
+    title: "Your files, your machine",
+    body: "Memory is YAML and SQLite in a folder you can open, diff, delete or commit. Nothing runs in the background, and nothing is uploaded.",
+    metric: `${claims.backgroundDaemons} background services`,
+    cmd: "memory files",
+  },
+];
+
+/* ── Benchmarks: the numbers behind the proof bento ───────────────────── */
+const benchmarks = [
+  { span: 3, label: "Recall latency", value: `sub-${claims.latency.recallMillis}ms`, note: "SQLite FTS5 BM25, in-process" },
+  { span: 3, label: "Hot cache lookup", value: `<${claims.latency.hotCacheMicros}µs`, note: "L0 in-process cache" },
+  { span: 3, label: "Import formats", value: String(claims.migratorProviders), note: "other memory systems" },
+  { span: 3, label: "Tests passing", value: claims.tests.count.toLocaleString("en-US"), note: `${claims.tests.files} files, runs offline` },
+  { span: 3, label: "Background services", value: String(claims.backgroundDaemons), note: "nothing to keep running" },
+  { span: 3, label: "MCP tools", value: String(claims.mcpTools), note: `${claims.mcpProfiles} task-focused profiles` },
+];
+
+/* ── Trust gates ──────────────────────────────────────────────────────── */
+const gates = [
+  { when: "On every write", what: "Secret scan", how: "The write is refused and the rule is named. The value is never echoed." },
+  { when: "On every write", what: "Citation check", how: "A note citing a file or symbol that does not exist is refused." },
+  { when: "On every recall", what: "Freshness gate", how: "Notes whose code drifted are withheld and reported, not served." },
+  { when: "On every import", what: "Context stripping", how: "Injected context blocks and base64 payloads are removed before storage." },
+];
+
+/* ── The three steps: what actually happens to a memory ───────────────── */
 const steps = [
   {
     n: "01",
     icon: "file-tree",
-    title: "Remember it",
-    plain:
-      "When your agent makes a decision or fixes a bug, Muse saves a short note — what changed and why.",
-    tech: "Every write passes a credential scan first, and the note lands as a readable YAML file beside a SQLite row.",
+    title: "Save it",
+    plain: "When your agent settles something — a decision, a fix, a constraint — Muse writes a short note: what changed and why.",
+    tech: "The note lands as a readable YAML file beside a SQLite row. A credential scan runs first.",
   },
   {
     n: "02",
     icon: "anchor",
     title: "Check it",
-    plain:
-      "Before the note is stored, Muse confirms the file or function it mentions actually exists.",
+    plain: "Before the note is stored, Muse confirms the file or function it mentions really exists.",
     tech: "Citations are structural fingerprints, not line numbers, so moving a function does not silently break the note.",
   },
   {
     n: "03",
     icon: "gauge",
     title: "Hand it back",
-    plain:
-      "Next session, Muse returns the notes that fit the task — sized to your budget, not the whole archive.",
-    tech: "One in-process query over SQLite FTS5. Under 2ms, with a hard token ceiling. No daemon, no network, no model call.",
+    plain: "Next session, Muse returns the notes that fit the task, sized to your token budget instead of the whole archive.",
+    tech: "One in-process query over SQLite FTS5. Under two milliseconds, with a hard ceiling. No daemon, no network, no model call.",
   },
-];
-
-/* ── Code-first feature grid: real surface, not marketing ──────────────── */
-const features = [
-  {
-    icon: "plug",
-    title: "One command wires your tools",
-    body: "Muse detects the coding agents you already run and connects the memory server to each one over MCP — with no permission prompts and no config file to hand-edit.",
-    code: "npx musememory connect",
-    lang: "bash",
-  },
-  {
-    icon: "shield-check",
-    title: "Writes are scanned, not trusted",
-    body: "Every write — capture, import, sync packet — is matched against credential patterns first. A suspected secret stops the write instead of landing in a file you might later commit.",
-    code: 'memory capture "auth uses jose" --project core',
-    lang: "bash",
-  },
-  {
-    icon: "anchor",
-    title: "Citations are verified at write time",
-    body: "A note that points at a file or function which does not exist is rejected on the spot. Hallucinated citations never reach the store.",
-    code: 'memory anchor create --file src/auth.ts --symbol verify',
-    lang: "bash",
-  },
-  {
-    icon: "clock-history",
-    title: "Stale notes are withheld, not served",
-    body: "At recall time Muse re-checks every citation. If the code moved on, the note is held back and reported — never handed over as if it were still true.",
-    code: "muse_context  # returns withheld_memories + freshness_notice",
-    lang: "mcp",
-  },
-  {
-    icon: "git-branch",
-    title: "Memory is versioned like code",
-    body: "Scope memory to a branch, blame a note back to the session that wrote it, and roll back to a known-good state. Git for AI memory.",
-    code: "memory branch m_1700… --path core/auth\nmemory blame m_1700…",
-    lang: "bash",
-  },
-  {
-    icon: "wand",
-    title: "Failures become permanent lessons",
-    body: "Muse watches the error → fix → no-recurrence sequence in your session logs and distills a negative memory, so the same mistake is not made twice.",
-    code: 'memory capture --negative "AVOID: jwt.sign without an explicit algorithm"',
-    lang: "bash",
-  },
-];
-
-/* ── Proof ────────────────────────────────────────────────────────────── */
-const benchmarks = [
-  { label: "Recall latency", value: `sub-${claims.latency.recallMillis}ms`, note: "SQLite FTS5 BM25, in-process" },
-  { label: "Hot cache lookup", value: `<${claims.latency.hotCacheMicros}µs`, note: "L0 in-process cache" },
-  { label: "Import formats", value: String(claims.migratorProviders), note: "other memory systems" },
-  { label: "Tests passing", value: claims.tests.count.toLocaleString("en-US"), note: `${claims.tests.files} files, runs offline` },
-  { label: "Background services", value: String(claims.backgroundDaemons), note: "nothing to keep running" },
-  { label: "MCP tools", value: String(claims.mcpTools), note: `${claims.mcpProfiles} task-focused profiles` },
-];
-
-/* ── Trust gates ──────────────────────────────────────────────────────── */
-const gates = [
-  { when: "On every write", what: "Credential scan", how: "The write is refused and the rule is named. The value is never echoed." },
-  { when: "On every write", what: "Citation check", how: "A note citing a file or symbol that does not exist is refused." },
-  { when: "On every recall", what: "Freshness gate", how: "Notes whose code drifted are withheld and reported, not served." },
-  { when: "On every import", what: "Context stripping", how: "Injected context blocks and base64 payloads are removed before storage." },
 ];
 
 /* ── Integration surface ──────────────────────────────────────────────── */
 const surfaces = [
-  { icon: "terminal", name: "CLI", detail: "80+ commands, scriptable, no daemon" },
+  { icon: "terminal", name: "CLI", detail: "Scriptable, no daemon" },
   { icon: "plug", name: "MCP", detail: `${claims.mcpTools} tools over stdio` },
   { icon: "layers", name: "Profiles", detail: `${claims.mcpProfiles} task-shaped tool sets` },
   { icon: "file-tree", name: "Files", detail: "YAML + SQLite, yours to read" },
@@ -230,7 +256,7 @@ const jsonLd = [
     name: "Muse Memory",
     url: "https://harshsinghmp.github.io/musememory/",
     description:
-      "Persistent, local-first memory for AI coding agents. Citations are verified before they are stored, stale memories are withheld at recall, and the whole engine runs in-process on your machine.",
+      "Local-first memory for AI coding agents. Muse saves what your agent learns to plain files on your machine and hands the right notes back next session.",
     inLanguage: "en",
   },
   {
@@ -241,7 +267,7 @@ const jsonLd = [
     operatingSystem: "macOS, Linux, Windows",
     softwareVersion: claims.version,
     description:
-      "Persistent, self-verifying memory for AI coding agents. Citations are verified at write time, stale memories are withheld at recall, failures are fairly attributed, and negative lessons are mined from fix trajectories.",
+      "Local-first memory for AI coding agents. Notes are checked against your code before they are stored, stale notes are withheld at recall, and the whole engine runs in-process on your machine.",
     url: "https://harshsinghmp.github.io/musememory/",
     downloadUrl: npm,
     codeRepository: repo,
@@ -249,10 +275,10 @@ const jsonLd = [
     runtimePlatform: "Node.js, Bun",
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     featureList: [
+      "One command wires the majority of coding agents over MCP",
       "Write-time citation verification",
       "Recall-time freshness gate",
       "In-process retrieval engine (sub-2ms recall)",
-      "One command wires the majority of coding agents over MCP",
       "Deterministic lifecycle and forgetting",
       "Structural code anchors that survive refactors",
       "Credential scanning on every write",
@@ -264,7 +290,7 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to add persistent, self-verifying memory to an AI coding agent",
+    name: "How to give an AI coding agent memory that lasts",
     description:
       "Install Muse Memory in one command and give your AI coding assistant memory that survives between sessions.",
     totalTime: "PT1M",
@@ -314,14 +340,17 @@ const jsonLd = [
 ---
 
 <Base
-  title="Muse Memory — Persistent, self-verifying memory for AI coding agents"
-  description="Muse Memory gives AI coding agents a memory that survives the session and checks itself. Citations are verified before they are stored, stale notes are withheld at recall, and one command wires the majority of coding agents. No account, no API key, MIT."
+  title="Muse Memory — your AI agent gets a memory that lasts"
+  description="Muse saves what your AI coding agent learns to plain files on your machine, then hands the right notes back next session. No cloud, no daemon, no re-explaining. Free, MIT, runs offline."
   jsonLd={jsonLd}
 >
   <Nav />
 
   <main id="main">
-    <!-- ══ BLOCK 1 · HERO — utility first, one-command install ══════════════ -->
+    <!-- ══ HERO · outcome + audience + the objection removed ═════════════
+         One primary action (install), one secondary (see it work). The card
+         on the right is real UI: the command that runs and the files it
+         writes, so "no cloud" is shown rather than asserted. -->
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-bg" aria-hidden="true">
         <div class="mesh"></div>
@@ -329,51 +358,64 @@ const jsonLd = [
         <div class="synapse-orb orb-b"></div>
       </div>
 
-      <div class="container hero-inner">
-        <p class="hero-kicker">
-          <span class="pulse" aria-hidden="true"></span>
-          v{claims.version} · Runs on your machine · No account · MIT
-        </p>
+      <div class="container">
+        <div class="bento hero-bento">
+          <div class="hero-copy bento-span-8">
+            <p class="eyebrow">Local-first memory for AI coding agents</p>
 
-        <h1 id="hero-title" class="hero-title">
-          Persistent, self-verifying memory for AI coding agents
-        </h1>
+            <h1 id="hero-title" class="hero-title">
+              Your agent forgets everything. Give it a memory that lasts.
+            </h1>
 
-        <p class="hero-sub">
-          Muse stores what your agent learned — the decisions, the fixes, the
-          constraints — checks every note against the code it cites, and hands
-          back only what still holds. In-process, sub-2ms, no daemon.
-        </p>
+            <p class="hero-sub">
+              Muse saves what your agent learns to plain files on your machine,
+              then hands the right notes back next session. No cloud, no daemon,
+              no re-explaining.
+            </p>
 
-        <div class="hero-install">
-          <pre class="term" aria-label="Terminal: install command"><code id="install-cmd">npx musememory connect</code></pre>
-          {/* The button keeps one stable accessible name. Swapping the visible
-              label is not enough on its own: aria-label wins the name
-              computation, so an assistive-tech user never hears the result.
-              The live region below is what actually announces it. */}
-          <button class="copy" type="button" data-copy="#install-cmd" aria-label="Copy the install command">
-            <span data-copy-label>Copy</span>
-            <span class="sr-only" role="status" aria-live="polite" data-copy-status></span>
-          </button>
-        </div>
-
-        <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="#install">Get memory in one command</a>
-          <a class="btn btn-ghost btn-lg" href={`${base}/docs`}>Read the docs</a>
-        </div>
-
-        <dl class="hero-stats">
-          {benchmarks.slice(0, 4).map((b) => (
-            <div class="hero-stat">
-              <dt>{b.label}</dt>
-              <dd>{b.value}</dd>
+            <div class="hero-cta">
+              <a class="btn btn-primary btn-lg" href="#install">Install in one command</a>
+              <a class="btn btn-ghost btn-lg" href="#demo">See how recall works</a>
             </div>
-          ))}
-        </dl>
+
+            <ul class="chip-row hero-chips" aria-label="At a glance">
+              {proofChips.map((chip) => (
+                <li class="metric-chip">{chip}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div class="bento-card bento-span-4 hero-card reveal">
+            <p class="card-kicker">The whole setup</p>
+            <div class="cmd-wrap">
+              <pre class="term" aria-label="Terminal: install command"><code id="install-cmd">npx musememory connect</code></pre>
+              {/* The button keeps one stable accessible name. Swapping the
+                  visible label is not enough on its own: aria-label wins the
+                  name computation, so an assistive-tech user never hears the
+                  result. The live region below is what announces it. */}
+              <button class="copy" type="button" data-copy="#install-cmd" aria-label="Copy the install command">
+                <span data-copy-label>Copy</span>
+                <span class="sr-only" role="status" aria-live="polite" data-copy-status></span>
+              </button>
+            </div>
+
+            <p class="card-kicker">What it writes</p>
+            <pre class="tree" aria-label="The files Muse writes inside your project"><code>{`project/
+└── .memory/
+    ├── memory.db    # SQLite
+    ├── memories/    # YAML
+    └── CURRENT.md`}</code></pre>
+
+            <p class="hero-card-note">
+              Open it in any editor. Commit it, diff it, or delete it — your
+              memory is a folder, not an account.
+            </p>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- ══ BLOCK 2 · PROBLEM — PAS ═══════════════════════════════════════ -->
+    <!-- ══ PROBLEM · PAS ═════════════════════════════════════════════════ -->
     <section class="section section--raised" id="problem" aria-labelledby="problem-title">
       <div class="container">
         <div class="section-head">
@@ -381,42 +423,44 @@ const jsonLd = [
           <h2 id="problem-title">Why your agent forgets everything by Thursday</h2>
           <p class="answer">
             An assistant only knows what fits in its context window. When the
-            session ends that context is discarded, so the next session starts
-            from zero — and the cost compounds every time you re-explain
-            something that was settled yesterday.
+            session ends, that context is thrown away — so the next session
+            starts from zero, and you pay again for what was settled yesterday.
           </p>
         </div>
 
-        <div class="grid grid-4 problem-grid">
+        <div class="bento">
           {problems.map((p, i) => (
-            <article class="panel problem-card reveal" style={`--reveal-delay:${i * 70}ms`}>
-              <span class="problem-icon" aria-hidden="true">
-                <Icon name="clock-history" size={20} />
+            <article
+              class="bento-card bento-span-3 problem-card reveal"
+              style={`--reveal-delay:${i * 70}ms`}
+            >
+              <span class="bento-icon" aria-hidden="true">
+                <Icon name={p.icon} size={20} />
               </span>
               <h3>{p.title}</h3>
-              <p>{p.body}</p>
+              <p class="bento-body">{p.body}</p>
             </article>
           ))}
         </div>
       </div>
     </section>
 
-    <!-- ══ BLOCK 3 · DEMO — show, don't tell ════════════════════════════ -->
+    <!-- ══ DEMO · the three outcomes, shown ═════════════════════════════ -->
     <section class="section" id="demo" aria-labelledby="demo-title">
       <div class="container">
         <div class="section-head">
-          <p class="eyebrow">Show, don't tell</p>
+          <p class="eyebrow">See how recall works</p>
           <h2 id="demo-title">Every memory gets one of three outcomes</h2>
           <p class="answer">
             Nothing is stored on faith. A note is either confirmed against the
             code it cites, refused because that code does not exist, or
-            withheld because the code moved on since — and in that last case
-            you are told why.
+            withheld because the code moved on — and in that last case you are
+            told why.
           </p>
         </div>
 
-        <div class="demo-grid">
-          <figure class="reel panel reveal">
+        <div class="bento">
+          <figure class="bento-card bento-span-8 reel reveal">
             {/* width/height are the real dimensions of the poster frame
                 (1280×720, 16:9). They give the element an intrinsic aspect
                 ratio so the demo box is reserved before metadata arrives and
@@ -441,47 +485,55 @@ const jsonLd = [
             </figcaption>
           </figure>
 
-          <ul class="outcome-list">
+          <div class="bento-span-4 outcome-stack">
             {outcomes.map((o, i) => (
-              <li class={`outcome outcome-${o.tone} panel reveal`} style={`--reveal-delay:${i * 90}ms`}>
+              <article
+                class={`bento-card outcome outcome-${o.tone} reveal`}
+                style={`--reveal-delay:${i * 90}ms`}
+              >
                 <span class="outcome-badge" aria-hidden="true">
                   {o.tone === "ok" ? "✓" : o.tone === "no" ? "✕" : "!"}
                 </span>
-                <p class="outcome-title">{o.state}</p>
-                <p class="outcome-body"><code>{o.body}</code></p>
-                <p class="outcome-note">{o.note}</p>
-              </li>
+                <div>
+                  <p class="outcome-title">{o.state}</p>
+                  <p class="outcome-body"><code>{o.body}</code></p>
+                  <p class="outcome-note">{o.note}</p>
+                </div>
+              </article>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ══ BLOCK 4 · ARCHITECTURE & MECHANICS ═══════════════════════════ -->
+    <!-- ══ ARCHITECTURE · where the data lives ══════════════════════════ -->
     <section class="section section--raised" id="architecture" aria-labelledby="arch-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">How it works</p>
           <h2 id="arch-title">Your data never leaves the machine</h2>
           <p class="answer">
-            Muse runs as a process you start and stop. There is no server to
-            operate, no account to create, and no network call in the path of
-            a recall. The whole engine is a SQLite database and a folder of
-            YAML files you can open in any editor.
+            Muse is a process you start and stop. There is no server to
+            operate, no account to create, and no network call in the path of a
+            recall. The whole engine is a SQLite database and a folder of YAML
+            files you can open in any editor.
           </p>
         </div>
 
-        <figure class="figure panel reveal">
-          <ArchitectureDiagram />
-          <figcaption>
-            One process, two scopes. Project memory travels with the repo;
-            global memory holds the preferences that follow you.
-          </figcaption>
-        </figure>
+        <div class="bento">
+          <figure class="bento-card bento-span-12 figure reveal">
+            <ArchitectureDiagram />
+            <figcaption>
+              One process, two scopes. Project memory travels with the repo;
+              global memory holds the preferences that follow you.
+            </figcaption>
+          </figure>
 
-        <div class="grid grid-3 step-grid">
           {steps.map((s, i) => (
-            <article class="step panel reveal hoverable" style={`--reveal-delay:${i * 100}ms`}>
+            <article
+              class="bento-card bento-span-4 step reveal"
+              style={`--reveal-delay:${i * 100}ms`}
+            >
               <div class="step-head">
                 <span class="step-num" aria-hidden="true">{s.n}</span>
                 <span class="step-icon" aria-hidden="true">
@@ -493,10 +545,8 @@ const jsonLd = [
               <p class="step-tech">{s.tech}</p>
             </article>
           ))}
-        </div>
 
-        <div class="layout-split">
-          <div class="layout-copy">
+          <div class="bento-card bento-span-5 layout-copy reveal">
             <h3>Everything is a file you can read</h3>
             <p class="lede">
               Delete the folder and the memory is gone. Commit it and memory
@@ -504,7 +554,8 @@ const jsonLd = [
               <code>git revert</code>.
             </p>
           </div>
-          <pre class="term" aria-label="File layout of the memory store"><code>{`.memory/                                  # project scope
+
+          <pre class="bento-card bento-span-7 term term--code reveal" aria-label="File layout of the memory store"><code>{`.memory/                                  # project scope
 ├── memory.db                             # SQLite: memories, anchors, graph
 ├── memories/                             # one YAML file per memory
 ├── CURRENT.md                            # active constraints
@@ -517,52 +568,58 @@ const jsonLd = [
       </div>
     </section>
 
-    <!-- ══ BLOCK 5 · CODE-FIRST FEATURE GRID ════════════════════════════ -->
+    <!-- ══ FEATURES · the bento grid ════════════════════════════════════ -->
     <section class="section" id="surface" aria-labelledby="surface-title">
       <div class="container">
         <div class="section-head">
-          <p class="eyebrow">The surface</p>
-          <h2 id="surface-title">Real commands, real tools</h2>
+          <p class="eyebrow">What you get</p>
+          <h2 id="surface-title">Seven things that hold up under use</h2>
           <p class="answer">
-            Every capability below is something you can run right now. No
-            dashboards to configure, no workflows to author — a command, or a
-            tool your agent calls.
+            Each card is a capability you can run today. The command under it
+            is the one you would actually type.
           </p>
         </div>
 
-        <div class="grid grid-2 feature-grid">
+        <div class="bento">
           {features.map((f, i) => (
-            <article class="feature panel reveal hoverable" style={`--reveal-delay:${i * 60}ms`}>
-              <div class="feature-head">
-                <span class="feature-icon" aria-hidden="true">
-                  <Icon name={f.icon} size={20} />
-                </span>
-                <h3>{f.title}</h3>
+            <article
+              class={`bento-card bento-span-${f.span} feature reveal`}
+              style={`--reveal-delay:${i * 60}ms`}
+            >
+              <span class="bento-icon" aria-hidden="true">
+                <Icon name={f.icon} size={20} />
+              </span>
+              <h3>{f.title}</h3>
+              <p class="bento-body">{f.body}</p>
+              <div class="bento-foot">
+                <div class="chip-row">
+                  <span class="metric-chip"><strong>{f.metric}</strong></span>
+                </div>
+                <p class="cmd">
+                  <code>{f.cmd}</code>
+                </p>
               </div>
-              <p class="feature-body">{f.body}</p>
-              <pre class="term term--code"><code>{f.code}</code></pre>
             </article>
           ))}
         </div>
       </div>
     </section>
 
-    <!-- ══ BLOCK 6 · PROOF ══════════════════════════════════════════════ -->
+    <!-- ══ PROOF · benchmarks as a bento ════════════════════════════════ -->
     <section class="section section--raised" id="proof" aria-labelledby="proof-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Proof</p>
           <h2 id="proof-title">Measured, not claimed</h2>
           <p class="answer">
-            Recall takes under two milliseconds because it is a local database
-            query, not an API call. The hot cache answers in under fifty
-            microseconds. Run <code>memory benchmark</code> to reproduce every
-            number on this page.
+            Recall is a local database query, not an API call, so it finishes
+            in under two milliseconds. Run <code>memory benchmark</code> and
+            you get the same numbers on your own machine.
           </p>
         </div>
 
-        <div class="proof-grid">
-          <figure class="figure panel reveal">
+        <div class="bento">
+          <figure class="bento-card bento-span-6 figure reveal">
             <LatencyChart />
             <figcaption>
               Latency on the same machine, same store. The network row is a
@@ -570,24 +627,23 @@ const jsonLd = [
             </figcaption>
           </figure>
 
-          <div class="proof-side">
-            <dl class="metric-grid">
-              {benchmarks.map((b) => (
-                <div class="metric panel panel--flush hoverable">
-                  <dt>{b.label}</dt>
-                  <dd>{b.value}</dd>
-                  <dd class="metric-note">{b.note}</dd>
-                </div>
-              ))}
+          {benchmarks.map((b, i) => (
+            <dl
+              class={`bento-card bento-span-${b.span} metric reveal`}
+              style={`--reveal-delay:${i * 60}ms`}
+            >
+              <dt>{b.label}</dt>
+              <dd>{b.value}</dd>
+              <dd class="metric-note">{b.note}</dd>
             </dl>
-          </div>
+          ))}
         </div>
 
         <div class="gates-block">
-          <h3 class="gates-title">Four gates, every time</h3>
-          <div class="gates-list">
-            {gates.map((g) => (
-              <div class="gate reveal">
+          <h3 class="gates-title">Four checks, every time</h3>
+          <div class="bento">
+            {gates.map((g, i) => (
+              <div class="bento-card bento-span-3 gate reveal" style={`--reveal-delay:${i * 60}ms`}>
                 <span class="gate-when">{g.when}</span>
                 <span class="gate-what">{g.what}</span>
                 <span class="gate-how">{g.how}</span>
@@ -598,7 +654,7 @@ const jsonLd = [
       </div>
     </section>
 
-    <!-- ══ LIFECYCLE ══════════════════════════════════════════════════════ -->
+    <!-- ══ LIFECYCLE ═════════════════════════════════════════════════════ -->
     <section class="section" id="lifecycle" aria-labelledby="lifecycle-title">
       <div class="container">
         <div class="section-head">
@@ -606,32 +662,34 @@ const jsonLd = [
           <h2 id="lifecycle-title">Notes have a life, and an end</h2>
           <p class="answer">
             Nothing is written and forgotten. Every note moves through a
-            deterministic lifecycle, decays on a schedule tied to how much
-            you trust it, and can be restored if you delete it by mistake.
+            deterministic lifecycle, decays on a schedule tied to how much you
+            trust it, and can be restored if you delete it by mistake.
           </p>
         </div>
-        <figure class="figure panel reveal">
-          <LifecycleDiagram />
-          <figcaption>
-            <code>confirmed</code> is the only state served by default. A
-            deletion is a tombstone — <code>memory restore</code> brings it
-            back.
-          </figcaption>
-        </figure>
+        <div class="bento">
+          <figure class="bento-card bento-span-12 figure reveal">
+            <LifecycleDiagram />
+            <figcaption>
+              <code>confirmed</code> is the only state served by default. A
+              deletion is a tombstone — <code>memory restore</code> brings it
+              back.
+            </figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 
-    <!-- ══ COMPARE ═══════════════════════════════════════════════════════ -->
+    <!-- ══ COMPARE · the landscape ══════════════════════════════════════ -->
     <section class="section section--raised" id="compare" aria-labelledby="compare-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Landscape</p>
-          <h2 id="compare-title">How it is different</h2>
+          <h2 id="compare-title">Where Muse differs from other memory tools</h2>
           <p class="answer">
-            Vector stores optimise for similarity and graph platforms for
-            relationships. Muse optimises for what a coding assistant
-            actually needs: recall that is fast, local and tied to your code —
-            and that never passes off a stale fact as current.
+            Vector stores optimise for similarity, graph platforms for
+            relationships. Muse optimises for what a coding assistant actually
+            needs: recall that is fast, local and tied to your code — and that
+            never passes off a stale fact as current.
           </p>
         </div>
         {/* The scroll container itself has to be focusable and named, or a
@@ -690,7 +748,7 @@ const jsonLd = [
       </div>
     </section>
 
-    <!-- ══ BLOCK 7 · QUICKSTART (TTFV) & INTEGRATION SURFACE ══════════════ -->
+    <!-- ══ INSTALL · the one action this page asks for ══════════════════ -->
     <section class="section" id="install" aria-labelledby="install-title">
       <div class="container">
         <div class="section-head">
@@ -699,35 +757,35 @@ const jsonLd = [
           <p class="answer">
             Open a terminal in your project, paste the line, press enter. Muse
             finds the coding agents you already run and connects each one over
-            MCP, with only the tools its task needs. Time to first value:
-            under a minute.
+            MCP, with only the tools its task needs. Under a minute to first
+            value.
           </p>
         </div>
 
-        <ol class="install-steps">
-          <li class="install-step panel reveal hoverable">
+        <ol class="bento install-steps">
+          <li class="bento-card bento-span-4 install-step reveal">
             <span class="is-num" aria-hidden="true">1</span>
             <h3>Paste one line</h3>
             <p>No install step, no config file, no account.</p>
-            <pre class="term term--code"><code>npx musememory connect</code></pre>
+            <p class="cmd"><code>npx musememory connect</code></p>
           </li>
-          <li class="install-step panel reveal hoverable" style="--reveal-delay:80ms">
+          <li class="bento-card bento-span-4 install-step reveal" style="--reveal-delay:80ms">
             <span class="is-num" aria-hidden="true">2</span>
             <h3>Let it wire your tools</h3>
             <p>Each agent gets the memory tools its task needs — nothing more.</p>
-            <pre class="term term--code"><code>memory hooks install   # optional: hands-free recall</code></pre>
+            <p class="cmd"><code>memory hooks install</code></p>
           </li>
-          <li class="install-step panel reveal hoverable" style="--reveal-delay:160ms">
+          <li class="bento-card bento-span-4 install-step reveal" style="--reveal-delay:160ms">
             <span class="is-num" aria-hidden="true">3</span>
             <h3>Keep working</h3>
-            <p>Ask why something is the way it is — your agent can now look it up.</p>
-            <pre class="term term--code"><code>memory context --query "how does auth work" --budget 2000</code></pre>
+            <p>Ask why something is the way it is — your agent can look it up.</p>
+            <p class="cmd"><code>memory context --query "how does auth work" --budget 2000</code></p>
           </li>
         </ol>
 
-        <div class="surface-row">
+        <div class="bento surface-row">
           {surfaces.map((s) => (
-            <div class="surface panel panel--flush reveal">
+            <div class="bento-card bento-span-3 surface reveal">
               <span class="surface-icon" aria-hidden="true"><Icon name={s.icon} size={18} /></span>
               <span class="surface-name">{s.name}</span>
               <span class="surface-detail">{s.detail}</span>
@@ -743,7 +801,7 @@ const jsonLd = [
       </div>
     </section>
 
-    <!-- ══ LICENCE ═══════════════════════════════════════════════════════ -->
+    <!-- ══ LICENCE ══════════════════════════════════════════════════════ -->
     <section class="section section--raised licence" aria-labelledby="licence-title">
       <div class="container container-narrow licence-inner">
         <h2 id="licence-title">Free forever. No paid tier, no telemetry.</h2>
@@ -787,7 +845,7 @@ const jsonLd = [
       </div>
     </section>
 
-    <!-- ══ FAQ ═══════════════════════════════════════════════════════════ -->
+    <!-- ══ FAQ ══════════════════════════════════════════════════════════ -->
     <section class="section section--raised" id="faq" aria-labelledby="faq-title">
       <div class="container faq-wrap">
         <div class="section-head">
@@ -796,7 +854,7 @@ const jsonLd = [
         </div>
         <div class="faq">
           {faqs.map((f, i) => (
-            <details class="faq-item panel reveal hoverable" style={`--reveal-delay:${i * 50}ms`}>
+            <details class="faq-item bento-card reveal" style={`--reveal-delay:${i * 50}ms`}>
               <summary><span>{f.q}</span></summary>
               <p>{f.a}</p>
             </details>
@@ -809,7 +867,7 @@ const jsonLd = [
     <section class="cta-final" aria-labelledby="cta-title">
       <div class="container container-narrow cta-inner reveal">
         <h2 id="cta-title">Stop re-explaining. Start remembering.</h2>
-        <p>One command connects every assistant you use. The memory verifies itself from there.</p>
+        <p>One command connects every assistant you use. The memory checks itself from there.</p>
         <div class="cta-actions">
           <a class="btn btn-primary btn-lg" href="#install">Install now</a>
           <a class="btn btn-ghost btn-lg" href={repo} rel="noopener">Read the source ↗</a>
@@ -825,7 +883,7 @@ const jsonLd = [
     .hero {
       position: relative;
       isolation: isolate;
-      padding-block: var(--space-3xl) var(--space-2xl);
+      padding-block: var(--space-2xl) var(--space-xl);
       overflow: clip;
     }
     .hero-bg {
@@ -853,157 +911,123 @@ const jsonLd = [
       .orb-a, .orb-b { display: none; }
     }
 
-    .hero-inner {
+    .hero-bento { align-items: center; }
+    .hero-copy {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      text-align: center;
+      align-items: flex-start;
+      padding-block: var(--space-lg);
     }
-    .hero-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55em;
-      font-size: var(--text-xs);
-      color: var(--text-secondary);
-      border: 1px solid var(--border-subtle);
-      background: var(--surface-raised);
-      border-radius: var(--radius-full);
-      padding: 0.45em 1.1em;
-      margin-block-end: var(--space-lg);
-    }
-    .pulse {
-      inline-size: 8px;
-      block-size: 8px;
-      border-radius: 50%;
-      background: var(--accent-success);
-      box-shadow: 0 0 0 0 rgb(95 211 154 / 50%);
-      animation: pulse 2.4s var(--ease-in-out) infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgb(95 211 154 / 50%); }
-      70% { box-shadow: 0 0 0 9px rgb(95 211 154 / 0%); }
-      100% { box-shadow: 0 0 0 0 rgb(95 211 154 / 0%); }
-    }
-
     .hero-title {
-      max-width: 18ch;
-      margin-block-end: var(--space-md);
-      background: linear-gradient(96deg, #fff 22%, var(--accent-primary) 76%, var(--accent-secondary));
+      max-width: 17ch;
+      margin-block-end: var(--space-sm);
+      font-size: var(--text-4xl);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      background: linear-gradient(96deg, #fff 34%, var(--accent-primary) 82%, var(--accent-secondary));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
+    @media (max-width: 900px) {
+      .hero-title { max-width: 24ch; }
+      /* The copy owns the row on a tablet, so the card takes the whole row
+         underneath it rather than a half-width column beside nothing. */
+      .hero-card { grid-column: 1 / -1; }
+    }
     .hero-sub {
-      max-width: 52ch;
+      max-width: 54ch;
       color: var(--text-secondary);
       font-size: var(--text-md);
-      margin-block-end: var(--space-xl);
-    }
-    .hero-install {
-      position: relative;
-      inline-size: 100%;
-      max-width: 34rem;
-    }
-    .hero-install .term {
-      margin-inline: auto;
-      padding-inline-end: 5.5rem;
-      text-align: start;
+      margin-block-end: var(--space-lg);
     }
     .hero-cta {
       display: flex;
       gap: var(--space-sm);
       flex-wrap: wrap;
-      justify-content: center;
-      margin-block: var(--space-lg);
-    }
-    .hero-stats {
-      inline-size: 100%;
-      max-width: 56rem;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-      gap: 1px;
-      background: var(--border-subtle);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-    }
-    .hero-stat {
-      background: var(--surface-panel);
-      padding: var(--space-md);
-    }
-    .hero-stat dt {
-      font-size: var(--text-2xs);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-      margin-block-end: var(--space-3xs);
-    }
-    .hero-stat dd {
-      font-size: var(--text-xl);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      background: linear-gradient(92deg, var(--accent-primary), var(--accent-secondary));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    /* ── GRIDS ───────────────────────────────────────────────────────────── */
-    .grid { display: grid; gap: var(--space-md); }
-    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
-    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); }
-    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
-
-    /* ── PROBLEM ─────────────────────────────────────────────────────────── */
-    .problem-card { padding: var(--space-lg); }
-    .problem-icon {
-      display: inline-grid;
-      place-items: center;
-      inline-size: 2.4rem;
-      block-size: 2.4rem;
-      border-radius: var(--radius-sm);
-      background: var(--accent-primary-soft);
-      color: var(--accent-primary);
       margin-block-end: var(--space-md);
     }
-    .problem-card h3 { font-size: var(--text-md); margin-block-end: var(--space-xs); }
-    .problem-card p { color: var(--text-secondary); font-size: var(--text-sm); }
+    .hero-chips {
+      list-style: none;
+      padding: 0;
+    }
+
+    /* The hero card: a command and the files it writes. */
+    .hero-card {
+      align-self: stretch;
+      justify-content: center;
+      gap: var(--space-xs);
+    }
+    .card-kicker {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+    /* The copy button is positioned against this wrapper, not the <pre>. */
+    .cmd-wrap { position: relative; }
+    .cmd-wrap .term {
+      padding: var(--space-sm) var(--space-md);
+      padding-inline-end: 5.5rem;
+      box-shadow: none;
+    }
+    .cmd-wrap .term code { font-size: var(--text-2xs); }
+    .tree {
+      margin: 0;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+    }
+    .tree code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: var(--text-2xs);
+      line-height: 1.7;
+      color: var(--text-secondary);
+      /* The tree wraps instead of scrolling: a horizontally scrollable region
+         would need its own tab stop (axe: scrollable-region-focusable) and is
+         unreachable on a phone. */
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .hero-card-note {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      line-height: 1.6;
+    }
+
+    /* ── PROBLEM ─────────────────────────────────────────────────────────── */
+    .problem-card h3 { font-size: var(--text-md); }
+    .problem-card p { margin: 0; }
 
     /* ── DEMO ────────────────────────────────────────────────────────────── */
-    .demo-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-      gap: var(--space-lg);
-      align-items: start;
-    }
-    @media (max-width: 900px) {
-      .demo-grid { grid-template-columns: 1fr; }
-    }
-    .reel { overflow: hidden; margin: 0; }
+    .reel { overflow: hidden; margin: 0; padding: 0; }
     /* block-size: auto keeps the intrinsic 16:9 ratio from the width/height
        attributes while the inline size follows the column. */
     .reel video { inline-size: 100%; block-size: auto; aspect-ratio: 16 / 9; }
-    .reel figcaption,
-    .figure figcaption {
+    .figure figcaption,
+    .reel figcaption {
       padding: var(--space-sm) var(--space-md);
       font-size: var(--text-xs);
       color: var(--text-tertiary);
       border-block-start: 1px solid var(--border-subtle);
     }
-    .outcome-list {
-      list-style: none;
+    .outcome-stack {
       display: grid;
       gap: var(--space-sm);
+      align-content: start;
     }
     .outcome {
       display: grid;
       grid-template-columns: auto 1fr;
       gap: var(--space-xs) var(--space-sm);
-      padding: var(--space-md);
       align-items: start;
+      padding: var(--space-md);
     }
     .outcome-badge {
-      grid-row: span 3;
       display: inline-grid;
       place-items: center;
       inline-size: 1.6rem;
@@ -1022,17 +1046,16 @@ const jsonLd = [
     .outcome-note { font-size: var(--text-xs); color: var(--text-secondary); }
 
     /* ── FIGURES ─────────────────────────────────────────────────────────── */
-    .figure { margin: 0; overflow: hidden; }
+    .figure { margin: 0; overflow: hidden; padding: 0; }
     .figure :global(svg) { inline-size: 100%; block-size: auto; }
 
     /* ── STEPS ───────────────────────────────────────────────────────────── */
-    .step-grid { margin-block-start: var(--space-xl); }
     .step { padding: var(--space-lg); }
     .step-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-block-end: var(--space-sm);
+      margin-block-end: var(--space-2xs);
     }
     .step-num {
       font-family: var(--font-mono);
@@ -1041,74 +1064,34 @@ const jsonLd = [
       color: var(--accent-secondary);
     }
     .step-icon { color: var(--text-tertiary); }
-    .step h3 { font-size: var(--text-md); margin-block-end: var(--space-xs); }
     .step-plain { font-size: var(--text-sm); }
     .step-tech {
-      margin-block-start: var(--space-md);
-      padding-block-start: var(--space-md);
+      margin-block-start: auto;
+      padding-block-start: var(--space-sm);
       border-block-start: 1px solid var(--border-subtle);
       color: var(--text-secondary);
       font-size: var(--text-xs);
       line-height: 1.6;
     }
 
-    /* ── LAYOUT SPLIT ────────────────────────────────────────────────────── */
-    .layout-split {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-      gap: var(--space-xl);
-      align-items: center;
-      margin-block-start: var(--space-2xl);
-    }
-    @media (max-width: 900px) {
-      .layout-split { grid-template-columns: 1fr; }
-    }
-    .layout-copy h3 { font-size: var(--text-lg); margin-block-end: var(--space-sm); }
-
-    /* ── FEATURES ────────────────────────────────────────────────────────── */
-    .feature { padding: var(--space-lg); display: flex; flex-direction: column; }
-    .feature-head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      margin-block-end: var(--space-sm);
-    }
-    .feature-icon {
-      display: inline-grid;
-      place-items: center;
-      inline-size: 2.2rem;
-      block-size: 2.2rem;
-      border-radius: var(--radius-sm);
-      background: var(--accent-secondary-soft);
-      color: var(--accent-secondary);
-      flex: none;
-    }
-    .feature-head h3 { font-size: var(--text-md); }
-    .feature-body { color: var(--text-secondary); font-size: var(--text-sm); margin-block-end: var(--space-md); }
+    /* ── LAYOUT SPLIT (copy + file tree) ─────────────────────────────────── */
+    .layout-copy h3 { font-size: var(--text-lg); margin-block-end: var(--space-xs); }
     .term--code {
-      margin-block-start: auto;
-      padding: var(--space-sm) var(--space-md);
+      margin: 0;
+      padding: var(--space-md) var(--space-lg);
       box-shadow: none;
       background: var(--surface-inset);
     }
     .term--code code { font-size: var(--text-xs); }
 
+    /* ── FEATURES ────────────────────────────────────────────────────────── */
+    .feature { padding: var(--space-lg); }
+    .feature h3 { margin-block-start: var(--space-2xs); }
+    .feature .bento-foot { display: grid; gap: var(--space-2xs); }
+    .feature .cmd { margin: 0; }
+
     /* ── PROOF ───────────────────────────────────────────────────────────── */
-    .proof-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: var(--space-lg);
-      align-items: start;
-    }
-    @media (max-width: 900px) {
-      .proof-grid { grid-template-columns: 1fr; }
-    }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-      gap: var(--space-sm);
-    }
-    .metric { padding: var(--space-md); }
+    .metric { padding: var(--space-md) var(--space-lg); }
     .metric dt {
       font-size: var(--text-2xs);
       letter-spacing: 0.1em;
@@ -1116,7 +1099,7 @@ const jsonLd = [
       color: var(--text-tertiary);
     }
     .metric dd {
-      font-size: var(--text-lg);
+      font-size: var(--text-xl);
       font-weight: 800;
       letter-spacing: -0.02em;
       color: var(--accent-secondary);
@@ -1131,20 +1114,7 @@ const jsonLd = [
 
     .gates-block { margin-block-start: var(--space-2xl); }
     .gates-title { font-size: var(--text-lg); margin-block-end: var(--space-md); }
-    .gates-list { display: grid; gap: var(--space-sm); }
-    .gate {
-      display: grid;
-      grid-template-columns: minmax(7rem, 0.7fr) minmax(9rem, 1fr) minmax(0, 2.4fr);
-      gap: var(--space-md);
-      align-items: baseline;
-      padding: var(--space-md);
-      background: var(--surface-panel);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-    }
-    @media (max-width: 760px) {
-      .gate { grid-template-columns: 1fr; gap: var(--space-2xs); }
-    }
+    .gate { padding: var(--space-md); gap: var(--space-3xs); }
     .gate-when {
       font-size: var(--text-2xs);
       letter-spacing: 0.1em;
@@ -1152,7 +1122,7 @@ const jsonLd = [
       color: var(--text-tertiary);
     }
     .gate-what { font-weight: 700; font-size: var(--text-sm); }
-    .gate-how { color: var(--text-secondary); font-size: var(--text-sm); }
+    .gate-how { color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
 
     /* ── COMPARE ─────────────────────────────────────────────────────────── */
     .compare { min-inline-size: 38rem; }
@@ -1171,13 +1141,7 @@ const jsonLd = [
     .table-more { margin-block-start: var(--space-xs); font-size: var(--text-sm); }
 
     /* ── INSTALL ─────────────────────────────────────────────────────────── */
-    .install-steps {
-      list-style: none;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-      gap: var(--space-md);
-      text-align: start;
-    }
+    .install-steps { list-style: none; margin: 0; }
     .install-step { padding: var(--space-lg); }
     .is-num {
       display: inline-grid;
@@ -1189,23 +1153,13 @@ const jsonLd = [
       color: var(--accent-primary);
       font-weight: 800;
       font-size: var(--text-xs);
-      margin-block-end: var(--space-sm);
     }
-    .install-step h3 { font-size: var(--text-md); margin-block-end: var(--space-xs); }
-    .install-step p { color: var(--text-secondary); font-size: var(--text-sm); margin-block-end: var(--space-md); }
-    .install-step .term { box-shadow: none; }
+    .install-step h3 { font-size: var(--text-md); }
+    .install-step p { color: var(--text-secondary); font-size: var(--text-sm); }
+    .install-step .cmd { margin-block-start: auto; }
 
-    .surface-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-      gap: var(--space-sm);
-      margin-block-start: var(--space-xl);
-    }
-    .surface {
-      display: grid;
-      gap: var(--space-3xs);
-      padding: var(--space-md);
-    }
+    .surface-row { margin-block-start: var(--space-xl); }
+    .surface { gap: var(--space-3xs); padding: var(--space-md); }
     .surface-icon { color: var(--accent-secondary); }
     .surface-name { font-weight: 700; font-size: var(--text-sm); }
     .surface-detail { font-size: var(--text-xs); color: var(--text-secondary); }
@@ -1262,7 +1216,10 @@ const jsonLd = [
     /* ── FAQ ─────────────────────────────────────────────────────────────── */
     .faq-wrap { max-width: var(--container-narrow); }
     .faq { display: grid; gap: var(--space-xs); }
-    .faq-item { padding: var(--space-md) var(--space-lg); transition: border-color var(--duration-base) var(--ease-standard); }
+    .faq-item {
+      padding: var(--space-md) var(--space-lg);
+      transition: border-color var(--duration-base) var(--ease-standard);
+    }
     .faq-item[open] { border-color: var(--border-strong); }
     .faq-item summary {
       cursor: pointer;

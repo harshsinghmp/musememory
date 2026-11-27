@@ -170,9 +170,13 @@ describe("Published-claim integrity", () => {
       expect(index).toContain("claims.mcpTools");
       expect(index).toContain("claims.tests.count");
       expect(index).toContain("claims.latency.recallMillis");
-      // The agent count is deliberately NOT published anywhere on the site:
-      // the claim is "the majority of coding agents".
-      expect(index).not.toContain("claims.agentPlatforms");
+      // The agent count is published on the landing page and in the layout's
+      // default description, but ONLY from the manifest. What is banned is a
+      // hand-typed count — the layout used to say "80+ platforms wired" while
+      // the registry held 52 — not the number itself, which is a fact about
+      // the code and therefore belongs to claims.json.
+      const layout = readFileSync(join(ROOT, "apps/website/src/layouts/Base.astro"), "utf8");
+      expect([index, layout].every((src) => src.includes("claims.agentPlatforms"))).toBe(true);
       expect(index).not.toContain("claims.credentialRuleFamilies");
     });
 
