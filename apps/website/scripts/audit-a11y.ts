@@ -100,6 +100,15 @@ const PAIRS: Array<{ label: string; fg: string; bg: string; min: number; where: 
   { label: "th label", fg: "#9aa5c3", bg: "#101624", min: 4.5, where: "thead on panel (th bg is 5% violet over panel)" },
   // Primary button (white on violet gradient ~ #8b7cf7..#6d5cf0; worst case darker end)
   { label: "btn-primary text", fg: "#ffffff", bg: "#6d5cf0", min: 4.5, where: "white on primary gradient end" },
+  // Bento surfaces. The card's top edge carries a 6% white gradient over
+  // --surface-raised (#0c1019 -> ~#161a22); these pairs use that lightened
+  // value, which is the worst case for every bit of text inside a card.
+  { label: "bento body", fg: "#9aa5c3", bg: "#161a22", min: 4.5, where: "bento card body text (top of card)" },
+  { label: "bento title", fg: "#e8ecf8", bg: "#161a22", min: 4.5, where: "bento card title (top of card)" },
+  { label: "bento faint", fg: "#8791ad", bg: "#161a22", min: 4.5, where: "bento foot / metric chip label" },
+  // Command preview sits on --surface-inset.
+  { label: "cmd text", fg: "#e8ecf8", bg: "#0a0e17", min: 4.5, where: "command preview inside a bento card" },
+  { label: "metric number", fg: "#4fd6e0", bg: "#101624", min: 4.5, where: "metric chip number" },
   // Nav link dim on translucent nav over bg
   { label: "nav dim", fg: "#9aa5c3", bg: "#07090f", min: 4.5, where: "nav links" },
   // Footer dim

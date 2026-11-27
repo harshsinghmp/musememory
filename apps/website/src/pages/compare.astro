@@ -9,7 +9,7 @@ const base = import.meta.env.BASE_URL;
 const rows = [
   { cap: "Runs 100% local — zero daemons, zero cloud", muse: "yes", vec: "no", graph: "no", session: "yes" },
   { cap: "Keyless mode (no LLM / embedding API)", muse: "yes", vec: "no", graph: "no", session: "partial" },
-  { cap: "Sub-2ms in-process retrieval", muse: "yes", vec: "no", graph: "no", session: "partial" },
+  { cap: `Sub-${claims.latency.recallMillis}ms in-process retrieval`, muse: "yes", vec: "no", graph: "no", session: "partial" },
   { cap: "Write-time citation verification", muse: "yes", vec: "no", graph: "no", session: "no" },
   { cap: "Recall-time freshness gate (withhold stale)", muse: "yes", vec: "no", graph: "partial", session: "no" },
   { cap: "Deterministic lifecycle state machine", muse: "yes", vec: "no", graph: "yes", session: "no" },
@@ -34,11 +34,14 @@ const icon = (v: string) => (v === "yes" ? "✓" : v === "partial" ? "~" : "✕"
 const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no");
 ---
 
-<Base title="Muse Memory vs vector stores, graph platforms, session search" description="A 14-capability comparison of Muse Memory against vector stores, knowledge-graph platforms, and session search tools. Muse is the only one that is simultaneously local-first, fully keyless, and git-versioned.">
+<Base
+  title="Muse Memory compared with vector stores, graph platforms and session search"
+  description={`A ${rows.length}-capability comparison of Muse Memory against vector stores, knowledge-graph platforms, and session search tools. Muse is the only one that is local-first, fully keyless, and git-versioned at the same time.`}
+>
   <Nav
     links={[
       { href: `${base}/#architecture`, label: "How it works" },
-      { href: `${base}/#surface`, label: "Capabilities" },
+      { href: `${base}/#surface`, label: "What you get" },
       { href: `${base}/#proof`, label: "Benchmarks" },
       { href: `${base}/docs`, label: "Docs" },
     ]}
@@ -49,7 +52,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Landscape</p>
-          <h1>Four approaches to agent memory</h1>
+          <h1>How Muse compares to other memory tools</h1>
           <p>
             Vector stores optimize for semantic similarity, graph platforms for entity
             relationships, session search for retroactive lookup. Muse optimizes for the thing

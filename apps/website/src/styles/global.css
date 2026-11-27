@@ -579,7 +579,223 @@ tbody tr:hover :is(th, td) { background: rgb(139 124 247 / 4%); }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   5. Motion system
+   5. Bento grid
+   ─────────────────────────────────────────────────────────────────────────
+   The landing page's primary layout primitive: a 12-column mosaic where each
+   card claims 3, 4, 6, 8 or 12 columns, so every row still resolves to whole
+   tracks. At 900px the track halves to 6 columns and the spans collapse to
+   halves; at 640px it is one column. The same markup is therefore a dense
+   mosaic on a desktop and a plain readable stack on a phone — no card needs
+   its own breakpoint.
+
+   The card is a LAYERED surface, not one flat colour: `--surface-raised` is
+   the base, a white gradient lifts the top 42%, and `--depth-edge-light`
+   draws the 1px inner highlight along the top edge. Those three layers are
+   what read as "raised" on the dark canvas. `--radius-lg` (20px) carries the
+   card silhouette.
+
+   Interaction: the lift is gated on a fine pointer (a touch device fires a
+   synthetic hover that would leave the card stuck in its lifted state), and
+   `:focus-within` paints the same treatment for a keyboard user, so nothing
+   here is hover-only information. Focus itself stays with the global
+   `:focus-visible` outline on the control — the card ring is decoration on
+   top of it, never a replacement.
+   ───────────────────────────────────────────────────────────────────────── */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+/* `min-width: 0` is load-bearing: a wide child (a `<pre>`, a command, a
+   table) would otherwise force its track past the viewport. The default span
+   is a third of the track; cards opt into another share with a span class. */
+.bento > * {
+  min-width: 0;
+  grid-column: span 4;
+}
+
+/* Span scale — 3 / 4 / 6 / 8 / 12 of the twelve columns. */
+.bento-span-3  { grid-column: span 3; }
+.bento-span-4  { grid-column: span 4; }
+.bento-span-6  { grid-column: span 6; }
+.bento-span-8  { grid-column: span 8; }
+.bento-span-12 { grid-column: span 12; }
+
+/* The card. `isolation: isolate` keeps the inner highlights off the page
+   stacking context, so a card can stack its own layers without z-index. */
+.bento-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), transparent 42%),
+    var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 var(--depth-edge-light),
+    var(--shadow-sm);
+  transition:
+    translate var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+/* A card that is ALSO a scroll-reveal target needs both transition sets: the
+   reveal animates opacity + transform, the hover lift animates `translate`.
+   Without this rule the later `.reveal` shorthand would replace the card's
+   transition list. `translate` is a separate property from `transform` for
+   exactly this reason — the reveal's entrance slide and the hover lift can
+   then run on different durations, and the stagger delay applies only to the
+   entrance. */
+.bento .bento-card {
+  transition:
+    opacity var(--duration-reveal) var(--ease-out) var(--reveal-delay, 0ms),
+    transform var(--duration-reveal) var(--ease-out) var(--reveal-delay, 0ms),
+    translate var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+/* A card that holds a link or a button lifts the whole surface on focus, so
+   the keyboard path highlights the same box the pointer path does. */
+.bento-card:focus-within,
+.bento-card:has(:focus-visible) {
+  border-color: var(--border-accent);
+  box-shadow:
+    inset 0 1px 0 var(--depth-edge-light),
+    0 0 0 2px var(--accent-primary-soft),
+    var(--shadow-lg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bento-card:hover {
+    translate: 0 -3px;
+    border-color: var(--border-accent);
+    box-shadow:
+      inset 0 1px 0 var(--depth-edge-light),
+      var(--shadow-lg);
+  }
+}
+
+/* Card anatomy: an optional icon, a one-line outcome title, a short body,
+   then a real command or metric pinned to the foot of the card so a row of
+   cards aligns on its evidence. */
+.bento-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2.2rem;
+  block-size: 2.2rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  flex: none;
+}
+.bento-card > h3 {
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+}
+.bento-body {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.bento-foot {
+  margin-block-start: auto;
+  padding-block-start: var(--space-sm);
+}
+
+/* Metric chip: a small, countable fact rendered next to a claim. The mono
+   face marks it as data; the sans `<strong>` is the number, because a figure
+   set in mono reads as code rather than as a measurement. */
+.metric-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45em;
+  padding: 0.3em 0.8em;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.metric-chip strong {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--accent-secondary);
+}
+
+/* A row of chips that wraps instead of overflowing at 375px. */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+/* Command preview: one real command inside a card, drawn as a terminal strip.
+   It wraps rather than scrolls — a horizontally scrollable region would need
+   its own tab stop (axe: scrollable-region-focusable) and would still be
+   unreachable on a phone. */
+.cmd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+.cmd::before {
+  content: "$";
+  color: var(--accent-secondary);
+  flex: none;
+}
+.cmd code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 900px: the track halves. A span-8 or span-12 card becomes a full row;
+   everything else pairs up. */
+@media (max-width: 900px) {
+  .bento { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .bento > *,
+  .bento-span-3,
+  .bento-span-4 { grid-column: span 3; }
+  .bento-span-6,
+  .bento-span-8,
+  .bento-span-12 { grid-column: span 6; }
+}
+
+/* 640px: one card per row. The `[class*="bento-span-"]` selector is what
+   guarantees no span survives here — a leftover `span 12` inside a 1-column
+   grid would create eleven implicit columns and scroll the page sideways. */
+@media (max-width: 640px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento > *,
+  [class*="bento-span-"] { grid-column: 1 / -1; }
+  .bento-card { padding: var(--space-md); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   6. Motion system
    ───────────────────────────────────────────────────────────────────────── */
 .reveal {
   opacity: 0;
@@ -723,7 +939,7 @@ tbody tr:hover :is(th, td) { background: rgb(139 124 247 / 4%); }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   6. Reduced motion & pointer gating
+   7. Reduced motion & pointer gating
    ───────────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

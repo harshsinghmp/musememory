@@ -15,6 +15,7 @@
  */
 import "../styles/global.css";
 import { initMotion } from "../scripts/motion.ts";
+import claims from "../../../../claims.json";
 
 interface Props {
   title?: string;
@@ -30,8 +31,8 @@ interface Props {
 }
 
 const {
-  title = "Muse Memory — Agent memory that verifies itself",
-  description = "Zero-daemon, sub-2ms persistent memory for AI coding agents. Citations verified at write time, stale memories withheld at recall time. 80+ platforms wired in one command — fully local, keyless, MIT.",
+  title = "Muse Memory — your AI agent gets a memory that lasts",
+  description = `Muse saves what your AI coding agent learns to plain files on your machine, then hands the right notes back next session. No cloud, no daemon, no re-explaining. ${claims.agentPlatforms} platforms wired in one command — free, MIT, runs offline.`,
   ogImage = "brand/og.png",
   canonicalPath,
   robots = "index, follow, max-image-preview:large, max-snippet:-1",
@@ -92,13 +93,13 @@ const motionScript = initMotion();
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Muse Memory — persistent memory for AI coding agents that verifies itself" />
+    <meta property="og:image:alt" content="Muse Memory — your agent forgets everything. Give it a memory that lasts." />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogAbs} />
-    <meta name="twitter:image:alt" content="Muse Memory — persistent memory for AI coding agents that verifies itself" />
+    <meta name="twitter:image:alt" content="Muse Memory — your agent forgets everything. Give it a memory that lasts." />
 
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <link rel="icon" type="image/png" sizes="192x192" href={`${base}/icon-192.png`} />
