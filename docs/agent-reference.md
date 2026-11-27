@@ -158,6 +158,13 @@ untrusted server); a tool name that is not in the map is still served with the
 conservative default — not read-only, destructive, not idempotent — so nothing
 ships unannotated.
 
+A read tool whose payload is already a stable object also publishes an
+`outputSchema` (`src/mcp/output-schemas.ts`) and returns that object as
+`structuredContent` beside the untouched text block — `search`, `memory_recall`,
+`get_context` and `muse_health` today — so a host can render and validate a
+result without re-parsing JSON out of a string, while a client that ignores
+`structuredContent` still sees byte-identical `content`.
+
 ### Request directories and the workspace root
 
 Every tool accepts an optional `dir` (`workspace`, `project_dir` and `cwd` are

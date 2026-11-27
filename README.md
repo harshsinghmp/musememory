@@ -21,9 +21,9 @@
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
 <<<<<<< HEAD
-![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1865%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 =======
-![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+![CI Tests](https://img.shields.io/badge/Tests-1865%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
 >>>>>>> origin/dev
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
@@ -786,9 +786,9 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 ```bash
 bun install
 <<<<<<< HEAD
-bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
+bun test          # 1865 pass, 0 fail, 10427 assertions across 279 files
 =======
-bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
+bun test          # 1865 pass, 0 fail, 10427 assertions across 279 files
 >>>>>>> origin/dev
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
