@@ -329,6 +329,15 @@ export function ingestKnowledge(
 
   // 4. Process each incoming memory
   for (const incoming of packet.payload.memories) {
+    // #515: record how this write reached us and who sent it, so a gossiped
+    // memory is not indistinguishable from a local one. Any upstream provenance
+    // the sender attached (prompt hash, capture time) is preserved.
+    incoming.provenance = {
+      ...(incoming.provenance ?? {}),
+      channel: "sync",
+      agent: packet.sender_id,
+      captured_at: incoming.provenance?.captured_at ?? new Date().toISOString(),
+    };
     const existing = get(store, incoming.id);
 
     // Exact ID match

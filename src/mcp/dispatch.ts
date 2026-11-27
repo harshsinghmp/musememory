@@ -373,14 +373,27 @@ export async function dispatchToolCall(
           source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
           linked_memory_ids: Array.isArray(a.linked_memory_ids) ? a.linked_memory_ids.map(String) : (Array.isArray(a.linkedMemoryIds) ? a.linkedMemoryIds.map(String) : undefined),
           session_id: a.session_id ? String(a.session_id) : undefined,
+          // #515: per-write provenance. The channel is this tool; the agent is
+          // whatever the caller identifies as (falls back to its source field).
+          provenance: {
+            channel: "mcp",
+            agent: a.agent ? String(a.agent) : a.source ? String(a.source) : undefined,
+          },
         });
         if (a.type === "constraint") {
-          // #433: an over-length constraint is refused by the write path.
-          // Returning the reason beats a silent omission from CURRENT.md.
-          try {
-            setCurrent(activeMemoryDir, String(a.content), projectName);
-          } catch (err: unknown) {
-            return toolError(err instanceof Error ? err.message : String(err));
+          // #515: an instruction-bearing write is privileged content. It lands as
+          // a candidate awaiting approval and is NOT replayed into CURRENT.md,
+          // which every later prompt reads; syncConstraints() already filters to
+          // active/confirmed for the same reason.
+          const pendingApproval = entry.contains_instructions === true && entry.status === "candidate";
+          if (!pendingApproval) {
+            // #433: an over-length constraint is refused by the write path.
+            // Returning the reason beats a silent omission from CURRENT.md.
+            try {
+              setCurrent(activeMemoryDir, String(a.content), projectName);
+            } catch (err: unknown) {
+              return toolError(err instanceof Error ? err.message : String(err));
+            }
           }
         }
         if (activeMemoryDir) {

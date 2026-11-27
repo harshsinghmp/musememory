@@ -287,6 +287,8 @@ export function distillObservationsToCandidates(
         confirmed: false, // Remains candidate until verified
         tags: ["distilled-fix", obs.source],
         test_command: obs.metadata?.test_command,
+        // #515: distillation is a harvest-class channel, not a direct write.
+        provenance: { channel: "harvest" },
       });
 
       proposedCandidates.push(candidate);
@@ -310,6 +312,7 @@ export function distillObservationsToCandidates(
         source: `distilled_${obs.source}`,
         confirmed: false,
         tags: ["distilled-architecture", obs.source],
+        provenance: { channel: "harvest" },
       });
 
       proposedCandidates.push(candidate);

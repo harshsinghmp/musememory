@@ -212,6 +212,25 @@ propose → candidate → confirmed → superseded
 | Freshness gate | every recall | Memories whose anchors drifted are **withheld** and reported via `withheld_memories` + `freshness_notice`. They are never silently served. `include_drifted: true` returns them with a `⚠ FRESHNESS` provenance warning. |
 | Ingest sanitisation | import / harvest | Injected `<memory-context>` blocks and base64 payloads are stripped before the text is considered. |
 
+**Instruction-bearing writes.** OWASP LLM Top 10 2026 (LLM01) names memory
+persistence as a first-class injection path and Agentic ASI06 calls the same
+failure memory & context poisoning, so `propose` classifies every write's
+title+content before it lands. A write that carries instructions, role
+assignments or policy overrides — "ignore previous instructions", "disregard the
+above rules", "from now on", "you are now", "act as", "system prompt", "developer
+mode", "you must always", or "always use" at the start of a sentence — is stamped
+`contains_instructions: true` and persists as `candidate` only; `confirmed: true`
+is the approval step and is never downgraded. Candidates are excluded from
+`CURRENT.md` (`syncConstraints` takes only `active`/`confirmed`), so an injected
+instruction cannot be promoted into the constraint block every later prompt
+reads. The classifier is conservative on purpose: two weak signals (a
+sentence-start imperative, a tool name, a URL, "remember to") must co-occur before
+it fires, and fenced code is not scanned — demoting a legitimate memory costs
+more than missing one. Every write also carries `provenance: { channel, agent,
+prompt_hash?, captured_at }`: `captured_at` is always stamped, `channel` names
+`mcp`, `cli`, `sync` or `harvest`, and `prompt_hash` stays absent unless the
+caller supplied one.
+
 ## 8. Failure semantics
 
 | Condition | Result |

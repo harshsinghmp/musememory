@@ -200,6 +200,22 @@ export interface GraphMetadata {
   graph_verified_at?: string;
 }
 
+/**
+ * #515: Per-write provenance. Records the channel a memory arrived through and
+ * the agent that wrote it, so an entry can be traced back to the write that
+ * produced it instead of looking like anonymous knowledge.
+ */
+export interface MemoryProvenance {
+  /** Write channel: "mcp", "cli", "sync", "harvest", ... */
+  channel?: string;
+  /** Agent or sender identifier responsible for the write. */
+  agent?: string;
+  /** Hash of the causing prompt, when the caller has one. Never invented. */
+  prompt_hash?: string;
+  /** ISO timestamp of the write itself (stamped by propose). */
+  captured_at?: string;
+}
+
 export interface MemoryEntry {
   id: string;
   title: string;
@@ -311,6 +327,14 @@ export interface MemoryEntry {
   expired_by?: string;
   /** T-081: Optional decay model override ('exponential' or 'weibull'). */
   decay_model?: "exponential" | "weibull";
+  /**
+   * #515: True when the write carries instruction-, role- or policy-bearing
+   * content (OWASP LLM01 memory persistence, Agentic ASI06). Set by `propose`
+   * from the classifier unless the caller states it explicitly.
+   */
+  contains_instructions?: boolean;
+  /** #515: Per-write provenance (channel, agent, prompt hash, capture time). */
+  provenance?: MemoryProvenance;
 }
 
 export type TrustTier = "trusted" | "candidate" | "untrusted" | "T1" | "T2" | "T3" | "T4";

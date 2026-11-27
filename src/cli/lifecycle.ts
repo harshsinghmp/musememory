@@ -50,6 +50,8 @@ export async function handleProposeCommand({ positional, flags }: ParsedArgs): P
       tags,
       type,
       confirmed: flags["confirmed"] === "true",
+      // #515: record which channel produced this write.
+      provenance: { channel: "cli" },
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
