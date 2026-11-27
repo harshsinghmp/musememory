@@ -18,6 +18,24 @@ import {
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "../mcp.ts";
 import { isLoopbackHost } from "../net.ts";
+import { constantTimeEqual } from "../security/timing.ts";
+
+/**
+ * Issue #513: find the configured token that equals `candidate`, comparing every
+ * entry in constant time and never returning early.
+ *
+ * Returns the **stored** token (not the candidate) so the peer mapping is looked
+ * up by the value this process configured, never by attacker-supplied text. A
+ * `null` result is the only "no match" answer, and it is reached after the whole
+ * allowlist has been scanned.
+ */
+function matchConfiguredToken(candidate: string, configured: Set<string>): string | null {
+  let matched: string | null = null;
+  for (const token of configured) {
+    if (constantTimeEqual(candidate, token)) matched = token;
+  }
+  return matched;
+}
 
 export interface HttpMcpServerOptions {
   port?: number;
@@ -212,7 +230,14 @@ export function validateHttpAuth(
   }
 
   const token = match[1].trim();
-  if (!validTokens.has(token)) {
+  // Issue #513: a `Set.has()` lookup compares until the first differing byte, so
+  // the response time leaked how much of a guessed token was correct (and, for a
+  // missing token, its length). Scan every configured token with a constant-time
+  // comparison and never break early, so the cost depends on the allowlist size,
+  // which is public, and not on the candidate. The auth decision is unchanged:
+  // no match is still the same 403 with the same message.
+  const matchedToken = matchConfiguredToken(token, validTokens);
+  if (matchedToken === null) {
     return {
       authenticated: false,
       status: 403,
@@ -220,7 +245,7 @@ export function validateHttpAuth(
     };
   }
 
-  const mappedPeer = tokenToPeer.get(token);
+  const mappedPeer = tokenToPeer.get(matchedToken);
   const headerPeer = (req.headers["mcp-peer-id"] || req.headers["x-peer-id"]) as string | undefined;
   // A single shared token maps to the synthetic identity "default": it says
   // "authenticated", not "this is peer X". Only an explicit `peer:token` mapping

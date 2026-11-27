@@ -308,6 +308,13 @@ prompt_hash?, captured_at }`: `captured_at` is always stamped, `channel` names
 `mcp`, `cli`, `sync` or `harvest`, and `prompt_hash` stays absent unless the
 caller supplied one.
 
+**Reporting a security issue.** The threat model, supported versions, scope and
+response targets are in [**SECURITY.md**](../SECURITY.md). Report through the
+repository's **Security** tab → "Report a vulnerability" (GitHub private
+vulnerability reporting); there is no security email address, and a suspected
+vulnerability never goes in a public issue or pull request. The
+"Hardening already in place" list there is the shortest index of the gates above.
+
 ## 8. Failure semantics
 
 | Condition | Result |
