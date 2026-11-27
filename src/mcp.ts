@@ -9,7 +9,7 @@ import {
   ReadResourceRequestSchema,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from "@modelcontextprotocol/sdk/types.js";
-import { MCP_TOOL_CATALOG } from "./mcp/catalog.ts";
+import { ANNOTATED_TOOL_CATALOG } from "./mcp/annotations.ts";
 import { dispatchToolCall } from "./mcp/dispatch.ts";
 import { toolError } from "./mcp/tool-result.ts";
 import { STATIC_MCP_RESOURCES, readMcpResource } from "./mcp/resources.ts";
@@ -164,7 +164,13 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const filteredByProfile = filterToolsForProfile(MCP_TOOL_CATALOG, activeProfile);
+    // #495: the catalog is served with its safety hints attached. The mapping
+    // happens once at module load (`ANNOTATED_TOOL_CATALOG`), not per request —
+    // a `tools/list` call only filters. `readOnlyHint` is what a host uses to
+    // auto-approve a read, `destructiveHint` to warn before a delete, so a tool
+    // must never be served without them (a name missing from the map still gets
+    // `defaultAnnotation()`, which is conservative rather than silent).
+    const filteredByProfile = filterToolsForProfile(ANNOTATED_TOOL_CATALOG, activeProfile);
     // T-394: Enforce mcp.enabledTools from settings
     const settings = getSettings(memoryDir);
     const enabledTools = settings.mcp?.enabledTools;
