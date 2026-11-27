@@ -133,6 +133,31 @@ The server advertises the versions its installed SDK supports. The
 `2026-07-28` revision is not implemented: `@modelcontextprotocol/sdk@1.32.2`
 does not know it.
 
+### Tool annotations (safety hints)
+
+Every entry in `tools/list` carries the four MCP safety hints — `readOnlyHint`,
+`destructiveHint`, `idempotentHint` and `openWorldHint` — from
+`src/mcp/annotations.ts`, attached once at module load, so the catalog's names,
+order, descriptions and input schemas are served unchanged. `readOnlyHint: true`
+marks the calls that only read (every search, context, list, get, report, scan
+and health tool); a host may use it to **auto-approve** retrieval instead of
+prompting on every call. `destructiveHint: true` marks the six calls that can
+delete, forget, overwrite or prune stored state (`memory_delete`,
+`memory_lifecycle`, `memory_restore`, `memory_import`,
+`memory_disconnect_pageindex`, `muse_reconcile_anchors`), so a host can warn
+before one, and no tool is ever both read-only and destructive. `idempotentHint:
+true` marks the writes that converge — status transitions, `set`-style updates
+and builders that regenerate a derived artefact — so a retry after a timeout is
+safe, while appends and run-type tools (`memory_capture`, `memory_observe`,
+`memory_freeze_run`, `memory_verify`, …) are not idempotent.
+`openWorldHint` is `false` on all 126 tools: nothing dereferences a URL or
+fetches remote content — `memory_source_add` records a URL without retrieving
+it, and the sync tools exchange packets through a local directory. These are
+**hints**, not guarantees (the SDK says a client must not trust them from an
+untrusted server); a tool name that is not in the map is still served with the
+conservative default — not read-only, destructive, not idempotent — so nothing
+ships unannotated.
+
 ### Request directories and the workspace root
 
 Every tool accepts an optional `dir` (`workspace`, `project_dir` and `cwd` are
