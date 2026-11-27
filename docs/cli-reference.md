@@ -112,7 +112,9 @@ Ecosystem, Migration & Connectivity:
   mcp [--http] [--host H] [--port N] MCP server: stdio by default, Streamable HTTP with --http/--port
                                  Non-loopback --host requires --token/--tokens (or MUSE_BEARER_TOKEN/
                                  MUSE_AUTH_TOKENS) unless --insecure is passed; Host allowlist is derived
-                                 from the bind host + loopback unless --allowed-hosts is given
+                                 from the bind host + loopback unless --allowed-hosts is given.
+                                 Browser origins (any request with an Origin header) are denied unless
+                                 listed in --allowed-origins; clients that send no Origin are unaffected
 
 Version Control (R23):
   branch <id> --path <path> [--label L] Tag a memory with semantic dotted-path addressing

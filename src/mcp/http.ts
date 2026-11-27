@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import {
   createServer as createHttpServer,
   type IncomingMessage,
+  type ServerResponse,
   type Server as HttpServer,
 } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -24,7 +25,15 @@ export interface HttpMcpServerOptions {
   endpoint?: string;
   stateless?: boolean;
   enableJsonResponse?: boolean;
-  /** T-151: Allowed Origin headers for CSRF protection. */
+  /**
+   * T-151 / issue #511: the operator's browser-origin allowlist (`--allowed-origins`).
+   *
+   * A request that carries an `Origin` header is a browser request, and it is
+   * allowed **only** when that exact origin is listed here. An absent `Origin`
+   * means a native MCP client and is always allowed. There is no
+   * "loopback implies trusted" shortcut: the default is deny for every browser
+   * origin, because any web page the user visits can reach 127.0.0.1.
+   */
   allowedOrigins?: string[];
   /** T-151: Allowed Host headers for DNS rebinding protection. */
   allowedHosts?: string[];
@@ -58,6 +67,58 @@ export interface HttpAuthResult {
   peerId?: string;
   status?: number;
   errorMessage?: string;
+}
+
+export interface HttpOriginResult {
+  allowed: boolean;
+  /**
+   * The only value this server may ever put in `access-control-allow-origin`:
+   * an origin that `allowedOrigins` explicitly contains. Never `*`, never an
+   * echo of an arbitrary caller header.
+   */
+  allowOrigin?: string;
+  status?: number;
+  errorMessage?: string;
+}
+
+/**
+ * Issue #511: decide whether a request may proceed, based on its `Origin` header.
+ *
+ * The transport previously authenticated only when a token existed or the bind
+ * was non-loopback, so the default `127.0.0.1` server answered everyone — and
+ * its OPTIONS branch reflected `req.headers.origin ?? "*"` with `authorization`
+ * in `access-control-allow-headers`. Any page the user loaded could therefore
+ * POST `initialize` + `tools/call` to `http://127.0.0.1:<port>/mcp` and drive
+ * every tool (integrity/availability; response bodies stay unreadable).
+ *
+ * Native MCP clients send no `Origin` header; browsers always do. That is the
+ * discriminator: absent → allow (non-browser client); present → allow only when
+ * `options.allowedOrigins` explicitly includes it. Deny is the default even on
+ * loopback, and it applies before auth and before dispatch.
+ */
+export function validateHttpOrigin(
+  req: IncomingMessage,
+  options: HttpMcpServerOptions = {},
+): HttpOriginResult {
+  const rawOrigin = req.headers["origin"];
+  if (rawOrigin === undefined) {
+    // No Origin header: a native MCP client (stdio-bridge, CLI, SDK, curl).
+    return { allowed: true };
+  }
+
+  const origin = Array.isArray(rawOrigin) ? rawOrigin[0] : rawOrigin;
+
+  // An empty or opaque (`Origin: null`) value is a browser origin like any
+  // other — it is not a wildcard, and it is not allowlisted by default.
+  if (typeof origin === "string" && options.allowedOrigins?.includes(origin)) {
+    return { allowed: true, allowOrigin: origin };
+  }
+
+  return {
+    allowed: false,
+    status: 403,
+    errorMessage: `Forbidden: Origin '${origin ?? ""}' is not allowed (browser origins must be allowlisted with --allowed-origins; MCP clients that send no Origin header are unaffected)`,
+  };
 }
 
 /**
@@ -203,10 +264,10 @@ export interface HttpMcpServerHandle {
 }
 
 /**
- * T-150, T-151 & T-386: Start MCP Streamable HTTP transport server (2025-06-18 spec).
+ * T-150, T-151, T-386 & #511: Start MCP Streamable HTTP transport server (2025-06-18 spec).
  * Supports JSON-RPC tool/method execution over HTTP POST and SSE streaming,
- * with strict Bearer token authentication, per-peer allowlists, Origin validation,
- * DNS rebinding protection, and protocol version headers.
+ * with strict Bearer token authentication, per-peer allowlists, deny-by-default
+ * browser-origin validation, DNS rebinding protection, and protocol version headers.
  */
 export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Promise<HttpMcpServerHandle> {
   const server = createServer();
@@ -224,22 +285,60 @@ export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Pr
 
   await server.connect(transport);
 
+  /**
+   * Issue #511: the single refusal path for a browser origin that is not on the
+   * allowlist. It never sets `access-control-allow-origin`, so a browser cannot
+   * even read the refusal.
+   */
+  const rejectOrigin = (res: ServerResponse, errorMessage: string): void => {
+    res.writeHead(403, { "content-type": "application/json", vary: "Origin" });
+    res.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32000, message: errorMessage },
+        id: null,
+      }),
+    );
+  };
+
   const httpServer = createHttpServer((req, res) => {
-    // Handle CORS OPTIONS pre-flight
+    // Issue #511: the Origin decision runs first, for the pre-flight *and* for
+    // every real request, before auth and before dispatch. A request with no
+    // Origin is a native MCP client and is unaffected; a request with an Origin
+    // is a browser and must name an allowlisted origin.
+    const originResult = validateHttpOrigin(req, options);
+    if (!originResult.allowed) {
+      rejectOrigin(res, originResult.errorMessage ?? "Forbidden: Origin is not allowed");
+      return;
+    }
+
+    // Handle CORS OPTIONS pre-flight. Only an allowlisted origin is ever
+    // echoed; there is no `*` fallback, because `*` plus the pre-flight's
+    // `authorization` allowance is exactly what let a web page drive the tools.
     if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "access-control-allow-origin": req.headers["origin"] ?? "*",
+      const headers: Record<string, string> = {
         "access-control-allow-methods": "GET, POST, OPTIONS",
         "access-control-allow-headers":
           "content-type, authorization, accept, mcp-session-id, mcp-protocol-version, mcp-peer-id, x-peer-id",
         "access-control-max-age": "86400",
-      });
+        vary: "Origin",
+      };
+      if (originResult.allowOrigin) {
+        headers["access-control-allow-origin"] = originResult.allowOrigin;
+      }
+      res.writeHead(204, headers);
       res.end();
       return;
     }
 
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname === endpoint || (endpoint === "/mcp" && url.pathname === "/")) {
+      // An allowlisted browser origin gets a readable (if always same-origin
+      // policy) answer; nothing else can appear in this header.
+      if (originResult.allowOrigin) {
+        res.setHeader("access-control-allow-origin", originResult.allowOrigin);
+        res.setHeader("vary", "Origin");
+      }
       // T-386: Bearer token auth + per-peer allowlist
       const authResult = validateHttpAuth(req, options);
       if (!authResult.authenticated) {
@@ -283,26 +382,7 @@ export async function startHttpMcpServer(options: HttpMcpServerOptions = {}): Pr
         res.setHeader("mcp-protocol-version", "2024-11-05");
       }
 
-      // T-151: Origin validation if allowedOrigins configured
-      const origin = req.headers["origin"];
-      if (options.allowedOrigins && options.allowedOrigins.length > 0 && typeof origin === "string") {
-        if (!options.allowedOrigins.includes(origin)) {
-          res.writeHead(403, { "content-type": "application/json" });
-          res.end(
-            JSON.stringify({
-              jsonrpc: "2.0",
-              error: {
-                code: -32000,
-                message: `Forbidden: Origin '${origin}' is not allowed`,
-              },
-              id: null,
-            }),
-          );
-          return;
-        }
-      }
-
-      // T-151: Allowed hosts check
+      // T-151: Allowed hosts check (DNS-rebinding protection, unchanged)
       if (options.allowedHosts && options.allowedHosts.length > 0) {
         const hostHeader = (req.headers["host"] ?? "").split(":")[0];
         if (!options.allowedHosts.includes(hostHeader)) {

@@ -429,3 +429,201 @@ describe("T-151: Origin validation, session ID enforcement, and protocol version
   });
 });
 
+describe("#511: browser origins are deny-by-default on the MCP HTTP server", () => {
+  const initPayload = (id = 1) =>
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "1.0.0" },
+      },
+    });
+
+  test("a request from an unlisted Origin is refused with 403 and no CORS header", async () => {
+    const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "origin": "https://evil.example",
+        },
+        body: initPayload(),
+      });
+
+      expect(resp.status).toBe(403);
+      // The refusal must not be readable by the page that sent it: no ACAO at
+      // all, and certainly not a reflection of its own origin.
+      expect(resp.headers.get("access-control-allow-origin")).toBeNull();
+      const json = (await resp.json()) as any;
+      expect(json.error.message).toContain("Origin 'https://evil.example' is not allowed");
+      // The refused request never reached the transport, so no session exists.
+      expect(resp.headers.get("mcp-session-id")).toBeNull();
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("the same request with no Origin header (a native MCP client) succeeds", async () => {
+    const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+        },
+        body: initPayload(),
+      });
+
+      expect(resp.status).toBe(200);
+      expect(resp.headers.get("mcp-session-id")).toBeDefined();
+      const json = (await resp.json()) as any;
+      expect(json.result.serverInfo.name).toBe("musememory");
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("an explicitly allowlisted Origin is allowed and echoed back", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+      allowedOrigins: ["http://localhost:5173"],
+    });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "origin": "http://localhost:5173",
+        },
+        body: initPayload(),
+      });
+
+      expect(resp.status).toBe(200);
+      // Exactly the allowlisted origin — never `*` and never a reflection of
+      // whatever the caller happened to send.
+      expect(resp.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("a browser origin cannot drive tools/call even after a native client initialised a session", async () => {
+    const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+
+    try {
+      // A native client (no Origin) opens a real session.
+      const initResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+        },
+        body: initPayload(),
+      });
+      expect(initResp.status).toBe(200);
+      const sessionId = initResp.headers.get("mcp-session-id");
+      expect(sessionId).toBeDefined();
+
+      // A hostile page that learned the session id still cannot use it: the
+      // Origin gate runs before dispatch, so no tool body is ever executed.
+      const evilResp = await fetch(handle.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream",
+          "mcp-session-id": sessionId!,
+          "origin": "https://evil.example",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "memory_capture", arguments: { content: "pwned", project: "pwned" } },
+        }),
+      });
+
+      expect(evilResp.status).toBe(403);
+      expect(evilResp.headers.get("access-control-allow-origin")).toBeNull();
+      const evilJson = (await evilResp.json()) as any;
+      expect(evilJson.result).toBeUndefined();
+      expect(evilJson.error.message).toContain("is not allowed");
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("OPTIONS preflight from an unlisted Origin is refused with 403 and no CORS header", async () => {
+    const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "OPTIONS",
+        headers: {
+          "origin": "https://evil.example",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "authorization, content-type",
+        },
+      });
+
+      expect(resp.status).toBe(403);
+      expect(resp.headers.get("access-control-allow-origin")).toBeNull();
+      // The dangerous allowances must not be handed to a refused preflight
+      // either — `authorization` in `allow-headers` was how the page got past
+      // the preflight in the first place.
+      expect(resp.headers.get("access-control-allow-headers")).toBeNull();
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("OPTIONS preflight from an allowlisted Origin is answered with that Origin", async () => {
+    const handle = await startHttpMcpServer({
+      port: 0,
+      host: "127.0.0.1",
+      allowedOrigins: ["http://localhost:5173"],
+    });
+
+    try {
+      const resp = await fetch(handle.url, {
+        method: "OPTIONS",
+        headers: {
+          "origin": "http://localhost:5173",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "authorization, content-type",
+        },
+      });
+
+      expect(resp.status).toBe(204);
+      expect(resp.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+      expect(resp.headers.get("access-control-allow-methods")).toContain("POST");
+      expect(resp.headers.get("access-control-allow-headers")).toContain("authorization");
+    } finally {
+      await handle.close();
+    }
+  });
+
+  test("OPTIONS without an Origin header is answered without any CORS origin", async () => {
+    const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1" });
+
+    try {
+      const resp = await fetch(handle.url, { method: "OPTIONS" });
+
+      expect(resp.status).toBe(204);
+      expect(resp.headers.get("access-control-allow-origin")).toBeNull();
+    } finally {
+      await handle.close();
+    }
+  });
+});
+
