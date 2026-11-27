@@ -12,13 +12,13 @@
     "llms": "bun run scripts/build-llms-txt.ts"
   },
   "dependencies": {
-    "astro": "7.4.7",
-    "sql.js": "1.13.0"
+    "astro": "7.4.13",
+    "sql.js": "1.17.0"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "axe-core": "^4.13.0",
-    "hyperframes": "^0.8.101",
+    "hyperframes": "^0.9.91",
     "playwright-core": "^1.63.0"
   }
 }
