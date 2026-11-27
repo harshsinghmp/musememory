@@ -66,6 +66,7 @@ musememory/
 │   ├── intelligence/       # Pluggable code intelligence providers (CodeGraph, Graphify, LSP, AST)
 │   ├── learning/           # Observation, candidate distillation, negative anti-patterns
 │   ├── mcp.ts              # Model Context Protocol stdio server (126 tools with profiles)
+│   ├── mcp/                # Tool catalog, dispatch, HTTP transport, safety annotations, output schemas
 │   ├── mesh/               # Multi-repo & monorepo workspace discovery, query resolver, contracts
 │   ├── orchestrator/       # Flagship muse_context fusion, bidirectional lookups, MCP profiles
 │   ├── paths.ts            # Strict path containment (resolveWithin) & intentional-external opt-out (resolveExternal)
@@ -75,6 +76,7 @@ musememory/
 │   ├── root.ts             # Hierarchical root detection & auto-bootstrap
 │   ├── schema.ts           # JSON Schema & store referential validator
 │   ├── secrets.ts          # Vibeguard zero-leakage secret scanner & redactor
+│   ├── security/           # Output fencing, instruction classifier, constant-time token compare
 │   ├── store.ts            # Dual-scope storage layout & lifecycle state machine
 │   ├── sync/               # Cross-agent knowledge sync, P2P gossip protocol, shared pool
 │   ├── transcript.ts       # Universal JSONL parser, dialogue windowing & search
@@ -83,10 +85,22 @@ musememory/
 │   ├── user.ts             # Persona & working preference engine
 │   ├── agents/             # Workstation coding agents detection & registry (52 platforms)
 │   └── migrator/           # Multi-provider auto-detection & migration engine (30 providers)
-├── test/                   # Automated Bun test suites (1724 tests across 267 suites)
-├── package.json            # Package metadata & dependencies (v3.4.2)
+├── test/                   # Automated Bun test suites (1867 tests across 280 suites)
+├── package.json            # Package metadata & dependencies (v3.4.6)
 └── dist/                   # Compiled Node/Bun bundle
 ```
+
+**Runtime security boundaries (v3.4.6).** The HTTP transport refuses any request carrying an
+`Origin` header unless that origin is in `--allowed-origins`; native clients send no `Origin`
+and are unaffected. A request-supplied `dir` must resolve inside the configured workspace root
+(`MUSE_MCP_ALLOW_EXTERNAL_DIR=1` is the explicit opt-out). Stores are created `0700` and
+CURRENT/USER/CORE/audit/checkpoint files `0600`. Prompt text and the four markdown resources
+are wrapped in `<muse-memory data-not-instructions="true">`, with fence tokens stripped first;
+`memory://entry/<id>` stays JSON. Writes are classified by
+`security/instruction_classifier.ts` and an instruction-bearing write without `confirmed: true`
+is forced to `candidate`, so it cannot reach CURRENT.md. Tokens are compared with
+`security/timing.ts`. Attestation verification is a registry (`ed25519` today) with an opt-in
+`maxAgeDays`; `docs/crypto-inventory.md` records the NIST IR 8547 dates.
 
 ---
 
