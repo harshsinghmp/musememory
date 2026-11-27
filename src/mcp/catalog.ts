@@ -83,7 +83,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "memory_capture",
-    description: "Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', automatically appends to CURRENT.md.",
+    description: "Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', appends to CURRENT.md unless the content is instruction-bearing (OWASP LLM01), in which case it stays a candidate until confirmed.",
     inputSchema: {
       type: "object",
       properties: {

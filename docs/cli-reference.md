@@ -156,7 +156,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 
 | Tool | Required parameters | Description |
 | --- | --- | --- |
-| `memory_capture` | `content` | Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', automatically appends to CURRENT.md. |
+| `memory_capture` | `content` | Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', appends to CURRENT.md unless the content is instruction-bearing (OWASP LLM01), in which case it stays a candidate until confirmed. |
 | `memory_current` | `action` | Read or append active working constraints and hard invariants in CURRENT.md for the active project |
 | `memory_get_constraints` | `query` | Read the active working constraints and hard invariants recorded in CURRENT.md for the active project |
 | `memory_set_constraints` | `query` | Append a working constraint or hard invariant to CURRENT.md for the active project |
