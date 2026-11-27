@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The published README contained git conflict markers**: the `README.md` shipped in 3.4.6 carried six literal `<<<<<<<` / `=======` / `>>>>>>>` lines around the test badge and the quickstart's `bun test` line, left behind when a feature branch's README change was merged without resolving that file. Both sides of the block happened to hold the same (stale) counts, which is why no gate caught it — `claims:check` validates the numbers, not the absence of merge artefacts. The markers are removed, the counts are regenerated from the tree, and a new test fails if any tracked file under `README.md`, `docs/` or `.agents/` contains a conflict marker.
 - **Dependabot could not update a single dependency**: the first scheduled run after the workflow was added failed with the runner's own diagnosis — *“This project has a `bun.lock` file but no `package-lock.json`, `yarn.lock` or `pnpm-lock.yaml` … Set `package-ecosystem: "bun"`”*. The repository is Bun-managed, so the `npm` entry could never have worked; it is now `package-ecosystem: "bun"`. The weekly schedule, grouping and the five-PR cap are unchanged, and the GitHub Actions entry was already correct.
 
 ## [3.4.6] - 2026-11-27
