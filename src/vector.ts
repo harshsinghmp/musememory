@@ -12,8 +12,22 @@ import {
   resolveRrfConfig,
 } from "./retrieval/rrf.ts";
 import type { MemoryEntry } from "./types.ts";
+import type { SqliteDatabase } from "./sqlite.ts";
+import { getContentGeneration } from "./sqlite.ts";
+import {
+  getVecIndex,
+  vecCount,
+  vecDelete,
+  vecKnn,
+  vecMetaGet,
+  vecMetaSet,
+  vecUpsert,
+  vecUpsertMany,
+  type VecIndex,
+} from "./vector/vec-index.ts";
 
-const DIMS = 256;
+/** Embedding width. Also the `vec0` column dimension (`embedding float[DIMS]`). */
+export const DIMS = 256;
 
 /** BM25 parameters (standard defaults). */
 const K1 = 1.5;
@@ -83,11 +97,16 @@ export function termFrequencies(text: string): { tf: Record<string, number>; len
   return { tf, len };
 }
 
+/** The exact text a memory is indexed by: title, body and tags. */
+export function indexedText(entry: Pick<MemoryEntry, "title" | "content" | "tags">): string {
+  return `${entry.title} ${entry.content} ${(entry.tags ?? []).join(" ")}`;
+}
+
 /** Build a full index over the store. ponytail: O(n) full rebuild every time — fine to ~10k entries; switch to incremental per-entry upserts if stores grow past that. */
 export function rebuildIndex(store: Store): VectorIndex {
   const index: VectorIndex = { version: 1, updated_at: new Date().toISOString(), entries: {} };
   for (const e of list(store)) {
-    const text = `${e.title} ${e.content} ${(e.tags ?? []).join(" ")}`;
+    const text = indexedText(e);
     const { tf, len } = termFrequencies(text);
     index.entries[e.id] = { vector: embed(text), tf, len };
   }
@@ -100,16 +119,60 @@ export function saveIndex(index: VectorIndex, memoryDir: string): void {
 }
 
 /**
- * T-304: Incrementally upsert an entry into index.json if the index file exists.
- * Does not force index creation if none exists yet (rebuildIndex handles cold stores).
+ * Issue #497 — portability surface. `index.json` is no longer a read path: it is
+ * an export/snapshot a human (or another tool) can inspect, diff or carry to a
+ * store that cannot load the extension. Regenerating it is always safe because
+ * every field is derived from the entries themselves.
  */
-export function upsertIndexEntry(entry: MemoryEntry, memoryDir: string): boolean {
+export function exportVectorSnapshot(store: Store, memoryDir: string): VectorIndex {
+  const index = rebuildIndex(store);
+  saveIndex(index, memoryDir);
+  return index;
+}
+
+/**
+ * Issue #497 — is a vector index actually usable for this store?
+ * True when the vec0 table holds rows, or when the JSON snapshot exists.
+ * Callers use this to gate the hybrid path without knowing which backend won.
+ */
+export function hasVectorIndex(store: Store, memoryDir: string): boolean {
+  const vec = getVecIndex(store.db ?? null, DIMS);
+  if (vec && vecCount(vec) > 0) return true;
+  return existsSync(indexFilePath(memoryDir));
+}
+
+/**
+ * Issue #497 — how many vectors the active backend holds, or null when there is
+ * no index at all. Lets callers detect a stale index without loading index.json.
+ */
+export function vectorIndexSize(store: Store, memoryDir: string): number | null {
+  const vec = getVecIndex(store.db ?? null, DIMS);
+  if (vec) {
+    const count = vecCount(vec);
+    if (count > 0) return count;
+  }
+  const index = loadIndex(memoryDir);
+  return index ? Object.keys(index.entries).length : null;
+}
+
+/**
+ * T-304 / Issue #497: keep the vector index in step with one written entry.
+ *
+ * With the extension loaded this is a single `vec0` upsert and `index.json` is
+ * left alone (it is a snapshot, not the read path). Without it, the previous
+ * read-modify-write of `index.json` runs unchanged — the fallback stays
+ * functional rather than becoming a second-class crash path.
+ */
+export function upsertIndexEntry(entry: MemoryEntry, memoryDir: string, db?: SqliteDatabase | null): boolean {
+  const vec = getVecIndex(db, DIMS);
+  if (vec && vecUpsert(vec, entry.id, embed(indexedText(entry)))) return true;
+
   const p = indexFilePath(memoryDir);
   if (!existsSync(p)) return false;
   try {
     const index = loadIndex(memoryDir);
     if (!index) return false;
-    const text = `${entry.title} ${entry.content} ${(entry.tags ?? []).join(" ")}`;
+    const text = indexedText(entry);
     const { tf, len } = termFrequencies(text);
     index.entries[entry.id] = { vector: embed(text), tf, len };
     index.updated_at = new Date().toISOString();
@@ -121,20 +184,27 @@ export function upsertIndexEntry(entry: MemoryEntry, memoryDir: string): boolean
 }
 
 /**
- * T-304: Remove an entry from index.json upon deletion or tombstoning.
+ * T-304 / Issue #497: drop one entry's vector on delete or tombstone.
+ * vec0 mode deletes the row and does not rewrite the JSON snapshot.
  */
-export function removeIndexEntry(id: string, memoryDir: string): boolean {
+export function removeIndexEntry(id: string, memoryDir: string, db?: SqliteDatabase | null): boolean {
+  const vec = getVecIndex(db, DIMS);
+  let removedFromVec = false;
+  if (vec) removedFromVec = vecDelete(vec, id);
+
   const p = indexFilePath(memoryDir);
-  if (!existsSync(p)) return false;
+  if (!existsSync(p)) return removedFromVec;
   try {
     const index = loadIndex(memoryDir);
-    if (!index || !index.entries[id]) return false;
+    if (!index || !index.entries[id]) return removedFromVec;
+    // vec0 owns the live index; the JSON file is a snapshot and is left as-is.
+    if (vec) return removedFromVec;
     delete index.entries[id];
     index.updated_at = new Date().toISOString();
     saveIndex(index, memoryDir);
     return true;
   } catch {
-    return false;
+    return removedFromVec;
   }
 }
 
@@ -150,7 +220,7 @@ export function loadIndex(memoryDir: string): VectorIndex | null {
 }
 
 /** Classic BM25 of the query against one indexed entry, given corpus stats. */
-export function bm25Score(queryTf: Record<string, number>, entry: IndexedEntry, idf: Record<string, number>, avgLen: number): number {
+export function bm25Score(queryTf: Record<string, number>, entry: Pick<IndexedEntry, "tf" | "len">, idf: Record<string, number>, avgLen: number): number {
   let score = 0;
   for (const [term, qCount] of Object.entries(queryTf)) {
     const f = entry.tf[term];
@@ -238,40 +308,126 @@ function passesRowFilter(entry: MemoryEntry, o: HybridSearchOptions, now: number
 }
 
 /**
- * Hybrid search: 0.5 * cosine(hashed-trigram embedding) + 0.5 * bm25_norm.
- * Returns results sorted by fused score desc. Returns null when no index
- * exists yet so callers can fall back to live scoring with a reindex hint.
+ * Issue #497: raw scored candidate, backend-agnostic. Both the vec0 KNN path and
+ * the JSON/cosine fallback produce these, so fusion has exactly one implementation.
  */
-export function hybridSearch(
-  store: Store,
-  memoryDir: string,
-  query: string,
-  options: HybridSearchOptions = {},
-): HybridResult[] | null {
-  const index = loadIndex(memoryDir);
-  if (!index) return null;
+interface ScoredCandidate {
+  entry: MemoryEntry;
+  cosine: number;
+  bm25: number;
+}
 
-  const now = options.now ?? Date.now();
-  const qVec = embed(query);
-  const { tf: qTf } = termFrequencies(query);
-  const { idf, avgLen } = inverseDocumentFrequencies(index);
+/** BM25 corpus statistics derived from entry text, keyed per store generation. */
+interface CorpusStatistics {
+  generation: number;
+  signature: number;
+  idf: Record<string, number>;
+  avgLen: number;
+  byId: Map<string, { tf: Record<string, number>; len: number }>;
+}
 
-  const byId = new Map(list(store).map((e) => [e.id, e]));
-  const results: HybridResult[] = [];
+const corpusCache = new WeakMap<Store, CorpusStatistics>();
 
-  // First pass: raw scores (needed for bm25 max-normalization)
-  const scored: { entry: MemoryEntry; indexed: IndexedEntry; cosine: number; bm25: number }[] = [];
-  for (const [id, indexed] of Object.entries(index.entries)) {
-    const entry = byId.get(id);
-    if (!entry) continue;
-    if (!passesRowFilter(entry, options, now)) continue;
-    scored.push({
-      entry,
-      indexed,
-      cosine: cosineSimilarity(qVec, indexed.vector),
-      bm25: bm25Score(qTf, indexed, idf, avgLen),
-    });
+function entriesSignature(entries: MemoryEntry[]): number {
+  let h = 0x811c9dc5;
+  for (const entry of entries) {
+    const s = `${entry.id}:${entry.updated_at}`;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
   }
+  return h >>> 0;
+}
+
+/**
+ * Issue #497: the lexical half of hybrid search needs term frequencies for every
+ * entry. In vec0 mode there is no index.json to read them from, so they are
+ * derived from the entries and cached per (store, content generation).
+ */
+function corpusStatistics(store: Store, entries: MemoryEntry[]): CorpusStatistics {
+  const generation = store.db ? getContentGeneration(store.db) : -1;
+  const signature = entriesSignature(entries);
+  const cached = corpusCache.get(store);
+  if (cached && cached.generation === generation && cached.signature === signature) return cached;
+
+  const byId = new Map<string, { tf: Record<string, number>; len: number }>();
+  const df: Record<string, number> = {};
+  let lenSum = 0;
+  for (const entry of entries) {
+    const { tf, len } = termFrequencies(indexedText(entry));
+    byId.set(entry.id, { tf, len });
+    lenSum += len;
+    for (const term of Object.keys(tf)) df[term] = (df[term] ?? 0) + 1;
+  }
+  const total = entries.length || 1;
+  const idf: Record<string, number> = {};
+  for (const [term, count] of Object.entries(df)) {
+    idf[term] = Math.log(1 + (total - count + 0.5) / (count + 0.5));
+  }
+  const result: CorpusStatistics = { generation, signature, idf, avgLen: lenSum / total, byId };
+  corpusCache.set(store, result);
+  return result;
+}
+
+const BACKFILL_META_KEY = "backfill_v1";
+/** Candidates pulled from vec0 before the lifecycle/project gates narrow the page. */
+const KNN_MIN_WINDOW = 256;
+const KNN_OVERFETCH = 4;
+
+/**
+ * Issue #497: one-time lazy backfill. A store that predates the vec0 table (or
+ * was written while the extension was unavailable) has rows but no vectors; the
+ * first search builds them from the stored content. Writes never wait for this.
+ */
+export function ensureVecBackfill(vec: VecIndex, entries: MemoryEntry[]): boolean {
+  if (vecMetaGet(vec, BACKFILL_META_KEY) === "done") return false;
+  if (entries.length === 0) return false;
+  const rows = entries.map((entry) => ({ id: entry.id, vector: embed(indexedText(entry)) }));
+  vecUpsertMany(vec, rows);
+  if (vecCount(vec) >= rows.length) vecMetaSet(vec, BACKFILL_META_KEY, "done");
+  return true;
+}
+
+/** vec0 candidate generation: KNN, then the same row gates the JSON path applies. */
+function scoreVecCandidates(
+  store: Store,
+  vec: VecIndex,
+  entries: MemoryEntry[],
+  qVec: number[],
+  qTf: Record<string, number>,
+  options: HybridSearchOptions,
+  now: number,
+  total: number,
+  limit: number,
+): ScoredCandidate[] {
+  const k = Math.min(total, Math.max(limit * KNN_OVERFETCH, KNN_MIN_WINDOW));
+  const hits = vecKnn(vec, qVec, k);
+  if (hits.length === 0) return [];
+
+  const { idf, avgLen, byId } = corpusStatistics(store, entries);
+  const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+  const scored: ScoredCandidate[] = [];
+  for (const hit of hits) {
+    const entry = entriesById.get(hit.id);
+    // A vector can outlive its row (hard delete, tombstone, another writer):
+    // the entry is the authority, exactly as the JSON path treated `byId`.
+    if (!entry || !passesRowFilter(entry, options, now)) continue;
+    const stats = byId.get(hit.id);
+    if (!stats) continue;
+    // vec0's cosine distance is `1 - cosine similarity`, the same number the
+    // fallback computes with cosineSimilarity() (float32-rounded).
+    const cosine = 1 - hit.distance;
+    scored.push({ entry, cosine, bm25: bm25Score(qTf, stats, idf, avgLen) });
+  }
+  return scored;
+}
+
+/** Shared fusion: linear (default), soft-or (T-114) or RRF (T-120). */
+function fuseCandidates(scored: ScoredCandidate[], options: HybridSearchOptions): HybridResult[] {
+  const limit = options.limit ?? 10;
+  if (scored.length === 0) return [];
+  const results: HybridResult[] = [];
   const maxBm25 = safeMax(scored.map((s) => s.bm25), Number.EPSILON);
 
   if (options.fusion === "rrf") {
@@ -300,12 +456,7 @@ export function hybridSearch(
         ],
         k,
       );
-      results.push({
-        entry: s.entry,
-        cosine: s.cosine,
-        bm25: s.bm25,
-        score,
-      });
+      results.push({ entry: s.entry, cosine: s.cosine, bm25: s.bm25, score });
     }
   } else {
     const useSoftOr = options.fusion === "soft_or";
@@ -313,15 +464,61 @@ export function hybridSearch(
       const pv = Math.max(0, s.cosine);
       const pl = Math.max(0, maxBm25 > 0 ? s.bm25 / maxBm25 : 0);
       const score = useSoftOr ? softOrFusion(pv, pl) : 0.5 * s.cosine + 0.5 * (s.bm25 / maxBm25);
-      results.push({
-        entry: s.entry,
-        cosine: s.cosine,
-        bm25: s.bm25,
-        score,
-      });
+      results.push({ entry: s.entry, cosine: s.cosine, bm25: s.bm25, score });
     }
   }
 
   results.sort((a, b) => b.score - a.score);
-  return results.slice(0, options.limit ?? 10);
+  return results.slice(0, limit);
+}
+
+/**
+ * Hybrid search: 0.5 * cosine(hashed-trigram embedding) + 0.5 * bm25_norm.
+ * Returns results sorted by fused score desc. Returns null when no index
+ * exists yet so callers can fall back to live scoring with a reindex hint.
+ *
+ * Issue #497: candidates come from the vec0 KNN query when the extension is
+ * loaded, and from the JSON/cosine scan when it is not. Both paths share the
+ * row gates and the fusion stage, so scores and ordering are interchangeable.
+ */
+export function hybridSearch(
+  store: Store,
+  memoryDir: string,
+  query: string,
+  options: HybridSearchOptions = {},
+): HybridResult[] | null {
+  const now = options.now ?? Date.now();
+  const limit = options.limit ?? 10;
+  const qVec = embed(query);
+  const { tf: qTf } = termFrequencies(query);
+
+  // 1. vec0: one indexed KNN query instead of reading and parsing index.json.
+  const vec = getVecIndex(store.db ?? null, DIMS);
+  if (vec) {
+    const entries = list(store);
+    ensureVecBackfill(vec, entries);
+    const total = vecCount(vec);
+    if (total > 0) {
+      return fuseCandidates(scoreVecCandidates(store, vec, entries, qVec, qTf, options, now, total, limit), options);
+    }
+  }
+
+  // 2. Fallback: the shipped JSON/cosine scan, unchanged.
+  const index = loadIndex(memoryDir);
+  if (!index) return null;
+
+  const { idf, avgLen } = inverseDocumentFrequencies(index);
+  const byId = new Map(list(store).map((e) => [e.id, e]));
+  const scored: ScoredCandidate[] = [];
+  for (const [id, indexed] of Object.entries(index.entries)) {
+    const entry = byId.get(id);
+    if (!entry) continue;
+    if (!passesRowFilter(entry, options, now)) continue;
+    scored.push({
+      entry,
+      cosine: cosineSimilarity(qVec, indexed.vector),
+      bm25: bm25Score(qTf, indexed, idf, avgLen),
+    });
+  }
+  return fuseCandidates(scored, options);
 }

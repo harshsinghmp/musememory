@@ -94,7 +94,7 @@ import { evaluateProjectHealth, reconcileCodeAnchors, resolveProjectName, format
 import { analyzeMemoryCodeImpact } from "../intelligence/index.ts";
 import { generatePrContext } from "../compaction/index.ts";
 import { broadcastKnowledge, ingestKnowledge, getSyncStatus, syncWithSharedPool } from "../sync/index.ts";
-import { keyIdFromPublicKey, verifyAttestation, verifyAttestationChain, type Attestation } from "../sync/attestation.ts";
+import { keyIdFromPublicKey, verifyAttestationChain, verifyAttestationDetailed, type Attestation } from "../sync/attestation.ts";
 import { currentGitBranch, listBranchOverlays, loadBranchOverlay } from "../store/branch.ts";
 import { listEnclaveEntries } from "../store/enclaves.ts";
 import { redactSecrets } from "../secrets.ts";
@@ -276,6 +276,8 @@ export async function dispatchToolCall(
           status: a.status ? String(a.status) : undefined,
           verified: a.verified === true,
           minVeracity: a.min_veracity as any,
+          // Issue #502: opt-in only — absent means the full-store scan.
+          prefilter: a.prefilter === true,
         });
         if (res.results.length > 0) {
           const ids = res.results.map((r) => r.entry.id);
@@ -307,6 +309,8 @@ export async function dispatchToolCall(
         verified: a.verified === true,
         as_of: a.as_of ? String(a.as_of) : undefined,
         minVeracity: a.min_veracity as any,
+        // Issue #502: opt-in only — absent means the full-store scan.
+        prefilter: a.prefilter === true,
       });
       // T-028: Record retrievals to update utility stats and salience
       if (res.results.length > 0) {
@@ -369,14 +373,27 @@ export async function dispatchToolCall(
           source_ids: Array.isArray(a.source_ids) ? a.source_ids.map(String) : undefined,
           linked_memory_ids: Array.isArray(a.linked_memory_ids) ? a.linked_memory_ids.map(String) : (Array.isArray(a.linkedMemoryIds) ? a.linkedMemoryIds.map(String) : undefined),
           session_id: a.session_id ? String(a.session_id) : undefined,
+          // #515: per-write provenance. The channel is this tool; the agent is
+          // whatever the caller identifies as (falls back to its source field).
+          provenance: {
+            channel: "mcp",
+            agent: a.agent ? String(a.agent) : a.source ? String(a.source) : undefined,
+          },
         });
         if (a.type === "constraint") {
-          // #433: an over-length constraint is refused by the write path.
-          // Returning the reason beats a silent omission from CURRENT.md.
-          try {
-            setCurrent(activeMemoryDir, String(a.content), projectName);
-          } catch (err: unknown) {
-            return toolError(err instanceof Error ? err.message : String(err));
+          // #515: an instruction-bearing write is privileged content. It lands as
+          // a candidate awaiting approval and is NOT replayed into CURRENT.md,
+          // which every later prompt reads; syncConstraints() already filters to
+          // active/confirmed for the same reason.
+          const pendingApproval = entry.contains_instructions === true && entry.status === "candidate";
+          if (!pendingApproval) {
+            // #433: an over-length constraint is refused by the write path.
+            // Returning the reason beats a silent omission from CURRENT.md.
+            try {
+              setCurrent(activeMemoryDir, String(a.content), projectName);
+            } catch (err: unknown) {
+              return toolError(err instanceof Error ? err.message : String(err));
+            }
           }
         }
         if (activeMemoryDir) {
@@ -1808,11 +1825,15 @@ export async function dispatchToolCall(
       ? a.key_id.trim()
       : keyIdFromPublicKey(publicKey);
     const expectedAudience = typeof a.audience === "string" && a.audience.trim() ? a.audience.trim() : undefined;
+    // Opt-in revocation proxy: reject a record whose signed timestamp is older
+    // than the caller's bound, without needing a release.
+    const maxAgeDays = typeof a.max_age_days === "number" ? a.max_age_days : undefined;
     if (Array.isArray(a.chain)) {
       const chain = a.chain as Attestation[];
       const valid = verifyAttestationChain(chain, publicKey, {
         expectedKeyId,
         expectedAudience,
+        maxAgeDays,
         requireHead: a.require_head !== false,
       });
       const last = chain[chain.length - 1];
@@ -1828,14 +1849,20 @@ export async function dispatchToolCall(
     if (!attestation || typeof attestation !== "object") {
       return toolError("muse_attestation_verify requires an attestation or a chain");
     }
-    const valid = verifyAttestation(a.packet, attestation, publicKey, { expectedKeyId, expectedAudience });
+    const result = verifyAttestationDetailed(a.packet, attestation, publicKey, { expectedKeyId, expectedAudience, maxAgeDays });
     return toolResult({
-      valid,
+      valid: result.valid,
       signer: attestation.signer,
       seq: attestation.seq,
       key_id: attestation.key_id,
       packet_hash: attestation.packet_hash,
-      reason: valid ? undefined : "signature, packet hash, key id or audience mismatch",
+      algorithm: result.algorithm,
+      age_days: result.ageDays,
+      // A distinct code, not a generic signature failure: "unsupported_algorithm"
+      // tells the caller to try a newer verifier, "signature_invalid" that the
+      // bytes do not match. `message` names the check that failed.
+      reason: result.reason,
+      message: result.message,
     });
   }
   default:

@@ -57,7 +57,8 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "search",
-    description: "Ranked search over memory entries",
+    description:
+      "Ranked search over memory entries. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need",
     inputSchema: {
       type: "object",
       properties: {
@@ -75,13 +76,14 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         as_of: { type: "string", description: "Bi-temporal point-in-time timestamp (ISO string)" },
         at_time: { type: "string", description: "Temporal point-in-time timestamp (default-excludes superseded entries)" },
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
+        prefilter: { type: "boolean", description: "Opt-in candidate prefilter (default false): score only FTS5 + vector candidates instead of the whole store. Faster on large stores, but a memory neither index surfaces is ranked as a zero-match (baseApplicability 0, -0.35 penalty) and can be missed — a recall/latency trade-off, not an exact optimisation" },
       },
       required: ["query"],
     },
   },
   {
     name: "memory_capture",
-    description: "Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', automatically appends to CURRENT.md.",
+    description: "Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', appends to CURRENT.md unless the content is instruction-bearing (OWASP LLM01), in which case it stays a candidate until confirmed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -183,7 +185,8 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "memory_recall",
-    description: "Recall active and confirmed memories for a query, with verification levels and related graph links",
+    description:
+      "Recall active and confirmed memories for a query, with verification levels and related graph links. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need",
     inputSchema: {
       type: "object",
       properties: {
@@ -198,6 +201,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         status: { type: "string" },
         verified: { type: "boolean" },
         min_veracity: { description: "Minimum provenance veracity class ('user', 'agent', 'external', 'system') or numerical threshold (1.0, 0.7, 0.5, 0.3)" },
+        prefilter: { type: "boolean", description: "Opt-in candidate prefilter (default false): score only FTS5 + vector candidates instead of the whole store. Faster on large stores, but a memory neither index surfaces is ranked as a zero-match (baseApplicability 0, -0.35 penalty) and can be missed — a recall/latency trade-off, not an exact optimisation" },
       },
       required: ["query"],
     },
@@ -1784,7 +1788,7 @@ export const MCP_TOOL_CATALOG: Tool[] = [
   },
   {
     name: "muse_attestation_verify",
-    description: "Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key",
+    description: "Read-only: verify a packet attestation (registry-dispatched; Ed25519 today) or an attestation chain against an inline public key",
     inputSchema: {
       type: "object",
       properties: {
@@ -1795,6 +1799,11 @@ export const MCP_TOOL_CATALOG: Tool[] = [
         key_id: { type: "string", description: "Optional pinned key id" },
         audience: { type: "string", description: "Optional expected audience" },
         require_head: { type: "boolean", description: "Require a signed head in a chain (default true)" },
+        max_age_days: {
+          type: "number",
+          description:
+            "Opt-in revocation proxy: reject a record whose signed created_at is older than this many days (default off)",
+        },
       },
       required: ["public_key"],
     },

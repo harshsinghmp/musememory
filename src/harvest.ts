@@ -264,6 +264,8 @@ export function importTranscript(
         tags: unit.tags,
         source: options.source ?? "transcript_import",
         confirmed: options.confirmed ?? false,
+        // #515: transcript harvesting is its own write channel.
+        provenance: { channel: "harvest" },
       });
       if (options.sessionId) {
         entry.session_id = options.sessionId;
@@ -291,6 +293,7 @@ export function importTranscript(
           type: "operation",
           tags: ["open-loop", "harvested"],
           source: options.source ?? "transcript_import",
+          provenance: { channel: "harvest" },
         });
         if (options.sessionId) {
           entry.session_id = options.sessionId;

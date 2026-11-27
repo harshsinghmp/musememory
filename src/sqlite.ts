@@ -11,6 +11,12 @@ export interface SqliteDatabase {
     get(params?: unknown[] | Record<string, unknown>): T | null | undefined;
   };
   close(): void;
+  /**
+   * Issue #497: load a SQLite extension (sqlite-vec) on this connection.
+   * Optional — a driver that cannot load extensions simply leaves it undefined
+   * and the vector path falls back to the index.json cosine scan.
+   */
+  loadExtension?(path: string): void;
 }
 
 let sqliteDriver: "bun" | "node" | "none" = "none";
@@ -80,6 +86,12 @@ export function openDatabase(dbPath: string): SqliteDatabase {
           },
         };
       },
+      // Issue #497: sqlite-vec is loaded per connection. bun:sqlite exposes
+      // loadExtension directly; the caller wraps this in try/catch and falls
+      // back to the JSON index when the extension is missing or refused.
+      loadExtension(path: string) {
+        rawDb.loadExtension(path);
+      },
       close() {
         rawDb.close();
       },
@@ -129,6 +141,17 @@ export function openDatabase(dbPath: string): SqliteDatabase {
             return stmt.get() as T;
           },
         };
+      },
+      // Issue #497: node:sqlite only grants extension loading when the handle
+      // opted in. Best-effort: any refusal throws and the caller falls back.
+      loadExtension(path: string) {
+        try {
+          rawDb.enableLoadExtension?.(true);
+        } catch {}
+        if (typeof rawDb.loadExtension !== "function") {
+          throw new Error("node:sqlite does not support loadExtension");
+        }
+        rawDb.loadExtension(path);
       },
       close() {
         rawDb.close();
@@ -505,6 +528,42 @@ export function getMemoryById(db: SqliteDatabase, id: string): MemoryEntry | nul
   const row = db.query<DbMemoryRow>(`SELECT * FROM memories WHERE id = ? LIMIT 1`).get([id]);
   if (!row) return null;
   return rowToMemoryEntry(row);
+}
+
+/**
+ * Issue #502: batch id lookup for the opt-in candidate prefilter.
+ *
+ * The prefilter derives a bounded id set from FTS5/vec0, so the rest of the
+ * pipeline needs only *those* rows — one `IN (...)` query instead of a
+ * full-table scan. Chunked because SQLite caps host parameters (999 by
+ * default) and the over-fetch window can exceed that. Tombstoned rows are
+ * excluded here, matching `list()`'s tombstone gate, so a candidate id that
+ * outlives its row (vec0 is derived data) never re-enters the page.
+ */
+export function getMemoriesByIds(db: SqliteDatabase, ids: string[]): MemoryEntry[] {
+  const unique = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  if (unique.length === 0) return [];
+
+  const CHUNK = 500;
+  const rows: DbMemoryRow[] = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    try {
+      rows.push(
+        ...db
+          .query<DbMemoryRow>(
+            `SELECT * FROM memories WHERE id IN (${placeholders}) AND (deleted_at IS NULL OR deleted_at = '')`,
+          )
+          .all(chunk),
+      );
+    } catch {
+      // A driver without the column (or a transient error) degrades to "no
+      // candidates"; the caller then falls back to the full-store path.
+      return rows.map(rowToMemoryEntry);
+    }
+  }
+  return rows.map(rowToMemoryEntry);
 }
 
 export function getMemoryByIdempotencyKey(db: SqliteDatabase, key: string): MemoryEntry | null {

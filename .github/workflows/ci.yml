@@ -12,8 +12,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Least privilege: the job reads the repo and the PR's check rollup. The
+    # delivery gate needs pull-requests/checks/actions read; nothing needs write.
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The delivery gate at the end of this job proves a commit reached
           # the remote, so the checkout needs the remote's branch refs and the
@@ -21,10 +28,17 @@ jobs:
           # ref that was checked out, which would leave `origin/<branch>`
           # missing and make the gate fail for every pull request.
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         id: setup-bun
         continue-on-error: true
         with:
+          # Deliberately NOT pinned. Pinning Bun caused a real incident: the
+          # pinned version stopped receiving the runtime fixes the test suite
+          # and `bun build` depend on, and CI went red for reasons that had
+          # nothing to do with the change under review. The workflow tracks
+          # `latest` on purpose — do not "harden" this by adding a version.
+          # The release artefacts are pinned where it actually matters: the
+          # dependency lockfile is frozen, and every action is SHA-pinned.
           bun-version: latest
       # GitHub release-asset downloads intermittently return 504 to Actions
       # runners while the npm registry stays reachable. Fall back to the npm
@@ -35,7 +49,7 @@ jobs:
       - name: Verify Bun
         run: bun --version
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
       - name: Storage Version Compatibility Matrix
         run: bun test --timeout 20000 test/storage_version_compat.test.ts
       - name: Run Test Suite
@@ -77,6 +91,27 @@ jobs:
           bunx playwright-core install chromium-headless-shell firefox
           bun run site:build
           bun run site:qa
+      - name: Build
+        # The bundle the release assets describe. `--external sqlite-vec` is
+        # why the BOM has to ask the native module for its own path below:
+        # the bundler never reads that file.
+        run: bun run build
+      - name: SBOM and checksums
+        # CycloneDX 1.7 over the runtime dependencies plus the sqlite-vec
+        # platform binary, then SHA-256 of the bundle and the BOM. Generated
+        # here and uploaded as an artefact — never committed, because a
+        # committed BOM goes stale silently.
+        run: |
+          bun run sbom
+          bun run checksums
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: |
+            dist/bom.cdx.json
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
       - name: Self Validation
         run: bun run bin/musememory.ts validate --dry-run
       - name: Delivery gate — the branch is pushed and reviewable
@@ -84,16 +119,25 @@ jobs:
         # pass review if its branch was never pushed, if it has no pull
         # request, or if its own checks are failing. See
         # .agents/standards/landing-gate.md.
-        run: bun run scripts/check-landed.ts --pr --branch "${{ github.head_ref }}"
+        # A branch name may legally contain backticks (`git check-ref-format`
+        # accepts them), so interpolating `${{ github.head_ref }}` directly into
+        # a `run:` block lets a fork PR choose shell syntax that executes before
+        # bun starts. The value reaches the script through `env`, which is data.
         env:
           # The gate reads the pull request and its check rollup through the
           # GitHub CLI, which needs an authenticated token. The workflow
           # token is read-only, which is all the gate asks for.
           GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ github.head_ref }}
+        run: bun run scripts/check-landed.ts --pr --branch "$PR_BRANCH"
         if: github.event_name == 'pull_request'
       - name: Delivery gate — the pushed commit is landed
         # On a push to an integration branch, this proves the commit is
         # reachable from the branch's remote head and that nothing is left
         # unpushed. It is the machine-checkable form of "verified on dev".
-        run: bun run scripts/check-landed.ts --integration "${{ github.ref_name }}"
+        # Same rule as the PR gate: expressions reach the shell through env,
+        # never as `${{ }}` inside a run block.
+        env:
+          INTEGRATION_REF: ${{ github.ref_name }}
+        run: bun run scripts/check-landed.ts --integration "$INTEGRATION_REF"
         if: github.event_name == 'push'

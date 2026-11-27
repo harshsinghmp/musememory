@@ -112,7 +112,9 @@ Ecosystem, Migration & Connectivity:
   mcp [--http] [--host H] [--port N] MCP server: stdio by default, Streamable HTTP with --http/--port
                                  Non-loopback --host requires --token/--tokens (or MUSE_BEARER_TOKEN/
                                  MUSE_AUTH_TOKENS) unless --insecure is passed; Host allowlist is derived
-                                 from the bind host + loopback unless --allowed-hosts is given
+                                 from the bind host + loopback unless --allowed-hosts is given.
+                                 Browser origins (any request with an Origin header) are denied unless
+                                 listed in --allowed-origins; clients that send no Origin are unaffected
 
 Version Control (R23):
   branch <id> --path <path> [--label L] Tag a memory with semantic dotted-path addressing
@@ -133,8 +135,8 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | --- | --- | --- |
 | `memory_read` | `id` | Read a full memory entry by id |
 | `get_context` | `query` | MANDATORY ON SESSION START: Fetch Top-K relevant memories, active user profile (USER.md), and active hard constraints (CURRENT.md) for prompt injection. MUST be called on the first turn of any task or session. |
-| `search` | `query` | Ranked search over memory entries |
-| `memory_recall` | `query` | Recall active and confirmed memories for a query, with verification levels and related graph links |
+| `search` | `query` | Ranked search over memory entries. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need |
+| `memory_recall` | `query` | Recall active and confirmed memories for a query, with verification levels and related graph links. `prefilter` (default false) restricts scoring to the FTS5 + vector candidates instead of the whole store: lower latency on large stores, but a memory neither index surfaces is scored as a zero-match, so it can miss results the full scan would rank — leave it off unless you measure the recall you need |
 | `memory_get_user_profile` | `content` | Read the active user profile and preferences (USER.md) |
 | `memory_search_transcripts` | `query`, `transcript` | Full-text search over conversation transcripts (.jsonl or text) with conversation bookends (start/end) and context window |
 | `memory_tree_search` | `query` | Hierarchical tree-indexed reasoning search across partitioned memory shards |
@@ -154,7 +156,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 
 | Tool | Required parameters | Description |
 | --- | --- | --- |
-| `memory_capture` | `content` | Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', automatically appends to CURRENT.md. |
+| `memory_capture` | `content` | Create a new memory entry with inline secret scan (refuses probable secrets). When type='constraint', appends to CURRENT.md unless the content is instruction-bearing (OWASP LLM01), in which case it stays a candidate until confirmed. |
 | `memory_current` | `action` | Read or append active working constraints and hard invariants in CURRENT.md for the active project |
 | `memory_get_constraints` | `query` | Read the active working constraints and hard invariants recorded in CURRENT.md for the active project |
 | `memory_set_constraints` | `query` | Append a working constraint or hard invariant to CURRENT.md for the active project |
@@ -286,7 +288,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | `muse_remediation_playbooks` | `client` | Read-only: synthesize remediation playbook candidates from recurring, resolved test failures (nothing is persisted) |
 | `muse_enclave_recall` | `client` | Read-only: decrypt and return entries from one client enclave vault. Requires an explicit client; every read is audit-logged. |
 | `muse_overlay_status` | `public_key` | Read-only: list branch memory overlays and their entry counts, or inspect one branch overlay's entries |
-| `muse_attestation_verify` | `public_key` | Read-only: verify an Ed25519 packet attestation or an attestation chain against an inline public key |
+| `muse_attestation_verify` | `public_key` | Read-only: verify a packet attestation (registry-dispatched; Ed25519 today) or an attestation chain against an inline public key |
 
 ---
 

@@ -24,6 +24,8 @@ import {
 import { calculateMultiFactorScore } from "../src/retrieval/ranking.ts";
 import { RetrievalEngine } from "../src/retrieval/engine.ts";
 import { hybridSearch, rebuildIndex, saveIndex } from "../src/vector.ts";
+import { setVecLoaderMode } from "../src/vector/vec-index.ts";
+import { MCP_TOOL_CATALOG } from "../src/mcp/catalog.ts";
 import { setupFixtureRoot, makeTempRoot, cleanup } from "./helpers.ts";
 
 describe("unified context & retrieval engine", () => {
@@ -458,10 +460,18 @@ describe("unified context & retrieval engine", () => {
     expect(engineRes.explanation).toContain("Degraded read: requested tree search");
 
     // Requesting hybrid search when no vector index exists falls back to exact with stale: true
-    const hybridRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "hybrid" });
-    expect(hybridRes.mode).toBe("exact");
-    expect(hybridRes.stale).toBe(true);
-    expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
+    // Issue #497: the vec0 index is maintained on every write, so a store that
+    // never ran a reindex still has one. "No vector index" is therefore produced
+    // by an unavailable extension, not by a missing index.json.
+    setVecLoaderMode("disabled");
+    try {
+      const hybridRes = RetrievalEngine.search(store, memoryDir, "auth", { mode: "hybrid" });
+      expect(hybridRes.mode).toBe("exact");
+      expect(hybridRes.stale).toBe(true);
+      expect(hybridRes.explanation).toContain("Degraded read: requested hybrid vector index");
+    } finally {
+      setVecLoaderMode("auto");
+    }
 
     cleanup(root);
   });
@@ -687,6 +697,178 @@ describe("unified context & retrieval engine", () => {
     expect(accessCount()).toBeGreaterThan(afterGeneral);
 
     cleanup(root);
+  });
+});
+
+/**
+ * Issue #502: part 1 is the exact SQL filter pushdown (no semantic change);
+ * part 2 is the opt-in candidate prefilter, which is a latency/recall
+ * trade-off. The contract these tests hold it to: off by default, identical to
+ * the full path whenever it cannot fill the page, and never the reason a
+ * project/type filter stops filtering.
+ */
+describe("issue #502: SQL filter pushdown + opt-in candidate prefilter", () => {
+  const NOW = Date.parse("2026-02-01T00:00:00.000Z");
+
+  test("pushdown: project/type filters return the same ids as filtering the full list in JS", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    try {
+      const store = openStore(memoryDir);
+      const mk = (project: string, type: any, title: string, content: string) =>
+        propose(store, { title, content, project, type, confirmed: true });
+
+      mk("alpha", "decision", "Alpha decision one", "vacuum scheduler alpha decision one");
+      mk("alpha", "decision", "Alpha decision two", "vacuum scheduler alpha decision two");
+      mk("alpha", "discovery", "Alpha note", "vacuum scheduler alpha note");
+      mk("beta", "decision", "Beta decision", "vacuum scheduler beta decision");
+      mk("beta", "discovery", "Beta note", "vacuum scheduler beta note");
+
+      // Exactly what the pre-pushdown code did: read the whole store, then
+      // filter project/type in JavaScript, then score.
+      const expected = sortCandidates(
+        list(store).filter((e) => e.project === "alpha" && e.type === "decision"),
+        [],
+        NOW,
+      ).map((r) => r.entry.id);
+
+      // ... and what it does now: the same predicates are indexed SQL.
+      const actual = queryContext(store, "", {
+        project: "alpha",
+        type: "decision",
+        limit: 50,
+        recordAccess: false,
+        now: NOW,
+      });
+
+      expect(expected.length).toBe(2);
+      expect(actual.results.map((r) => r.entry.id)).toEqual(expected);
+      expect(
+        actual.results.every((r) => r.entry.project === "alpha" && r.entry.type === "decision"),
+      ).toBe(true);
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  test("pushdown: a filter for a project that does not exist still returns []", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    try {
+      const store = openStore(memoryDir);
+      propose(store, {
+        title: "Alpha entry",
+        content: "vacuum scheduler alpha",
+        project: "alpha",
+        type: "decision",
+        confirmed: true,
+      });
+
+      const res = queryContext(store, "vacuum scheduler", {
+        project: "does-not-exist",
+        recordAccess: false,
+        limit: 10,
+      });
+
+      expect(res.results).toEqual([]);
+      expect(res.hidden_count).toBe(0);
+      expect(res.mode).toBe("no_confident_match");
+      expect(list(store, { project: "does-not-exist" })).toEqual([]);
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  test("prefilter: returns a full page from index candidates when they can fill it", () => {
+    const { root, memoryDir } = setupFixtureRoot();
+    try {
+      const store = openStore(memoryDir);
+      const ids: string[] = [];
+      for (let i = 0; i < 12; i++) {
+        ids.push(
+          propose(store, {
+            title: `Vacuum scheduler note ${i}`,
+            content: `vacuum scheduler maintenance routine number ${i}`,
+            project: "gamma",
+            type: "decision",
+            confirmed: true,
+          }).id,
+        );
+      }
+
+      const res = queryContext(store, "vacuum scheduler", {
+        prefilter: true,
+        limit: 5,
+        recordAccess: false,
+        now: NOW,
+      });
+
+      expect(res.prefilter_used).toBe(true);
+      expect(res.prefilter_candidate_count).toBeGreaterThanOrEqual(5);
+      expect(res.results.length).toBe(5);
+      expect(res.results.every((r) => ids.includes(r.entry.id))).toBe(true);
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  test("prefilter: falls back when candidates cannot fill the page, and is off by default", () => {
+    const root = makeTempRoot();
+    const memoryDir = join(root, ".memory");
+    // No vector backend here: this is the production shape where sqlite-vec is
+    // not installed (#497 keeps that functional), so FTS5 is the only candidate
+    // source and one hit really is one candidate.
+    setVecLoaderMode("disabled");
+    try {
+      const store = openStore(memoryDir);
+      propose(store, {
+        title: "Zebra crossing policy",
+        content: "zebra crossing procedure for the north gate",
+        project: "delta",
+        type: "decision",
+        confirmed: true,
+      });
+      for (let i = 0; i < 5; i++) {
+        propose(store, {
+          title: `Unrelated note ${i}`,
+          content: `unrelated maintenance note number ${i}`,
+          project: "delta",
+          type: "discovery",
+          confirmed: true,
+        });
+      }
+
+      const off = queryContext(store, "zebra crossing", { limit: 5, recordAccess: false, now: NOW });
+      const on = queryContext(store, "zebra crossing", {
+        prefilter: true,
+        limit: 5,
+        recordAccess: false,
+        now: NOW,
+      });
+
+      // One FTS hit, page size 5: the candidate set cannot fill the page, so
+      // the prefilter must decline and let the full scan answer.
+      expect(on.prefilter_candidate_count).toBeLessThan(5);
+      expect(on.prefilter_used).toBe(false);
+      expect(on.results.length).toBe(5);
+
+      // Off by default: an explicit `prefilter: true` on a fixture where the
+      // candidates are few is the full path, id for id.
+      expect(off.prefilter_used).toBe(false);
+      expect(on.results.map((r) => r.entry.id)).toEqual(off.results.map((r) => r.entry.id));
+    } finally {
+      setVecLoaderMode("auto");
+      cleanup(root);
+    }
+  });
+
+  test("prefilter: exposed on the MCP search and memory_recall schemas, optional and boolean", () => {
+    for (const name of ["search", "memory_recall"]) {
+      const tool = MCP_TOOL_CATALOG.find((t) => t.name === name);
+      expect(tool).toBeDefined();
+      const schema = (tool as any).inputSchema;
+      expect(schema.properties.prefilter?.type).toBe("boolean");
+      expect(schema.required ?? []).not.toContain("prefilter");
+      expect(String((tool as any).description)).toContain("prefilter");
+    }
   });
 });
 

@@ -445,6 +445,12 @@
       return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // Issue #520: class names are built from API data, so strip everything a CSS
+    // ident (or a quote, or a space) could break out of before interpolating.
+    function safeClass(value) {
+      return String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
     function renderList() {
       const container = document.getElementById('memoryList');
       const fragment = document.createDocumentFragment();
@@ -466,7 +472,7 @@
         card.innerHTML = `
           <div class="card-header">
             <div class="card-title">${escapeHtml(m.title)}</div>
-            <div class="card-type type-${m.type || 'discovery'}">${m.type || 'discovery'}</div>
+            <div class="card-type type-${escapeHtml(safeClass(m.type) || 'discovery')}">${escapeHtml(m.type || 'discovery')}</div>
           </div>
           <div class="card-snippet">${escapeHtml(m.content || '')}</div>
           <div class="card-meta">
@@ -548,7 +554,11 @@
       if (!m) return;
       selectedMemory = m;
       document.querySelectorAll('#memoryList .card.selected').forEach(c => c.classList.remove('selected'));
-      const activeCard = document.querySelector(`#memoryList .card[data-id="${m.id}"]`);
+      // Issue #520: never interpolate a memory id into a CSS selector — match it
+      // against the rendered dataset instead, so a quote cannot escape the query.
+      const activeCard = Array.prototype.slice
+        .call(document.querySelectorAll('#memoryList .card[data-id]'))
+        .filter(function (card) { return card.dataset.id === m.id; })[0];
       if (activeCard) activeCard.classList.add('selected');
 
       const pane = document.getElementById('detailPane');
@@ -557,11 +567,11 @@
 
       const meta = document.getElementById('dMeta');
       meta.innerHTML = `
-        <span class="meta-tag mono">ID: ${m.id}</span>
-        <span class="meta-tag">Status: ${m.status}</span>
-        <span class="meta-tag">Salience: ${m.salience || 0.5}</span>
-        <span class="meta-tag">Verification: ${m.verification ? m.verification.level : 'unverified'}</span>
-        <span class="meta-tag">Links: ${(m.related_memory_ids || []).length}</span>
+        <span class="meta-tag mono">ID: ${escapeHtml(m.id)}</span>
+        <span class="meta-tag">Status: ${escapeHtml(m.status || '')}</span>
+        <span class="meta-tag">Salience: ${escapeHtml(String(m.salience || 0.5))}</span>
+        <span class="meta-tag">Verification: ${escapeHtml(m.verification ? m.verification.level : 'unverified')}</span>
+        <span class="meta-tag">Links: ${escapeHtml(String((m.related_memory_ids || []).length))}</span>
       `;
 
       document.getElementById('dContent').textContent = m.content;
@@ -1338,7 +1348,7 @@
               card.innerHTML = `
                 <div class="card-header">
                   <div class="card-title">${escapeHtml(adr.title)}</div>
-                  <span class="adr-badge adr-${(adr.status || 'proposed').toLowerCase()}">${adr.status}</span>
+                  <span class="adr-badge adr-${escapeHtml(safeClass(adr.status) || 'proposed')}">${escapeHtml(adr.status || '')}</span>
                 </div>
                 <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;"><strong>Context:</strong> ${escapeHtml(adr.context || '')}</div>
                 <div style="font-size:12px; color:#f1f5f9; margin-bottom:6px;"><strong>Decision:</strong> ${escapeHtml(adr.decision || '')}</div>
@@ -1365,7 +1375,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td class="mono"><strong>${escapeHtml(item.symbol)}</strong></td>
-              <td><span class="drift-badge drift-${(item.status || 'documented').toLowerCase()}">${item.status}</span></td>
+              <td><span class="drift-badge drift-${escapeHtml(safeClass(item.status) || 'documented')}">${escapeHtml(item.status || '')}</span></td>
               <td style="font-size:11px; color:var(--text-dim);">${escapeHtml(item.docRef || item.codeRef || item.path || '')}</td>
               <td style="font-size:12px;">${escapeHtml(item.explanation || '')}</td>
             `;
@@ -1428,7 +1438,7 @@
             el.innerHTML = `
               <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
                 <span class="mono" style="font-weight:700; color:#f1f5f9;">${escapeHtml(c.subsystem)}</span>
-                <span class="badge-cause badge-${c.root_cause}">${c.root_cause}</span>
+                <span class="badge-cause badge-${escapeHtml(safeClass(c.root_cause))}">${escapeHtml(c.root_cause || '')}</span>
               </div>
               <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">${escapeHtml(c.pattern_summary)}</div>
               <div style="font-size:11px; color:var(--text-dim);">Frequency: <strong>${c.frequency}</strong> &bull; Fragility: <strong>${(c.fragility_score * 100).toFixed(0)}%</strong></div>
@@ -1447,7 +1457,7 @@
               <td class="mono">${escapeHtml(h.file || h.filePath || '')}</td>
               <td>${h.todo_count ?? 0}</td>
               <td>${h.fixme_count ?? 0}</td>
-              <td><span class="badge-cause badge-${h.risk_level || h.severity || 'low'}">${h.risk_level || h.severity || 'low'}</span></td>
+              <td><span class="badge-cause badge-${escapeHtml(safeClass(h.risk_level || h.severity) || 'low')}">${escapeHtml(h.risk_level || h.severity || 'low')}</span></td>
             `;
             debtBody.appendChild(tr);
           });
@@ -1541,7 +1551,7 @@
                 ${storeStatus}
               </div>
               <div style="font-size:11px; color:var(--text-dim); margin-bottom:6px; word-break:break-all;">${escapeHtml(node.path)}</div>
-              <div style="font-size:11px; color:var(--text-muted);">Type: <strong>${node.nodeType}</strong></div>
+              <div style="font-size:11px; color:var(--text-muted);">Type: <strong>${escapeHtml(node.nodeType || '')}</strong></div>
               ${node.dependencies && node.dependencies.length > 0 ? `<div style="font-size:11px; color:var(--text-dim); margin-top:4px;">Deps: ${node.dependencies.slice(0, 3).map(escapeHtml).join(', ')}${node.dependencies.length > 3 ? '...' : ''}</div>` : ''}
             `;
             grid.appendChild(el);
@@ -1572,7 +1582,7 @@
                   <div style="font-weight:700; color:#fff;">${escapeHtml(res.memory.title)}</div>
                   <div>
                     <span class="priority-badge priority-medium">[${escapeHtml(res.originProject)}]</span>
-                    <span class="adr-badge adr-proposed">${res.memory.type}</span>
+                    <span class="adr-badge adr-proposed">${escapeHtml(res.memory.type)}</span>
                   </div>
                 </div>
                 <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${escapeHtml(res.memory.content)}</div>
@@ -1604,7 +1614,7 @@
               <td class="mono"><strong>${escapeHtml(item.sourcePackage)}</strong></td>
               <td class="mono"><strong>${escapeHtml(item.targetPackage)}</strong></td>
               <td class="mono">${escapeHtml(item.symbol)}</td>
-              <td><span class="drift-badge ${color}">${item.status}</span></td>
+              <td><span class="drift-badge ${color}">${escapeHtml(item.status || '')}</span></td>
               <td style="font-size:12px;">${escapeHtml(item.detail)}</td>
             `;
             tbody.appendChild(tr);
@@ -1744,6 +1754,61 @@
     });
     var scopeSwitch = document.getElementById('scopeSwitch');
     if (window.STANDALONE_DATA && scopeSwitch) scopeSwitch.style.display = 'none';
+    // Issue #520: `script-src 'self'` forbids inline handlers, so every control in
+    // the shell names a static action (`data-action="fetch-health"`) instead of
+    // carrying `onclick="fetchHealth()"`. One delegated listener dispatches it —
+    // the map is a literal lookup, never `eval`, which a CSP without
+    // `'unsafe-eval'` would refuse anyway.
+    var STUDIO_ACTIONS = {
+      'refresh-memories': function () { refreshMemories(); },
+      'optimize-store': function () { optimizeStoreDashboard(); },
+      'export-html': function () { exportDataHtml(); },
+      'quick-add-constraint': function () { quickAddConstraint(); },
+      'save-user-profile': function () { saveUserProfile(); },
+      'test-retrieval': function () { testRetrieval(); },
+      'load-audit': function () { loadAudit(); },
+      'fetch-health': function () { fetchHealth(); },
+      'fetch-adrs': function () { fetchAdrs(); },
+      'fetch-drift': function () { fetchDrift(); },
+      'explain-why': function () { explainWhyCode(); },
+      'broadcast-sync': function () { broadcastSyncPacket(); },
+      'sync-pool': function () { syncPool(); },
+      'fetch-sync-status': function () { fetchSyncStatus(); },
+      'fetch-mesh-status': function () { fetchMeshStatus(); },
+      'search-mesh': function () { searchMesh(); },
+      'fetch-mesh-audit': function () { fetchMeshAudit(); },
+      'fetch-activity': function () { fetchActivity(); },
+      'reindex-terrain': function () { reindexTerrain(); },
+      'copy-agent-snippet': function () { copyAgentSnippet(); },
+      'close-detail': function () {
+        var pane = document.getElementById('detailPane');
+        if (pane) pane.classList.remove('open');
+      },
+      'copy-prompt-context': function () {
+        var out = document.getElementById('promptContextOut');
+        navigator.clipboard.writeText(out ? out.textContent : '');
+        flash('Copied prompt context!');
+      },
+    };
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
+      if (!trigger) return;
+      var action = STUDIO_ACTIONS[trigger.dataset.action];
+      if (typeof action !== 'function') return;
+      event.preventDefault();
+      action();
+    });
+
+    document.addEventListener('input', function (event) {
+      var trigger = event.target && event.target.closest ? event.target.closest('[data-input]') : null;
+      if (!trigger) return;
+      if (trigger.dataset.input === 'sandbox-budget') {
+        var out = document.getElementById('sandboxBudgetVal');
+        if (out) out.textContent = trigger.value + ' tokens';
+      }
+    });
+
     var initialScope = new URLSearchParams(window.location.search).get('scope');
     setScope(initialScope || 'project', { refetch: false });
 

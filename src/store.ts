@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor } from "./types.ts";
+import type { MemoryEntry, MemoryType, MemoryStatus, Verification, GraphMetadata, TrustTier, FactProvenanceRecord, CodeAnchor, MemoryProvenance } from "./types.ts";
 import { MAX_TITLE_LENGTH, MAX_TAGS, MAX_DRAFT_TITLE_LENGTH } from "./types.ts";
 import { scanSecrets, redactSecrets } from "./secrets.ts";
 import { recordAuditEvent, getAuditTrail } from "./audit.ts";
@@ -10,6 +10,7 @@ import { getCurrent, setCurrent, syncConstraints } from "./current.ts";
 import { autoCompileWiki } from "./wiki/compiler.ts";
 import { extractHarvestUnits } from "./harvest.ts";
 import { stripInjectedContextBlocks } from "./security/strip.ts";
+import { classifyInstructionContent } from "./security/instruction_classifier.ts";
 import { autoStampGraphMetadata } from "./graph.ts";
 import { workspaceRootFor } from "./root.ts";
 import { loadSources } from "./provenance.ts";
@@ -969,11 +970,13 @@ export function save(store: Store, entry: MemoryEntry, options: { skipSecretChec
       store.cache.setEntry(entry, undefined, mtimeMs);
     }
 
-    // T-304: Incrementally upsert into vector index.json if present
+    // T-304 / Issue #497: keep the vector index in step with this write. With
+    // sqlite-vec loaded this is one vec0 row upsert; without it, the previous
+    // index.json read-modify-write runs unchanged as the fallback.
     if (store.memoryDir) {
       try {
         const { upsertIndexEntry } = require("./vector.ts");
-        upsertIndexEntry(entry, store.memoryDir);
+        upsertIndexEntry(entry, store.memoryDir, store.db);
       } catch {}
     }
   };
@@ -1137,6 +1140,15 @@ export function propose(
     draft?: boolean;
     /** First-class code anchors linking memory to files and symbols. */
     anchors?: CodeAnchor[];
+    /**
+     * #515: Instruction-bearing flag. When omitted, `propose` classifies
+     * title+content and forces `candidate` unless the caller confirmed the
+     * write. An explicit value wins — a caller that has justification can
+     * overrule the classifier.
+     */
+    contains_instructions?: boolean;
+    /** #515: Per-write provenance. `captured_at` is stamped here; channel/agent come from the caller. */
+    provenance?: MemoryProvenance;
   },
 ): MemoryEntry {
   if (!opts.content || !opts.content.trim()) {
@@ -1331,12 +1343,30 @@ export function propose(
     }
   }
 
+  // #515: OWASP LLM01 lists memory persistence as an injection path, and Agentic
+  // ASI06 is the same failure one hop away. An instruction-bearing write is
+  // therefore privileged content, not a fact. The classifier runs only when the
+  // caller left the flag undefined; an explicit value is preserved, so a caller
+  // with justification can overrule it. `confirmed: true` is the approval step and
+  // is never downgraded — only the silent default is.
+  const classification =
+    opts.contains_instructions === undefined ? classifyInstructionContent(`${title}\n${cleanContent}`) : null;
+  const containsInstructions = opts.contains_instructions ?? classification?.containsInstructions;
+  const instructionBearing = containsInstructions === true;
+
+  // #515: Per-write provenance. `captured_at` is stamped here so every write has
+  // one; channel/agent/prompt_hash belong to the caller and are never invented.
+  const provenance: MemoryProvenance = {
+    ...opts.provenance,
+    captured_at: opts.provenance?.captured_at ?? now,
+  };
+
   const entry: MemoryEntry = {
     id: opts.id ?? makeId(opts.title ?? cleanContent.slice(0, 60)),
     title,
     content: cleanContent,
     project: opts.project,
-    status: opts.confirmed ? "confirmed" : "candidate",
+    status: instructionBearing && !opts.confirmed ? "candidate" : opts.confirmed ? "confirmed" : "candidate",
     type: opts.type ?? "discovery",
     ...(isDraft ? { draft: true } : {}),
     created_at: createdAt,
@@ -1399,6 +1429,8 @@ export function propose(
             salience: typeof opts.salience === "number" ? opts.salience : undefined,
             temporal_mode,
           }),
+    contains_instructions: containsInstructions,
+    provenance,
   };
 
   entry.quality = opts.quality ?? determineQuality(entry);
@@ -2047,11 +2079,11 @@ export function deleteEntry(store: Store, id: string, reason?: string, actor?: s
     store.cache.deleteEntry(id);
   }
 
-  // T-304: Remove from vector index.json if present
+  // T-304 / Issue #497: drop the vector row on tombstone (vec0 or index.json).
   if (store.memoryDir) {
     try {
       const { removeIndexEntry } = require("./vector.ts");
-      removeIndexEntry(id, store.memoryDir);
+      removeIndexEntry(id, store.memoryDir, store.db);
     } catch {}
   }
 
@@ -2657,7 +2689,7 @@ export function forget(
     if (store.memoryDir) {
       try {
         const { removeIndexEntry } = require("./vector.ts");
-        removeIndexEntry(id, store.memoryDir);
+        removeIndexEntry(id, store.memoryDir, store.db);
       } catch {}
       recordAuditEvent(store.memoryDir, {
         operation: "lifecycle_forget",

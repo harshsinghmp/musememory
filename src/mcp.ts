@@ -1,10 +1,21 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { MCP_TOOL_CATALOG } from "./mcp/catalog.ts";
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "@modelcontextprotocol/sdk/types.js";
+import { ANNOTATED_TOOL_CATALOG } from "./mcp/annotations.ts";
 import { dispatchToolCall } from "./mcp/dispatch.ts";
 import { toolError } from "./mcp/tool-result.ts";
+import { STATIC_MCP_RESOURCES, readMcpResource } from "./mcp/resources.ts";
+import { getMcpPrompt, listMcpPrompts } from "./mcp/prompts.ts";
 import { findOrCreateProjectRoot } from "./root.ts";
+import { isWithinRoot, realishPath } from "./paths.ts";
 import { openStore, type Store } from "./store.ts";
 import { getSettings } from "./settings.ts";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.ts";
@@ -59,6 +70,23 @@ export function getCachedStore(memoryDir: string): Store {
   return opened;
 }
 
+/**
+ * #512: the operator's opt-in for a server that deliberately serves more than
+ * one project. Unset (the default) means a request-supplied directory must stay
+ * inside the workspace root `createServer` resolved.
+ */
+export const ALLOW_EXTERNAL_DIR_ENV = "MUSE_MCP_ALLOW_EXTERNAL_DIR";
+
+/** True when the operator opted into request directories outside the root. */
+export function allowsExternalRequestDirs(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[ALLOW_EXTERNAL_DIR_ENV] === "1";
+}
+
+/** Either the store a call should use, or the reason it was refused. */
+type StoreResolution =
+  | { ok: true; activeStore: Store; activeMemoryDir: string; activeRoot: string }
+  | { ok: false; reason: string };
+
 export function createServer(targetDir?: string, requestedProfile?: McpProfile): Server {
   const activeProfile = getActiveMcpProfile(requestedProfile);
   const resolvedTarget = targetDir || process.env.MUSE_MEMORY_PROJECT_DIR || process.env.PROJECT_ROOT || process.cwd();
@@ -67,23 +95,65 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
   // names this project's directory reuses it rather than opening a second one.
   const store = getCachedStore(memoryDir);
 
-  function resolveStoreForRequest(a?: Record<string, unknown>): { activeStore: Store; activeMemoryDir: string; activeRoot: string } {
-    const dir = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
-    if (typeof dir === "string" && dir.trim()) {
-      const resolved = findOrCreateProjectRoot(dir.trim());
+  /**
+   * Resolve the store a tool call addresses.
+   *
+   * #512: `dir`/`workspace`/`project_dir`/`cwd` come from the model, and this
+   * function used to hand them straight to `findOrCreateProjectRoot`, which
+   * creates `.memory/` wherever it is told. A prompt-injected agent could
+   * therefore point the store at `/`, at `$HOME`, or at another tenant's
+   * checkout and read or write there. The request directory is now confined to
+   * the workspace root this server was started for — resolved through
+   * `realishPath` so a symlinked prefix cannot launder an escape — and a
+   * directory outside it is rejected *before* `findOrCreateProjectRoot`, so no
+   * store is created for a rejected path. `MUSE_MCP_ALLOW_EXTERNAL_DIR=1` is the
+   * operator's opt-in for the deliberate multi-project workflow.
+   */
+  function resolveStoreForRequest(
+    a?: Record<string, unknown>,
+  ): StoreResolution {
+    const requested = a?.dir || a?.workspace || a?.project_dir || a?.cwd;
+    if (typeof requested === "string" && requested.trim()) {
+      const raw = requested.trim();
+
+      if (!allowsExternalRequestDirs()) {
+        let candidate: string;
+        let configuredRoot: string;
+        try {
+          candidate = realishPath(raw);
+          configuredRoot = realishPath(root);
+        } catch (err: unknown) {
+          return {
+            ok: false,
+            reason: `Invalid directory '${raw}': ${err instanceof Error ? err.message : String(err)}.`,
+          };
+        }
+        if (!isWithinRoot(configuredRoot, candidate)) {
+          return {
+            ok: false,
+            reason:
+              `Directory '${raw}' resolves to '${candidate}', which is outside the MCP workspace root ` +
+              `'${configuredRoot}'. Omit 'dir' to use the configured store, or start the server with ` +
+              `${ALLOW_EXTERNAL_DIR_ENV}=1 to permit external directories.`,
+          };
+        }
+      }
+
+      const resolved = findOrCreateProjectRoot(raw);
       return {
+        ok: true,
         activeStore: getCachedStore(resolved.memoryDir),
         activeMemoryDir: resolved.memoryDir,
         activeRoot: resolved.root,
       };
     }
-    return { activeStore: store, activeMemoryDir: memoryDir, activeRoot: root };
+    return { ok: true, activeStore: store, activeMemoryDir: memoryDir, activeRoot: root };
   }
 
   const server = new Server(
     { name: PACKAGE_NAME, version: PACKAGE_VERSION },
     {
-      capabilities: { tools: {}, logging: {} },
+      capabilities: { tools: {}, resources: {}, prompts: {}, logging: {} },
       instructions: `MUSE MEMORY PROTOCOL:
 You are equipped with Muse Memory, an autonomous persistent cognitive memory system.
 1. SESSION START / FIRST TURN: You MUST call 'get_context' on your very first turn in any conversation or task. This loads the user's role profile (USER.md), active working constraints (CURRENT.md), and relevant past decisions/fixes.
@@ -94,7 +164,13 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const filteredByProfile = filterToolsForProfile(MCP_TOOL_CATALOG, activeProfile);
+    // #495: the catalog is served with its safety hints attached. The mapping
+    // happens once at module load (`ANNOTATED_TOOL_CATALOG`), not per request —
+    // a `tools/list` call only filters. `readOnlyHint` is what a host uses to
+    // auto-approve a read, `destructiveHint` to warn before a delete, so a tool
+    // must never be served without them (a name missing from the map still gets
+    // `defaultAnnotation()`, which is conservative rather than silent).
+    const filteredByProfile = filterToolsForProfile(ANNOTATED_TOOL_CATALOG, activeProfile);
     // T-394: Enforce mcp.enabledTools from settings
     const settings = getSettings(memoryDir);
     const enabledTools = settings.mcp?.enabledTools;
@@ -109,7 +185,11 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const a = (args ?? {}) as Record<string, unknown>;
-    const { activeStore, activeMemoryDir, activeRoot } = resolveStoreForRequest(a);
+    const resolution = resolveStoreForRequest(a);
+    // #512: a rejected directory is a tool error, not a crash and not a silent
+    // fallback to the configured store — the caller must see which root bounds it.
+    if (!resolution.ok) return toolError(resolution.reason);
+    const { activeStore, activeMemoryDir, activeRoot } = resolution;
 
     // T-394: Reject disabled tools per mcp.enabledTools
     const settings = getSettings(activeMemoryDir);
@@ -136,6 +216,32 @@ You are equipped with Muse Memory, an autonomous persistent cognitive memory sys
     }
   });
 
+  // --- #494: resources -------------------------------------------------------
+  // `resources/list` advertises only the four stable documents. Enumerating
+  // every memory entry here would be an unbounded token cost for a client that
+  // asked for an index; entries stay reachable by id via `memory://entry/<id>`.
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: STATIC_MCP_RESOURCES.map((resource) => ({ ...resource })),
+  }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    // `readMcpResource` throws McpError(-32602) for an unknown or malformed URI
+    // and for an entry id the store does not hold, so the rejection reaches the
+    // client as a JSON-RPC error instead of an empty document.
+    const resource = readMcpResource(store, memoryDir, request.params.uri);
+    return { contents: [resource] };
+  });
+
+  // --- #494: prompts ---------------------------------------------------------
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: listMcpPrompts(),
+  }));
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: promptArgs } = request.params;
+    return getMcpPrompt(memoryDir, name, (promptArgs ?? {}) as Record<string, string>);
+  });
+
   return server;
 }
 
@@ -150,4 +256,18 @@ export async function runMcpServer(): Promise<void> {
   });
 }
 
-export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ["2024-11-05", "2025-06-18"];
+/**
+ * #494: the protocol revisions this server accepts, newest first.
+ *
+ * Bound to the installed SDK's own list rather than duplicated, because the SDK
+ * is what actually negotiates: it answers `initialize` with the client's version
+ * when that version is in `SUPPORTED_PROTOCOL_VERSIONS` and falls back to
+ * `LATEST_PROTOCOL_VERSION` otherwise. A hand-maintained copy here could only
+ * drift from the negotiation it is supposed to describe. The installed
+ * `@modelcontextprotocol/sdk@1.32.2` list is
+ * `['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07']`.
+ *
+ * This is also the HTTP transport's `mcp-protocol-version` allowlist, so a
+ * header naming anything else is rejected with 400 (see `src/mcp/http.ts`).
+ */
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS: readonly string[] = [...SUPPORTED_PROTOCOL_VERSIONS];

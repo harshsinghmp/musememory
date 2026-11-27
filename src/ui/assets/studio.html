@@ -39,16 +39,16 @@
         <label class="scope-filter-label" for="projectFilter">Project Filter</label>
         <input type="text" id="projectFilter" class="scope-filter-input" placeholder="all projects" autocomplete="off" spellcheck="false" title="Leave empty to audit the whole memory store, or enter a project name to scope the health gate, drift, bug cluster and technical debt audits." />
       </div>
-      <button class="btn-icon btn-refresh" id="refreshBtn" onclick="refreshMemories()" title="Refresh and sync active constraints, handoff state, and prior memories">
+      <button class="btn-icon btn-refresh" id="refreshBtn" data-action="refresh-memories" title="Refresh and sync active constraints, handoff state, and prior memories">
         <span class="refresh-icon" id="refreshIcon" aria-hidden="true"></span>
         <span id="refreshLabel">Refresh</span>
       </button>
-      <button class="btn-icon btn-optimize write-action" id="optimizeBtn" onclick="optimizeStoreDashboard()" title="Clean test noise, prune junk, deduplicate candidates, and defragment SQLite storage">
+      <button class="btn-icon btn-optimize write-action" id="optimizeBtn" data-action="optimize-store" title="Clean test noise, prune junk, deduplicate candidates, and defragment SQLite storage">
         <span class="optimize-icon" id="optimizeIcon" aria-hidden="true"></span>
         <span id="optimizeLabel">Optimize</span>
       </button>
       <div class="status-badge"><div class="status-dot"></div>[LIVE] Active</div>
-      <button class="btn-icon" onclick="exportDataHtml()">Export HTML</button>
+      <button class="btn-icon" data-action="export-html">Export HTML</button>
     </div>
   </header>
   <div class="scope-banner" id="scopeBanner" hidden></div>
@@ -147,7 +147,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>🛡️ Active Working Invariants & Hard Constraints</span>
-            <button class="btn-primary write-action" onclick="quickAddConstraint()">+ Add Constraint</button>
+            <button class="btn-primary write-action" data-action="quick-add-constraint">+ Add Constraint</button>
           </div>
           <div id="constraintsList" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
@@ -189,7 +189,7 @@
           <div style="margin-top:20px;">
             <div class="card-title-lg">Active USER.md Instructions</div>
             <textarea id="userProfileText" style="width:100%; height:200px; background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); color:#fff; padding:12px; font-family:'JetBrains Mono', monospace; font-size:12px; line-height:1.5; outline:none;"></textarea>
-            <button class="btn-primary write-action" style="margin-top:10px;" onclick="saveUserProfile()">Save Preferences</button>
+            <button class="btn-primary write-action" style="margin-top:10px;" data-action="save-user-profile">Save Preferences</button>
           </div>
         </div>
       </div>
@@ -202,16 +202,16 @@
           <div class="card-title-lg">🔍 Real-Time Knapsack Retrieval Sandbox</div>
           <div class="sandbox-input-grid">
             <input type="text" id="sandboxQuery" placeholder="Enter query (e.g., 'auth token refresh invariant', 'cors headers')..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
-            <button class="btn-primary" onclick="testRetrieval()">Simulate Prompt Context</button>
+            <button class="btn-primary" data-action="test-retrieval">Simulate Prompt Context</button>
           </div>
           <div class="control-row" style="margin-bottom:16px;">
             <span class="control-label">Token Budget:</span>
-            <input type="range" id="sandboxBudgetSlider" min="500" max="6000" step="250" value="2000" oninput="document.getElementById('sandboxBudgetVal').textContent = this.value + ' tokens'" />
+            <input type="range" id="sandboxBudgetSlider" min="500" max="6000" step="250" value="2000" data-input="sandbox-budget" />
             <span class="control-label mono" id="sandboxBudgetVal">2000 tokens</span>
           </div>
           <div class="card-title-lg" style="margin-top:16px;">
             <span>Simulated Prompt Context Injection</span>
-            <button class="btn-icon" onclick="navigator.clipboard.writeText(document.getElementById('promptContextOut').textContent); flash('Copied prompt context!');">📋 Copy</button>
+            <button class="btn-icon" data-action="copy-prompt-context">📋 Copy</button>
           </div>
           <div class="code-preview" id="promptContextOut">// Enter a query above and click simulate to inspect the rendered context...</div>
         </div>
@@ -224,7 +224,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>📜 Append-Only Compliance Audit Trail</span>
-            <button class="btn-icon" onclick="loadAudit()">🔄 Refresh</button>
+            <button class="btn-icon" data-action="load-audit">🔄 Refresh</button>
           </div>
           <table class="audit-table">
             <thead>
@@ -318,7 +318,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>📋 Prioritized Remediation Action Checklist</span>
-            <button class="btn-icon" onclick="fetchHealth()">🔄 Re-Audit</button>
+            <button class="btn-icon" data-action="fetch-health">🔄 Re-Audit</button>
           </div>
           <table class="audit-table">
             <thead>
@@ -336,7 +336,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>🏛️ Architecture Decision Records (ADRs)</span>
-            <button class="btn-icon" onclick="fetchAdrs()">🔄 Refresh</button>
+            <button class="btn-icon" data-action="fetch-adrs">🔄 Refresh</button>
           </div>
           <div id="adrsListGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;"></div>
         </div>
@@ -344,7 +344,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>🔍 Code ↔ Documentation Bi-Directional Drift Inspector</span>
-            <button class="btn-icon" onclick="fetchDrift()">🔄 Audit Drift</button>
+            <button class="btn-icon" data-action="fetch-drift">🔄 Audit Drift</button>
           </div>
           <table class="audit-table">
             <thead>
@@ -366,7 +366,7 @@
           </p>
           <div class="sandbox-input-grid">
             <input type="text" id="whyInput" placeholder="Enter symbol or path (e.g., 'computeFingerprint', 'openStore', 'src/sync/engine.ts')..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
-            <button class="btn-primary" onclick="explainWhyCode()">Explain Why</button>
+            <button class="btn-primary" data-action="explain-why">Explain Why</button>
           </div>
           <div id="whyOutput" style="display:none; margin-top:14px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid var(--panel-border); border-radius:var(--radius-md);"></div>
         </div>
@@ -393,8 +393,8 @@
           <div class="card-title-lg">
             <span>🤝 Cross-Agent Knowledge Sync & P2P Gossip Mesh</span>
             <div style="display:flex; gap:8px;">
-              <button class="btn-primary write-action" onclick="broadcastSyncPacket()">📡 Broadcast Packet</button>
-              <button class="btn-primary write-action" style="background:#059669;" onclick="syncPool()">🔄 Sync with Pool</button>
+              <button class="btn-primary write-action" data-action="broadcast-sync">📡 Broadcast Packet</button>
+              <button class="btn-primary write-action" style="background:#059669;" data-action="sync-pool">🔄 Sync with Pool</button>
             </div>
           </div>
           <div class="handoff-grid" style="margin-top:10px;">
@@ -408,7 +408,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>👥 Known Peer Agents & Vector Clocks</span>
-            <button class="btn-icon" onclick="fetchSyncStatus()">🔄 Refresh Status</button>
+            <button class="btn-icon" data-action="fetch-sync-status">🔄 Refresh Status</button>
           </div>
           <table class="audit-table">
             <thead>
@@ -426,7 +426,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>🕸️ Monorepo & Multi-Repo Cross-Project Mesh Topology</span>
-            <button class="btn-icon" onclick="fetchMeshStatus()">🔄 Refresh Mesh</button>
+            <button class="btn-icon" data-action="fetch-mesh-status">🔄 Refresh Mesh</button>
           </div>
           <div class="handoff-grid" style="margin-top:10px;">
             <div class="handoff-cell"><div class="handoff-lbl">Workspace Root</div><div class="handoff-val mono" style="font-size:12px;" id="meshRoot">--</div></div>
@@ -449,7 +449,7 @@
           </div>
           <div class="sandbox-input-grid">
             <input type="text" id="meshQueryInput" placeholder="Search across all linked packages & repos..." style="background:#080c14; border:1px solid var(--panel-border); border-radius:var(--radius-md); padding:10px 14px; color:#fff; font-size:13px; outline:none;" />
-            <button class="btn-primary" onclick="searchMesh()">Search Mesh</button>
+            <button class="btn-primary" data-action="search-mesh">Search Mesh</button>
           </div>
           <div id="meshQueryResults" style="display:flex; flex-direction:column; gap:10px;"></div>
         </div>
@@ -457,7 +457,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>🛡️ Cross-Package Contract & Dependency Audit</span>
-            <button class="btn-icon" onclick="fetchMeshAudit()">🔄 Run Audit</button>
+            <button class="btn-icon" data-action="fetch-mesh-audit">🔄 Run Audit</button>
           </div>
           <div id="meshAuditSummary" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
           <table class="audit-table">
@@ -526,7 +526,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>Agent Session Log</span>
-            <button type="button" class="btn-icon" onclick="fetchActivity()">Refresh</button>
+            <button type="button" class="btn-icon" data-action="fetch-activity">Refresh</button>
           </div>
           <div class="session-grid" id="activitySessions"></div>
         </div>
@@ -540,7 +540,7 @@
         <section class="terrain-viewer">
           <div class="terrain-toolbar">
             <span class="mono" id="terrainFileName">Select a map</span>
-            <button type="button" class="btn-icon" id="terrainReindex" onclick="reindexTerrain()">REINDEX</button>
+            <button type="button" class="btn-icon" id="terrainReindex" data-action="reindex-terrain">REINDEX</button>
           </div>
           <div class="terrain-content" id="terrainContent"><p class="activity-empty">Compile the terrain maps to inspect them.</p></div>
           <div class="terrain-scanline" id="terrainScanline" aria-hidden="true"></div>
@@ -561,7 +561,7 @@
         <div class="view-card">
           <div class="card-title-lg">
             <span>"Point Any Agent" Manifest</span>
-            <button type="button" class="btn-icon" onclick="copyAgentSnippet()">Copy snippet</button>
+            <button type="button" class="btn-icon" data-action="copy-agent-snippet">Copy snippet</button>
           </div>
           <p class="agent-meta">Point any MCP-capable agent at the server below. Paths are local to this machine.</p>
           <div class="agent-meta mono" id="agentManifestPaths">Loading...</div>
@@ -574,7 +574,7 @@
     <div class="detail-pane" id="detailPane">
       <div class="detail-header">
         <div class="detail-title" id="dTitle">Select a memory</div>
-        <button class="close-btn" onclick="document.getElementById('detailPane').classList.remove('open')">✕</button>
+        <button class="close-btn" data-action="close-detail">✕</button>
       </div>
       <div class="meta-row" id="dMeta"></div>
       <div class="content-box" id="dContent"></div>

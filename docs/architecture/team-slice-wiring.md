@@ -15,7 +15,7 @@ SQLite's Write-Ahead Log (WAL) mode relies on POSIX shared memory (`-shm`) and O
 The team topology designates **one machine or VM as the host server**. 
 - The host runs `musememory serve` (or `musememory mcp --http`).
 - The host owns and writes to `team.db` in-process with full WAL isolation.
-- Team members connect their coding agents (Cursor, Opencode, Claude Code, Antigravity) over local LAN or remote HTTPS using the **MCP Streamable HTTP transport (2025-06-18 spec)** with **Bearer token authentication**.
+- Team members connect their coding agents (Cursor, Opencode, Claude Code, Antigravity) over local LAN or remote HTTPS using the **MCP Streamable HTTP transport (2025-11-25 spec)** with **Bearer token authentication**.
 
 ```
                            ┌───────────────────────────────────────────────┐
@@ -28,7 +28,7 @@ The team topology designates **one machine or VM as the host server**.
                            │  └─────────────┘  └────────────────────────┘  │
                            └───────────────────────▲───────────────────────┘
                                                    │
-                  MCP Streamable HTTP (2025-06-18) │ Authorization: Bearer <token>
+                  MCP Streamable HTTP (2025-11-25) │ Authorization: Bearer <token>
        ┌───────────────────────────┬───────────────┴───────────────┬───────────────────────────┐
        │                           │                               │                           │
 ┌──────┴──────┐             ┌──────┴──────┐                 ┌──────┴──────┐             ┌──────┴──────┐

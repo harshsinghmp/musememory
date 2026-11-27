@@ -45,6 +45,18 @@ Currently under active development on dedicated feature branches.
 
 - *(none — sprint SOW-200 completed and shipped)*
 
+## 🔐 Cryptographic agility and the post-quantum migration
+
+**Dated 2026-11-27.** NIST **IR 8547 final (2026-10-27)** removed the draft's
+exemption for 128-bit classical parameters, so Ed25519 is **deprecated after
+2030-12-31**, **disallowed after 2035-12-31**, and from **2031-01-01** any
+deployment that still relies on it — verify-only included — owes a documented
+risk acceptance; attestation verification is therefore now registry-dispatched
+with an optional `sig_scheme` on the envelope, which lets an ML-DSA-65 verifier
+(phase 1, 2027 H1) and hybrid `ed25519+ml-dsa-65` signing (phase 2) land without
+a wire break, with the per-use inventory, owner, review date and the full phase
+plan in the [crypto inventory](crypto-inventory.md).
+
 ## 🔧 Engineering debt (audited, deliberately deferred)
 
 Found by the 2026-10-21 cross-file invariant audit. Each item is a real

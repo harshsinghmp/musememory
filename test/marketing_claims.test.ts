@@ -136,6 +136,25 @@ describe("Published-claim integrity", () => {
       expect(text).toContain(`${claims.migratorProviders} Engines`);
     });
 
+    it("the README test badge matches the claims manifest", () => {
+      // The badge said 1645 while claims.json published 1709: nothing compared
+      // them, because the checkbox is hand-typed. A published count that no
+      // gate reads drifts the moment a test is added.
+      const text = readFileSync(join(ROOT, "README.md"), "utf8");
+      const badge = text.match(/badge\/Tests-(\d+)%20Passed/);
+      expect(badge).not.toBeNull();
+      expect(Number(badge![1])).toBe(claims.tests.count);
+    });
+
+    it("the README quickstart counts match the claims manifest", () => {
+      const text = readFileSync(join(ROOT, "README.md"), "utf8");
+      const quickstart = text.match(/(\d+)\s+pass,\s*0 fail,\s*(\d+)\s+assertions across (\d+)\s+files/);
+      expect(quickstart).not.toBeNull();
+      expect(Number(quickstart![1])).toBe(claims.tests.count);
+      expect(Number(quickstart![2])).toBe(claims.tests.assertions);
+      expect(Number(quickstart![3])).toBe(claims.tests.files);
+    });
+
     it("the website reads its counts from the claims manifest, not from prose", () => {
       // The site interpolates from `claims.json`, so the assertion is that
       // the binding is used — a hardcoded number in the page would drift the

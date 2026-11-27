@@ -53,6 +53,17 @@
     "expired_by": { "type": "string" },
     "pinned": { "type": "boolean" },
     "decay_model": { "type": "string", "enum": ["exponential", "weibull"] },
+    "contains_instructions": { "type": "boolean" },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "channel": { "type": "string" },
+        "agent": { "type": "string" },
+        "prompt_hash": { "type": "string" },
+        "captured_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
     "reinforcement": { "type": "integer" },
     "source": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" }, "maxItems": 8 },

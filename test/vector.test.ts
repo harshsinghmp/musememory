@@ -1,8 +1,21 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { openStore, propose, get } from "../src/store.ts";
-import { embed, cosineSimilarity, rebuildIndex, saveIndex, loadIndex, hybridSearch, termFrequencies, bm25Score } from "../src/vector.ts";
+import { openStore, propose, get, deleteEntry } from "../src/store.ts";
+import {
+  embed,
+  cosineSimilarity,
+  rebuildIndex,
+  saveIndex,
+  loadIndex,
+  hybridSearch,
+  termFrequencies,
+  bm25Score,
+  exportVectorSnapshot,
+  indexFilePath,
+  DIMS,
+} from "../src/vector.ts";
+import { getVecIndex, setVecLoaderMode, vecKnn, vecCount } from "../src/vector/vec-index.ts";
 import { makeTempRoot, cleanup } from "./helpers.ts";
 
 function setup() {
@@ -119,28 +132,65 @@ describe("hybrid fusion search", () => {
     cleanup(root);
   });
 
-  test("T-304: save() incrementally updates index.json and deleteEntry() removes it", () => {
+  test("T-304 fallback: with the extension unavailable save() maintains index.json and delete() prunes it", () => {
     const { root, memoryDir, store } = setup();
-    const e1 = propose(store, { title: "First memory", content: "first content", project: "aria", confirmed: true });
+    // Issue #497: the JSON index is the fallback path now. Disable the loader
+    // instead of uninstalling the package, so this exercises the shipping code.
+    setVecLoaderMode("disabled");
+    try {
+      const e1 = propose(store, { title: "First memory", content: "first content", project: "aria", confirmed: true });
 
-    // 1. Build initial index
-    const index = rebuildIndex(store);
-    saveIndex(index, memoryDir);
+      // 1. Build initial index
+      const index = rebuildIndex(store);
+      saveIndex(index, memoryDir);
+      expect(Object.keys(loadIndex(memoryDir)!.entries).length).toBe(1);
+
+      // 2. Save a second memory: index.json gains it without a manual rebuild
+      const e2 = propose(store, { title: "Second memory", content: "second content", project: "aria", confirmed: true });
+      const updatedIndex = loadIndex(memoryDir)!;
+      expect(Object.keys(updatedIndex.entries).length).toBe(2);
+      expect(updatedIndex.entries[e2.id]).toBeDefined();
+
+      // 3. Delete e1: it leaves index.json
+      const { deleteEntry } = require("../src/store.ts");
+      deleteEntry(store, e1.id);
+      const postDeleteIndex = loadIndex(memoryDir)!;
+      expect(Object.keys(postDeleteIndex.entries).length).toBe(1);
+      expect(postDeleteIndex.entries[e1.id]).toBeUndefined();
+      expect(postDeleteIndex.entries[e2.id]).toBeDefined();
+    } finally {
+      setVecLoaderMode("auto");
+    }
+
+    cleanup(root);
+  });
+});
+
+describe("Issue #497: vec0 write path", () => {
+  test("save() upserts the vec0 row and does not rewrite the index.json snapshot", () => {
+    const { root, memoryDir, store } = setup();
+    const vec = getVecIndex(store.db!, DIMS);
+    expect(vec).not.toBeNull();
+
+    const e1 = propose(store, { title: "First memory", content: "first content", project: "aria", confirmed: true });
+    expect(vecCount(vec!)).toBe(1);
+    expect(vecKnn(vec!, embed("First memory first content"), 5).map((h) => h.id)).toEqual([e1.id]);
+
+    // index.json is a snapshot now: export it explicitly, then prove a save()
+    // leaves it byte-identical instead of re-serializing every vector.
+    exportVectorSnapshot(store, memoryDir);
+    const snapshot = readFileSync(indexFilePath(memoryDir), "utf8");
+
+    const e2 = propose(store, { title: "Second memory", content: "second content", project: "aria", confirmed: true });
+    expect(readFileSync(indexFilePath(memoryDir), "utf8")).toBe(snapshot);
+    expect(vecCount(vec!)).toBe(2);
     expect(Object.keys(loadIndex(memoryDir)!.entries).length).toBe(1);
 
-    // 2. Save a second memory: verify index.json now has 2 entries without manual rebuild
-    const e2 = propose(store, { title: "Second memory", content: "second content", project: "aria", confirmed: true });
-    const updatedIndex = loadIndex(memoryDir)!;
-    expect(Object.keys(updatedIndex.entries).length).toBe(2);
-    expect(updatedIndex.entries[e2.id]).toBeDefined();
-
-    // 3. Delete e1: verify e1 is removed from index.json
-    const { deleteEntry } = require("../src/store.ts");
+    // deleteEntry() tombstones the row and drops its vector
     deleteEntry(store, e1.id);
-    const postDeleteIndex = loadIndex(memoryDir)!;
-    expect(Object.keys(postDeleteIndex.entries).length).toBe(1);
-    expect(postDeleteIndex.entries[e1.id]).toBeUndefined();
-    expect(postDeleteIndex.entries[e2.id]).toBeDefined();
+    expect(vecCount(vec!)).toBe(1);
+    expect(vecKnn(vec!, embed("First memory first content"), 5).map((h) => h.id)).not.toContain(e1.id);
+    expect(vecKnn(vec!, embed("Second memory second content"), 5).map((h) => h.id)).toEqual([e2.id]);
 
     cleanup(root);
   });

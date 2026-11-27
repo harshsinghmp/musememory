@@ -131,11 +131,18 @@ function peersFilePath(memoryDir: string): string {
  */
 export function loadPeers(memoryDir: string): Record<string, PeerRecord> {
   const file = peersFilePath(memoryDir);
-  if (!existsSync(file)) return {};
+  if (!existsSync(file)) return Object.create(null);
   try {
-    return JSON.parse(readFileSync(file, "utf-8"));
+    const parsed = JSON.parse(readFileSync(file, "utf-8")) as Record<string, PeerRecord>;
+    // A peer id is attacker-supplied: it arrives inside a packet. A plain object
+    // inherits Object.prototype, so `peers["__proto__"]`, `["constructor"]` and
+    // `["toString"]` are truthy even when no such peer exists — which made every
+    // unsigned packet look like a known peer and skipped the #456 overwrite
+    // guard. A null prototype removes the inherited names; callers also use
+    // Object.hasOwn, so neither defence depends on the other.
+    return Object.assign(Object.create(null), parsed) as Record<string, PeerRecord>;
   } catch {
-    return {};
+    return Object.create(null);
   }
 }
 
@@ -315,10 +322,22 @@ export function ingestKnowledge(
   const senderPeers = loadPeers(memoryDir);
   // A known peer, or a packet whose signature we just verified, is trusted to
   // use newer-wins. Everyone else may only add knowledge, never rewrite ours.
-  const trustedSender = attestation.attested || Boolean(senderPeers[packet.sender_id]);
+  // `Object.hasOwn` — not a truthiness lookup — because the id is attacker-
+  // supplied and inherited names ("__proto__", "toString") are not peers.
+  const senderIsKnownPeer = Object.hasOwn(senderPeers, packet.sender_id);
+  const trustedSender = attestation.attested || senderIsKnownPeer;
 
   // 4. Process each incoming memory
   for (const incoming of packet.payload.memories) {
+    // #515: record how this write reached us and who sent it, so a gossiped
+    // memory is not indistinguishable from a local one. Any upstream provenance
+    // the sender attached (prompt hash, capture time) is preserved.
+    incoming.provenance = {
+      ...(incoming.provenance ?? {}),
+      channel: "sync",
+      agent: packet.sender_id,
+      captured_at: incoming.provenance?.captured_at ?? new Date().toISOString(),
+    };
     const existing = get(store, incoming.id);
 
     // Exact ID match
@@ -333,7 +352,7 @@ export function ingestKnowledge(
       // the peer's last sync time: if BOTH the stored copy and the incoming
       // copy were modified after we last synced with this sender, neither can
       // have seen the other's edit — that is a concurrent write.
-      const lastSync = senderPeers[packet.sender_id]?.last_seen_at;
+      const lastSync = senderIsKnownPeer ? senderPeers[packet.sender_id]?.last_seen_at : undefined;
       const concurrent =
         Boolean(lastSync) &&
         existing.updated_at > lastSync! &&

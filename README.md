@@ -15,12 +15,16 @@
 ![Node.js](https://img.shields.io/badge/Node.js-≥18.0.0-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 
-![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05-green?style=for-the-badge&logo=anthropic)
+![MCP Protocol](https://img.shields.io/badge/MCP-2025--11--25-green?style=for-the-badge&logo=anthropic)
 ![SQLite Engine](https://img.shields.io/badge/SQLite-Primary_DB-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![AST Graph](https://img.shields.io/badge/AST-CodeGraph_%26_Graphify-orange?style=for-the-badge&logo=diagram-project&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Storage-Zero--Daemon_%2F_Local--First-0D9488?style=for-the-badge)
 
-![CI Tests](https://img.shields.io/badge/Tests-1645%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+<<<<<<< HEAD
+![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+=======
+![CI Tests](https://img.shields.io/badge/Tests-1856%20Passed-brightgreen?style=for-the-badge&logo=checkmarx)
+>>>>>>> origin/dev
 ![Security](https://img.shields.io/badge/Security-Vibeguard_Zero--Leak-DC2626?style=for-the-badge&logo=shield)
 ![Agent Coverage](https://img.shields.io/badge/Agents-Majority%20Supported-4F46E5?style=for-the-badge&logo=openai)
 ![License](https://img.shields.io/badge/License-MIT-9333EA?style=for-the-badge)
@@ -188,6 +192,7 @@ memory optimize
 - [🧠 Shipped agent skills](#-shipped-agent-skills)
 - [👤 5 role archetypes](#-5-role-archetypes-usermd)
 - [🧪 Testing & verification](#-testing--verification)
+- [🔐 Security](#-security)
 - [🔮 Roadmap](#-roadmap)
 - [📜 License](#-license)
 
@@ -562,7 +567,7 @@ If you installed the pre-commit transcript harvester hook or injected agent prom
 
 ## 👥 Team & Multi-Member Setup
 
-Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-06-18)** with Bearer token authentication.
+Deploy a shared persistent cognitive memory layer across your entire engineering team. All team members' coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf) connect to a single host server running in-process SQLite over **MCP Streamable HTTP (2025-11-25, with 2025-06-18 compatibility)** with Bearer token authentication.
 
 ```
                     Central Team Server (`team.db` + `CURRENT.md`)
@@ -780,12 +785,41 @@ memory user set "- Prefers TypeScript, Bun, and ultra terse responses"
 
 ```bash
 bun install
-bun test          # 1335 pass, 0 fail, 6123 assertions across 205 files
+<<<<<<< HEAD
+bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
+=======
+bun test          # 1856 pass, 0 fail, 10347 assertions across 278 files
+>>>>>>> origin/dev
 bun run typecheck # 0 static type errors
 bun run build     # Clean bundled distribution build (dist/index.js)
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch/PR model, the per-commit gate, and the post-merge sequence.
+
+---
+
+## 🔐 Security
+
+Security fixes land on **3.4.x**; 3.3 and older are unsupported. The full policy —
+supported versions, scope, response targets, coordinated disclosure and safe
+harbour — is in [**SECURITY.md**](./SECURITY.md).
+
+**Reporting a vulnerability:** open the repository's [Security tab](https://github.com/harshsinghmp/musememory/security)
+and choose **"Report a vulnerability"** (GitHub private vulnerability reporting).
+There is no security email address, and please do not open a public issue or pull
+request for a suspected vulnerability.
+
+| Stage | Target |
+| :--- | :--- |
+| Acknowledgement | 72 hours |
+| Triage | 7 days |
+| Fix or mitigation plan | 30 days |
+
+Disclosure is coordinated: 90 days from the report or the release that fixes it,
+whichever comes first. Already hardened: the MCP HTTP origin gate, request
+directory confinement, fenced prompt/resource output, the Studio CSP and
+same-origin gate, signature-first sync trust, constant-time token checks and
+deletion reconciliation for the vector index — each with its evidence in [SECURITY.md](./SECURITY.md#hardening-already-in-place).
 
 ---
 

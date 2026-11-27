@@ -97,7 +97,7 @@ describe("embedded web UI server", () => {
     // Check HTML contains Refresh button
     const html = await (await fetch(`http://localhost:${srv.port}/`)).text();
     expect(html).toContain('id="refreshBtn"');
-    expect(html).toContain("refreshMemories()");
+    expect(html).toContain('data-action="refresh-memories"');
 
     // Test POST /api/refresh
     const refreshRes = await fetch(`http://localhost:${srv.port}/api/refresh`, {
@@ -219,7 +219,7 @@ describe("embedded web UI server", () => {
 
     // 9. Test Optimize Button and Endpoints
     expect(html).toContain('id="optimizeBtn"');
-    expect(html).toContain("optimizeStoreDashboard()");
+    expect(html).toContain('data-action="optimize-store"');
 
     const optRes = await fetch(`http://localhost:${srv.port}/api/optimize`, {
       method: "POST",
@@ -693,7 +693,7 @@ describe("Wave 23 PR 3: T-458 terrain vault UI", () => {
       expect(html).toContain('id="terrainTree"');
       expect(html).toContain('id="terrainContent"');
       expect(html).toContain('id="terrainScanline"');
-      expect(html).toContain("reindexTerrain()");
+      expect(html).toContain('data-action="reindex-terrain"');
       expect(js).toContain("function fetchTerrain");
       expect(js).toContain("function renderTerrainMarkdown");
       expect(js).toContain("terrainScanline");
@@ -886,7 +886,7 @@ describe("Wave 23 PR 4: T-462 point-any-agent manifest", () => {
       const js = await (await fetch(`${base}/assets/studio.js`)).text();
 
       expect(html).toContain('id="agentManifestSnippet"');
-      expect(html).toContain("copyAgentSnippet()");
+      expect(html).toContain('data-action="copy-agent-snippet"');
       expect(js).toContain("function fetchAgentManifest");
       expect(js).toContain("function copyAgentSnippet");
 

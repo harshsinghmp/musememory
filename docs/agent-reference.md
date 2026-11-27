@@ -127,7 +127,84 @@ Full matrix: [`cli-reference.md`](./cli-reference.md).
 ## 5. MCP
 
 The server speaks MCP over stdio. Protocol versions accepted:
-`2024-11-05`, `2025-06-18`.
+`2025-11-25` (current), `2025-06-18`, `2025-03-26`, `2024-11-05`, `2024-10-07`.
+
+The server advertises the versions its installed SDK supports. The
+`2026-07-28` revision is not implemented: `@modelcontextprotocol/sdk@1.32.2`
+does not know it.
+
+### Tool annotations (safety hints)
+
+Every entry in `tools/list` carries the four MCP safety hints — `readOnlyHint`,
+`destructiveHint`, `idempotentHint` and `openWorldHint` — from
+`src/mcp/annotations.ts`, attached once at module load, so the catalog's names,
+order, descriptions and input schemas are served unchanged. `readOnlyHint: true`
+marks the calls that only read (every search, context, list, get, report, scan
+and health tool); a host may use it to **auto-approve** retrieval instead of
+prompting on every call. `destructiveHint: true` marks the six calls that can
+delete, forget, overwrite or prune stored state (`memory_delete`,
+`memory_lifecycle`, `memory_restore`, `memory_import`,
+`memory_disconnect_pageindex`, `muse_reconcile_anchors`), so a host can warn
+before one, and no tool is ever both read-only and destructive. `idempotentHint:
+true` marks the writes that converge — status transitions, `set`-style updates
+and builders that regenerate a derived artefact — so a retry after a timeout is
+safe, while appends and run-type tools (`memory_capture`, `memory_observe`,
+`memory_freeze_run`, `memory_verify`, …) are not idempotent.
+`openWorldHint` is `false` on all 126 tools: nothing dereferences a URL or
+fetches remote content — `memory_source_add` records a URL without retrieving
+it, and the sync tools exchange packets through a local directory. These are
+**hints**, not guarantees (the SDK says a client must not trust them from an
+untrusted server); a tool name that is not in the map is still served with the
+conservative default — not read-only, destructive, not idempotent — so nothing
+ships unannotated.
+
+### Request directories and the workspace root
+
+Every tool accepts an optional `dir` (`workspace`, `project_dir` and `cwd` are
+aliases) naming the project the call applies to. That value is **confined**: it
+is resolved, then it must be the server's workspace root or live beneath it. The
+workspace root is the one the server resolved at startup — the `mcp` argument,
+else `MUSE_MEMORY_PROJECT_DIR`, else `PROJECT_ROOT`, else the working directory.
+A directory outside it is refused with a tool error that names the root, and the
+refusal happens **before** any `.memory/` is created, so a rejected call leaves
+the filesystem untouched. Containment is resolved through `realpath`, so a
+symlink inside the root cannot point the store outside it.
+
+The multi-project workflow — one server, several checkouts — is an **operator**
+decision, not a model one. Start the server with `MUSE_MCP_ALLOW_EXTERNAL_DIR=1`
+to lift the confinement for that process; unset (the default) is the confined
+behaviour.
+
+The store is private by construction: memory directories are created `0700` and
+`CURRENT.md`, `USER.md`, `CORE.md`, the audit trail and its salt file are
+`0600` (the modes are re-applied on write, so a store created by an older
+version is tightened on first use).
+
+### Prompt and resource output is data
+
+`prompts/get` text and the markdown resources (`memory://current`,
+`memory://user`, `memory://core`, `memory://handoff`) are served inside
+`<muse-memory data-not-instructions="true"> … </muse-memory>`. The fence tokens
+are stripped from the content first, so a memory cannot close the wrapper early,
+and `</muse-memory>`, `<muse-memory …>`, `<system>`, `<instructions>` and
+`<system-message>` never reach the client as tags. `memory://entry/<id>` stays
+valid JSON and is **not** wrapped; the same fence tokens are stripped from its
+string fields instead.
+
+### Browser origins on the HTTP transport
+
+`muse mcp --http` binds loopback and stays usable without a token, but it now
+decides browser access from the `Origin` header. A request that carries one is
+accepted **only** if the operator listed that exact origin with
+`--allowed-origins` (comma-separated) — the default is deny for every browser
+origin, loopback included — and the same rule runs for the `OPTIONS` preflight
+and for every real request, before authentication and before dispatch. A refused
+request gets `403` and no `access-control-allow-origin`, and that header is only
+ever set to an allowlisted origin (never `*`, never a reflection). Native MCP
+clients send no `Origin` header, so stdio bridges, the SDK, `curl` and
+loopback-without-a-token keep working; an allowlisted origin still has to pass
+`--token` / `--tokens` when those are configured, and the `Host` allowlist behind
+DNS-rebinding protection is unchanged.
 
 `claims.json` records the live totals; read them rather than trusting prose:
 
@@ -138,6 +215,25 @@ The server speaks MCP over stdio. Protocol versions accepted:
 | Agent platforms auto-wired | `src/agents/registry.ts` |
 | Import formats | `src/migrator/detect.ts` |
 | Credential rule families | `src/secrets.ts` |
+
+### Sync attestations and crypto agility
+
+Sync packets are attested with a signature over `SHA-256(canonicalJson(packet))`.
+Verification is **registry-dispatched**: `sig_scheme` (optional — absent means
+`"ed25519"`) selects a verifier in `src/sync/attestation.ts`, so an identifier
+this build does not know comes back as `unsupported_algorithm` — distinct from a
+bad signature — and a new scheme can be added without changing any caller.
+Nothing about the v2 envelope changed: existing packets and chains still verify
+byte for byte.
+
+`muse_attestation_verify` takes an inline `public_key` only (never a path), and
+its optional `max_age_days` rejects a record whose signed `created_at` is older
+than the bound — the practical way to stop trusting a compromised key without a
+release. `memory attest verify … --max-age-days N` is the same knob on the CLI.
+The per-use inventory, the NIST IR 8547 dates (deprecated **2030-12-31**,
+disallowed **2035-12-31**, risk acceptance from **2031-01-01**), the owner and
+the ML-DSA migration plan live in the
+[crypto inventory](crypto-inventory.md).
 
 ### Profiles
 
@@ -193,6 +289,32 @@ propose → candidate → confirmed → superseded
 | Freshness gate | every recall | Memories whose anchors drifted are **withheld** and reported via `withheld_memories` + `freshness_notice`. They are never silently served. `include_drifted: true` returns them with a `⚠ FRESHNESS` provenance warning. |
 | Ingest sanitisation | import / harvest | Injected `<memory-context>` blocks and base64 payloads are stripped before the text is considered. |
 
+**Instruction-bearing writes.** OWASP LLM Top 10 2026 (LLM01) names memory
+persistence as a first-class injection path and Agentic ASI06 calls the same
+failure memory & context poisoning, so `propose` classifies every write's
+title+content before it lands. A write that carries instructions, role
+assignments or policy overrides — "ignore previous instructions", "disregard the
+above rules", "from now on", "you are now", "act as", "system prompt", "developer
+mode", "you must always", or "always use" at the start of a sentence — is stamped
+`contains_instructions: true` and persists as `candidate` only; `confirmed: true`
+is the approval step and is never downgraded. Candidates are excluded from
+`CURRENT.md` (`syncConstraints` takes only `active`/`confirmed`), so an injected
+instruction cannot be promoted into the constraint block every later prompt
+reads. The classifier is conservative on purpose: two weak signals (a
+sentence-start imperative, a tool name, a URL, "remember to") must co-occur before
+it fires, and fenced code is not scanned — demoting a legitimate memory costs
+more than missing one. Every write also carries `provenance: { channel, agent,
+prompt_hash?, captured_at }`: `captured_at` is always stamped, `channel` names
+`mcp`, `cli`, `sync` or `harvest`, and `prompt_hash` stays absent unless the
+caller supplied one.
+
+**Reporting a security issue.** The threat model, supported versions, scope and
+response targets are in [**SECURITY.md**](../SECURITY.md). Report through the
+repository's **Security** tab → "Report a vulnerability" (GitHub private
+vulnerability reporting); there is no security email address, and a suspected
+vulnerability never goes in a public issue or pull request. The
+"Hardening already in place" list there is the shortest index of the gates above.
+
 ## 8. Failure semantics
 
 | Condition | Result |
@@ -242,3 +364,20 @@ The same `project` filter is available on every audit surface: the
 `/api/cognition/clusters` and `/api/cognition/debt` endpoints
 (`?project=P`). Code-side metrics stay workspace-wide by design — source code
 is shared between projects — so `scope.code_scope` always reads `workspace`.
+
+### The Studio dashboard is a loopback surface
+
+`memory ui` binds `127.0.0.1` only and has no remote-bind option, so the
+dashboard is reachable from the machine that started it and nowhere else. Every
+API call must be same-origin: a request to `/api/*` carrying an `Origin` header
+is served only when that origin's host equals the `Host` the request was
+addressed to (`http://localhost:2222` for a page on `localhost:2222`; another
+loopback port, `127.0.0.1` versus `localhost`, or any other site is refused with
+`403` and no CORS headers). Requests with no `Origin` — curl, scripts, native
+clients — are still allowed. Because the dashboard renders stored memory content
+into a browser, every response also carries a content-security policy scoped to
+`'self'` (no CDN, no webfonts, no inline scripts), plus `X-Content-Type-Options:
+nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and
+`Cache-Control: no-store` on `/api/*`. Do not proxy or port-forward the Studio
+to a network interface; a browser on that network would satisfy the bind while
+still being a third party.

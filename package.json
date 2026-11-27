@@ -1,6 +1,6 @@
 {
   "name": "musememory",
-  "version": "3.4.5",
+  "version": "3.4.6",
   "description": "Autonomous, self-organizing cognitive memory system for AI agents and agency networks",
   "main": "dist/index.js",
   "type": "module",
@@ -13,8 +13,11 @@
   ],
   "scripts": {
     "bench:graph": "bun scripts/bench-graph.ts",
+    "bench:vector": "bun scripts/bench-vector.ts",
     "agents:terrain": "bun run bin/musememory.ts terrain --workspace --out .agents/terrain",
-    "build": "bun build bin/musememory.ts --outfile dist/index.js --target node",
+    "build": "bun build bin/musememory.ts --outfile dist/index.js --target node --external sqlite-vec",
+    "sbom": "bun scripts/generate-sbom.ts",
+    "checksums": "bun scripts/generate-sbom.ts --checksums",
     "site:dev": "bun run --cwd apps/website dev",
     "site:build": "bun run --cwd apps/website build",
     "site:preview": "bun run --cwd apps/website preview",
@@ -77,9 +80,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "ajv": "^8.17.1",
-    "js-yaml": "^4.3.2"
+    "js-yaml": "^4.3.2",
+    "sqlite-vec": "0.1.9"
   },
   "devDependencies": {
     "@types/bun": "^1.1.0",

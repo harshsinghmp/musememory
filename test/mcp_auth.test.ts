@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { startHttpMcpServer, validateHttpAuth } from "../src/mcp/http.ts";
+import { startHttpMcpServer, validateHttpAuth, validateHttpOrigin } from "../src/mcp/http.ts";
 import type { IncomingMessage } from "node:http";
 
 function mockReq(headers: Record<string, string>): IncomingMessage {
@@ -136,6 +136,54 @@ describe("T-386: Bearer-token authentication & per-peer allowlist", () => {
       });
       expect(withToken.authenticated).toBe(false);
       expect(withToken.status).toBe(401);
+    });
+  });
+
+  describe("Unit: validateHttpOrigin (issue #511)", () => {
+    test("treats a missing Origin header as a native client and allows it", () => {
+      expect(validateHttpOrigin(mockReq({}), {}).allowed).toBe(true);
+      // Even with an allowlist configured, a non-browser client is unaffected.
+      const res = validateHttpOrigin(mockReq({}), { allowedOrigins: ["http://localhost:5173"] });
+      expect(res.allowed).toBe(true);
+      expect(res.allowOrigin).toBeUndefined();
+    });
+
+    test("denies any browser origin by default, including on loopback", () => {
+      for (const bindHost of ["127.0.0.1", "::1", "localhost"]) {
+        const res = validateHttpOrigin(mockReq({ origin: "https://evil.example" }), { bindHost });
+        expect(res.allowed).toBe(false);
+        expect(res.status).toBe(403);
+        expect(res.allowOrigin).toBeUndefined();
+        expect(res.errorMessage).toContain("Origin 'https://evil.example' is not allowed");
+      }
+    });
+
+    test("denies an unlisted origin even when an allowlist exists", () => {
+      const res = validateHttpOrigin(mockReq({ origin: "https://evil.example" }), {
+        allowedOrigins: ["http://localhost:5173"],
+      });
+      expect(res.allowed).toBe(false);
+      expect(res.status).toBe(403);
+      expect(res.allowOrigin).toBeUndefined();
+    });
+
+    test("denies an empty allowlist and the opaque `null` origin", () => {
+      expect(
+        validateHttpOrigin(mockReq({ origin: "https://evil.example" }), { allowedOrigins: [] }).allowed,
+      ).toBe(false);
+      // `Origin: null` is what a sandboxed iframe or a file:// page sends; it is
+      // a browser origin, not an absence of one.
+      const opaque = validateHttpOrigin(mockReq({ origin: "null" }), {});
+      expect(opaque.allowed).toBe(false);
+      expect(opaque.status).toBe(403);
+    });
+
+    test("allows exactly the allowlisted origin and echoes only that value", () => {
+      const res = validateHttpOrigin(mockReq({ origin: "http://localhost:5173" }), {
+        allowedOrigins: ["http://localhost:5173", "https://trusted.agency.internal"],
+      });
+      expect(res.allowed).toBe(true);
+      expect(res.allowOrigin).toBe("http://localhost:5173");
     });
   });
 
@@ -289,6 +337,57 @@ describe("T-386: Bearer-token authentication & per-peer allowlist", () => {
       }
     });
 
+    // Issue #511: an allowlisted browser origin still has to authenticate when
+    // tokens are configured — the origin gate admits it to the auth check, it
+    // does not stand in for one.
+    test("an allowlisted browser origin is still subject to Bearer auth", async () => {
+      const handle = await startHttpMcpServer({
+        port: 0,
+        host: "127.0.0.1",
+        bearerToken: "team-bearer-token-abc",
+        allowedOrigins: ["http://localhost:5173"],
+      });
+
+      try {
+        const initialize = JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+        });
+
+        // Allowlisted origin, no token: 401 (and now readable by that origin).
+        const noToken = await fetch(handle.url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "accept": "application/json, text/event-stream",
+            "origin": "http://localhost:5173",
+          },
+          body: initialize,
+        });
+        expect(noToken.status).toBe(401);
+        expect(noToken.headers.get("www-authenticate")).toBe('Bearer error="invalid_token"');
+        expect(noToken.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+
+        // Allowlisted origin plus the token: 200.
+        const withToken = await fetch(handle.url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "accept": "application/json, text/event-stream",
+            "origin": "http://localhost:5173",
+            "authorization": "Bearer team-bearer-token-abc",
+          },
+          body: initialize,
+        });
+        expect(withToken.status).toBe(200);
+        expect(withToken.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+      } finally {
+        await handle.close();
+      }
+    });
+
     test("still serves loopback requests without a token (issue #453)", async () => {
       const handle = await startHttpMcpServer({ port: 0, host: "127.0.0.1", bindHost: "127.0.0.1" });
 
@@ -318,6 +417,8 @@ describe("T-386: Bearer-token authentication & per-peer allowlist", () => {
         port: 0,
         host: "127.0.0.1",
         bearerToken: "team-bearer-token-abc",
+        // Issue #511: a preflight is only answered for an allowlisted origin.
+        allowedOrigins: ["https://dashboard.example.com"],
       });
 
       try {

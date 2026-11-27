@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { Store } from "./store.ts";
@@ -205,7 +205,10 @@ export function parseCurrentFile(memoryDir: string): CurrentFileData {
 
 export function writeCurrentFile(memoryDir: string, data: CurrentFileData): void {
   const p = currentFilePath(memoryDir);
-  mkdirSync(memoryDir, { recursive: true });
+  // #512: CURRENT.md carries the project's hard constraints and in-flight
+  // agent tasks. Create it 0o600 and tighten a file that already exists (it
+  // usually does — this is a rewrite, and `mode` only applies on creation).
+  mkdirSync(memoryDir, { recursive: true, mode: 0o700 });
 
   const parts: string[] = [
     "# Active Project Constraints & In-Flight Context\n",
@@ -263,7 +266,12 @@ export function writeCurrentFile(memoryDir: string, data: CurrentFileData): void
     parts.push("");
   }
 
-  writeFileSync(p, parts.join("\n"), "utf8");
+  writeFileSync(p, parts.join("\n"), { encoding: "utf8", mode: 0o600 });
+  try {
+    chmodSync(p, 0o600);
+  } catch {
+    // Best effort: a read-only mount keeps the mode it has.
+  }
 }
 
 export function updateSessionHandoff(memoryDir: string, update: Partial<SessionHandoff>): SessionHandoff {
