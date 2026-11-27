@@ -1,7 +1,49 @@
 # 📍 Current Shipped State & Active Invariants
 
-> **Version**: `v3.4.3` (post-release `dev`)  
-> **Status**: Wave 29 Landed — Sovereign Ecosystem Migration & Complete Decommissioning (T-444 to T-448).
+> **Version**: `v3.4.6` (npm `latest`, signed release assets)  
+> **Status**: Security hardening + release supply chain shipped; `dev` carries the post-release fixes.
+
+---
+
+## 🧾 Session — v3.4.6, Security Hardening & the Merge-Artefact Class (2026-11-27)
+
+**v3.4.6 shipped.** Tag `v3.4.6` on `beaf8e3` (merge of PR #531), npm `latest` = 3.4.6 after
+propagation, GitHub release published with four assets. `release-assets.yml` ran on publish and
+**succeeded on the first attempt**: it rebuilds the tag, regenerates the CycloneDX 1.7 SBOM and
+`SHA256SUMS`, signs both keyless with cosign (Sigstore OIDC), verifies its own signature against
+`…/release-assets.yml@refs/tags/<tag>` and the GitHub OIDC issuer, then uploads. The published
+`bom.cdx.json` was downloaded and its `sha256sum -c` line verified independently; it lists five
+components including `sqlite-vec-linux-x64` with the native binary's hash.
+
+**Security batch (all with mutation-verified tests).** Loopback MCP browser origins are
+deny-by-default (#511); request `dir` is confined to the workspace root with
+`MUSE_MCP_ALLOW_EXTERNAL_DIR=1` as the opt-in (#512); stores are `0700`, files `0600`;
+prompts and markdown resources are fenced as data (#514); instruction-bearing writes are
+classified, held as candidates without `confirmed: true`, and carry provenance (#515); the
+Studio has a CSP, framing denial, same-origin API gate and ten escaped XSS sites (#520);
+attestation verification is registry-driven with `maxAgeDays` and an ML-DSA path in
+`docs/crypto-inventory.md` (#518); tokens are compared in constant time and `SECURITY.md`
+exists (#513/#516); vec0 orphan rows are reconciled lazily (#519). #495 shipped the
+annotation half and structured `outputSchema`/`structuredContent` for `search`,
+`memory_recall`, `get_context` and `muse_health`; the remaining read tools are the residual.
+
+**The merge-artefact class.** Three process defects surfaced after the release:
+1. `README.md` shipped in 3.4.6 with six literal conflict markers. Both sides held the same
+   stale count, so `claims:check` validated the number and nothing looked for the artefact.
+   Fixed in #545 with `test/conflict_markers.test.ts`, mutation-verified with a fixture.
+   The 3.4.6 npm tarball is immutable — **a 3.4.7 patch is required to fix the npm page**.
+2. Five Dependabot action bumps were opened against `main` (the default branch). A failed
+   `gh pr edit --base dev` left them there and they merged into `main`; #542 back-merged them.
+   `target-branch: "dev"` is now explicit in `.github/dependabot.yml`.
+3. A branch cut from a shared checkout whose working tree sat on another feature branch
+   produced two stale-count merges (`1826` vs `1867`). Generated artifacts must be regenerated
+   **after** the merge, on the merged tree, never from the branch's own base.
+Also: I merged Dependabot #533 (scorecard 2.4.3 → 2.6.0) by hard-coding the wrong PR number;
+the bump is SHA-pinned and Scorecard runs green on 2.6.0, but the action was wrong.
+
+**Gates.** `bun test` 1867 pass / 0 fail / 10,432 assertions / 280 files; `bunx tsc --noEmit`
+clean; `bun run build`; `claims:check`, `cli:check`, `changelog:check`, `docs:check` green;
+`check:landed` → `RESULT: LANDED`.
 
 ---
 

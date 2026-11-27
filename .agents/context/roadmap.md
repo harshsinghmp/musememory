@@ -163,11 +163,12 @@
 
 ---
 
-## 📊 Current Status (as of v3.4.2)
+## 📊 Current Status (as of v3.4.6)
 
 | Area | Status | Next Milestone |
 |---|---|---|
-| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 1724 tests) | R25 (--include-abstract, --scope) |
+| **Speed & Observability** | ✅ Shipped (sub-2ms, <50µs hot cache, 1867 tests) | R25 (--include-abstract, --scope) |
+| **Security & release integrity** | ✅ Origin gate, dir confinement, output fencing, instruction classification, signed SBOM assets | #495 residual read tools; 3.4.7 README patch |
 | **Hands-free hooks** | ✅ 3/6 events shipped (GAP-2) | R24 (full plugin registry) |
 | **Trust gates** | ✅ Write-time verify + recall-time freshness gate (GAP-1, GAP-3) + calibrated contradiction engine (T-320) | R23 (extend to multi-repo) |
 | **Version control** | ✅ `memory branch/checkout/blame` (R23) + branch-isolated overlays (T-436) | R23 extend (merge/blame depth) |
