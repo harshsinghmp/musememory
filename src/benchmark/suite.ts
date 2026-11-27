@@ -192,7 +192,7 @@ export async function runMemoryBenchmark(
  * Formats a clean ASCII scoreboard table displaying benchmark telemetry.
  */
 export function formatBenchmarkScoreboard(report: BenchmarkReport): string {
-  const header = `\n┌──────────────────────────────────────────────────────────────────┐\n│ ⚡ MUSE MEMORY ENGINE BENCHMARK & TELEMETRY SCOREBOARD           │\n└──────────────────────────────────────────────────────────────────┘\n`;
+  const header = `\n┌──────────────────────────────────────────────────────────────────┐\n│ ⚡ aimm ENGINE BENCHMARK & TELEMETRY SCOREBOARD                   │\n└──────────────────────────────────────────────────────────────────┘\n`;
 
   let out = header;
   out += `\nBenchmark Runs:     ${report.iterations} iterations\n`;

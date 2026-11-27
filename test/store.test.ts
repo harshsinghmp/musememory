@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { writeFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import {
   openStore,
   propose,

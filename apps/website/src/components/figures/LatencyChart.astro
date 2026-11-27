@@ -8,8 +8,8 @@
  * the same data.
  *
  * The last row is a contrast, not a claim: a network embedding API is drawn
- * dashed and faint and is explicitly labelled "network · not Muse", so nobody
- * reads it as a Muse number.
+ * dashed and faint and is explicitly labelled "network · not aimm", so nobody
+ * reads it as a aimm number.
  *
  * Colour contract: hex values are inlined because an inline SVG cannot read
  * the page's custom properties. They mirror the site tokens
@@ -135,7 +135,7 @@ const descId = `latency-desc-${uid}`;
     microseconds, FTS5 BM25 recall in under 2 milliseconds and local semantic
     cosine in about 4 milliseconds. The final, dashed row is a network
     embedding API at about 300 milliseconds, shown as a contrast rather than a
-    Muse path.
+    aimm path.
   </desc>
 
   {/* Title block */}
@@ -186,7 +186,7 @@ const descId = `latency-desc-${uid}`;
         </text>
         {bar.contrast && (
           <text x="696" y={bar.top + 32} fill={TEXT_FAINT} font-size="10" text-anchor="end">
-            network · not Muse
+            network · not aimm
           </text>
         )}
       </g>
@@ -215,6 +215,6 @@ const descId = `latency-desc-${uid}`;
     Measurements from the built-in benchmark; run &quot;memory benchmark&quot; to reproduce.
   </text>
   <text x="24" y="298" fill={TEXT_FAINT} font-size="10">
-    Muse Memory v{claims.version} · the benchmark runs offline, on this machine.
+    aimm v{claims.version} · the benchmark runs offline, on this machine.
   </text>
 </svg>

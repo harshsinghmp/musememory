@@ -194,7 +194,7 @@ describe("Published-claim integrity", () => {
       expect(footer).toContain("v{claims.version}");
 
       const compare = readFileSync(join(ROOT, "apps/website/src/pages/compare.astro"), "utf8");
-      expect(compare).toContain("Muse row reflects v{claims.version}");
+      expect(compare).toContain("aimm row reflects v{claims.version}");
     });
   });
 

@@ -68,7 +68,7 @@ interface Box {
 
 /**
  * Layer 1 — the agents. The last box is the catch-all: it deliberately says
- * what Muse covers instead of quoting a count, so it is taller and its label
+ * what aimm covers instead of quoting a count, so it is taller and its label
  * is set on two lines to stay inside the box.
  */
 const AGENT_LINES: Record<string, Line[]> = {
@@ -150,10 +150,10 @@ const descId = `architecture-desc-${uid}`;
   aria-labelledby={`${titleId} ${descId}`}
   font-family={FONT}
 >
-  <title id={titleId}>How Muse fits together</title>
+  <title id={titleId}>How aimm fits together</title>
   <desc id={descId}>
     Four layers. Coding agents talk to a local MCP stdio subprocess. That
-    subprocess drives the Muse Memory engine, which unifies recall, applies
+    subprocess drives the aimm engine, which unifies recall, applies
     write gates and runs the memory lifecycle. The engine reads and writes two
     local folders, .memory in the project and .memory in the home directory.
     Everything below the transport runs on your own machine: no account, no
@@ -188,7 +188,7 @@ const descId = `architecture-desc-${uid}`;
   </defs>
 
   <text x="24" y="26" fill={TEXT} font-size="15" font-weight="600" letter-spacing="0.2">
-    How Muse fits together
+    How aimm fits together
   </text>
   <text x="24" y="46" fill={TEXT_DIM} font-size="10">
     The whole path, from the editor you already use to the file that holds the memory.
@@ -336,7 +336,7 @@ const descId = `architecture-desc-${uid}`;
       stroke-width={STROKE}
     />
     <text x={ENGINE.x + 16} y={ENGINE.y + 22} fill={TEXT} font-size="12" font-weight="600">
-      Muse Memory engine
+      aimm engine
     </text>
     <text
       x={ENGINE.x + ENGINE.w - 16}

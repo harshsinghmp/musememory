@@ -40,7 +40,7 @@
   <circle cx="589.92" cy="168.64" r="10.08" fill="#4fd6e0"/>
   <circle cx="636.00" cy="291.52" r="10.08" fill="#8b7cf7"/>
   <circle cx="540.00" cy="253.12" r="13.61" fill="#e8ecf8"/>
-  <text x="540.0" y="400.0" text-anchor="middle" font-family="Inter" font-size="46.0" font-weight="800" letter-spacing="-1.7" fill="#e8ecf8">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="540.0" y="400.0" text-anchor="middle" font-family="Inter" font-size="46.0" font-weight="800" letter-spacing="-1.7" fill="#e8ecf8">aim<tspan fill="#4fd6e0">m</tspan></text>
   <text x="540.0" y="452.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="17.0" font-weight="500" letter-spacing="1.8" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
   <text x="540.0" y="600.0" text-anchor="middle" font-family="Inter" font-size="60.0" font-weight="800" letter-spacing="-1.2" fill="#e8ecf8">Your agent forgets</text>
   <text x="540.0" y="669.6" text-anchor="middle" font-family="Inter" font-size="60.0" font-weight="800" letter-spacing="-1.2" fill="#e8ecf8">everything. Give it</text>

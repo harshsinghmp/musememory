@@ -1,4 +1,4 @@
-# 🧠 Muse Memory — Core Concepts & Architecture
+# 🧠 aimm — Core Concepts & Architecture
 
 > **Copywriting Framework**: **ACCA** (*Awareness* → *Comprehension* → *Conviction* → *Action*)  
 > **Target Audience**: Technical Architects, Engineering Directors, and Senior Developers evaluating memory infrastructure for AI coding agents.
@@ -22,17 +22,17 @@ The moment a chat window closes, a compaction event triggers, or a new subagent 
 | **Cloud Vector Databases (Pinecone, Chroma, Mem0)** | High latency (200–500ms network round-trips), mandatory cloud telemetry, recurring SaaS bills, and "semantic fuzziness" (vector embeddings match words that *sound* similar but lack technical precision). |
 | **Local Background Daemons** | Heavy background Docker containers or resident Python daemons that consume gigabytes of RAM, fail silently on port conflicts, and break across OS upgrades. |
 
-Muse Memory was engineered to replace these broken paradigms with an **in-process, dual-scope cognitive memory engine** that delivers deterministic retrieval with zero daemon processes and zero prompt overflow.
+aimm was engineered to replace these broken paradigms with an **in-process, dual-scope cognitive memory engine** that delivers deterministic retrieval with zero daemon processes and zero prompt overflow.
 
 ---
 
-## 2. Comprehension: How Muse Memory Works
+## 2. Comprehension: How aimm Works
 
-Muse Memory is built on six foundational engineering pillars:
+aimm is built on six foundational engineering pillars:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              MUSE MEMORY ENGINE                             │
+│                              aimm ENGINE                             │
 ├──────────────────────────────────────┬──────────────────────────────────────┤
 │             LOCAL SCOPE              │             GLOBAL SCOPE             │
 │        `<project>/.memory/`          │             `~/.memory/`             │
@@ -68,7 +68,7 @@ Project context and personal preferences must never contaminate each other:
 
 Unregulated write admission corrupts memory stores. If an agent records every passing hallucination as permanent fact, retrieval quality quickly collapses.
 
-Muse Memory enforces an explicit, deterministic state machine:
+aimm enforces an explicit, deterministic state machine:
 
 ```
   [propose] ──► candidate ──► confirm() ──► confirmed ──► supersede() ──► superseded
@@ -90,7 +90,7 @@ Muse Memory enforces an explicit, deterministic state machine:
 
 ### Pillar 3: Multi-Factor Scoring & Knapsack Token Packing
 
-When an agent needs context, sending *all* memories destroys the context window. Muse Memory dynamically evaluates every memory using a multi-factor ranking formula:
+When an agent needs context, sending *all* memories destroys the context window. aimm dynamically evaluates every memory using a multi-factor ranking formula:
 
 $$\text{Score} = 1.0 \times \text{LexicalBM25} + \text{ExactSymbolMatch} + \text{CodeAnchorProximity} + \text{VerificationBonus} + \text{SalienceBonus} + 0.3 \times e^{-\frac{\Delta t}{90\text{ days}}} + 0.5 \times \text{CosineSimilarity}$$
 
@@ -101,7 +101,7 @@ $$\text{Score} = 1.0 \times \text{LexicalBM25} + \text{ExactSymbolMatch} + \text
 
 ### Pillar 4: Live `CURRENT.md` Synchronization
 
-Context compaction in coding agents (Claude Code, Cursor, Opencode) clears active thought chains. Muse Memory continuously synchronizes in-flight task states, hard constraints, and subagent checkpoints directly into **`CURRENT.md`**.
+Context compaction in coding agents (Claude Code, Cursor, Opencode) clears active thought chains. aimm continuously synchronizes in-flight task states, hard constraints, and subagent checkpoints directly into **`CURRENT.md`**.
 
 When an agent restarts or compacts, reading `CURRENT.md` instantly restores the exact operational baseline:
 - High-level goal and architecture invariant.
@@ -111,14 +111,14 @@ When an agent restarts or compacts, reading `CURRENT.md` instantly restores the 
 
 ### Pillar 5: First-Class Code Anchors
 
-Text-only memories drift as codebases evolve. Muse Memory attaches **structural code anchors** to memories:
+Text-only memories drift as codebases evolve. aimm attaches **structural code anchors** to memories:
 - **Anchor Types**: `repository`, `file`, `module`, `symbol`, `route`, `test`.
 - **Structural Hashes**: Normalizes whitespace and comments to create resilient code fingerprints.
 - **Drift Detection**: When files are refactored or functions renamed, `memory doctor` detects orphaned anchors and prompts for automated reconciliation (`memory reconcile`).
 
 ### Pillar 6: Anti-Pattern Sentry (First-Class Negative Memories)
 
-Knowing what **not** to do is often more critical than knowing what to do. Muse Memory natively stores negative patterns:
+Knowing what **not** to do is often more critical than knowing what to do. aimm natively stores negative patterns:
 - **Types**: `DO_NOT_USE`, `FAILED_APPROACH`, `BUG_PRONE_PATTERN`.
 - **Reproduction Commands**: Includes exact shell commands that trigger the failure.
 - **Sentry Prioritization**: When an agent attempts a pattern tagged as a known bug, the Negative Sentry immediately elevates the warning to the top of the retrieval pack.
@@ -127,7 +127,7 @@ Knowing what **not** to do is often more critical than knowing what to do. Muse 
 
 ## 3. Conviction: Verifiable Engineering Proofs
 
-Muse Memory is engineered with unyielding operational standards:
+aimm is engineered with unyielding operational standards:
 
 ### 1. Zero Background Daemons
 - Runs entirely in-process using SQLite WAL mode (`PRAGMA journal_mode = WAL;`).

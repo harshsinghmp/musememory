@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 export interface Routine {
   /** Cron expression; consumed by the user's own crontab — musememory never schedules anything itself. */

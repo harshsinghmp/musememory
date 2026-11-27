@@ -40,7 +40,7 @@
   <circle cx="618.00" cy="201.00" r="15.75" fill="#4fd6e0"/>
   <circle cx="690.00" cy="393.00" r="15.75" fill="#8b7cf7"/>
   <circle cx="540.00" cy="333.00" r="21.26" fill="#e8ecf8"/>
-  <text x="540.0" y="500.0" text-anchor="middle" font-family="Inter" font-size="54.0" font-weight="800" letter-spacing="-1.9" fill="#e8ecf8">Muse<tspan fill="#4fd6e0">Memory</tspan></text>
+  <text x="540.0" y="500.0" text-anchor="middle" font-family="Inter" font-size="54.0" font-weight="800" letter-spacing="-1.9" fill="#e8ecf8">aim<tspan fill="#4fd6e0">m</tspan></text>
   <text x="540.0" y="556.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="18.0" font-weight="500" letter-spacing="2" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
   <text x="540.0" y="700.0" text-anchor="middle" font-family="Inter" font-size="84.0" font-weight="800" letter-spacing="-1.68" fill="#e8ecf8">Your agent</text>
   <text x="540.0" y="795.8" text-anchor="middle" font-family="Inter" font-size="84.0" font-weight="800" letter-spacing="-1.68" fill="#e8ecf8">forgets</text>

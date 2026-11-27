@@ -238,12 +238,12 @@ describe("cli e2e", () => {
     // 2. Run install
     const inst = run(root, ["install"]);
     expect(inst.code).toBe(0);
-    expect(inst.stdout).toContain("Initialized Muse Memory");
+    expect(inst.stdout).toContain("Initialized aimm");
 
     // 3. Run uninstall --dry-run
     const uninst = run(root, ["uninstall", "--dry-run"]);
     expect(uninst.code).toBe(0);
-    expect(uninst.stdout).toContain("Muse Memory Uninstaller");
+    expect(uninst.stdout).toContain("aimm Uninstaller");
 
     cleanup(root);
   });

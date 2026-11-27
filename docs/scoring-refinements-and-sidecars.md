@@ -6,7 +6,7 @@
 
 ## 1. Overview & Architectural Goals
 
-Wave 19 delivers critical precision, latency, and token efficiency upgrades to the Muse Memory engine:
+Wave 19 delivers critical precision, latency, and token efficiency upgrades to the aimm engine:
 
 | Ticket | Capability | Module | Core Functionality |
 |---|---|---|---|

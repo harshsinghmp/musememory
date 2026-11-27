@@ -1,6 +1,6 @@
 # Roadmap
 
-> The delivery board for Muse Memory. Work moves through four deterministic
+> The delivery board for aimm. Work moves through four deterministic
 > phases and ships as a pull request from `dev` to `main`, with a GitHub
 > milestone per sprint.
 >

@@ -1,7 +1,8 @@
-# 🧠 Muse Memory — AGENTS.md
+# 🧠 aimm — AGENTS.md
 
 > **Operating Identity**: **Muse** (Chief Agency Orchestrator)
-> **Project**: Muse Memory (Autonomous Persistent Cognitive Memory Engine for AI Agents & Agency Networks)
+> **Project**: **aimm** — local-first memory for AI coding agents (project/package: `musememory`)
+> **Naming**: the product is `aimm`; the package, repo, binaries, `.memory/`, `muse_*` tool names and `MUSE_*` env vars are frozen. Canonical rules: [docs/brand.md](./docs/brand.md).
 > **Toolchain**: `bun` · `bun test` · `bun run build` · `tsc --noEmit`
 > **DOX Rail**: `AGENTS.md` files are binding work contracts for their subtrees. Walk from root to target path; closer docs control local work details.
 
@@ -19,7 +20,7 @@
 8. **The Landing Gate (a commit is not a delivery)**: Work is **landed** only when reachable from the integration branch **on the remote**; until then it is **local**. Run `bun run check:landed` before the closeout DOX pass, the final report, and any remote-state claim. Never `git add -A` in a checkout another agent may be writing. Full contract: [`.agents/standards/landing-gate.md`](./.agents/standards/landing-gate.md).
 9. **Structured Commits**: `<type>(<scope>): <summary>` with Why/What/Verification blocks.
 10. **Agent Containment & Archive**: Artifacts live in `./.agents/*`; retired plans move to `./.agents/archive/[title]-[timestamp].md`.
-11. **Session Memory & Closeout DOX Pass**: Update `./.agents/context/current.md` and this `AGENTS.md` before completing tasks. **Never touch `./.memory/**`** — it is owned by the MuseMemory engine.
+11. **Session Memory & Closeout DOX Pass**: Update `./.agents/context/current.md` and this `AGENTS.md` before completing tasks. **Never touch `./.memory/**`** — it is owned by the `musememory` engine.
 12. **Workspace Isolation & Sync Boundary**: Never run `updateagents` or a repo-mutating scaffolder from a parent directory. Nested clones are separate scopes. Never sync `.git` or a live SQLite store (`.memory/`); transfer git state with `git push` / `git pull`.
 
 ---
@@ -44,6 +45,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 🧠 [Context, Memory & Identity](./.agents/standards/memory-context.md) — Context hygiene, `./.memory` lifecycle, Creed proposals, canonical memory sources.
 
 ### 🎨 Brand Identity, UI & Accessibility System
+- 🎨 [Brand & Naming](./docs/brand.md) — **the canonical name** (`aimm`), pronunciation, the keep-list (package, binaries, `.memory/`, `muse_*`, `MUSE_*`), do/don't, and the Meta-Muse rationale.
 - 🎨 [Design System & UI Standards](./.agents/brand/design.md) — Token architecture, 7 required UI component states, fluid typography.
 - 📐 [Semantic BEM CSS Conventions](./.agents/brand/bem-conventions.md) — Block-Element-Modifier architecture and shallow depth rules.
 - ♿ [Accessibility (A11y) Baseline](./.agents/brand/a11y.md) — WCAG 2.2 AA mandates, contrast ratios, hit targets, axe-core zero-tolerance.
@@ -51,7 +53,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 📸 [Reference Screenshots & Mocks](./.agents/brand/screenshots/README.md) — UI screenshots, wireframes, design snapshots.
 - 🌐 [Astro Frontend Standards](./.agents/standards/frontend-astro.md) — `apps/website` stack, the `/musememory` base-path rule, generated assets, a11y/visual gates.
 
-### 📖 Durable Muse Memory Context
+### 📖 Durable aimm Context
 - 📖 [Context Map](./.agents/context/index.md) · 📦 [Product Scope](./.agents/context/product.md) — MCP tool matrix, 7 profiles, CLI surface, trust gates.
 - 🏗️ [Architecture & Storage](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, repo layout. · 📍 [Current State](./.agents/context/current.md) — v3.4.6 status, active invariants.
 - 🏛️ [Locked Decisions](./.agents/context/decisions.md) — ADRs (zero-daemon, dual persistence, MCP stdio). · 🗺️ [Roadmap](./.agents/context/roadmap.md) — Active milestones.

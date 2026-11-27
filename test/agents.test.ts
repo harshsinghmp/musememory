@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { detectAgents } from "../src/agents/detect.ts";
 import { AGENT_REGISTRY } from "../src/agents/registry.ts";
 import { connectAgent, connectHermes, connectOpenCode, connectGoose, connectOpenClaw, ALL_MEMORY_TOOLS } from "../src/connect.ts";

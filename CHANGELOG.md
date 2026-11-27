@@ -1,13 +1,24 @@
 # 📜 Changelog
 
-All notable changes to the **Muse Memory** (`musememory`) project will be documented in this file.
+All notable changes to the **aimm** (`musememory`) project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Naming note**: entries dated before 2026-11-27 describe the product under its
+> former name, **Muse Memory**. Released sections are historical records and are
+> not rewritten; the current name, the keep-list and why it changed are in
+> [`docs/brand.md`](./docs/brand.md). The package is `musememory` throughout.
+
 ## [Unreleased]
 
+## [3.5.0] - 2026-11-27
+
+### Changed
+- **The product is renamed `aimm`, and nothing an installed client touches changes**: "Muse" collides with Meta's Muse bot, so search results for the product's own name return Meta's assistant and a reader cannot tell which "Muse" a sentence means. Every user-facing surface now says **aimm** (short for *AI Memory*, always lowercase, pronounced "aim", the doubled `m` is the memory): the CLI help header and terminal banners, `package.json` `description`, the MCP `serverInfo` **title/description** and the tool descriptions that named the product (never the tool **names** — renaming `muse_context` or `muse_health` breaks every client and aliases are a 4.0 decision per ADR-012), the README/SECURITY/CONTRIBUTING/DESIGN guides, `docs/**` current guides, `.agents/context` and `.agents/standards`, and every website page, meta/OG tag, FAQ, figure caption and the `Logo.astro` wordmark. `docs/brand.md` is the new canonical naming source — name, pronunciation, capitalization, the one-line description ("aimm — local-first memory for AI coding agents."), do/don't usage, what stays unchanged, and the collision rationale. Compatibility is the point: the npm package and repo (`musememory`), both binaries (`memory`, `musememory`), `npx musememory`, `.memory/` and every file path, `MUSE_*` env vars, schema keys, JSON fields and all 126 MCP tool names are byte-identical, `serverInfo.name` still resolves to `musememory`, and `Muse` still names the assistant persona in `AGENTS.md`. Historical records — `.agents/archive|artifacts|plans|research/**`, `ticket-plan.md`, `docs/launch/**`, `docs/research/**` and the released sections below — keep the former name on purpose, with the note above standing in for an edit. Brand assets were regenerated from the one wordmark source (`Muse|Memory` → `aim|m`; the M mark is unchanged because it is the memory glyph), so the OG (1200×630), Twitter (1200×628), banner (1280×640), README (1280×400) and social-kit PNGs now carry the new name. Verified: the grep audit pasted in the PR body (no `Muse Memory`/`MuseMemory` outside the listed historical records, no standalone product `Muse`), `bun test`, `bunx tsc --noEmit`, `bun run build`, `bun run site:build`, `bun run site:qa`, `bun run site:audit:a11y`, `claims:check`, `cli:check`, `changelog:check` and `docs:check`.
+
 ### Fixed
+- **js-yaml 5 is ESM-only, and the default import broke every CLI command (dependency bump #562)**: v5 ships `dist/js-yaml.mjs` with named exports and no default, so the eleven modules using `import yaml from "js-yaml"` failed at runtime with *“Missing 'default' export”* — including the YAML mirror, routines, connect and every migrator adapter. They now use a namespace import (`import * as yaml`), which exposes `load`/`dump` under both v4 and v5. This nearly shipped green: the first local run passed because `node_modules` still held v4, and the failure only appeared after a clean install — the verification below is against the installed 5.5.0. Verified: `bun test` 1885 pass / 0 fail, `tsc` clean, build green.
 - **Social link previews pointed at `/brand/og.png`, which does not exist under the `/musememory` base path**: `BASE_URL` has no trailing slash, so resolving `brand/og.png` against it treated `musememory` as a file and dropped it — every `og:image` and `twitter:image` 404'd in previews while the page itself rendered fine. The layout now forces the directory form before resolving, and `site:qa` gained a static check that fails when any absolute social-image URL omits the base path (mutation-verified by rewriting the built HTML and seeing it BLOCK). Verified: `site:build` 6 pages, `site:qa` 18/18 SHIP.
 
 ## [3.4.7] - 2026-11-27
