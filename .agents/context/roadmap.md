@@ -1,4 +1,4 @@
-# 🗺️ aimm Roadmap & Backlog
+# 🗺️ musememory Roadmap & Backlog
 
 ---
 
@@ -178,7 +178,7 @@
 ---
 
 ### 11. **R27: Recall Quality Eval Harness (LoCoMo-style, CI-gated)**
-- **Golden recall fixture**: labeled queries plus same-topic distractors covering the five LongMemEval-V2 abilities (static state recall, dynamic state tracking, workflow knowledge, environment gotchas, premise awareness). aimm already covers 3–4 of the 5; the fixture proves it.
+- **Golden recall fixture**: labeled queries plus same-topic distractors covering the five LongMemEval-V2 abilities (static state recall, dynamic state tracking, workflow knowledge, environment gotchas, premise awareness). musememory already covers 3–4 of the 5; the fixture proves it.
 - **CI gate**: `bun test` fails below a recall@5 threshold; p50 latency reported beside it. Current benchmarks measure speed only — recall quality is unmeasured.
 - Reuses `src/benchmark/` and existing test infrastructure. Prerequisite for judging R21 and every future retrieval change.
 
@@ -222,7 +222,7 @@
 - **P2 additions**: server mode (Streamable HTTP + per-tenant DB files + SyncPool-over-HTOP + git YAML distribution + Litestream backups); dashboard rehaul (recall-debug, lineage graph, eval panel, control tower, mesh view); always-on memory cadence; Hermes MemoryProvider adapter (qdrant branch becomes opt-in vector adapter); federation handshake; observer/observed team semantics; memory forking; gated graph retrieval; funded pools; marketplace.
 - **Hard rejects**: daemon-backed stores, SaaS memory backends, AGPL/BSL/PolyForm code copies, multilingual stemming, auto-delete, full-file injection.
 
-Engine verdict: aimm's zero-daemon SQLite+FTS5+YAML+MCP architecture is the majority position of the field and ahead of the Hermes plugin long tail; the gap is shipping the convergent mechanisms (above), not architecture change.
+Engine verdict: musememory's zero-daemon SQLite+FTS5+YAML+MCP architecture is the majority position of the field and ahead of the Hermes plugin long tail; the gap is shipping the convergent mechanisms (above), not architecture change.
 
 ### R17b Full Item List (source of truth: `.agents/research/ecosystem-teardown-2026-10.md` §10)
 

@@ -14,7 +14,7 @@ AI coding agents and autonomous workflows fail in production not because they la
 3. **Performative Certainty**: When an agent queries memory with ambiguous or out-of-domain queries, systems often return weak candidate matches with low cosine scores rather than frankly abstaining.
 4. **Rigid Exponential Assumptions**: Real software knowledge does not decay at a single constant rate. Architectural patterns exhibit long survival tails, while dependency workarounds suffer rapid wear-out cliffs.
 
-**aimm Wave 15** introduces a zero-daemon, mathematically rigorous engine for **Abstention, Corroboration Confidence, Trust-Keyed Half-Lives, and Pin-Capable Expiry Policies**.
+**musememory Wave 15** introduces a zero-daemon, mathematically rigorous engine for **Abstention, Corroboration Confidence, Trust-Keyed Half-Lives, and Pin-Capable Expiry Policies**.
 
 ---
 
@@ -81,7 +81,7 @@ Half-life decay scales dynamically with provenance trust:
 | **T4 / untrusted** | `web`, `crawler`, `external`, `scrape`, `unknown` | **30 days** | Rapid decay prevents poisoning |
 
 ### D. Optional Weibull Hazard Curve Modeling
-Standard exponential decay assumes memoryless constant hazard ($k = 1$). aimm provides re-derived Weibull retention curves calibrated to the exact half-life $t_{1/2}$:
+Standard exponential decay assumes memoryless constant hazard ($k = 1$). musememory provides re-derived Weibull retention curves calibrated to the exact half-life $t_{1/2}$:
 $$R(t) = \exp\left( - \left(\frac{t}{\lambda}\right)^k \right) \quad \text{where} \quad \lambda = \frac{t_{1/2}}{(\ln 2)^{1/k}}$$
 
 Because $\lambda$ is derived from $t_{1/2}$, **at $t = t_{1/2}$, $R(t_{1/2}) = 0.5000$ holds true for every shape parameter $k$**:

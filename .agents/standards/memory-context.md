@@ -23,7 +23,7 @@ Before compaction, confirm:
 
 ---
 
-## 2. Persistent Cognitive Memory (`./.memory` & aimm MCP)
+## 2. Persistent Cognitive Memory (`./.memory` & musememory MCP)
 
 The `./.memory` directory at the project root is the local persistent memory store for agents and context.
 
@@ -38,7 +38,7 @@ The `./.memory` directory at the project root is the local persistent memory sto
 
 ## 3. Creed Native Context & Canonical Memory Sources
 
-Agents reference these canonical sovereign aimm sources:
+Agents reference these canonical sovereign musememory sources:
 
 1. `~/.memory/USER.md` — Stable principal identity, telos, agency council roles, preferences, and portfolio routing.
 2. `./CURRENT.md` — Active working project constraints, invariants, and open loops.

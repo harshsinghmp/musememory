@@ -11,7 +11,7 @@ memory <command> [arguments] [options]   # alias: musememory
 ```
 
 ```
-aimm (memory / musememory) -- Autonomous Persistent Memory for AI Agents & Agency Networks
+musememory (memory) -- Autonomous Persistent Memory for AI Agents & Agency Networks
 
 Usage:
   memory <command> [arguments] [options]
@@ -268,7 +268,7 @@ Select a profile with the `MUSE_MCP_PROFILE` environment variable. Call `muse_pr
 | --- | --- | --- |
 | `memory_detect_providers` | `entries` | Scan the machine and local workspace for existing external memory systems (24+ providers) |
 | `memory_detect_agents` | `entries` | Scan the machine for installed coding agents (Claude Code, Cursor, Hermes, OpenCode, OpenClaw, Codex, etc.) |
-| `memory_connect` | `entries` | Auto-wire aimm MCP into installed coding agents or a specified agent |
+| `memory_connect` | `entries` | Auto-wire musememory MCP into installed coding agents or a specified agent |
 | `memory_migrate` | `entries` | Auto-detect and migrate memories from external providers preserving active/superseded state |
 | `graph_status` | `query` | Check the status of the project graph provider (e.g. codegraph) |
 | `graph_index` | `query` | Index AST symbols from the project's CodeGraph/Graphify provider and cache in .memory/ |

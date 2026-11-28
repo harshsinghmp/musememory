@@ -47,7 +47,7 @@ fixture. Never relax this scan to make a fixture pass.
 
 ---
 
-## 5. Runtime Boundaries (aimm 3.4.6+)
+## 5. Runtime Boundaries (musememory 3.4.6+)
 
 These are enforced in code and covered by tests; do not weaken them to make a caller work:
 

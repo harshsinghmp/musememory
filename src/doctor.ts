@@ -71,7 +71,7 @@ export interface DoctorReport {
 }
 
 /**
- * Perform comprehensive health check on aimm installation and ecosystem.
+ * Perform comprehensive health check on musememory installation and ecosystem.
  */
 export async function runDoctor(targetDir?: string, options: { global?: boolean } = {}): Promise<DoctorReport> {
   const home = homedir();
@@ -253,7 +253,7 @@ export async function runDoctor(targetDir?: string, options: { global?: boolean 
  */
 export function printDoctorReport(report: DoctorReport): void {
   console.log(`\n====================================================`);
-  console.log(`aimm Health & Ecosystem Diagnostic Report`);
+  console.log(`musememory Health & Ecosystem Diagnostic Report`);
   console.log(`====================================================`);
 
   // Storage
@@ -307,7 +307,7 @@ export function printDoctorReport(report: DoctorReport): void {
   // Agents
   console.log(`\n[AGENTS] Coding Agents & MCP Connectivity:`);
   console.log(`  Installed Agents Detected: ${report.agents.detectedInstalled}`);
-  console.log(`  Connected to aimm:  ${report.agents.connectedCount} / ${report.agents.detectedInstalled}`);
+  console.log(`  Connected to musememory:  ${report.agents.connectedCount} / ${report.agents.detectedInstalled}`);
   if (report.agents.connectedList.length > 0) {
     console.log(`  [OK] Connected: ${report.agents.connectedList.join(", ")}`);
   }
@@ -346,7 +346,7 @@ export function printDoctorReport(report: DoctorReport): void {
     if (report.schema.storeVersion < report.schema.codeVersion) {
       console.log(`     -> Pending additive migrations were applied on open. Re-run 'memory doctor' to confirm.`);
     } else {
-      console.log(`     -> Store is ahead of this build (likely an older install). Upgrade aimm to the latest version.`);
+      console.log(`     -> Store is ahead of this build (likely an older install). Upgrade musememory to the latest version.`);
     }
   }
 

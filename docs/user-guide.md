@@ -1,4 +1,4 @@
-# 🛠️ aimm — Developer Daily User Guide
+# 🛠️ musememory — Developer Daily User Guide
 
 > **Copywriting Framework**: **QUEST** (*Qualify* → *Understand* → *Educate* → *Stimulate* → *Transition*)  
 > **Target Audience**: Software Engineers, Agency Architects, and Builders pairing daily with AI coding agents (Cursor, Opencode, Claude Code, Antigravity, Windsurf).
@@ -41,13 +41,13 @@ When your chat window compacts or closes:
 2. **Context Compaction Destroys Focus**: Mid-refactor compaction wipes out active subagent states, causing the model to hallucinate or ask "What were we working on?".
 3. **Knowledge Remains Trapped**: Hard-earned solutions discovered in one terminal window never transfer to your other windows or your teammates.
 
-aimm eliminates this tax completely.
+musememory eliminates this tax completely.
 
 ---
 
 ## 3. Educate: The 3-Phase Daily Coding Workflow
 
-With aimm installed, your daily engineering workflow transforms into a clean, 3-phase compounding loop:
+With musememory installed, your daily engineering workflow transforms into a clean, 3-phase compounding loop:
 
 ```
                          THE COMPOUNDING COGNITIVE LOOP
@@ -174,7 +174,7 @@ musememory capture \
 
 ## 5. Stimulate: The 30-Day Payoff
 
-Here is what happens after two weeks of using aimm:
+Here is what happens after two weeks of using musememory:
 
 - **Zero Repetitive Prompting**: You never have to type "Remember to use TypeScript strict mode, don't use lodash, and always mock Redis" again.
 - **Immunity to Recurring Bugs**: Every bug you fix once is permanently barred from returning. If an agent tries to reintroduce a flawed approach, the Negative Sentry blocks it.
@@ -187,7 +187,7 @@ Here is what happens after two weeks of using aimm:
 
 Transform your AI pair programming experience right now:
 
-### Step 1: Install aimm Globally
+### Step 1: Install musememory Globally
 ```bash
 bun add -g musememory@latest
 # or: npm install -g musememory@latest

@@ -1,4 +1,4 @@
-# Contributing to aimm
+# Contributing to musememory
 
 ## Branch & PR model
 - **One PR per feature.** Branch `feat/*` or `fix/*` off `dev`. Never commit directly to `main`, `master`, or `dev`.

@@ -261,7 +261,7 @@ describe("mcp tool handlers logic", () => {
     cleanup(root);
   });
 
-  test("ensureProjectAgentInstructions writes and updates AGENTS.md with the aimm directive", async () => {
+  test("ensureProjectAgentInstructions writes and updates AGENTS.md with the musememory directive", async () => {
     const { ensureProjectAgentInstructions, MUSE_MEMORY_DIRECTIVE } = await import("../src/cli/ecosystem.ts");
     const { mkdtempSync, rmSync, readFileSync, writeFileSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");

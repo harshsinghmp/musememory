@@ -648,7 +648,7 @@ export async function resolveMuseContext(
  */
 export function formatCompactContextPack(result: FusedContextResult): string {
   const lines: string[] = [
-    "# 🧠 aimm Context Pack",
+    "# 🧠 musememory Context Pack",
     `> Budget: ${result.tokens_used}/${result.token_budget} tokens used | Constraints: ${result.active_constraints.length} | Memories: ${result.relevant_memories.length}`,
     "",
   ];

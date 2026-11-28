@@ -238,7 +238,9 @@ export async function playPandaLoader(
   const panda = options.panda ?? DEFAULT_PANDA_FRAMES;
 
   const cleanTitle = options.title || "SYSTEM LEVEL-UP & RECOVERY MATRIX";
-  const titleLine = `\n┌──────────────────────────────────────────────────────────────────┐\n│  🧠 aimm · ${cleanTitle.padEnd(53)}│\n└──────────────────────────────────────────────────────────────────┘\n`;
+  // `musememory` is six characters longer than the interim `aimm`, so the title
+  // is padded six columns narrower to keep the right border where it was.
+  const titleLine = `\n┌──────────────────────────────────────────────────────────────────┐\n│  🧠 musememory · ${cleanTitle.padEnd(47)}│\n└──────────────────────────────────────────────────────────────────┘\n`;
   stream.write(titleLine);
 
   let frameIndex = 0;
@@ -709,7 +711,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
         console.log(`   Run 'memory upgrade' or '${pm === "bun" ? "bun add -g" : "npm install -g"} musememory@latest' to update.`);
         return failOnUpdate ? 1 : 0;
       } else {
-        console.log(`\n✓ aimm is up to date (v${currentVersion}).`);
+        console.log(`\n✓ musememory is up to date (v${currentVersion}).`);
         return 0;
       }
     }
@@ -811,7 +813,7 @@ export async function handleUpgradeCommand({ flags }: ParsedArgs): Promise<numbe
     return 1;
   }
 
-  console.log(`🏆 [LEVEL-UP COMPLETE] aimm is now fully armed and up to date!`);
+  console.log(`🏆 [LEVEL-UP COMPLETE] musememory is now fully armed and up to date!`);
   if (repairInfo && repairInfo.actionsTaken.length > 0) {
     console.log(`\n🔧 Self-Healing Actions Applied:`);
     for (const act of repairInfo.actionsTaken) {
