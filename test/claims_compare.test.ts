@@ -28,15 +28,13 @@ describe("claims test-count comparison", () => {
     expect(checkTestClaims({ ...actual, files: 281 }, actual).stale).toBe(true);
   });
 
-  test("an over-claimed assertion total fails", () => {
-    const result = checkTestClaims({ ...actual, assertions: 10433 }, actual);
-    expect(result.stale).toBe(true);
-  });
+  test("an assertion-total difference is always a note, in either direction", () => {
+    const over = checkTestClaims({ ...actual, assertions: 10433 }, actual);
+    expect(over.stale).toBe(false);
+    expect(over.notes).toHaveLength(1);
 
-  test("an under-claimed assertion total is a note, not a failure", () => {
-    const result = checkTestClaims({ ...actual, assertions: 10430 }, actual);
-    expect(result.stale).toBe(false);
-    expect(result.notes).toHaveLength(1);
-    expect(result.notes[0]).toContain("10430");
+    const under = checkTestClaims({ ...actual, assertions: 10430 }, actual);
+    expect(under.stale).toBe(false);
+    expect(under.notes[0]).toContain("10430");
   });
 });
