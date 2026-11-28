@@ -1,4 +1,4 @@
-# 📦 aimm Product Scope & Capabilities
+# 📦 musememory Product Scope & Capabilities
 
 > **Binary Names**: `memory` (primary), `musememory` (alias), `npx musememory` (zero-install)
 > **MCP Protocol**: `2025-11-25` (SDK-negotiated; `2025-06-18`, `2025-03-26`, `2024-11-05` and `2024-10-07` still accepted), stdio + loopback HTTP with origin gating
@@ -16,7 +16,7 @@
 
 ## 🎯 Executive Overview
 
-aimm is a zero-daemon, file-backed cognitive memory engine that gives AI agents
+musememory is a zero-daemon, file-backed cognitive memory engine that gives AI agents
 (Claude Code, Cursor, Antigravity, Windsurf, Codex, Gemini CLI, Hermes, OpenCode,
 OpenClaw, and the rest of the detected registry) persistent, self-organizing memory
 across sessions — without an external database daemon, an account, or a cloud service.

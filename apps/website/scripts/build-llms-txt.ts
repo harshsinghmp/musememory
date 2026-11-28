@@ -150,7 +150,7 @@ const PAGES: Array<{ path: string; title: string }> = [
   { path: "compare/index.html", title: "Compare — 14-capability comparison against other memory approaches" },
 ];
 
-const CURATED = `# Muse Memory
+const CURATED = `# musememory
 
 > Persistent, local-first memory for AI coding agents. Runs in-process on the user's
 > machine: sub-${claims.latency.recallMillis}ms recall, write-time citation verification, the majority
@@ -158,7 +158,7 @@ const CURATED = `# Muse Memory
 >
 > Version ${claims.version} · https://harshsinghmp.github.io/musememory/
 
-Muse Memory gives an AI coding agent a memory that survives between sessions. Every
+musememory gives an AI coding agent a memory that survives between sessions. Every
 memory is checked against the real code before it is stored and re-checked before it
 is served, so an agent is never handed a fact that has since become false.
 
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
     parts.push(`# ${title}\n\n> Source: ${url}\n\n${text}`);
   }
 
-  const full = `# Muse Memory — full site text\n\n> Plain-text rendering of https://harshsinghmp.github.io${BASE}/\n> Generated from the built site. The repository README is the authoritative source.\n\n---\n\n${parts.join("\n\n---\n\n")}\n`;
+  const full = `# musememory — full site text\n\n> Plain-text rendering of https://harshsinghmp.github.io${BASE}/\n> Generated from the built site. The repository README is the authoritative source.\n\n---\n\n${parts.join("\n\n---\n\n")}\n`;
 
   await Bun.write(join(DIST, "llms.txt"), CURATED);
   await Bun.write(join(DIST, "llms-full.txt"), full);

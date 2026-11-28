@@ -12,8 +12,16 @@ const INJECTED_TAG_REGEXES = [
   /<!--\s*(?:memory-context|muse-context|context-pack|injected-context)\s*-->[\s\S]*?<!--\s*\/(?:memory-context|muse-context|context-pack|injected-context)\s*-->/gi,
 ];
 
+/**
+ * The markdown context-pack header written by `buildContextPack`.
+ *
+ * Both spellings are matched on purpose: `musememory` is the current name and
+ * `aimm` is the interim name 3.5.0 shipped. A pack written by that build is
+ * still an injected pack, and failing to strip it re-ingests it into the store
+ * on the next capture — the recursive context poisoning T-110 exists to stop.
+ */
 const MARKDOWN_CONTEXT_PACK_REGEX =
-  /(?:^|\n)# 🧠 aimm Context Pack[\s\S]*?(?=\n\n(?![#>*\-\s])|\n# [^#]|\n---|(?:\n\s*){3,}|$)/gi;
+  /(?:^|\n)# 🧠 (?:aimm|musememory) Context Pack[\s\S]*?(?=\n\n(?![#>*\-\s])|\n# [^#]|\n---|(?:\n\s*){3,}|$)/gi;
 
 // Base64 data URI payload pattern (>= 50 chars of base64 data)
 const BASE64_DATA_URI_REGEX =

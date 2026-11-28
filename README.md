@@ -1,13 +1,13 @@
 <div align="center">
 
-<a href="#what-aimm-does">
-  <img src="./apps/website/public/brand/readme-banner.png" alt="aimm — persistent memory for AI coding agents that verifies itself" width="100%" />
+<a href="#what-musememory-does">
+  <img src="./apps/website/public/brand/readme-banner.png" alt="musememory — persistent memory for AI coding agents that verifies itself" width="100%" />
 </a>
 
 <br />
 <br />
 
-# 🧠 aimm
+# 🧠 musememory
 
 ![GitHub Release](https://img.shields.io/github/v/release/harshsinghmp/musememory?style=for-the-badge&logo=github&color=2563EB)
 ![NPM Version](https://img.shields.io/npm/v/musememory?style=for-the-badge&logo=npm&color=CB3837)
@@ -67,16 +67,16 @@ has since changed.
 
 ## 🏆 The Golden Sequence: Best-Practice Workflow for AI Agents
 
-To get the absolute best results out of aimm across any AI coding agent (Cursor, Claude Code, Windsurf, OpenCode, Antigravity, Gemini CLI, Hermes, etc.), execute this end-to-end sequence:
+To get the absolute best results out of musememory across any AI coding agent (Cursor, Claude Code, Windsurf, OpenCode, Antigravity, Gemini CLI, Hermes, etc.), execute this end-to-end sequence:
 
 ```text
 1. INITIALIZE & AUTO-WIRE → 2. PERSONA & PROFILE SETUP → 3. SESSION GROUNDING → 4. IN-FLIGHT TRACKING → 5. DECISION CAPTURE → 6. CONTINUOUS HARVESTING → 7. GOVERNANCE & AUDIT
 ```
 
 ### 1️⃣ Onboarding & Workstation Auto-Wiring
-Connect all installed AI coding agents on your machine to aimm in one command:
+Connect all installed AI coding agents on your machine to musememory in one command:
 ```bash
-# Wire aimm into every detected agent on your workstation with lifecycle hooks
+# Wire musememory into every detected agent on your workstation with lifecycle hooks
 npx musememory connect all --with-hooks
 
 # Confirm ecosystem health, database schemas, and toolchain integrity
@@ -175,7 +175,7 @@ memory optimize
 - [Start here (60 seconds)](#start-here-60-seconds)
 - [🏆 The Golden Sequence](#-the-golden-sequence-best-practice-workflow-for-ai-agents)
 - [What's new](#whats-new)
-- [What aimm does](#what-aimm-does)
+- [What musememory does](#what-musememory-does)
 - [How it works](#how-it-works)
 - [Key capabilities](#key-capabilities)
 - [Where your memory lives](#where-your-memory-lives)
@@ -195,9 +195,9 @@ memory optimize
 
 ---
 
-## What aimm does
+## What musememory does
 
-AI agents lose project context when a session ends. aimm keeps that context on your machine, where your tools can retrieve it during the next task.
+AI agents lose project context when a session ends. musememory keeps that context on your machine, where your tools can retrieve it during the next task.
 
 Store working constraints, decisions, handoffs, and verified facts in one local memory layer. SQLite handles retrieval, while readable Markdown and YAML files keep the important context inspectable in Git.
 
@@ -208,7 +208,7 @@ Store working constraints, decisions, handoffs, and verified facts in one local 
 └───────────────────────┬─────────────────────────────────────┬───────────────┘
                         │ MCP stdio / Terminal CLI            │ Local HTTP
 ┌───────────────────────▼─────────────────────────────────────▼───────────────┐
-│                           aimm Core Engine                           │
+│                           musememory Core Engine                            │
 │                                                                             │
 │ ┌──────────────────────┐ ┌──────────────────────┐ ┌───────────────────────┐ │
 │ │  Unified Context &   │ │ 5-Pillar Health Gate │ │ Autonomous Cognition  │ │
@@ -247,15 +247,15 @@ Store working constraints, decisions, handoffs, and verified facts in one local 
 
 Three steps, on a loop:
 
-1. **Remember it** — when your assistant makes a decision or fixes a bug, aimm
+1. **Remember it** — when your assistant makes a decision or fixes a bug, musememory
    saves a short note about what changed and why.
-2. **Check it** — before the note is stored, aimm confirms the file or function
+2. **Check it** — before the note is stored, musememory confirms the file or function
    it mentions actually exists. Citations are structural fingerprints, not line
    numbers, so a refactor does not silently break the note.
-3. **Hand it back** — next time you start work, aimm returns the notes that fit
+3. **Hand it back** — next time you start work, musememory returns the notes that fit
    the task, sized to your token budget, not the whole archive.
 
-If a saved fact no longer matches your code, aimm leaves it out and says so,
+If a saved fact no longer matches your code, musememory leaves it out and says so,
 rather than serving it as if it were still true.
 
 ---
@@ -280,7 +280,7 @@ rather than serving it as if it were still true.
 
 ## Where your memory lives
 
-Everything aimm knows is a folder you can open, read, diff, back up, or commit.
+Everything musememory knows is a folder you can open, read, diff, back up, or commit.
 
 ```
 .memory/                                  # project scope — travels with your repo
@@ -385,7 +385,7 @@ prose paragraph to learn a flag name.
 
 ## 🔄 Updating the System, Project & Packages
 
-Keep aimm and all your connected AI coding agents at peak cognitive performance with automated updates, self-healing environment repairs, and consistent `@latest` versioning.
+Keep musememory and all your connected AI coding agents at peak cognitive performance with automated updates, self-healing environment repairs, and consistent `@latest` versioning.
 
 ### 1️⃣ Updating the Global Package / Workstation CLI
 Always use `@latest` across every package manager to pull the newest releases:
@@ -507,7 +507,7 @@ npx musememory connect claude-code --harness claude
 <details>
 <summary><b>🗑️ Complete Uninstallation & System Removal Steps</b> — <i>Click to expand</i></summary>
 
-aimm can be cleanly and completely removed with zero trace left on your machine.
+musememory can be cleanly and completely removed with zero trace left on your machine.
 
 #### Step 1: Unwire Coding Agents (Zero-Trace MCP Cleanup)
 Remove the memory MCP server configuration from every detected agent config file (`cursor`, `claude-code`, `antigravity`, `windsurf`, `opencode`, `codex`, etc.):
@@ -652,7 +652,7 @@ memory migrate --all
 
 ## 🌐 Cognitive Studio Dashboard (`memory ui` / `memory studio`)
 
-aimm includes an embedded, zero-dependency visual graph studio and observability dashboard:
+musememory includes an embedded, zero-dependency visual graph studio and observability dashboard:
 
 ```bash
 memory studio
@@ -733,7 +733,7 @@ never handed the whole surface. Select one with `MUSE_MCP_PROFILE`.
 <details>
 <summary><b>🧠 Shipped agent skills (<code>.agents/skills/</code>)</b> — <i>Click to expand</i></summary>
 
-aimm ships with 11 turnkey Agent Skills designed for coding agents (Claude Code, Cursor, Antigravity, OpenCode, Codex, Gemini CLI, etc.) under `.agents/skills/`:
+musememory ships with 11 turnkey Agent Skills designed for coding agents (Claude Code, Cursor, Antigravity, OpenCode, Codex, Gemini CLI, etc.) under `.agents/skills/`:
 
 | Skill | Trigger Phase | Core Agent Responsibility |
 | :--- | :--- | :--- |
@@ -754,7 +754,7 @@ aimm ships with 11 turnkey Agent Skills designed for coding agents (Claude Code,
 <details>
 <summary><b>👤 5 Zero-Fingerprint Role Archetypes (`USER.md`)</b> — <i>Click to expand</i></summary>
 
-aimm maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style:
+musememory maintains a persistent user profile (`~/.memory/USER.md` globally, or `.memory/USER.md` locally) to ground AI agents in your working style:
 
 1. **`developer`** (Default): Code-first, direct, concise, runnable diffs, strict types, fail-fast mechanics.
 2. **`designer`**: Visual hierarchy, CSS/Tailwind systems, GSAP animations, WCAG accessibility, Figma/tokens design tokens.

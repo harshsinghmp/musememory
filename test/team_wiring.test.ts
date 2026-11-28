@@ -77,7 +77,7 @@ describe("T-387: Team Slice Member Wiring & Scoping Policy", () => {
       });
 
       expect(exitCode).toBe(0);
-      expect(output).toContain("aimm Team Server Client Configuration Recipes (T-387)");
+      expect(output).toContain("musememory Team Server Client Configuration Recipes (T-387)");
       expect(output).toContain("http://10.0.0.5:31338/mcp");
       expect(output).toContain("tok-test-123");
       expect(output).toContain("nexus");

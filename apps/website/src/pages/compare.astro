@@ -24,7 +24,7 @@ const rows = [
 ];
 
 const cols = [
-  { key: "muse", label: "aimm", sub: "local-first memory engine" },
+  { key: "muse", label: "musememory", sub: "local-first memory engine" },
   { key: "vec", label: "Vector stores", sub: "dense embedding-based" },
   { key: "graph", label: "Graph platforms", sub: "entity relationship-based" },
   { key: "session", label: "Session search", sub: "retroactive lookup-only" },
@@ -35,8 +35,8 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
 ---
 
 <Base
-  title="aimm compared with vector stores, graph platforms and session search"
-  description={`A ${rows.length}-capability comparison of aimm against vector stores, knowledge-graph platforms, and session search tools. aimm is the only one that is local-first, fully keyless, and git-versioned at the same time.`}
+  title="musememory compared with vector stores, graph platforms and session search"
+  description={`A ${rows.length}-capability comparison of musememory against vector stores, knowledge-graph platforms, and session search tools. musememory is the only one that is local-first, fully keyless, and git-versioned at the same time.`}
 >
   <Nav
     links={[
@@ -52,15 +52,15 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Landscape</p>
-          <h1>How aimm compares to other memory tools</h1>
+          <h1>How musememory compares to other memory tools</h1>
           <p>
             Vector stores optimize for semantic similarity, graph platforms for entity
-            relationships, session search for retroactive lookup. aimm optimizes for the thing
+            relationships, session search for retroactive lookup. musememory optimizes for the thing
             coding agents actually need: <strong>verified, code-grounded recall that never serves stale truth</strong>.
           </p>
           <p class="plain">
             <strong>The differentiator:</strong> while other approaches serve memory at confidence,
-            aimm verifies it at both write and recall. Notes are checked against your real code
+            musememory verifies it at both write and recall. Notes are checked against your real code
             before they enter the store, and withheld if the code has drifted since they were
             written. Nothing is served as truth that cannot be traced to a structural anchor.
           </p>
@@ -79,7 +79,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
         >
           <table class="compare">
             <caption class="sr-only">
-              Capability comparison between aimm, dense vector stores,
+              Capability comparison between musememory, dense vector stores,
               entity-relationship graph platforms, and session search tools.
             </caption>
             <thead>
@@ -113,7 +113,7 @@ const cls = (v: string) => (v === "yes" ? "yes" : v === "partial" ? "part" : "no
           <span class="no">✕</span> not documented
         </p>
         <p class="table-note">
-          Methodology: capability claims follow a documented-features-only standard — code beats docs, quick evolutions on all sides. aimm row reflects v{claims.version}.
+          Methodology: capability claims follow a documented-features-only standard — code beats docs, quick evolutions on all sides. musememory row reflects v{claims.version}.
         </p>
       </div>
     </section>

@@ -32,10 +32,10 @@ When AI agents like Cursor, Claude Code, or Antigravity read outdated docs, they
 
 ## 2. Comprehension: The Living Decision Architecture
 
-aimm solves documentation rot by transforming static markdown into **living, executable architectural contracts** tied directly to structural code identity:
+musememory solves documentation rot by transforming static markdown into **living, executable architectural contracts** tied directly to structural code identity:
 
 ```
-                      aimm LIVING ADR SYSTEM
+                      musememory LIVING ADR SYSTEM
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            Living ADR (ADR-004)                             │
 │  "Persist session tokens in Redis with 15-minute TTL; reject raw JWTs"      │

@@ -1,6 +1,6 @@
 {
-  "name": "Muse Memory",
-  "short_name": "Muse",
+  "name": "musememory",
+  "short_name": "musememory",
   "description": "Persistent, local-first memory for AI coding agents. Sub-2ms recall, write-time citation verification, zero background daemons.",
   "start_url": "/musememory/",
   "scope": "/musememory/",

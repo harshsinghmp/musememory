@@ -72,7 +72,7 @@ describe("Repeatable Benchmark Suite & Telemetry Scoreboard", () => {
 
     // Formatted scoreboard
     const scoreboard = formatBenchmarkScoreboard(report);
-    expect(scoreboard).toContain("aimm ENGINE BENCHMARK & TELEMETRY SCOREBOARD");
+    expect(scoreboard).toContain("musememory ENGINE BENCHMARK & TELEMETRY SCOREBOARD");
     expect(scoreboard).toContain("Hot Cache Lookup");
     expect(scoreboard).toContain("FTS5 BM25 Retrieval");
     expect(scoreboard).toContain("KNOWLEDGE QUALITY & ROI");

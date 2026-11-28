@@ -80,7 +80,7 @@ totalEntities: 34
 - ...
 
 ## By Project
-- [[musememory|aimm]] (892)
+- [[musememory|musememory]] (892)
 - [[personal|Personal]] (355)
 ```
 

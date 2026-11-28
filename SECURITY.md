@@ -1,6 +1,6 @@
 # Security Policy
 
-aimm stores what an agent is told to remember, so a weakness here is a
+musememory stores what an agent is told to remember, so a weakness here is a
 weakness in every session that reads the store back. This document says which
 versions get fixes, how to report a problem privately, and what is in scope.
 

@@ -9,11 +9,11 @@ import { computeStructuralHash, extractSymbolBody } from "../anchors/fingerprint
  *
  * Kage-pattern recall gate: memories whose code anchors no longer match the live
  * filesystem are WITHHELD from fused context by default instead of merely being
- * down-ranked. aimm already verifies at write time (see verify-write.ts); this
+ * down-ranked. musememory already verifies at write time (see verify-write.ts); this
  * gate closes the loop at recall time, because code moves *after* a memory is
  * stored too.
  *
- * Design constraints (aimm invariants):
+ * Design constraints (musememory invariants):
  *  - Zero-daemon, in-process: verifies anchors directly against the filesystem.
  *  - Sub-millisecond recall: verification is memoized per (path, symbol, mtime)
  *    within a single gate instance, so a repo-hot recall pass reads each file at

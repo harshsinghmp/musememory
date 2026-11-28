@@ -152,12 +152,12 @@ export function createServer(targetDir?: string, requestedProfile?: McpProfile):
 
   const server = new Server(
     // `name` is the protocol identifier (`musememory`) and must not change;
-    // `title`/`description` are the human-readable product label (aimm).
+    // `title`/`description` are the human-readable product label (musememory).
     { name: PACKAGE_NAME, title: PRODUCT_NAME, version: PACKAGE_VERSION, description: PRODUCT_TAGLINE },
     {
       capabilities: { tools: {}, resources: {}, prompts: {}, logging: {} },
-      instructions: `aimm PROTOCOL:
-You are equipped with aimm, an autonomous persistent cognitive memory system.
+      instructions: `musememory PROTOCOL:
+You are equipped with musememory, an autonomous persistent cognitive memory system.
 1. SESSION START / FIRST TURN: You MUST call 'get_context' on your very first turn in any conversation or task. This loads the user's role profile (USER.md), active working constraints (CURRENT.md), and relevant past decisions/fixes.
 2. WORKING CONSTRAINTS: When hard constraints, open loops, or project invariants are established or modified, immediately record them to CURRENT.md via 'memory_capture' (type='constraint') or 'memory_current'.
 3. CONTINUOUS KNOWLEDGE CAPTURE: Whenever you resolve a bug, make an architectural decision, or establish a project convention, immediately call 'memory_capture' to persist it.

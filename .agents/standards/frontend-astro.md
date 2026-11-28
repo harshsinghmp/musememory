@@ -1,7 +1,7 @@
 # 🚀 Astro Frontend Engineering Standards
 
 > **Runtime Target**: Astro v7.4.7 · Bun / Node runtime · TypeScript Strict
-> **Applies to**: `apps/website/` — the aimm marketing and documentation site.
+> **Applies to**: `apps/website/` — the musememory marketing and documentation site.
 
 ---
 

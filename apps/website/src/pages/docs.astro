@@ -11,7 +11,7 @@ const sections = [
     id: "quickstart",
     title: "Quickstart",
     body: [
-      "Install, connect, verify — under two minutes, no API key, no account. One command wires aimm into the majority of the coding agents you already run, over MCP:",
+      "Install, connect, verify — under two minutes, no API key, no account. One command wires musememory into the majority of the coding agents you already run, over MCP:",
     ],
     code: `npx musememory connect           # wire the agents you already run
 npx musememory connect --with-hooks  # + Claude Code lifecycle hooks
@@ -52,7 +52,7 @@ memory optimize                # prune noise + VACUUM (auto-cadence)`,
     id: "learning",
     title: "Failure attribution & negative mining (v3.0.0)",
     body: [
-      "Scoped failure attribution: when a test or command fails, aimm verifies relevance against code anchors, affected paths, and reproduction commands before penalizing retrieved notes. Bystander memories are untouched, per-session retry spikes are deduplicated to 1 strike, and active strikes decay after 2 clean runs or 30 days.",
+      "Scoped failure attribution: when a test or command fails, musememory verifies relevance against code anchors, affected paths, and reproduction commands before penalizing retrieved notes. Bystander memories are untouched, per-session retry spikes are deduplicated to 1 strike, and active strikes decay after 2 clean runs or 30 days.",
       "Constitutional immunity: entries typed as constraint, timeless, or foundational (salience >= 0.95) are protected from automated dispute.",
       "Fix-pair trajectory mining: automatically detects Error ➔ Remediation ➔ Success sequences in your session logs and distills actionable 'AVOID' negative memories with dynamic line number normalization and Vibeguard secret scrubbing.",
       "HOT.md working set compounding: candidate memories from your active working set receive memoized sub-millisecond retrieval boosts with origin channel attribution (source:hot, source:fts).",
@@ -91,7 +91,7 @@ memory audit --operation dispute_triggered`,
 const nav = sections.map((s) => ({ id: s.id, title: s.title }));
 ---
 
-<Base title="Docs — aimm" description="Connect aimm to your agents, capture verified memories, and recall them in under 2ms. Quickstart, CLI, MCP tools, hooks, and trust gates.">
+<Base title="Docs — musememory" description="Connect musememory to your agents, capture verified memories, and recall them in under 2ms. Quickstart, CLI, MCP tools, hooks, and trust gates.">
   <Nav />
 
   <main id="main">
@@ -104,9 +104,9 @@ const nav = sections.map((s) => ({ id: s.id, title: s.title }));
           </nav>
         </aside>
         <div class="docs-body">
-          <h1>aimm documentation</h1>
+          <h1>musememory documentation</h1>
           <p class="docs-intro">
-            Everything needed to run aimm day to day: connect your
+            Everything needed to run musememory day to day: connect your
             agents, capture what matters, recall it in under two milliseconds.
             The complete command and tool reference lives in the
             <a href="https://github.com/harshsinghmp/musememory/blob/main/docs/cli-reference.md" rel="noopener">generated CLI reference</a>.
