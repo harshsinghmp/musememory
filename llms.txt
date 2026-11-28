@@ -1,10 +1,10 @@
-# aimm
+# musememory
 
-> aimm — local-first memory for AI coding agents. Autonomous cognitive memory engine for agents and agency networks. Runs in-process: sub-2ms recall, write-time citation verification, 52 agent platforms wired by one command, 0 background daemons, MIT licensed.
+> musememory — local-first memory for AI coding agents. Autonomous cognitive memory engine for agents and agency networks. Runs in-process: sub-2ms recall, write-time citation verification, 52 agent platforms wired by one command, 0 background daemons, MIT licensed.
 >
 > Version 3.3.0 · https://harshsinghmp.github.io/musememory/
 
-aimm gives an AI agent a memory that survives between sessions. Every memory is checked against the real code before it is stored and re-checked before it is served, so an agent is never handed a fact that has since become false.
+musememory gives an AI agent a memory that survives between sessions. Every memory is checked against the real code before it is stored and re-checked before it is served, so an agent is never handed a fact that has since become false.
 
 ## Install
 

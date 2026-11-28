@@ -1,7 +1,7 @@
 # SOW: Proactive Memory Layer & Competitive Parity Analysis
 
 > **Scope**: Competitive analysis of 11 memory systems (mem.ai + 10 OSS repos) and the resulting
-> Scope-of-Work items SOW-101…106 — a proactive "chief of staff" layer for aimm that stays
+> Scope-of-Work items SOW-101…106 — a proactive "chief of staff" layer for musememory that stays
 > zero-daemon, file-backed, and local-first. Works **standalone** (musememory alone) or
 > **composed** (muse-agents personas driving musememory via MCP).
 >
@@ -18,26 +18,26 @@ hindsight, supermemory, OpenViking), social-memory servers (honcho), curated con
 (byterover-cli), embedded SQLite (mnemosyne), eval harnesses (autocontext), and markdown-brain
 systems (gbrain).
 
-**aimm's defensible moat**: its *core engine* is pure file-backed, stdio-only, and
+**musememory's defensible moat**: its *core engine* is pure file-backed, stdio-only, and
 zero-daemon, with human-gated lifecycle governance (`candidate → confirmed → superseded/stale/rejected`),
 an append-only audit ledger, deterministic multi-factor scoring with knapsack token budgeting,
 and hard secret blocking on every write. Every competitor in the set (eval harnesses excluded)
 requires at least one of: a daemon, a database, an LLM-key write path, or a cloud account for
-its *storage layer*. Optional aimm add-ons (embedded UI graph server, WebSocket hub) are
+its *storage layer*. Optional musememory add-ons (embedded UI graph server, WebSocket hub) are
 opt-in processes, not storage infrastructure.
 
 **Biggest competitive risk**: [gbrain](https://github.com/garrytan/gbrain) (MIT) already ships
 the entire proactive layer planned here — signal-detector open-loop extraction (≈SOW-103),
 cron "dream cycle" routines (≈SOW-102), and gap-analysis briefings (≈SOW-101). However it is
 designed around a 24/7 daemon, PGLite/Postgres, and a private GitHub repo as durable store —
-none of which fit aimm's constraints. The niche remains open: **proactive intelligence
+none of which fit musememory's constraints. The niche remains open: **proactive intelligence
 without infrastructure**.
 
 ---
 
 ## 2. Master Comparison Table
 
-| Project | License | Infra / Storage | Lifecycle & Audit | Retrieval | Overlaps aimm | Out of Scope for aimm |
+| Project | License | Infra / Storage | Lifecycle & Audit | Retrieval | Overlaps musememory | Out of Scope for musememory |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | [mem.ai](https://get.mem.ai) | Cloud $0–$199/mo | Cloud SaaS | None | Deep Search; Heads-Up related-context panel | MCP connector; task extraction concept | Cloud/mobile/voice/iMessage/WhatsApp/consumer |
 | [mem0](https://github.com/mem0ai/mem0) | Apache-2.0 · 64k★ | Vector DB (+graph/history DB); Docker server or cloud; LLM-key writes | CRUD + per-entry `history()`; no states | Fused semantic+BM25+entity, `top_k` | MCP server; CLI; transcript distillation; audit analog | Vector DBs, daemon server, LLM-required writes |
@@ -55,9 +55,9 @@ without infrastructure**.
 
 ## 3. Overlap vs Existing Features
 
-Capabilities competitors ship that aimm **already has** — no action needed:
+Capabilities competitors ship that musememory **already has** — no action needed:
 
-| Existing aimm feature | Duplicated by |
+| Existing musememory feature | Duplicated by |
 | :--- | :--- |
 | Lifecycle state machine (candidate→confirmed→superseded/stale/rejected) | byterover review gate (partial); autocontext promotion gates (different domain) |
 | Append-only `audit.jsonl` ledger | mem0 per-entry `history()`; byterover curate history; gbrain page provenance |
@@ -84,7 +84,7 @@ Capabilities competitors ship that aimm **already has** — no action needed:
 
 **Risk note**: gbrain ships SOW-101/102/103 equivalents but requires a resident daemon,
 embedded Postgres, and a private GitHub repo as store. Shipping these as cron-invoked CLI
-commands over plain YAML files keeps aimm's constraint set intact and the niche unoccupied.
+commands over plain YAML files keeps musememory's constraint set intact and the niche unoccupied.
 
 ## 5. Adoption Candidates (ranked by fit)
 
@@ -112,7 +112,7 @@ commands over plain YAML files keeps aimm's constraint set intact and the niche 
 
 ### SOW-102: Daily Briefing & Routines Scheduler ☐
 
-- **Problem**: mem.ai/gbrain prove scheduled synthesis (briefings, routine jobs) is the core chief-of-staff primitive; aimm has no scheduling story.
+- **Problem**: mem.ai/gbrain prove scheduled synthesis (briefings, routine jobs) is the core chief-of-staff primitive; musememory has no scheduling story.
 - **Approach**: `memory brief` produces a markdown daily briefing (fresh confirmed entries, stale warnings, open loops, upcoming dues). Routines declared in `.memory/routines.yaml` (name, schedule cron expr, command sequence); executed by any external cron invoking `memory routine run <name>` — **no daemon**.
 - **Standalone**: `memory routine install` prints the exact crontab line for the user to install (no mutation of system crontab; avoids cron/launchd/systemd platform variance).
 - **Composed**: muse-agents personas consume briefing output as morning context.

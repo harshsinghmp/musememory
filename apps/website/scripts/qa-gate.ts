@@ -1,5 +1,5 @@
 /**
- * Release gate for the Muse Memory website.
+ * Release gate for the musememory website.
  *
  * This is the qa-launch `gate` mode made executable. It asserts the
  * objective, repeatable conditions a release must satisfy, and prints a
@@ -483,7 +483,7 @@ async function main() {
   const blocking = failed.filter((c) => c.severity === "P0" || c.severity === "P1");
   const width = Math.max(...checks.map((c) => c.label.length));
 
-  console.log("\n══ Muse Memory · website release gate ══\n");
+  console.log("\n══ musememory · website release gate ══\n");
   for (const c of checks) {
     console.log(
       `  ${c.ok ? "PASS" : "FAIL"}  ${c.severity}  ${c.label.padEnd(width)}  ${c.detail}`,

@@ -1,6 +1,6 @@
 # 🎯 Invalidation, Attribution & Multi-Factor Ranking Rigor Guide
 
-> **Audience**: AI Engineers, Autonomous Agent Developers, and Systems Architects integrating aimm.  
+> **Audience**: AI Engineers, Autonomous Agent Developers, and Systems Architects integrating musememory.  
 > **Copywriting Framework**: ACCA (*Awareness · Comprehension · Conviction · Action*)  
 > **Release Target**: v2.2.0 (Wave 14)
 
@@ -17,7 +17,7 @@ When autonomous agents query memory systems, subtle ranking and invalidation bug
 5. **Runaway Associative Networks**: Unbounded Hebbian plasticity causes co-activation graphs to explode in size and create unbounded loops when memories repeatedly fire together.
 6. **Stripped Capture Metadata**: Calling \`memory_capture\` via MCP stripped out rich propose options (such as idempotency keys, evidence links, verification levels, and temporal bounds), forcing all captures into flat defaults.
 
-aimm Wave 14 systematically eliminates these failure modes with strict attribution, incremental synchronization, and ranking rigor.
+musememory Wave 14 systematically eliminates these failure modes with strict attribution, incremental synchronization, and ranking rigor.
 
 ---
 

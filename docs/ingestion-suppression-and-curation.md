@@ -15,7 +15,7 @@ In multi-agent systems and conversational pair-programming environments, unmanag
 4. **Autonomous Hallucination Promotion (`T-106`, `T-107`)**: Unsupervised LLMs promote speculative ideas to global policy without empirical evidence. Agents must only append empirical evidence (test runs, build results, verification logs); deterministic code gates must arbitrate whether a memory earns project or global scope.
 5. **Compute & Token Exhaustion on Trivial or Repetitive Queries (`T-112`, `T-113`)**: Greetings ("hi", "hello", "thanks", "ok") triggered full FTS5, vector, and graph scans, hallucinating irrelevant memory packs. Similarly, consecutive tool calls asking variations of the exact same query re-executed full retrieval pipelines.
 
-**aimm Wave 18** establishes an immutable fortress across the entire ingestion and retrieval lifecycle: **Curator Protocol, Two-Tier Promotion, 6-Turn Re-injection Suppression, Age-Bounded Self-Echo Suppression, Context Block Stripping, Seen-Chunk TTL, Topic-Overlap Prefetch Skipping, and Trivial-Prompt Gates**.
+**musememory Wave 18** establishes an immutable fortress across the entire ingestion and retrieval lifecycle: **Curator Protocol, Two-Tier Promotion, 6-Turn Re-injection Suppression, Age-Bounded Self-Echo Suppression, Context Block Stripping, Seen-Chunk TTL, Topic-Overlap Prefetch Skipping, and Trivial-Prompt Gates**.
 
 ---
 
@@ -94,7 +94,7 @@ Memories captured by the active session or agent within a 10-minute horizon (`DE
 `stripInjectedContextBlocks(text)` executes regex sanitization before text enters `extractHarvestUnits`, `harvestSessionMemories`, or `store.propose`:
 
 - Strips `<memory-context>...</memory-context>`, `<muse-memory>...</muse-memory>`, `<context-pack>...</context-pack>`, `<system-instructions>...</system-instructions>`, and HTML comment boundaries.
-- Strips raw Markdown Context Packs (`# 🧠 aimm Context Pack...`).
+- Strips raw Markdown Context Packs (`# 🧠 musememory Context Pack...`).
 - Redacts base64 data URIs (`data:image/png;base64,...`) and raw base64 code blocks to `[base64-payload-stripped]`.
 - Rejects propose calls consisting entirely of stripped injected content.
 

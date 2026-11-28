@@ -1,6 +1,6 @@
 ---
 /**
- * The aimm mark, inlined as SVG so it inherits currentColor and the
+ * The musememory mark, inlined as SVG so it inherits currentColor and the
  * brand gradient. Used by the nav, the footer and the 404 page so the logo
  * exists in exactly one place (it was previously copy-pasted per page and
  * had already drifted).
@@ -11,7 +11,7 @@
  */
 interface Props {
   size?: number;
-  /** Render the "Memory" half of the wordmark in the accent colour. */
+  /** Render the "memory" half of the wordmark in the accent colour. */
   withWordmark?: boolean;
   title?: string;
 }
@@ -50,7 +50,7 @@ const gradId = `mm-grad-${Math.random().toString(36).slice(2, 8)}`;
         <circle cx="56" cy="52" r="6" fill="#8b7cf7"></circle>
         <circle cx="32" cy="39" r="7.5" fill="#e8ecf8"></circle>
       </svg>
-      <span class="brand-word">aim<span>m</span></span>
+      <span class="brand-word">muse<span>memory</span></span>
     </span>
   ) : (
     <svg

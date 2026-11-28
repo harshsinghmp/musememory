@@ -102,7 +102,7 @@ const PROFILE_DESCRIPTIONS: Record<McpProfile, string> = {
   review: "Optimized for code reviews, architectural audits, and conflict verification",
   architecture: "Optimized for system design, promotions, entity wikis, and tree indexing",
   maintenance: "Optimized for repository health, deduplication, and archival lifecycle sweeping",
-  full: "Exposes the complete suite of all available aimm tools",
+  full: "Exposes the complete suite of all available musememory tools",
 };
 
 /**

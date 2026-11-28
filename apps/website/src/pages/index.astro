@@ -1,6 +1,6 @@
 ---
 /**
- * aimm — landing page.
+ * musememory — landing page.
  *
  * Copy framework: AIDA across the page spine (Attention → Interest → Desire
  * → Action), with PAS (Problem → Agitation → Solution) driving the problem
@@ -93,7 +93,7 @@ const features = [
     icon: "plug",
     span: 8,
     title: "One command wires every agent",
-    body: "Run one command in your project. aimm finds the coding agents you already use and connects each one over MCP. There is no config file to hand-edit.",
+    body: "Run one command in your project. musememory finds the coding agents you already use and connects each one over MCP. There is no config file to hand-edit.",
     metric: `${claims.agentPlatforms} platforms`,
     cmd: "npx musememory connect",
   },
@@ -133,7 +133,7 @@ const features = [
     icon: "wand",
     span: 6,
     title: "Failures become permanent lessons",
-    body: "aimm watches error → fix → no-recurrence in your session and distils a negative note, so the same mistake does not come back next week.",
+    body: "musememory watches error → fix → no-recurrence in your session and distils a negative note, so the same mistake does not come back next week.",
     metric: "captured as a negative",
     cmd: 'memory capture --negative "AVOID: jwt.sign without an explicit algorithm"',
   },
@@ -171,21 +171,21 @@ const steps = [
     n: "01",
     icon: "file-tree",
     title: "Save it",
-    plain: "When your agent settles something — a decision, a fix, a constraint — aimm writes a short note: what changed and why.",
+    plain: "When your agent settles something — a decision, a fix, a constraint — musememory writes a short note: what changed and why.",
     tech: "The note lands as a readable YAML file beside a SQLite row. A credential scan runs first.",
   },
   {
     n: "02",
     icon: "anchor",
     title: "Check it",
-    plain: "Before the note is stored, aimm confirms the file or function it mentions really exists.",
+    plain: "Before the note is stored, musememory confirms the file or function it mentions really exists.",
     tech: "Citations are structural fingerprints, not line numbers, so moving a function does not silently break the note.",
   },
   {
     n: "03",
     icon: "gauge",
     title: "Hand it back",
-    plain: "Next session, aimm returns the notes that fit the task, sized to your token budget instead of the whole archive.",
+    plain: "Next session, musememory returns the notes that fit the task, sized to your token budget instead of the whole archive.",
     tech: "One in-process query over SQLite FTS5. Under two milliseconds, with a hard ceiling. No daemon, no network, no model call.",
   },
 ];
@@ -206,7 +206,7 @@ const faqs = [
   },
   {
     q: "Do I need an API key or a subscription?",
-    a: "No account, no API key, no subscription. aimm is MIT-licensed and free. It never calls a model: recall is a database query on your own machine, so there is nothing to bill.",
+    a: "No account, no API key, no subscription. musememory is MIT-licensed and free. It never calls a model: recall is a database query on your own machine, so there is nothing to bill.",
   },
   {
     q: "Where is my data stored?",
@@ -218,11 +218,11 @@ const faqs = [
   },
   {
     q: "Does it work with the tools I already use?",
-    a: "Yes. aimm connects to the majority of the coding agents people actually run — Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes, OpenClaw and the rest of the mainstream field. One command wires each of them; you keep working exactly as you do today.",
+    a: "Yes. musememory connects to the majority of the coding agents people actually run — Claude Code, Cursor, Codex, Windsurf, Gemini CLI, OpenCode, Hermes, OpenClaw and the rest of the mainstream field. One command wires each of them; you keep working exactly as you do today.",
   },
   {
     q: "What if it remembers something wrong?",
-    a: "aimm checks citations before storing them and re-checks them at recall. If the code a note points at has changed or disappeared, the note is withheld and you are told why, rather than served as if it were still true. Contradictions are marked conflicted instead of silently overwritten.",
+    a: "musememory checks citations before storing them and re-checks them at recall. If the code a note points at has changed or disappeared, the note is withheld and you are told why, rather than served as if it were still true. Contradictions are marked conflicted instead of silently overwritten.",
   },
   {
     q: "What happens to passwords and API keys?",
@@ -243,9 +243,9 @@ const glossary = [
   { term: "AI coding agent", def: "An AI assistant that reads and edits code in your project — Claude Code, Cursor, Codex, Windsurf and similar tools." },
   { term: "Agent memory", def: "What an assistant keeps between sessions: decisions, fixes and preferences it can look up later instead of rediscovering." },
   { term: "Context window", def: "The fixed amount of text an assistant can consider at once. Anything outside it is invisible — which is why sessions forget." },
-  { term: "MCP", def: "Model Context Protocol — the standard way assistants connect to outside tools like aimm. You never have to use the acronym." },
+  { term: "MCP", def: "Model Context Protocol — the standard way assistants connect to outside tools like musememory. You never have to use the acronym." },
   { term: "Local-first", def: "The data lives and is processed on your own machine. No account, no upload, no service that can go down or change its pricing." },
-  { term: "Code anchor", def: "A pointer from a note to a specific file or function. aimm uses a structural fingerprint instead of a line number, so refactors do not break it." },
+  { term: "Code anchor", def: "A pointer from a note to a specific file or function. musememory uses a structural fingerprint instead of a line number, so refactors do not break it." },
 ];
 
 /* ── Structured data ──────────────────────────────────────────────────── */
@@ -253,16 +253,16 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "aimm",
+    name: "musememory",
     url: "https://harshsinghmp.github.io/musememory/",
     description:
-      "Local-first memory for AI coding agents. aimm saves what your agent learns to plain files on your machine and hands the right notes back next session.",
+      "Local-first memory for AI coding agents. musememory saves what your agent learns to plain files on your machine and hands the right notes back next session.",
     inLanguage: "en",
   },
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "aimm",
+    name: "musememory",
     applicationCategory: "DeveloperApplication",
     operatingSystem: "macOS, Linux, Windows",
     softwareVersion: claims.version,
@@ -292,7 +292,7 @@ const jsonLd = [
     "@type": "HowTo",
     name: "How to give an AI coding agent memory that lasts",
     description:
-      "Install aimm in one command and give your AI coding assistant memory that survives between sessions.",
+      "Install musememory in one command and give your AI coding assistant memory that survives between sessions.",
     totalTime: "PT1M",
     tool: [{ "@type": "HowToTool", name: "A terminal" }],
     step: [
@@ -306,7 +306,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 2,
         name: "Run npx musememory connect",
-        text: "Run npx musememory connect. aimm detects the coding agents you already have and connects each one, so you do not configure them individually.",
+        text: "Run npx musememory connect. musememory detects the coding agents you already have and connects each one, so you do not configure them individually.",
       },
       {
         "@type": "HowToStep",
@@ -328,7 +328,7 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "aimm capabilities",
+    name: "musememory capabilities",
     itemListElement: features.map((f, i) => ({
       "@type": "ListItem",
       position: i + 1,
@@ -340,8 +340,8 @@ const jsonLd = [
 ---
 
 <Base
-  title="aimm — your AI agent gets a memory that lasts"
-  description="aimm saves what your AI coding agent learns to plain files on your machine, then hands the right notes back next session. No cloud, no daemon, no re-explaining. Free, MIT, runs offline."
+  title="musememory — your AI agent gets a memory that lasts"
+  description="musememory saves what your AI coding agent learns to plain files on your machine, then hands the right notes back next session. No cloud, no daemon, no re-explaining. Free, MIT, runs offline."
   jsonLd={jsonLd}
 >
   <Nav />
@@ -368,7 +368,7 @@ const jsonLd = [
             </h1>
 
             <p class="hero-sub">
-              aimm saves what your agent learns to plain files on your machine,
+              musememory saves what your agent learns to plain files on your machine,
               then hands the right notes back next session. No cloud, no daemon,
               no re-explaining.
             </p>
@@ -400,7 +400,7 @@ const jsonLd = [
             </div>
 
             <p class="card-kicker">What it writes</p>
-            <pre class="tree" aria-label="The files aimm writes inside your project"><code>{`project/
+            <pre class="tree" aria-label="The files musememory writes inside your project"><code>{`project/
 └── .memory/
     ├── memory.db    # SQLite
     ├── memories/    # YAML
@@ -513,7 +513,7 @@ const jsonLd = [
           <p class="eyebrow">How it works</p>
           <h2 id="arch-title">Your data never leaves the machine</h2>
           <p class="answer">
-            aimm is a process you start and stop. There is no server to
+            musememory is a process you start and stop. There is no server to
             operate, no account to create, and no network call in the path of a
             recall. The whole engine is a SQLite database and a folder of YAML
             files you can open in any editor.
@@ -623,7 +623,7 @@ const jsonLd = [
             <LatencyChart />
             <figcaption>
               Latency on the same machine, same store. The network row is a
-              reference point, not a aimm claim.
+              reference point, not a musememory claim.
             </figcaption>
           </figure>
 
@@ -684,10 +684,10 @@ const jsonLd = [
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Landscape</p>
-          <h2 id="compare-title">Where aimm differs from other memory tools</h2>
+          <h2 id="compare-title">Where musememory differs from other memory tools</h2>
           <p class="answer">
             Vector stores optimise for similarity, graph platforms for
-            relationships. aimm optimises for what a coding assistant actually
+            relationships. musememory optimises for what a coding assistant actually
             needs: recall that is fast, local and tied to your code — and that
             never passes off a stale fact as current.
           </p>
@@ -704,13 +704,13 @@ const jsonLd = [
         >
           <table class="compare">
             <caption class="sr-only">
-              Capability comparison between aimm, dense vector stores,
+              Capability comparison between musememory, dense vector stores,
               and entity-relationship graph platforms.
             </caption>
             <thead>
               <tr>
                 <th scope="col">Capability</th>
-                <th scope="col">aimm</th>
+                <th scope="col">musememory</th>
                 <th scope="col">Vector stores<br /><span class="th-sub">dense embedding-based</span></th>
                 <th scope="col">Graph platforms<br /><span class="th-sub">entity relationship-based</span></th>
               </tr>
@@ -740,7 +740,7 @@ const jsonLd = [
         </div>
         <p class="table-note">
           Generalizations — each platform evolves quickly, so check their docs.
-          The aimm column reflects v{claims.version}.
+          The musememory column reflects v{claims.version}.
         </p>
         <p class="table-more">
           <a href={`${base}/compare`}>See the full comparison →</a>
@@ -755,7 +755,7 @@ const jsonLd = [
           <p class="eyebrow">Get started</p>
           <h2 id="install-title">One line. That's the whole setup.</h2>
           <p class="answer">
-            Open a terminal in your project, paste the line, press enter. aimm
+            Open a terminal in your project, paste the line, press enter. musememory
             finds the coding agents you already run and connects each one over
             MCP, with only the tools its task needs. Under a minute to first
             value.
@@ -806,7 +806,7 @@ const jsonLd = [
       <div class="container container-narrow licence-inner">
         <h2 id="licence-title">Free forever. No paid tier, no telemetry.</h2>
         <p class="answer">
-          aimm is MIT-licensed. The whole engine — capture, ranking and
+          musememory is MIT-licensed. The whole engine — capture, ranking and
           recall — runs in-process on your machine, so there is no hosted
           component to charge for and nothing to phone home about. Clone it,
           fork it, ship it inside your product.

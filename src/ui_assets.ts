@@ -34,7 +34,7 @@ function renderStudioHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>aimm -- Visual Inspector & Cognitive Studio</title>
+  <title>musememory -- Visual Inspector & Cognitive Studio</title>
   <link rel="stylesheet" href="/assets/studio.css">
 </head>
 <body>
@@ -72,7 +72,7 @@ export function renderStandaloneHtml(store: Store): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>aimm -- Visual Inspector & Cognitive Studio</title>
+  <title>musememory -- Visual Inspector & Cognitive Studio</title>
   <style>
 ${STUDIO_CSS}
   </style>

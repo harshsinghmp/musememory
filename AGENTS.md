@@ -1,8 +1,8 @@
-# 🧠 aimm — AGENTS.md
+# 🧠 musememory — AGENTS.md
 
 > **Operating Identity**: **Muse** (Chief Agency Orchestrator)
-> **Project**: **aimm** — local-first memory for AI coding agents (project/package: `musememory`)
-> **Naming**: the product is `aimm`; the package, repo, binaries, `.memory/`, `muse_*` tool names and `MUSE_*` env vars are frozen. Canonical rules: [docs/brand.md](./docs/brand.md).
+> **Project**: **musememory** — local-first memory for AI coding agents (project/package: `musememory`)
+> **Naming**: the product is `musememory`; the package, repo, binaries, `.memory/`, `muse_*` tool names and `MUSE_*` env vars are frozen. Canonical rules: [docs/brand.md](./docs/brand.md).
 > **Toolchain**: `bun` · `bun test` · `bun run build` · `tsc --noEmit`
 > **DOX Rail**: `AGENTS.md` files are binding work contracts for their subtrees. Walk from root to target path; closer docs control local work details.
 
@@ -45,7 +45,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 🧠 [Context, Memory & Identity](./.agents/standards/memory-context.md) — Context hygiene, `./.memory` lifecycle, Creed proposals, canonical memory sources.
 
 ### 🎨 Brand Identity, UI & Accessibility System
-- 🎨 [Brand & Naming](./docs/brand.md) — **the canonical name** (`aimm`), pronunciation, the keep-list (package, binaries, `.memory/`, `muse_*`, `MUSE_*`), do/don't, and the Meta-Muse rationale.
+- 🎨 [Brand & Naming](./docs/brand.md) — **the canonical name** (`musememory`), pronunciation, the keep-list (package, binaries, `.memory/`, `muse_*`, `MUSE_*`), do/don't, and the Meta-Muse rationale.
 - 🎨 [Design System & UI Standards](./.agents/brand/design.md) — Token architecture, 7 required UI component states, fluid typography.
 - 📐 [Semantic BEM CSS Conventions](./.agents/brand/bem-conventions.md) — Block-Element-Modifier architecture and shallow depth rules.
 - ♿ [Accessibility (A11y) Baseline](./.agents/brand/a11y.md) — WCAG 2.2 AA mandates, contrast ratios, hit targets, axe-core zero-tolerance.
@@ -53,7 +53,7 @@ Load on demand. Full index (incl. retained-but-inapplicable standards): [Standar
 - 📸 [Reference Screenshots & Mocks](./.agents/brand/screenshots/README.md) — UI screenshots, wireframes, design snapshots.
 - 🌐 [Astro Frontend Standards](./.agents/standards/frontend-astro.md) — `apps/website` stack, the `/musememory` base-path rule, generated assets, a11y/visual gates.
 
-### 📖 Durable aimm Context
+### 📖 Durable musememory Context
 - 📖 [Context Map](./.agents/context/index.md) · 📦 [Product Scope](./.agents/context/product.md) — MCP tool matrix, 7 profiles, CLI surface, trust gates.
 - 🏗️ [Architecture & Storage](./.agents/context/architecture.md) — Dual-scope engine, SQLite DB, retrieval scoring, repo layout. · 📍 [Current State](./.agents/context/current.md) — v3.4.6 status, active invariants.
 - 🏛️ [Locked Decisions](./.agents/context/decisions.md) — ADRs (zero-daemon, dual persistence, MCP stdio). · 🗺️ [Roadmap](./.agents/context/roadmap.md) — Active milestones.

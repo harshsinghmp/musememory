@@ -1,5 +1,5 @@
 /**
- * Builds every aimm brand asset from one source of truth.
+ * Builds every musememory brand asset from one source of truth.
  *
  * Why this exists
  * ---------------
@@ -258,10 +258,57 @@ function proofRow(x: number, y: number, gap: number, size: number): string {
   }).join("\n");
 }
 
-/** Wordmark: "aim" in the text colour, the second "m" (the memory) in cyan. */
-function wordmark(x: number, y: number, size: number, anchor: "start" | "middle" = "start"): string {
+/* ── The wordmark ────────────────────────────────────────────────────────
+   One word, two tones: `muse` in the text colour and `memory` in cyan, so
+   the product's own word carries the idea the M mark draws.
+
+   `musememory` is two and a half times the length of the interim `aimm`, and
+   resvg has no text-measurement API, so the width is computed from Inter's
+   advances rather than guessed: every call states the box the wordmark has to
+   fit, `fitWordmark()` returns a size that fits it, and the build prints the
+   measured width of every card. A wordmark that clips its own name is worse
+   than no card at all. */
+const WORD_HEAD = "muse";
+const WORD_TAIL = "memory";
+
+/** Inter lowercase advances in ems at weight 800, from the faces vendored in
+ *  `src/assets/fonts`. Only the glyphs the wordmark uses, so a typo in the
+ *  name fails loudly instead of silently falling back to a wrong width. */
+const WORD_ADVANCE: Record<string, number> = {
+  m: 0.902, u: 0.639, s: 0.548, e: 0.596, o: 0.638, r: 0.417, y: 0.596,
+};
+
+/** Optical tracking for a ten-glyph word — tighter than the four-glyph
+ *  wordmark it replaces, which is what stops it reading as two words. */
+const WORD_TRACKING = -0.042;
+
+/** Rendered width of the wordmark at `size`, in user units. */
+function wordmarkWidth(size: number): number {
+  const glyphs = WORD_HEAD + WORD_TAIL;
+  let em = 0;
+  for (const ch of glyphs) {
+    const advance = WORD_ADVANCE[ch];
+    if (advance === undefined) throw new Error(`wordmark: no advance measured for "${ch}"`);
+    em += advance;
+  }
+  return em * size + WORD_TRACKING * size * glyphs.length;
+}
+
+/** Largest size at or below `size` whose wordmark fits inside `maxWidth`. */
+function fitWordmark(size: number, maxWidth: number): number {
+  const measured = wordmarkWidth(size);
+  return measured <= maxWidth ? size : Math.floor((size * maxWidth) / measured * 10) / 10;
+}
+
+/** Every rendered wordmark, for the fit report at the end of the build. */
+const WORDMARK_REPORT: Array<{ card: string; size: number; width: number; maxWidth: number }> = [];
+
+/** Wordmark: "muse" in the text colour, "memory" in the accent colour. */
+function wordmark(x: number, y: number, size: number, maxWidth: number, card: string, anchor: "start" | "middle" = "start"): string {
+  const fitted = fitWordmark(size, maxWidth);
+  WORDMARK_REPORT.push({ card, size: fitted, width: wordmarkWidth(fitted), maxWidth });
   const at = anchor === "middle" ? ' text-anchor="middle"' : "";
-  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${at} font-family="${SANS}" font-size="${size.toFixed(1)}" font-weight="800" letter-spacing="${(-size * 0.036).toFixed(1)}" fill="${T.text}">aim<tspan fill="${T.cyan}">m</tspan></text>`;
+  return `  <text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${at} font-family="${SANS}" font-size="${fitted.toFixed(1)}" font-weight="800" letter-spacing="${(WORD_TRACKING * fitted).toFixed(1)}" fill="${T.text}">${WORD_HEAD}<tspan fill="${T.cyan}">${WORD_TAIL}</tspan></text>`;
 }
 
 /**
@@ -280,7 +327,7 @@ function card(w: number, h: number): string {
     w,
     h,
     `${mesh(w, h)}
-${wordmark(x, h * 0.17, 52 * scale)}
+${wordmark(x, h * 0.17, 46 * scale, w * 0.34, "landscape card")}
 ${textLine(x, h * 0.27, EYEBROW, { size: 13 * scale, family: MONO_FAMILY, fill: T.cyan, tracking: 1.4 * scale })}
 ${textLine(x, h * 0.44, HERO_L1, { size: headSize, weight: 800, tracking: -headSize * 0.02 })}
 ${textLine(x, h * 0.44 + headSize * 1.18, HERO_L2, { size: headSize, weight: 800, tracking: -headSize * 0.02 })}
@@ -307,7 +354,7 @@ function socialPost(): string {
     h,
     `${mesh(w, h)}
 ${mark(cx, 232, 96, { stroke: 16 })}
-${wordmark(cx, 400, 46, "middle")}
+${wordmark(cx, 400, 40, w * 0.6, "social post", "middle")}
 ${textLine(cx, 452, EYEBROW, { size: 17, family: MONO_FAMILY, fill: T.cyan, tracking: 1.8, anchor: "middle" })}
 ${headline(cx, 600, headSize, wrap(HERO_H1, 20))}
 ${proofRow(cx, 850, 16, 18)}
@@ -331,7 +378,7 @@ function socialStory(): string {
     h,
     `${mesh(w, h)}
 ${mark(cx, 300, 150, { stroke: 24 })}
-${wordmark(cx, 500, 54, "middle")}
+${wordmark(cx, 500, 46, w * 0.6, "social story", "middle")}
 ${textLine(cx, 556, EYEBROW, { size: 18, family: MONO_FAMILY, fill: T.cyan, tracking: 2, anchor: "middle" })}
 ${headline(cx, 700, 84, wrap(HERO_H1, 17), { leading: 1.14 })}
 ${proofRow(cx, 1300, 18, 20)}
@@ -400,7 +447,7 @@ async function emit(dir: string, name: string, svg: string, w: number, h: number
 }
 
 async function main(): Promise<void> {
-  console.log("Building aimm brand assets\n");
+  console.log("Building musememory brand assets\n");
 
   await emit(PUBLIC_DIR, "favicon.svg", favicon(), 512, 512, false);
   await emit(PUBLIC_DIR, "apple-touch-icon.png", favicon(), 180, 180, false);
@@ -427,7 +474,7 @@ async function main(): Promise<void> {
     1280,
     400,
     `${mesh(1280, 400)}
-${wordmark(64, 132, 44)}
+${wordmark(64, 132, 38, 720, "readme banner")}
 ${textLine(64, 182, EYEBROW, { size: 12, family: MONO_FAMILY, fill: T.cyan, tracking: 1.4 })}
 ${textLine(64, 250, HERO_H1, { size: 28, weight: 800, tracking: -0.6 })}
 ${textLine(64, 326, MONO_CMD, { size: 22, family: MONO_FAMILY, fill: T.textDim })}
@@ -455,6 +502,17 @@ ${mark(1130, 190, 78, { stroke: 9 })}
     console.log(`  assets/banner.png  1280x640  ${(legacyPng.length / 1024).toFixed(1)} KB  (legacy path)`);
   } catch (e) {
     console.warn(`  skipped legacy assets/ mirror: ${(e as Error).message}`);
+  }
+
+  // Fit gate: every wordmark is measured against the box it was given, so a
+  // future rename that lengthens the name fails the build instead of shipping
+  // a card that clips it.
+  console.log("\nWordmark fit:");
+  for (const w of WORDMARK_REPORT) {
+    console.log(`  ${w.card.padEnd(16)} ${w.size.toFixed(1).padStart(5)}px  ${w.width.toFixed(0).padStart(4)} / ${w.maxWidth.toFixed(0).padStart(4)} u`);
+    if (w.width > w.maxWidth) {
+      throw new Error(`wordmark overflows the ${w.card} card: ${w.width.toFixed(1)} > ${w.maxWidth.toFixed(1)} units`);
+    }
   }
 
   console.log("\nDone.");

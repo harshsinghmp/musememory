@@ -1,6 +1,6 @@
 # Cryptographic inventory
 
-Every signature operation in aimm, the verifier behind it, its policy
+Every signature operation in musememory, the verifier behind it, its policy
 position under NIST **IR 8547** (final, 2026-10-27), and the path to a
 post-quantum scheme.
 

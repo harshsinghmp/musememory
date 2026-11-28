@@ -253,7 +253,7 @@ export async function handleHookCommand({ positional, flags }: ParsedArgs): Prom
  * `memory hooks` — Claude Code lifecycle hook pack (GAP-2).
  *
  *  memory hooks install [--dry-run]     wire SessionStart/PostToolUse/Stop
- *  memory hooks uninstall               remove aimm-owned hook entries
+ *  memory hooks uninstall               remove musememory-owned hook entries
  *  memory hooks session-start           (hook payload; reads Claude Code stdin)
  *  memory hooks post-tool-use           (hook payload)
  *  memory hooks stop                    (hook payload)
@@ -278,7 +278,7 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
         });
         console.log(`${dryRun ? "[DRY RUN] " : ""}Hook pack -> ${result.settingsPath}`);
         for (const r of result.installed) console.log(`  * ${r.message}`);
-        if (result.alreadyPresent) console.log("  (existing aimm hooks were refreshed in place)");
+        if (result.alreadyPresent) console.log("  (existing musememory hooks were refreshed in place)");
         console.log("\nMemory is now hands-free: context injects at SessionStart, tool results are captured at PostToolUse, sessions distill at Stop.");
         return 0;
       } catch (err: any) {
@@ -292,7 +292,7 @@ export async function handleHooksCommand({ positional, flags }: ParsedArgs): Pro
         harness: flags["harness"],
       });
       if (result.removed.length === 0) {
-        console.log(`No aimm hooks found in ${result.settingsPath}.`);
+        console.log(`No musememory hooks found in ${result.settingsPath}.`);
       } else {
         console.log(`Removed ${result.removed.join(", ")} hook(s) from ${result.settingsPath}.`);
       }

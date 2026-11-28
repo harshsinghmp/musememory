@@ -1,4 +1,4 @@
-# 🏗️ aimm Architecture & System Design
+# 🏗️ musememory Architecture & System Design
 
 ---
 
@@ -11,7 +11,7 @@
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP stdio / Terminal CLI
 ┌──────────────────────────────▼──────────────────────────────┐
-│                    aimm Core Engine                  │
+│                    musememory Core Engine                   │
 │                                                             │
 │ ┌───────────────────┐ ┌──────────────────┐ ┌──────────────┐ │
 │ │  Retrieval Engine │ │ Vibeguard Secret │ │ Auto-Migrate │ │

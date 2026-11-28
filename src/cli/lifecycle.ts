@@ -397,7 +397,7 @@ export async function handleStatsCommand({ flags }: ParsedArgs): Promise<number>
     if (e.type) typeCounts[e.type] = (typeCounts[e.type] ?? 0) + 1;
   }
   console.log(`\n====================================================`);
-  console.log(`aimm Statistics (${ctx.memoryDir})`);
+  console.log(`musememory Statistics (${ctx.memoryDir})`);
   console.log(`====================================================`);
   console.log(`Total Memories: ${entries.length}`);
   console.log(`Status Breakdown:`);
@@ -461,7 +461,7 @@ export async function handleOptimizeCommand({ flags }: ParsedArgs): Promise<numb
   const project = flags["project"];
 
   console.log(`\n====================================================`);
-  console.log(`  ⚡ aimm Optimizer ${isDryRun ? "(DRY-RUN)" : ""}`);
+  console.log(`  ⚡ musememory Optimizer ${isDryRun ? "(DRY-RUN)" : ""}`);
   console.log(`====================================================`);
   if (project) console.log(`Scope: Project '${project}'`);
   console.log(`Store: ${ctx.memoryDir}\n`);
@@ -636,7 +636,7 @@ export async function handleVerifyCommand({ positional, flags }: ParsedArgs): Pr
 
   if (flags["strict"] === "true" || positional[0] === "--strict" || flags["all"] === "true") {
     const report = verifyStrictIntegrity(ctx.store, ctx.memoryDir, ctx.root);
-    console.log(`=== aimm Strict Integrity Audit ===`);
+    console.log(`=== musememory Strict Integrity Audit ===`);
     for (const c of report.checks) {
       const statusIcon = c.passed ? "✓" : "✗";
       console.log(`${statusIcon} ${c.name}: ${c.message}`);

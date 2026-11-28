@@ -1,5 +1,5 @@
 /**
- * Responsive visual review for the Muse Memory site.
+ * Responsive visual review for the musememory site.
  *
  * For each built page × viewport (375 / 768 / 1280):
  *   - no horizontal overflow (scrollWidth vs innerWidth)

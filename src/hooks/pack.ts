@@ -14,7 +14,7 @@ import { recordAuditEvent } from "../audit.ts";
 /**
  * Claude Code Hook Pack (GAP-2)
  *
- * Wires aimm into Claude Code's lifecycle hooks so memory is hands-free:
+ * Wires musememory into Claude Code's lifecycle hooks so memory is hands-free:
  *  - SessionStart: injects a budgeted context block (constraints + top memories)
  *    into the session before the agent's first turn.
  *  - PostToolUse:  captures every tool result as an ephemeral observation
@@ -74,7 +74,7 @@ export interface HookPackOptions {
 
 /**
  * Harnesses with a documented hooks settings file, as `<home>`-relative paths.
- * Claude Code is the only hook-capable harness aimm knows; every other
+ * Claude Code is the only hook-capable harness musememory knows; every other
  * agent opts in with an explicit `settingsPath`.
  */
 const HARNESS_HOOK_PATHS: Record<string, string> = {
@@ -124,8 +124,8 @@ function resolveHookSettingsPath(
 }
 
 /**
- * Installs the aimm hook pack into the resolved settings file, merging with
- * any existing hooks and replacing only aimm-owned entries (idempotent).
+ * Installs the musememory hook pack into the resolved settings file, merging with
+ * any existing hooks and replacing only musememory-owned entries (idempotent).
  * See {@link resolveHookSettingsPath} for the target resolution order.
  */
 export function installHookPack(
@@ -169,7 +169,7 @@ export function installHookPack(
       command: entry.command,
       message:
         museEntryIdx >= 0
-          ? `Updated existing aimm ${event} hook`
+          ? `Updated existing musememory ${event} hook`
           : `Wired ${event} hook: ${entry.command}`,
     });
   }
@@ -180,7 +180,7 @@ export function installHookPack(
 }
 
 /**
- * Removes aimm-owned hook entries from the resolved settings file, using the
+ * Removes musememory-owned hook entries from the resolved settings file, using the
  * same resolution order as {@link installHookPack}. Only entries whose command
  * includes "memory hooks" are touched.
  */

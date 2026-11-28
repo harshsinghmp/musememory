@@ -132,7 +132,7 @@ export async function generatePrContext(
   const prTitle = `feat(${primaryScope}): Update ${changedFiles.length} file(s) with memory-verified invariants`;
 
   let md = `## 📋 Summary & Purpose\n\n`;
-  md += `This PR modifies **${changedFiles.length} file(s)** and has been evaluated against aimm's cognitive governance engine.\n\n`;
+  md += `This PR modifies **${changedFiles.length} file(s)** and has been evaluated against musememory's cognitive governance engine.\n\n`;
 
   md += `### 📂 Changed Files\n`;
   if (changedFiles.length === 0) {

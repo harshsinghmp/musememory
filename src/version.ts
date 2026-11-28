@@ -21,10 +21,12 @@ export const PACKAGE_NAME: string = pkg.name;
  * The product name, shown to humans.
  *
  * `PACKAGE_NAME` above is the protocol contract — it is what a client stores
- * in its config and what `npx musememory` resolves — so it stays `musememory`
- * forever. This constant is only the human-readable label, served as the MCP
- * `serverInfo.title` and the one-line description beside it, so a client can
- * display "aimm" without any tool name, package name or env var changing.
+ * in its config and what `npx musememory` resolves. The final product name is
+ * the same word, but the two stay separate constants: `PACKAGE_NAME` must never
+ * drift from `package.json`, while `PRODUCT_NAME` is copy, served as the MCP
+ * `serverInfo.title` and the one-line description beside it. Keeping them
+ * separate is what let the interim `aimm` label ship for 3.5.0 without a single
+ * tool name, package name or env var moving.
  */
-export const PRODUCT_NAME = "aimm";
-export const PRODUCT_TAGLINE = "aimm — local-first memory for AI coding agents.";
+export const PRODUCT_NAME = "musememory";
+export const PRODUCT_TAGLINE = "musememory — local-first memory for AI coding agents.";

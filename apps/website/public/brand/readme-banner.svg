@@ -32,7 +32,7 @@
     <ellipse cx="1126.4" cy="32" rx="512" ry="184" fill="url(#meshB)"/>
     <ellipse cx="793.6" cy="392" rx="537.6" ry="176" fill="url(#meshC)"/>
   </g>
-  <text x="64.0" y="132.0" font-family="Inter" font-size="44.0" font-weight="800" letter-spacing="-1.6" fill="#e8ecf8">aim<tspan fill="#4fd6e0">m</tspan></text>
+  <text x="64.0" y="132.0" font-family="Inter" font-size="38.0" font-weight="800" letter-spacing="-1.6" fill="#e8ecf8">muse<tspan fill="#4fd6e0">memory</tspan></text>
   <text x="64.0" y="182.0" font-family="IBM Plex Mono" font-size="12.0" font-weight="500" letter-spacing="1.4" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
   <text x="64.0" y="250.0" font-family="Inter" font-size="28.0" font-weight="800" letter-spacing="-0.6" fill="#e8ecf8">Your agent forgets everything. Give it a memory that lasts.</text>
   <text x="64.0" y="326.0" font-family="IBM Plex Mono" font-size="22.0" font-weight="500" fill="#9aa5c3">npx musememory connect</text>

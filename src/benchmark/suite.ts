@@ -190,9 +190,22 @@ export async function runMemoryBenchmark(
 
 /**
  * Formats a clean ASCII scoreboard table displaying benchmark telemetry.
+ *
+ * The border width is fixed and the header label is padded to it by *display
+ * columns* — `⚡` takes two cells in a monospace terminal — so a rename that
+ * lengthens the product name cannot push the right border out of alignment.
  */
+const SCOREBOARD_INNER_WIDTH = 66;
+function scoreboardHeader(): string {
+  const label = "⚡ musememory ENGINE BENCHMARK & TELEMETRY SCOREBOARD";
+  const displayWidth = [...label].reduce((n, ch) => n + (ch === "⚡" ? 2 : 1), 0);
+  const rule = "─".repeat(SCOREBOARD_INNER_WIDTH);
+  const pad = " ".repeat(Math.max(0, SCOREBOARD_INNER_WIDTH - 1 - displayWidth));
+  return `\n┌${rule}┐\n│ ${label}${pad}│\n└${rule}┘\n`;
+}
+
 export function formatBenchmarkScoreboard(report: BenchmarkReport): string {
-  const header = `\n┌──────────────────────────────────────────────────────────────────┐\n│ ⚡ aimm ENGINE BENCHMARK & TELEMETRY SCOREBOARD                   │\n└──────────────────────────────────────────────────────────────────┘\n`;
+  const header = scoreboardHeader();
 
   let out = header;
   out += `\nBenchmark Runs:     ${report.iterations} iterations\n`;

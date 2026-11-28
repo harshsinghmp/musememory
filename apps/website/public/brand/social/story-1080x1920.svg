@@ -40,7 +40,7 @@
   <circle cx="618.00" cy="201.00" r="15.75" fill="#4fd6e0"/>
   <circle cx="690.00" cy="393.00" r="15.75" fill="#8b7cf7"/>
   <circle cx="540.00" cy="333.00" r="21.26" fill="#e8ecf8"/>
-  <text x="540.0" y="500.0" text-anchor="middle" font-family="Inter" font-size="54.0" font-weight="800" letter-spacing="-1.9" fill="#e8ecf8">aim<tspan fill="#4fd6e0">m</tspan></text>
+  <text x="540.0" y="500.0" text-anchor="middle" font-family="Inter" font-size="46.0" font-weight="800" letter-spacing="-1.9" fill="#e8ecf8">muse<tspan fill="#4fd6e0">memory</tspan></text>
   <text x="540.0" y="556.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="18.0" font-weight="500" letter-spacing="2" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
   <text x="540.0" y="700.0" text-anchor="middle" font-family="Inter" font-size="84.0" font-weight="800" letter-spacing="-1.68" fill="#e8ecf8">Your agent</text>
   <text x="540.0" y="795.8" text-anchor="middle" font-family="Inter" font-size="84.0" font-weight="800" letter-spacing="-1.68" fill="#e8ecf8">forgets</text>
@@ -73,7 +73,7 @@
       rx="30.0" fill="#101624" fill-opacity="0.85" stroke="#f5b455" stroke-opacity="0.34" stroke-width="1.2"/>
     <circle cx="745.6" cy="1300.0" r="4.8" fill="#f5b455"/>
     <text x="756.6" y="1307.2"
-      font-family="Inter" font-size="20" font-weight="500" fill="#e8ecf8">1,885 tests</text>
+      font-family="Inter" font-size="20" font-weight="500" fill="#e8ecf8">1,886 tests</text>
   </g>
   <rect x="90" y="1450" width="900" height="2" fill="url(#rule)" opacity="0.55"/>
   <text x="540.0" y="1520.0" text-anchor="middle" font-family="IBM Plex Mono" font-size="28.0" font-weight="500" fill="#9aa5c3">npx musememory connect</text>

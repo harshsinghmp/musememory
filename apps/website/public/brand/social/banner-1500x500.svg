@@ -32,7 +32,7 @@
     <ellipse cx="1320" cy="40" rx="600" ry="230" fill="url(#meshB)"/>
     <ellipse cx="930" cy="490" rx="630" ry="220" fill="url(#meshC)"/>
   </g>
-  <text x="112.5" y="85.0" font-family="Inter" font-size="41.3" font-weight="800" letter-spacing="-1.5" fill="#e8ecf8">aim<tspan fill="#4fd6e0">m</tspan></text>
+  <text x="112.5" y="85.0" font-family="Inter" font-size="36.5" font-weight="800" letter-spacing="-1.5" fill="#e8ecf8">muse<tspan fill="#4fd6e0">memory</tspan></text>
   <text x="112.5" y="135.0" font-family="IBM Plex Mono" font-size="10.3" font-weight="500" letter-spacing="1.111111111111111" fill="#4fd6e0">LOCAL-FIRST MEMORY FOR AI CODING AGENTS</text>
   <text x="112.5" y="220.0" font-family="Inter" font-size="28.6" font-weight="800" letter-spacing="-0.5714285714285714" fill="#e8ecf8">Your agent forgets everything.</text>
   <text x="112.5" y="253.7" font-family="Inter" font-size="28.6" font-weight="800" letter-spacing="-0.5714285714285714" fill="#e8ecf8">Give it a memory that lasts.</text>
@@ -62,7 +62,7 @@
       rx="20.2" fill="#101624" fill-opacity="0.85" stroke="#f5b455" stroke-opacity="0.34" stroke-width="1.2"/>
     <circle cx="887.2" cy="350.0" r="3.2" fill="#f5b455"/>
     <text x="894.6" y="354.9"
-      font-family="Inter" font-size="13.492063492063492" font-weight="500" fill="#e8ecf8">1,885 tests</text>
+      font-family="Inter" font-size="13.492063492063492" font-weight="500" fill="#e8ecf8">1,886 tests</text>
   </g>
   <rect x="112.5" y="400.0" width="1275.0" height="1.6" fill="url(#rule)" opacity="0.55"/>
   <text x="112.5" y="450.0" font-family="IBM Plex Mono" font-size="15.1" font-weight="500" fill="#9aa5c3">npx musememory connect</text>
